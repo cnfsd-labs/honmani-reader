@@ -866,12 +866,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
                         text = stringResource(R.string.library_continue_reading),
                         style = MaterialTheme.typography.labelSmall,
                     )
-                    Text(
-                        text = book.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    BookTitle(book.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                 }
                 Text(
                     text = stringResource(R.string.library_progress, (book.progress * 100).roundToInt()),
@@ -1026,11 +1021,10 @@ private fun BookCard(
                 )
             }
         }
-        Text(
-            text = book.title,
+        BookTitle(
+            book.title,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
         book.author?.let {
