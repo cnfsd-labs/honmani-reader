@@ -42,21 +42,27 @@ object WordMarks {
     fun of(text: String, segmenter: Segmenter, knowledge: WordKnowledge, mode: WordMarksMode): List<WordMark> {
         if (mode == WordMarksMode.OFF) return emptyList()
         val marks = ArrayList<WordMark>()
+        val tokens = ArrayList<Token>()
+        segmenter.segment(text) { tokens += it }
+        val tokenEnds = tokens.mapTo(HashSet()) { it.start + it.length }
         // Where a word written as it was looked up ends ([WordKnowledge.learningForms]).
         var formEnd = 0
-        segmenter.segment(text) { token ->
-            if (token.start < formEnd) return@segment
-            knowledge.learningFormAt(text, token.start)?.let { form ->
+        for (token in tokens) {
+            if (token.start < formEnd) continue
+            // Only a form that ends where a word of the book ends: た looked up inside だった
+            // marks no た at the start of ただ.
+            val form = knowledge.learningFormAt(text, token.start) { token.start + it.length in tokenEnds }
+            if (form != null) {
                 marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
                 formEnd = token.start + form.length
-                return@segment
+                continue
             }
             // Names and other text no dictionary knows stay unmarked.
-            if (token.rank == Token.UNKNOWN) return@segment
+            if (token.rank == Token.UNKNOWN) continue
             val kind = when {
                 token.key in knowledge.learning -> WordMark.Kind.LEARNING
                 mode == WordMarksMode.NEW && token.key !in knowledge.read -> WordMark.Kind.NEW
-                else -> return@segment
+                else -> continue
             }
             marks += WordMark(token.start, token.length, kind)
         }

@@ -166,9 +166,21 @@ class DictionaryLookup(
         // is 家, 本気 read マジ is マジ. Then the furigana's word is looked up too, its longest
         // match only (not every word read like the first kana).
         val byFurigana = match(furiganaCandidates(text, ruby, entries))
+        // Hiragana furigana over kanji names a word written in kanji: 宅 read うち is 家, not the
+        // prefix うち written in kana, which would otherwise win as matched by its written form.
+        // Katakana furigana names the katakana word itself (停車場 read ステーション).
+        var kanaOnlyNamed = emptySet<Long>()
         if (byFurigana.isNotEmpty()) {
             val longest = byFurigana.maxOf { it.source.length }
             val (moreEntries, morePointers) = resolved(byFurigana.filter { it.source.length == longest })
+            val first = ruby.first()
+            val hiraganaOverKanji = first.reading.all(JapaneseText::isHiragana) &&
+                text.substring(first.start, first.end).codePoints().anyMatch(JapaneseText::isKanji)
+            if (hiraganaOverKanji) {
+                kanaOnlyNamed = moreEntries
+                    .filter { entry -> entry.term.expression.codePoints().noneMatch(JapaneseText::isKanji) }
+                    .mapTo(HashSet()) { it.term.id }
+            }
             entries = (entries + moreEntries.map { it.copy(matchesFurigana = true) }).distinctBy { it.term.id }
             pointers = pointers + morePointers
         }
@@ -184,6 +196,7 @@ class DictionaryLookup(
             // A pointer whose target is missing says nothing itself.
             .thenBy { it.term.id in pointers }
             .thenByDescending { it.matchesFurigana }
+            .thenBy { it.term.id in kanaOnlyNamed }
             .thenBy { it.inflections.size }
             .thenByDescending { it.matchedExpression }
             // The more common word first (by the frequency dictionaries, if any are installed).

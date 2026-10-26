@@ -15,6 +15,7 @@ class WordMarksTest {
                 .add("は", 0, 2)
                 .add("を", 0, 4)
                 .add("猫", 0, 900)
+                .add("ただ", 0, 300)
                 .add("鼬", 0, 40_000)
                 .add("食べる", WordClass.V1, 187),
         ).build(),
@@ -76,5 +77,19 @@ class WordMarksTest {
         val marks = WordMarks.of(text, segmenter, looked, WordMarksMode.LEARNING)
             .map { text.substring(it.start, it.start + it.length) to it.kind }
         assertEquals(listOf("ねこ" to WordMark.Kind.LEARNING, "食べ過ぎた" to WordMark.Kind.LEARNING), marks)
+    }
+
+    @Test
+    fun aFormAsWrittenMarksNothingWhereItEndsInsideAWord() {
+        // た looked up on its own (inside だった): the た starting ただ is another word.
+        val looked = WordKnowledge(
+            read = emptyMap(),
+            progress = emptyMap(),
+            learning = setOf("た"),
+            learningForms = setOf("た"),
+        )
+        val text = "私はただ猫を"
+        val marks = WordMarks.of(text, segmenter, looked, WordMarksMode.LEARNING)
+        assertEquals(emptyList<WordMark>(), marks)
     }
 }

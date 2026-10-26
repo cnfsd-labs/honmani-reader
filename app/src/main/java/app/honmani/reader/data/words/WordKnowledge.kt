@@ -39,9 +39,9 @@ class WordKnowledge(
         learningForms.filter { it.isNotEmpty() }.groupBy { it[0] }.mapValues { (_, forms) -> forms.sortedByDescending { it.length } }
     }
 
-    /** The longest of [learningForms] written in [text] at [index], if any. */
-    fun learningFormAt(text: String, index: Int): String? =
-        formsByFirst[text[index]]?.firstOrNull { text.startsWith(it, index) }
+    /** The longest of [learningForms] written in [text] at [index] that [fits], if any. */
+    fun learningFormAt(text: String, index: Int, fits: (String) -> Boolean = { true }): String? =
+        formsByFirst[text[index]]?.firstOrNull { text.startsWith(it, index) && fits(it) }
 
     fun steps(word: WordEntity): Int = progress[word.id]?.steps ?: 0
 

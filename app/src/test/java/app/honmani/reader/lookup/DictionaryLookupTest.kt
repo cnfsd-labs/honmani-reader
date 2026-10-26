@@ -451,6 +451,8 @@ class DictionaryLookupTest {
         install(
             "JMdict",
             listOf("宅", "たく", "", 10, "house (formal)"),
+            // A word written in kana and read like the furigana, before 家 in the dictionary.
+            listOf("うち", "うち", "", 10, "emphasis prefix"),
             listOf("家", "うち", "", 10, "home"),
             listOf("失策", "しっさく", "vs", 10, "blunder"),
             listOf("仕舞う", "しまう", "v5", 10, "to finish"),
@@ -462,9 +464,10 @@ class DictionaryLookupTest {
         val station = lookup.lookup("停車場へ", ruby = listOf(RubySpan(0, 3, "ステーション")))
         assertEquals(listOf("ステーション", "停車場"), station.headwords())
 
+        // Hiragana furigana over a kanji names a word written in kanji first.
         val home = lookup.lookup("宅へ", ruby = listOf(RubySpan(0, 1, "うち")))
-        assertEquals(listOf("家", "宅"), home.headwords())
-        assertEquals(listOf("宅", "宅"), home.entries.map { it.source })
+        assertEquals(listOf("家", "うち", "宅"), home.headwords())
+        assertEquals(listOf("宅", "宅", "宅"), home.entries.map { it.source })
         assertTrue(home.entries.first().matchesFurigana)
 
         // The kana after the base belong to the furigana's word: 失策った read しまった.
