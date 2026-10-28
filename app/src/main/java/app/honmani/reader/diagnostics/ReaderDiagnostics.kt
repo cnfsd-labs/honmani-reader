@@ -8,8 +8,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Collects what is needed to debug the reader on a user's device: the WebView's console output
- * and a snapshot of the last opened book's layout. Kept in memory only; the user shares it
+ * Collects what is needed to debug the reader on a user's device: why the app last stopped
+ * ([CrashLog]), the WebView's console output and a snapshot of the last opened book's layout. Kept in memory only; the user shares it
  * explicitly.
  */
 class ReaderDiagnostics {
@@ -33,6 +33,8 @@ class ReaderDiagnostics {
         appendLine("Honmani ${packageInfo.versionName} (${context.packageName})")
         appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         appendLine("WebView: ${webView?.packageName} ${webView?.versionName}")
+        appendLine()
+        append(CrashLog(context).report())
         appendLine()
         appendLine("== Last opened book")
         appendLine(bookSnapshot ?: "(no book opened since the app started)")

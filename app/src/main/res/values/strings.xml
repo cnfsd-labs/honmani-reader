@@ -45,7 +45,7 @@
     <string name="settings_cover_difficulty_details">Each book\'s difficulty (1–100) in a corner of its cover</string>
     <string name="settings_reader">Reader settings</string>
     <string name="settings_reader_details">Font, size, colours, vertical or horizontal text, page turning</string>
-    <string name="settings_diagnostics_details">Sends the reader\'s log, for reporting a problem</string>
+    <string name="settings_diagnostics_details">Sends the reader\'s log and the last crash, for reporting a problem</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_about_details">Version %1$s · licences and source code</string>
     <string name="about_title">About Honmani</string>

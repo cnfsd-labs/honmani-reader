@@ -62,9 +62,10 @@ The book reader itself never loads anything from the internet.
 - **Files for Anki on a computer:** saving your words as an Anki package or text file writes it
   where you choose in Android's save dialog. Honmani sends it nowhere.
 - **Share diagnostics:** only when you tap it in Settings, Honmani prepares a short technical
-  report (app and Android version, the reader's log, layout details of the last opened book,
-  which can include short excerpts of its text) and opens Android's share menu. You choose who
-  receives it, if anyone.
+  report (app and Android version, the reader's log, why the app last crashed or was closed by
+  Android, layout details of the last opened book, which can include short excerpts of its text)
+  and opens Android's share menu. You choose who receives it, if anyone. The record of the last
+  crash stays in the app's storage on your phone.
 
 ## Children
 
