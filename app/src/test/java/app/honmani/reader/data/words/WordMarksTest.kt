@@ -17,6 +17,8 @@ class WordMarksTest {
                 .add("猫", 0, 900)
                 .add("ただ", 0, 300)
                 .add("鼬", 0, 40_000)
+                .add("当たり前", 0, 698)
+                .add("当り前", 0, 40_708)
                 .add("食べる", WordClass.V1, 187),
         ).build(),
     )
@@ -91,5 +93,24 @@ class WordMarksTest {
         val text = "私はただ猫を"
         val marks = WordMarks.of(text, segmenter, looked, WordMarksMode.LEARNING)
         assertEquals(emptyList<WordMark>(), marks)
+    }
+
+    @Test
+    fun anotherSpellingOfAWordReadOrBeingLearnedCountsAsIt() {
+        val variants = SpellingVariants.Builder().add(1, 1448800, "当たり前").add(1, 1448800, "当り前").build()
+        // 当たり前 was read: 当り前 is no new word.
+        val read = WordKnowledge(
+            read = mapOf("当たり前" to ReadWord(698, 4)),
+            progress = emptyMap(),
+            learning = emptySet(),
+            variants = variants,
+        )
+        assertEquals(emptyList<WordMark>(), WordMarks.of("当り前", segmenter, read, WordMarksMode.NEW))
+        // 当たり前 is being learned: 当り前 is marked as being learned.
+        val learning = WordKnowledge(read = emptyMap(), progress = emptyMap(), learning = setOf("当たり前"), variants = variants)
+        assertEquals(listOf(WordMark(0, 3, WordMark.Kind.LEARNING)), WordMarks.of("当り前", segmenter, learning, WordMarksMode.NEW))
+        assertEquals(true, learning.isLearning("当り前"))
+        assertEquals(false, learning.knows("当り前", 40_708, vocabulary = 50_000))
+        assertEquals(true, read.knows("当り前", 40_708, vocabulary = 0))
     }
 }

@@ -33,7 +33,15 @@ class WordKnowledge(
      * 猫) or splits it otherwise.
      */
     val learningForms: Set<String> = emptySet(),
+    /** Other spellings of a word, which count as the word ([hasRead], [isLearning]). */
+    val variants: SpellingVariants = SpellingVariants.EMPTY,
 ) {
+    /** Whether [key], or another spelling of it, was read. */
+    fun hasRead(key: String): Boolean = key in read || variants.of(key).any { it in read }
+
+    /** Whether [key], or another spelling of it, was looked up and is not known yet. */
+    fun isLearning(key: String): Boolean = key in learning || variants.of(key).any { it in learning }
+
     /** [learningForms] by first character, longest first. */
     private val formsByFirst: Map<Char, List<String>> by lazy {
         learningForms.filter { it.isNotEmpty() }.groupBy { it[0] }.mapValues { (_, forms) -> forms.sortedByDescending { it.length } }
@@ -52,11 +60,14 @@ class WordKnowledge(
      * estimate counts it: not being learned, and met in reading or within the reader's
      * [vocabulary] (a frequency rank, `VocabularyEstimate.words`).
      */
-    fun knows(key: String, rank: Int, vocabulary: Int): Boolean = key !in learning && (key in read || rank <= vocabulary)
+    fun knows(key: String, rank: Int, vocabulary: Int): Boolean = !isLearning(key) && (hasRead(key) || rank <= vocabulary)
 
-    /** Words known from reading alone (never looked up), with how often each was read, most read first. */
+    /**
+     * Words known from reading alone (never looked up in any spelling), with how often each was
+     * read, most read first.
+     */
     fun knownByReading(lookedUp: Set<String>): List<Pair<String, Int>> =
-        read.filter { (key, word) -> word.reads >= WordProgress.KNOWN && key !in lookedUp }
+        read.filter { (key, word) -> word.reads >= WordProgress.KNOWN && key !in lookedUp && variants.of(key).none { it in lookedUp } }
             .map { (key, word) -> key to word.reads }
             .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
 
@@ -133,6 +144,8 @@ class WordKnowledgeTracker(
     /** A book's words by content hash ([app.honmani.reader.data.difficulty.DifficultyStore.words]). */
     private val bookWords: (String) -> BookWords?,
     private val store: WordProgressStore,
+    /** Other spellings of the installed dictionaries' words. */
+    private val variants: suspend () -> SpellingVariants = { SpellingVariants.EMPTY },
     context: CoroutineContext = Dispatchers.IO,
 ) {
     /** Words already read, by content hash and grade signature: they only change when a book is graded again. */
@@ -153,6 +166,7 @@ class WordKnowledgeTracker(
                 read[key] = if (before == null) ReadWord(rank, reads) else ReadWord(minOf(before.rank, rank), before.reads + reads)
             }
         }
+        val spellings = variants()
         val loaded = store.generation
         val previous = progress?.takeIf { generation == loaded } ?: store.load()
         val updated = words.associate { word ->
@@ -160,7 +174,7 @@ class WordKnowledgeTracker(
             val kana = before?.kana == true || lookedUpInKana(word)
             word.id to WordProgress.update(
                 before,
-                reads = readsOf(word, kana, read),
+                reads = readsOf(word, kana, read, spellings),
                 lookups = word.lookupCount,
                 learned = word.status == WordStatus.LEARNED,
             ).copy(kana = kana)
@@ -175,15 +189,16 @@ class WordKnowledgeTracker(
                 ?.substring(word.lastSurfaceStart, word.lastSurfaceEnd)
                 ?.takeIf { it.isNotBlank() }
         }
-        WordKnowledge(read, updated, learning, shares, forms)
+        WordKnowledge(read, updated, learning, shares, forms, spellings)
     }.flowOn(context)
 
     /**
-     * How often [word] was read: as written in its entry (分かる), and if it was looked up in kana,
-     * also as its reading in kana (わかる), which is how the books' words count it there.
+     * How often [word] was read: as written in its entry (分かる) or in another spelling (判る),
+     * and if it was looked up in kana, also as its reading in kana (わかる), which is how the
+     * books' words count it there.
      */
-    private fun readsOf(word: WordEntity, kana: Boolean, read: Map<String, ReadWord>): Int {
-        val asWritten = read[word.expression]?.reads ?: 0
+    private fun readsOf(word: WordEntity, kana: Boolean, read: Map<String, ReadWord>, spellings: SpellingVariants): Int {
+        val asWritten = (read[word.expression]?.reads ?: 0) + spellings.of(word.expression).sumOf { read[it]?.reads ?: 0 }
         if (!kana || word.reading.isEmpty() || word.reading == word.expression) return asWritten
         return asWritten + (read[word.reading]?.reads ?: 0)
     }

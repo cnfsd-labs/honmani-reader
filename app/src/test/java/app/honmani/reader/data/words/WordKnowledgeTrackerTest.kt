@@ -51,13 +51,19 @@ class WordKnowledgeTrackerTest {
         lastSurfaceEnd = end,
     )
 
-    private fun tracker(words: List<WordEntity>, store: WordProgressStore) = WordKnowledgeTracker(
+    private fun tracker(
+        words: List<WordEntity>,
+        store: WordProgressStore,
+        inBook: BookWords = bookWords,
+        variants: SpellingVariants = SpellingVariants.EMPTY,
+    ) = WordKnowledgeTracker(
         books = flowOf(listOf(book)),
         stretches = flowOf(mapOf("h" to intArrayOf(0, BookWords.POSITIONS))),
         grades = flowOf(mapOf("h" to grade)),
         words = MutableStateFlow(words),
-        bookWords = { bookWords },
+        bookWords = { inBook },
         store = store,
+        variants = { variants },
         context = Dispatchers.Unconfined,
     )
 
@@ -88,5 +94,26 @@ class WordKnowledgeTrackerTest {
         val again = tracker(listOf(word("よく分かった。", 2, 5)), store).knowledge.first()
         assertEquals(true, again.progress[1]?.kana)
         assertEquals(12, again.progress[1]?.reads)
+    }
+
+    @Test
+    fun readsInAnotherSpellingCountForTheWordLookedUp() = runBlocking {
+        // 分かる looked up; the book writes 判る ten times and 分かる twice.
+        val inBook = BookWords(
+            keys = listOf("判る", "分かる"),
+            ranks = intArrayOf(5_000, 100),
+            positions = bookWords.positions,
+        )
+        val variants = SpellingVariants.Builder().add(1, 1, "分かる").add(1, 1, "判る").build()
+        val words = listOf(word("よく分かった。", 2, 5))
+        val knowledge = tracker(words, store(), inBook, variants).knowledge.first()
+        assertEquals(12, knowledge.progress[1]?.reads)
+        // Known now in either spelling, and 判る is no word known from reading of its own.
+        val lists = WordLists.of(words, knowledge)
+        assertEquals(listOf("分かる"), lists.known.map { it.expression })
+        assertEquals(emptyList<Pair<String, Int>>(), lists.knownByReading)
+
+        // Without the link, only the two reads of 分かる count.
+        assertEquals(2, tracker(words, store(), inBook).knowledge.first().progress[1]?.reads)
     }
 }

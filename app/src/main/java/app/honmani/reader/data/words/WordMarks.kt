@@ -60,8 +60,8 @@ object WordMarks {
             // Names and other text no dictionary knows stay unmarked.
             if (token.rank == Token.UNKNOWN) continue
             val kind = when {
-                token.key in knowledge.learning -> WordMark.Kind.LEARNING
-                mode == WordMarksMode.NEW && token.key !in knowledge.read -> WordMark.Kind.NEW
+                knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
+                mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
                 else -> continue
             }
             marks += WordMark(token.start, token.length, kind)

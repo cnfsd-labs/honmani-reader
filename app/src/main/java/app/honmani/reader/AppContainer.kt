@@ -51,6 +51,7 @@ import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.ReadStretchStore
+import app.honmani.reader.data.words.SpellingVariants
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordKnowledgeTracker
 import app.honmani.reader.data.words.WordMarker
@@ -76,6 +77,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Manual dependency container. Objects are created lazily and live as long as the process. */
@@ -285,6 +288,24 @@ class AppContainer(context: Context) {
     private suspend fun lexiconSources(): LexiconSources? =
         LexiconSources.of(database.dictionaryDao().enabledReady()) { database.difficultyDao().hasFrequencies(it.id) }
 
+    private val spellingLock = Mutex()
+    private var spellings: Pair<String, SpellingVariants>? = null
+
+    /** Other spellings of the enabled word dictionaries' words, read again when they change. */
+    private suspend fun spellingVariants(): SpellingVariants = spellingLock.withLock {
+        val terms = database.dictionaryDao().enabledReady().filter { it.termCount > 0 }
+        val signature = terms.sortedBy { it.id }.joinToString("|") { "${it.id}@${it.revision}" }
+        spellings?.takeIf { it.first == signature }?.second
+            ?: run {
+                val started = System.nanoTime()
+                val cache = File(appContext.filesDir, "spelling-variants.txt")
+                SpellingVariants.load(database.difficultyDao(), terms.map { it.id }, cache, signature).also {
+                    spellings = signature to it
+                    Log.i("Honmani.words", "Spelling variants of ${it.size} forms read in ${(System.nanoTime() - started) / 1_000_000} ms")
+                }
+            }
+    }
+
     /** The words to mark in the reader (a reader setting). */
     val wordMarker: WordMarker by lazy {
         WordMarker(
@@ -343,6 +364,7 @@ class AppContainer(context: Context) {
             words = wordRepository.all,
             bookWords = difficultyStore::words,
             store = wordProgressStore,
+            variants = { spellingVariants() },
         ).knowledge.shareIn(applicationScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
     }
 

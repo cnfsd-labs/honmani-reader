@@ -7,6 +7,14 @@ import androidx.room.Query
 /** A term's forms and word classes, for the [Lexicon]. */
 data class LexiconTerm(val id: Long, val expression: String, val reading: String, val rules: String)
 
+/** A term's written form and dictionary entry, for `SpellingVariants`. */
+data class Spelling(
+    val id: Long,
+    @ColumnInfo(name = "dictionary_id") val dictionaryId: Long,
+    val expression: String,
+    val sequence: Long,
+)
+
 /** A frequency rank, for the [Lexicon]. */
 data class LexiconFrequency(
     val id: Long,
@@ -28,6 +36,12 @@ interface DifficultyDao {
             "ORDER BY id LIMIT :limit",
     )
     suspend fun terms(dictionaries: List<Long>, after: Long, limit: Int): List<LexiconTerm>
+
+    @Query(
+        "SELECT id, dictionary_id, expression, sequence FROM term WHERE dictionary_id IN (:dictionaries) " +
+            "AND sequence > 0 AND id > :after ORDER BY id LIMIT :limit",
+    )
+    suspend fun spellings(dictionaries: List<Long>, after: Long, limit: Int): List<Spelling>
 
     @Query(
         "SELECT id, expression, reading, value, display FROM term_meta WHERE dictionary_id = :dictionary " +
