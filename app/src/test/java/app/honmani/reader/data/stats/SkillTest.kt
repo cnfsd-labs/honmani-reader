@@ -47,6 +47,41 @@ class SkillTest {
     }
 
     @Test
+    fun aRereadDoesntRaiseTheFluency_butStillCountsAsReading() {
+        val rows = listOf(
+            // First read of a 20,000-character level-50 book, three weeks ago: 8,000 an hour.
+            day(21, 1, 9_000, 20_000),
+            // Started over this week and read twice as fast: the story is remembered.
+            day(1, 1, 3_600, 16_000),
+        )
+
+        val estimate = Skill.estimate(rows, grades::get, today, length = mapOf(1L to 20_000L)::get)
+
+        assertEquals(50, estimate.current)
+        assertEquals(12_600, estimate.gradedSeconds)
+        assertEquals(36_000, estimate.gradedCharacters)
+        // Without the book's length every read counts, the reread at level 60.
+        assertEquals(54, Skill.estimate(rows, grades::get, today).current)
+    }
+
+    @Test
+    fun theDayAFirstReadEnds_onlyItsShareUpToTheBooksLengthCounts() {
+        val rows = listOf(
+            day(3, 1, 3_600, 8_000),
+            // 2,000 + 10% slack (2,000) of these 8,000 characters finish the first read.
+            day(2, 1, 3_600, 8_000),
+            // Still re-reading: time without characters counts no more.
+            day(1, 1, 600, 0),
+        )
+
+        val estimate = Skill.estimate(rows, grades::get, today, length = mapOf(1L to 10_000L)::get)
+
+        // 12,000 characters in 1 h 30 min: 8,000 an hour, level 50.
+        assertEquals(50, estimate.current)
+        assertEquals(7_800, estimate.gradedSeconds)
+    }
+
+    @Test
     fun ungradedBooksAndShortReadingDontCount() {
         val estimate = Skill.estimate(
             listOf(day(0, 3, 7_200, 40_000), day(0, 1, 300, 2_000), day(10, 1, 400, 1_000)),

@@ -29,8 +29,21 @@ class SkillTracker(
             grades[book.contentHash]?.takeIf { it.difficulty.score > 0 }?.let { book to it }
         }
         val scores = restored + graded.associate { (book, grade) -> book.id to grade.difficulty.score }
-        Skill.combine(Skill.estimate(rows, scores::get, today()), vocabulary(graded, knowledge))
+        val lengths = graded.associate { (book, grade) -> book.id to length(book, grade) }
+        Skill.combine(Skill.estimate(rows, scores::get, today(), length = lengths::get), vocabulary(graded, knowledge))
     }
+
+    /**
+     * The book's length as the reading counts characters (ttu's way): from its position, once
+     * that is far enough in to say; before that (just started, or started over) the grader's
+     * count of its Japanese characters, which is close.
+     */
+    private fun length(book: BookEntity, grade: StoredDifficulty): Long =
+        if (book.progress >= MIN_PROGRESS_FOR_LENGTH && book.characters > 0) {
+            (book.characters / book.progress.toDouble()).toLong()
+        } else {
+            grade.difficulty.characters
+        }
 
     private fun vocabulary(graded: List<Pair<BookEntity, StoredDifficulty>>, knowledge: WordKnowledge): VocabularySkill? {
         if (knowledge.read.isEmpty()) return null
@@ -51,5 +64,9 @@ class SkillTracker(
         if (weights <= 0.0) return null
         val score = Difficulty.scoreOfRank(estimate.words, kanji / weights, sentence / weights)
         return VocabularySkill(score, estimate)
+    }
+
+    private companion object {
+        const val MIN_PROGRESS_FOR_LENGTH = 0.05f
     }
 }

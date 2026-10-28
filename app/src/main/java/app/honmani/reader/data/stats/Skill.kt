@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /** The reader's skill on a week's last day, on the books' 1–100 difficulty scale; null before any measurement. */
 data class SkillPoint(val weekEnd: LocalDate, val skill: Int?)
@@ -37,6 +38,11 @@ data class VocabularySkill(val score: Int, val estimate: VocabularyEstimate)
  * 8,000 characters an hour counts as 50, at 16,000 as 60. Recent weeks count more (half-life
  * [HALF_LIFE_DAYS] days), and longer reading more than shorter. Speed depends on the screen and
  * the text direction, so this compares a reader only with themselves.
+ *
+ * Only a book's first read counts: once a book's reading adds up to its length (plus
+ * [REREAD_SLACK] for pages read again while going back and forth), the rest is a reread, fast
+ * because the story and its words are remembered, not because a new book of that difficulty
+ * would read as fast. Rereads still count as time and characters read.
  */
 object Skill {
     const val REFERENCE_SPEED = 8_000.0
@@ -46,15 +52,28 @@ object Skill {
     /** Half an hour in graded books before a skill is shown. */
     const val MIN_SECONDS = 1_800L
 
+    /** Share of a book that may be read twice before its reading counts as a reread. */
+    const val REREAD_SLACK = 0.1
+
     /** A book-week counts from ten minutes, like the reading speed in the statistics. */
     private const val MIN_WEEK_SECONDS = 600L
 
     private class Measurement(val weeksAgo: Int, val level: Double, val seconds: Long)
 
-    /** [difficulty] gives a book's score (1–100), or null for books not graded. */
-    fun estimate(rows: List<ReadingDayEntity>, difficulty: (bookId: Long) -> Int?, today: LocalDate, weeks: Int = 12): SkillEstimate {
+    /**
+     * [difficulty] gives a book's score (1–100), or null for books not graded; [length] its
+     * characters as the reading counts them, or null if not known (then all its reading counts).
+     */
+    fun estimate(
+        rows: List<ReadingDayEntity>,
+        difficulty: (bookId: Long) -> Int?,
+        today: LocalDate,
+        weeks: Int = 12,
+        length: (bookId: Long) -> Long? = { null },
+    ): SkillEstimate {
         var gradedSeconds = 0L
         var gradedCharacters = 0L
+        val firstRead = firstReadShares(rows, length)
         val measurements = rows
             .mapNotNull { row ->
                 val score = difficulty(row.bookId) ?: return@mapNotNull null
@@ -66,8 +85,8 @@ object Skill {
             }
             .groupBy({ it.first }, { it.second to it.third })
             .mapNotNull { (key, list) ->
-                val seconds = list.sumOf { it.second.seconds }
-                val characters = list.sumOf { it.second.characters }
+                val seconds = list.sumOf { (_, row) -> row.seconds * firstRead.getValue(row) }.roundToLong()
+                val characters = list.sumOf { (_, row) -> row.characters * firstRead.getValue(row) }
                 if (seconds < MIN_WEEK_SECONDS || characters <= 0) return@mapNotNull null
                 val speed = characters * 3_600.0 / seconds
                 val level = list.first().first + POINTS_PER_DOUBLING * ln(speed / REFERENCE_SPEED) / ln(2.0)
@@ -92,6 +111,28 @@ object Skill {
             gradedSeconds = gradedSeconds,
             gradedCharacters = gradedCharacters,
         )
+    }
+
+    /**
+     * The share of each row (0 to 1) that is a book's first read: its rows in date order count
+     * until their characters reach the book's length plus [REREAD_SLACK]. A row with time only
+     * counts while the book is still within its first read.
+     */
+    private fun firstReadShares(rows: List<ReadingDayEntity>, length: (bookId: Long) -> Long?): Map<ReadingDayEntity, Double> {
+        val shares = HashMap<ReadingDayEntity, Double>(rows.size)
+        for ((bookId, bookRows) in rows.groupBy { it.bookId }) {
+            val limit = length(bookId)?.takeIf { it > 0 }?.let { it * (1 + REREAD_SLACK) }
+            var counted = 0.0
+            for (row in bookRows.sortedBy { it.day }) {
+                shares[row] = when {
+                    limit == null -> 1.0
+                    row.characters <= 0 -> if (counted < limit) 1.0 else 0.0
+                    else -> ((limit - counted) / row.characters).coerceIn(0.0, 1.0)
+                }
+                counted += row.characters
+            }
+        }
+        return shares
     }
 
     /** The vocabulary needs this much reading in graded books before it counts. */
