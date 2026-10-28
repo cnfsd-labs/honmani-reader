@@ -381,6 +381,7 @@
     <string name="inflection_classical">classical form</string>
 
     <string name="lookup_close">Close</string>
+    <string name="listen_failed">Can\'t say the word: %1$s.</string>
     <string name="lookup_nothing_found">No entry for “%1$s”.</string>
     <string name="lookup_no_dictionaries">No dictionary is installed yet. Get one in Settings → Dictionaries – it takes a minute.</string>
     <string name="lookup_open_dictionaries">Dictionaries</string>

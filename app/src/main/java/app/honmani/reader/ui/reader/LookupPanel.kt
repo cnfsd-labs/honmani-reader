@@ -108,6 +108,8 @@ fun LookupPanel(
     onOpenDictionaries: () -> Unit,
     modifier: Modifier = Modifier,
     onAddToAnki: (LookupGroup) -> Unit = {},
+    /** The listen button of a word: say it. */
+    onListen: (LookupGroup) -> Unit = {},
     /** A word referenced in a definition was tapped. */
     onLookupWord: (String) -> Unit = {},
     /** A kanji of a word was tapped; see [LookupPanelState.Results.kanji]. */
@@ -247,6 +249,7 @@ fun LookupPanel(
                             inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
                             adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
                             onAddToAnki = { onAddToAnki(group) },
+                            onListen = { onListen(group) },
                             onLookupWord = onLookupWord,
                             kanji = state.kanji,
                             onShowKanji = onShowKanji,
@@ -319,6 +322,7 @@ private fun LookupGroupItem(
     adding: Boolean,
     onAddToAnki: () -> Unit,
     onLookupWord: (String) -> Unit,
+    onListen: () -> Unit = {},
     kanji: Map<String, KanjiInfo> = emptyMap(),
     onShowKanji: (String) -> Unit = {},
 ) {
@@ -337,6 +341,13 @@ private fun LookupGroupItem(
                 HeadwordWithPitch(group, if (folded) emptySet() else kanji.keys, onShowKanji)
             }
             group.frequencies.firstOrNull()?.let { FrequencyBadge(it) }
+            IconButton(onClick = onListen) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_listen),
+                    contentDescription = stringResource(R.string.action_listen),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             IconButton(onClick = onAddToAnki, enabled = !adding) {
                 if (adding) {
                     // Making the card (with audio) takes a few seconds.

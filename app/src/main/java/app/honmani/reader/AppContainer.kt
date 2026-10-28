@@ -8,6 +8,7 @@ import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiExporter
 import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.anki.PhoneVoice
+import app.honmani.reader.anki.WordAudio
 import app.honmani.reader.anki.WordDetails
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.backup.Backup
@@ -188,6 +189,11 @@ class AppContainer(context: Context) {
 
     /** Audio for cards waits here until AnkiDroid has copied it; see `res/xml/file_paths.xml`. */
     val ankiAudioDir = File(appContext.cacheDir, "anki-audio")
+
+    /** The lookup panel's listen button: the card voice, or the phone's when card audio is off. */
+    val wordAudio: WordAudio by lazy {
+        WordAudio(voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice }, dir = File(appContext.cacheDir, "listen"))
+    }
 
     val ankiExporter: AnkiExporter by lazy {
         AnkiExporter(

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.CardContent
+import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.diagnostics.ReaderDiagnostics
@@ -88,6 +89,8 @@ class ReaderViewModel(
     private val inAnki: suspend (Collection<String>) -> Set<String> = { emptySet() },
     /** The kanji dictionaries' entries for the kanji in a text; see [app.honmani.reader.lookup.DictionaryLookup.kanji]. */
     private val lookupKanji: suspend (String) -> Map<String, KanjiInfo> = { emptyMap() },
+    /** Says a word (its reading); returns why it couldn't. See [app.honmani.reader.anki.WordAudio]. */
+    private val say: suspend (String) -> VoiceProblem? = { null },
     /** Where lookups run and results become what the panel shows (parsing definitions), off the main thread. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
@@ -115,6 +118,18 @@ class ReaderViewModel(
 
     /** How adding a word to Anki went (written form and result), to tell the reader. */
     val ankiResults: Flow<Pair<String, AnkiResult>> = _ankiResults.receiveAsFlow()
+
+    private val _voiceProblems = Channel<VoiceProblem>(Channel.BUFFERED)
+
+    /** Why a word couldn't be said, to tell the reader. */
+    val voiceProblems: Flow<VoiceProblem> = _voiceProblems.receiveAsFlow()
+
+    /** Says [group]'s word: its reading, which a voice can't misread. */
+    fun listen(group: LookupGroup) {
+        viewModelScope.launch {
+            say(group.reading.ifEmpty { group.expression })?.let { _voiceProblems.send(it) }
+        }
+    }
 
     fun onTap(tap: TapLookup) {
         lookupJob?.cancel()
@@ -346,6 +361,7 @@ class ReaderViewModel(
                     addCard = { container.ankiExporter.add(it) },
                     inAnki = { container.wordRepository.inAnki(it) },
                     lookupKanji = { lookup.kanji(it) },
+                    say = { container.wordAudio.play(it) },
                 )
             }
         }
