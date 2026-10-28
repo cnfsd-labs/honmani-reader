@@ -1,14 +1,19 @@
 package app.honmani.reader.ui.settings
 
 import android.media.MediaPlayer
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -17,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -48,6 +54,7 @@ import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
 import app.honmani.reader.anki.VoiceException
+import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import java.io.File
@@ -64,12 +71,42 @@ private sealed interface KeyCheck {
     data class Failed(val message: Int) : KeyCheck
 }
 
+/** Settings' Anki row: the deck and where card audio comes from; a tap opens [AnkiSettingsScreen]. */
+@Composable
+fun AnkiSettingsRow(onClick: () -> Unit) {
+    val context = LocalContext.current
+    val settings = remember { (context.applicationContext as HonmaniApplication).container.ankiSettings }
+    val audio by settings.audio.collectAsStateWithLifecycle()
+    val deck by settings.deck.collectAsStateWithLifecycle()
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_anki)) },
+        supportingContent = { Text(stringResource(R.string.settings_anki_summary, deck, stringResource(audio.label()))) },
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+}
+
 /**
  * Anki settings: the deck, where card audio comes from (none, the phone's voice, Google Cloud),
  * the Google API key and voice, and a sample to listen to before choosing.
  */
 @Composable
-fun AnkiSettingsSection() {
+fun AnkiSettingsScreen(onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    Scaffold(topBar = { HonmaniTopAppBar(title = stringResource(R.string.settings_anki), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp),
+        ) {
+            AnkiSettingsContent()
+        }
+    }
+}
+
+@Composable
+private fun AnkiSettingsContent() {
     val context = LocalContext.current
     val resources = LocalResources.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
@@ -137,16 +174,10 @@ fun AnkiSettingsSection() {
 
     Column {
         Text(
-            text = stringResource(R.string.settings_anki),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        )
-        Text(
             text = stringResource(R.string.settings_anki_details),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
         )
         DeckPicker(
             deck = deck,

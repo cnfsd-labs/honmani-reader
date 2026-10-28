@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.settings
 
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -104,6 +105,11 @@ fun SettingsScreen(
         AboutScreen(version, onBack = { showingAbout = false })
         return
     }
+    var showingAnki by rememberSaveable { mutableStateOf(false) }
+    if (showingAnki) {
+        AnkiSettingsScreen(onBack = { showingAnki = false })
+        return
+    }
     if (showingDictionaries) {
         DictionariesScreen(onBack = { onShowDictionaries(false) })
         return
@@ -131,7 +137,7 @@ fun SettingsScreen(
         onShareDiagnostics = onShareDiagnostics,
         onOpenAbout = { showingAbout = true },
         onOpenSample = onOpenSample,
-        anki = { AnkiSettingsSection() },
+        anki = { AnkiSettingsRow(onClick = { showingAnki = true }) },
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
     )
@@ -180,6 +186,14 @@ private fun SettingsContent(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            item { SectionHeading(R.string.settings_section_reading) }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_reader)) },
+                    supportingContent = { Text(stringResource(R.string.settings_reader_details)) },
+                    modifier = Modifier.clickable(onClick = onOpenReaderSettings),
+                )
+            }
             item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.dictionaries_title)) },
@@ -201,6 +215,14 @@ private fun SettingsContent(
             }
             item {
                 ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_sample_books)) },
+                    supportingContent = { Text(stringResource(R.string.settings_sample_books_details)) },
+                    modifier = Modifier.clickable { showingSamples = true },
+                )
+            }
+            item { SectionHeading(R.string.settings_section_appearance) }
+            item {
+                ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_accent)) },
                     supportingContent = { AccentPicker(accent, onAccentChange, customHue, onCustomHueChange) },
                 )
@@ -213,46 +235,26 @@ private fun SettingsContent(
                     modifier = Modifier.clickable { onShowDifficultyChange(!showDifficulty) },
                 )
             }
-            if (catalogs.isNotEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.settings_book_servers),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
-                    )
-                }
-                items(catalogs, key = { it.id }) { catalog ->
-                    ListItem(
-                        headlineContent = { Text(catalog.title) },
-                        supportingContent = { Text(stringResource(R.string.catalog_auto_import_details)) },
-                        trailingContent = {
-                            Switch(
-                                checked = catalog.autoImport,
-                                onCheckedChange = { onAutoImportChange(catalog, it) },
-                            )
-                        },
-                        modifier = Modifier.clickable { onAutoImportChange(catalog, !catalog.autoImport) },
-                    )
-                }
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_sample_books)) },
-                    supportingContent = { Text(stringResource(R.string.settings_sample_books_details)) },
-                    modifier = Modifier.clickable { showingSamples = true },
-                )
-            }
+            item { SectionHeading(R.string.settings_section_flashcards) }
             item { anki() }
-            item { sync() }
-            item { backup() }
-            item {
+            item { SectionHeading(R.string.settings_section_books) }
+            items(catalogs, key = { it.id }) { catalog ->
                 ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_reader)) },
-                    supportingContent = { Text(stringResource(R.string.settings_reader_details)) },
-                    modifier = Modifier.clickable(onClick = onOpenReaderSettings),
+                    headlineContent = { Text(catalog.title) },
+                    supportingContent = { Text(stringResource(R.string.catalog_auto_import_details)) },
+                    trailingContent = {
+                        Switch(
+                            checked = catalog.autoImport,
+                            onCheckedChange = { onAutoImportChange(catalog, it) },
+                        )
+                    },
+                    modifier = Modifier.clickable { onAutoImportChange(catalog, !catalog.autoImport) },
                 )
             }
+            item { sync() }
+            item { SectionHeading(R.string.settings_section_data) }
+            item { backup() }
+            item { SectionHeading(R.string.settings_section_help) }
             item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.action_share_diagnostics)) },
@@ -269,6 +271,17 @@ private fun SettingsContent(
             }
         }
     }
+}
+
+/** A group's title in the settings list. */
+@Composable
+private fun SectionHeading(@StringRes title: Int) {
+    Text(
+        text = stringResource(title),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+    )
 }
 
 /** The books that come with the app, roughly easiest first; a tap opens one. */

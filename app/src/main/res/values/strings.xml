@@ -140,7 +140,12 @@
     <string name="catalog_sync_replaces">For Calibre-Web Automated, with this login. Replaces the sync on %1$s.</string>
     <string name="catalog_sync_error_none">This server has no reading progress sync. In Calibre-Web Automated it can be turned on in its settings; or switch sync off here.</string>
     <string name="catalog_sync_error_unauthorized">The server did not accept this login for reading progress sync. Enter the password to turn sync on.</string>
-    <string name="settings_book_servers">Book servers</string>
+    <string name="settings_section_reading">Reading</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_flashcards">Flashcards</string>
+    <string name="settings_section_books">Books and sync</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_help">Help</string>
     <string name="action_mark_finished">Mark as finished</string>
     <string name="library_search_hint">Title or author</string>
     <string name="library_search_empty">No books match.</string>
@@ -231,6 +236,7 @@
     <string name="voice_problem_network">no connection to Google</string>
 
     <string name="settings_anki">Anki</string>
+    <string name="settings_anki_summary">Deck “%1$s” · %2$s</string>
     <string name="settings_anki_details">Cards go to AnkiDroid, deck “Honmani”: the word and your book\'s sentence on the front; reading, meaning and audio on the back.</string>
     <string name="settings_card_audio">Card audio</string>
     <string name="card_audio_off">No audio</string>
