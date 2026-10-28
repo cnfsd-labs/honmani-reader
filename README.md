@@ -61,7 +61,9 @@ libraries, a complete bundled reader, and no Play-restricted permissions.
   (`data/dictionary/`, definitions stored compressed). The panel draws Yomitan's structured
   content natively.
 - **Words and Anki.** Every lookup is saved and ranked by a decayed score (`data/words/`);
-  cards go to AnkiDroid through its content provider or into an Anki package (`anki/`).
+  cards go to AnkiDroid through its content provider or into an Anki package (`anki/`). Spellings
+  one dictionary entry lists together (当たり前, 当り前) count as one word for word marks and
+  progress (`SpellingVariants`).
 - **Book servers and sync.** OPDS 1.x catalogues with Basic or Digest login (`data/opds/`),
   and KOReader's sync protocol with exact positions between KOReader's XPointers and ttu's
   character count (`data/sync/`). Passwords are encrypted with an Android Keystore key; over

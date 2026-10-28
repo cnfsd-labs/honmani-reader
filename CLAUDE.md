@@ -52,6 +52,11 @@ repository is public: never copy those notes, personal details or discussions in
   たが); deinflection rules are Honmani's own (`lookup/Deinflector`). Glossaries are always stored deflated (`GlossaryPacker`).
 - **Saved words** are recorded on every lookup, ranked by a decayed score (half-life 14 days),
   never deleted for age. "Learned", not "Known". Anki cards are suggested, never pushed.
+- **Spelling variants** (`SpellingVariants`): forms with kanji, two characters or more, that one
+  dictionary entry (Yomitan sequence) lists together count as one word for marks, book coverage
+  and word progress; single kanji are left out (生 is also うぶ, under 初). The vocabulary
+  estimate and grading keep exact forms (fitted on them). Cached in `files/spelling-variants.txt`
+  per dictionary set.
 - **Anki:** own client for AnkiDroid's content provider (not the LGPL library); note type and
   deck "Honmani"; `.apkg` (schema 11, fixed note type id, guid from the word) or a text file for
   Anki on a computer. The Google Cloud key is Keystore-encrypted and only sent in
@@ -72,7 +77,10 @@ repository is public: never copy those notes, personal details or discussions in
 - `./gradlew lintDebug testDebugUnitTest assembleRelease assembleInternal assembleDebug`, then
   `scripts/check-apk.sh <apk>`.
 - `cd web-tests && npm ci && npx playwright install --with-deps chromium && npx playwright test`
-  (needs `:app:buildTtu` output, or `TTU_DIR=...`).
+  (needs `:app:buildTtu` output, or `TTU_DIR=...`). Playwright has no Chromium build for Ubuntu
+  26.04 yet: set `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64` for install and run.
+- Unit tests merge the app's assets, so even `testDebugUnitTest` runs `:app:buildTtu` (Node and
+  pnpm needed; `-x :app:buildTtu` fails).
 - Lookup against a real dictionary: `scripts/lookup-coverage/export_terms.py <honmani.db>` (from a
   debug build), then `LookupCoverageCheck` taps through the sample books and writes
   `app/build/lookup-coverage/report.txt` (skipped without the export, so CI skips it).
