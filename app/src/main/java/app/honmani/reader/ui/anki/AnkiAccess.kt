@@ -73,6 +73,11 @@ fun showAnkiResult(context: Context, expression: String, result: AnkiResult) {
     toast(context, message)
 }
 
+/** Tells why the lookup panel's speaker couldn't say a word. */
+fun showVoiceProblem(context: Context, problem: VoiceProblem) {
+    toast(context, context.getString(R.string.listen_failed, context.getString(problem.label())))
+}
+
 fun VoiceProblem.label(): Int = when (this) {
     VoiceProblem.NO_ENGINE -> R.string.voice_problem_no_engine
     VoiceProblem.NO_JAPANESE -> R.string.voice_problem_no_japanese

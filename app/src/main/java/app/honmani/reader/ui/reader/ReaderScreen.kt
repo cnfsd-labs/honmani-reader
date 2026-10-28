@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -47,9 +46,9 @@ import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.ui.HomeNavigationBar
 import app.honmani.reader.ui.HomeTab
-import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.library.AddBookStart
 import app.honmani.reader.ui.library.LibraryScreen
 import app.honmani.reader.ui.library.LibraryViewModel
@@ -152,10 +151,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         viewModel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
     }
     LaunchedEffect(viewModel) {
-        viewModel.voiceProblems.collect { problem ->
-            val message = context.getString(R.string.listen_failed, context.getString(problem.label()))
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        }
+        viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
 
     // While a book is open: the words being learned and how they were written, so marks follow
