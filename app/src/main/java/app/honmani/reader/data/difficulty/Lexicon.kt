@@ -1,5 +1,11 @@
 package app.honmani.reader.data.difficulty
 
+import java.io.BufferedOutputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
+
 /**
  * Every written form and reading of the installed dictionaries, with the word classes they can
  * have and how common they are, packed into a few arrays so that a book can be split into words
@@ -141,8 +147,51 @@ class Lexicon private constructor(
         }
     }
 
+    /** Saves the lexicon for [read] with the same [signature]. */
+    fun write(file: File, signature: String) {
+        file.parentFile?.mkdirs()
+        val temporary = File(file.path + ".tmp")
+        DataOutputStream(BufferedOutputStream(temporary.outputStream(), 1 shl 16)).use { out ->
+            out.writeInt(MAGIC)
+            val name = signature.toByteArray(Charsets.UTF_8)
+            out.writeInt(name.size)
+            out.write(name)
+            out.writeInt(chars.size)
+            out.writeInt(classes.size)
+            for (c in chars) out.writeChar(c.code)
+            for (start in starts) out.writeInt(start)
+            for (value in classes) out.writeInt(value)
+            for (rank in ranks) out.writeInt(rank)
+        }
+        temporary.renameTo(file)
+    }
+
     companion object {
         /** In a dictionary, but in no frequency list: rarer than anything ranked. */
         const val UNRANKED = Int.MAX_VALUE
+
+        private const val MAGIC = 0x4C455831
+
+        /**
+         * A lexicon saved by [write] with [signature], or null (none, another signature, or
+         * damaged). Reading it takes a fraction of building it from the dictionaries.
+         */
+        fun read(file: File, signature: String): Lexicon? = runCatching {
+            RandomAccessFile(file, "r").use { raf ->
+                val buffer = raf.channel.map(FileChannel.MapMode.READ_ONLY, 0, raf.length())
+                if (buffer.int != MAGIC) return null
+                val name = ByteArray(buffer.int).also { buffer.get(it) }
+                if (String(name, Charsets.UTF_8) != signature) return null
+                val charCount = buffer.int
+                val count = buffer.int
+                val chars = CharArray(charCount).also { buffer.asCharBuffer().get(it) }
+                buffer.position(buffer.position() + charCount * 2)
+                val ints = buffer.asIntBuffer()
+                val starts = IntArray(count + 1).also { ints.get(it) }
+                val classes = IntArray(count).also { ints.get(it) }
+                val ranks = IntArray(count).also { ints.get(it) }
+                Lexicon(chars, starts, classes, ranks)
+            }
+        }.getOrNull()
     }
 }

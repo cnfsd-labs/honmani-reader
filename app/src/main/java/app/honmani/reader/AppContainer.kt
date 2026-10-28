@@ -16,6 +16,7 @@ import app.honmani.reader.data.difficulty.BookGrader
 import app.honmani.reader.data.difficulty.BookWords
 import app.honmani.reader.data.difficulty.DifficultyStore
 import app.honmani.reader.data.difficulty.DifficultyWorker
+import app.honmani.reader.data.difficulty.Lexicon
 import app.honmani.reader.data.difficulty.LexiconLoader
 import app.honmani.reader.data.difficulty.LexiconSources
 import app.honmani.reader.data.difficulty.StoredDifficulty
@@ -272,7 +273,7 @@ class AppContainer(context: Context) {
             store = difficultyStore,
             books = { bookDao.observeAll().first() },
             sources = { lexiconSources() },
-            lexicon = { LexiconLoader(database.difficultyDao()).load(it) },
+            lexicon = { lexicon(it) },
             texts = { book ->
                 val file = bookImporter.bookFile(book)
                 when (book.format) {
@@ -287,6 +288,30 @@ class AppContainer(context: Context) {
 
     private suspend fun lexiconSources(): LexiconSources? =
         LexiconSources.of(database.dictionaryDao().enabledReady()) { database.difficultyDao().hasFrequencies(it.id) }
+
+    private val lexiconLock = Mutex()
+    private var sharedLexicon: Pair<String, Lexicon>? = null
+
+    /**
+     * The words of [sources] for splitting books, one for grading and word marks. Saved in app
+     * storage, so only a new dictionary set or an app update builds it again (several seconds).
+     */
+    private suspend fun lexicon(sources: LexiconSources): Lexicon = lexiconLock.withLock {
+        // An update may change what LexiconLoader adds (grammar words): its time is part of the key.
+        val installed = appContext.packageManager.getPackageInfo(appContext.packageName, 0).lastUpdateTime
+        val signature = "${sources.signature}|$installed"
+        sharedLexicon?.takeIf { it.first == signature }?.second ?: withContext(Dispatchers.IO) {
+            val started = System.nanoTime()
+            val file = File(appContext.filesDir, "lexicon.bin")
+            val read = Lexicon.read(file, signature)
+            (read ?: LexiconLoader(database.difficultyDao()).load(sources).also { runCatching { it.write(file, signature) } })
+                .also {
+                    sharedLexicon = signature to it
+                    val how = if (read != null) "read" else "built"
+                    Log.i("Honmani.difficulty", "Lexicon of ${it.size} words $how in ${(System.nanoTime() - started) / 1_000_000} ms")
+                }
+        }
+    }
 
     private val spellingLock = Mutex()
     private var spellings: Pair<String, SpellingVariants>? = null
@@ -310,7 +335,7 @@ class AppContainer(context: Context) {
     val wordMarker: WordMarker by lazy {
         WordMarker(
             sources = { lexiconSources() },
-            lexicon = { LexiconLoader(database.difficultyDao()).load(it) },
+            lexicon = { lexicon(it) },
             knowledge = { wordKnowledge.first() },
         )
     }
