@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -55,7 +57,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -231,8 +232,8 @@ private fun SettingsContent(
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_cover_difficulty)) },
                     supportingContent = { Text(stringResource(R.string.settings_cover_difficulty_details)) },
-                    trailingContent = { Switch(checked = showDifficulty, onCheckedChange = onShowDifficultyChange) },
-                    modifier = Modifier.clickable { onShowDifficultyChange(!showDifficulty) },
+                    trailingContent = { Switch(checked = showDifficulty, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(showDifficulty, role = Role.Switch, onValueChange = onShowDifficultyChange),
                 )
             }
             item { SectionHeading(R.string.settings_section_flashcards) }
@@ -243,12 +244,9 @@ private fun SettingsContent(
                     headlineContent = { Text(catalog.title) },
                     supportingContent = { Text(stringResource(R.string.catalog_auto_import_details)) },
                     trailingContent = {
-                        Switch(
-                            checked = catalog.autoImport,
-                            onCheckedChange = { onAutoImportChange(catalog, it) },
-                        )
+                        Switch(checked = catalog.autoImport, onCheckedChange = null)
                     },
-                    modifier = Modifier.clickable { onAutoImportChange(catalog, !catalog.autoImport) },
+                    modifier = Modifier.toggleable(catalog.autoImport, role = Role.Switch) { onAutoImportChange(catalog, it) },
                 )
             }
             item { sync() }
@@ -405,16 +403,16 @@ private fun AccentSwatch(
                 color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
                 shape = CircleShape,
             )
-            .semantics { selected = isSelected }
-            .clickable(onClickLabel = label, role = Role.RadioButton, onClick = onClick),
+            .semantics { contentDescription = label }
+            .selectable(selected = isSelected, role = Role.RadioButton, onClick = onClick),
     ) {
         val tint = if (color.luminance() > 0.4f) Color.Black else Color.White
         if (isSelected) {
-            Icon(Icons.Filled.Check, contentDescription = label, tint = tint)
+            Icon(Icons.Filled.Check, contentDescription = null, tint = tint)
         } else if (adjustable) {
             Icon(
                 painterResource(R.drawable.ic_tune),
-                contentDescription = label,
+                contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(20.dp),
             )

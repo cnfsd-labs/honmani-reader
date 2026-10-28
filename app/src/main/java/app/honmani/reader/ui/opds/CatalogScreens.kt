@@ -14,12 +14,13 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
@@ -58,6 +59,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -429,7 +431,7 @@ fun CatalogDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = !editor.checking) { autoImport = !autoImport },
+                        .toggleable(autoImport, enabled = !editor.checking, role = Role.Switch) { autoImport = it },
                 ) {
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(stringResource(R.string.catalog_auto_import), style = MaterialTheme.typography.bodyMedium)
@@ -439,14 +441,14 @@ fun CatalogDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = autoImport, onCheckedChange = { autoImport = it }, enabled = !editor.checking)
+                    Switch(checked = autoImport, onCheckedChange = null, enabled = !editor.checking)
                 }
                 if (username.isNotBlank()) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(enabled = !editor.checking) { syncProgress = !syncProgress },
+                            .toggleable(syncProgress, enabled = !editor.checking, role = Role.Switch) { syncProgress = it },
                     ) {
                         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                             Text(stringResource(R.string.catalog_sync), style = MaterialTheme.typography.bodyMedium)
@@ -461,7 +463,7 @@ fun CatalogDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Switch(checked = syncProgress, onCheckedChange = { syncProgress = it }, enabled = !editor.checking)
+                        Switch(checked = syncProgress, onCheckedChange = null, enabled = !editor.checking)
                     }
                 }
                 editor.error?.let {

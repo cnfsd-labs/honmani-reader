@@ -74,6 +74,7 @@ private val DOCUMENT_START_SCRIPTS = listOf(
     "honmani/library-bridge.js",
     "honmani/viewport-log.js",
     "honmani/help-text.js",
+    "honmani/button-labels.js",
     "honmani/book-end.js",
     "honmani/book-shown.js",
     "honmani/reading-activity.js",

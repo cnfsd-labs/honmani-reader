@@ -39,6 +39,7 @@ async function setUp(page, settings = {}) {
   await page.addInitScript({ path: path.join(ASSETS, 'keep-position.js') });
   await page.addInitScript({ path: path.join(ASSETS, 'library-bridge.js') });
   await page.addInitScript({ path: path.join(ASSETS, 'help-text.js') });
+  await page.addInitScript({ path: path.join(ASSETS, 'button-labels.js') });
 }
 
 const nekoEpub = {
@@ -244,6 +245,19 @@ test('help texts in the settings show on screen, also for icons far down the pag
   await page.mouse.wheel(0, -400);
   await page.waitForTimeout(200);
   expect(await onScreen()).toBe(true);
+});
+
+test('the reader\'s invisible buttons have names for screen readers', async ({ page }) => {
+  await setUp(page, { viewMode: 'paginated', enableTapEdgeToFlip: '1' });
+  await importAndOpen(page);
+
+  await expect(page.getByRole('button', { name: 'Show the reader menu' })).toHaveCount(1);
+  // ttu draws the page-turn strips at the edges in page mode, when "Tap edge to flip" is on.
+  await expect(page.getByRole('button', { name: 'Page to the left' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Page to the right' })).toHaveCount(1);
+  const unnamed = await page.locator('button:not([aria-label])').evaluateAll((buttons) =>
+    buttons.filter((b) => !b.textContent.trim() && !b.querySelector('[aria-label], title, svg title')).length);
+  expect(unnamed).toBe(0);
 });
 
 test('Aozora Bunko text files (Shift_JIS, with markup) import as clean text', async ({ page }) => {

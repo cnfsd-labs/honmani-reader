@@ -42,11 +42,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.R
 import app.honmani.reader.data.dictionary.CatalogDictionary
 import app.honmani.reader.data.dictionary.DictionaryCatalog
@@ -57,8 +59,9 @@ import app.honmani.reader.data.dictionary.ImportError
 import app.honmani.reader.data.dictionary.ImportProgress
 import app.honmani.reader.data.dictionary.ImportStatus
 import app.honmani.reader.ui.HonmaniTopAppBar
-import app.honmani.reader.ui.theme.HonmaniTheme
+import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.rememberWithNotifications
+import app.honmani.reader.ui.theme.HonmaniTheme
 import java.text.NumberFormat
 
 /** MIME types file managers use for Yomitan's .zip files. */
@@ -110,10 +113,13 @@ private fun DictionariesContent(
             HonmaniTopAppBar(title = stringResource(R.string.dictionaries_title), onBack = onBack)
         },
         floatingActionButton = {
+            // The label didn't reach TalkBack from the text slot (the 7 Pro's accessibility tree
+            // showed a nameless button): the icon names the button and the text stays visual.
+            val importLabel = stringResource(R.string.action_import_dictionary)
             ExtendedFloatingActionButton(
                 onClick = onImport,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text(stringResource(R.string.action_import_dictionary)) },
+                icon = { Icon(Icons.Filled.Add, contentDescription = importLabel) },
+                text = { Text(importLabel, modifier = Modifier.clearAndSetSemantics {}) },
             )
         },
     ) { padding ->
@@ -429,7 +435,12 @@ private fun DictionaryRow(
                         Text(stringResource(R.string.dictionary_deleting))
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                     } else {
-                        Switch(checked = dictionary.enabled, onCheckedChange = onSetEnabled)
+                        Switch(
+                            checked = dictionary.enabled,
+                            onCheckedChange = onSetEnabled,
+                            // Read out with the dictionary's name, not just "switch".
+                            modifier = Modifier.semantics { contentDescription = dictionary.title },
+                        )
                         DictionaryMenu(canMoveUp, canMoveDown, onMove, onDelete)
                     }
                 }
