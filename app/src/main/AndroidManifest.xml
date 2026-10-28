@@ -70,6 +70,28 @@
             </intent-filter>
         </activity>
 
+        <!-- Looks up words outside a book: text selected in other apps (their selection menu),
+             shared text, or a word typed in. Its own task, over the app it came from. -->
+        <activity
+            android:name=".ui.lookup.LookupActivity"
+            android:label="@string/lookup_activity_label"
+            android:theme="@style/Theme.Honmani.Lookup"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- Shares card audio with AnkiDroid, which copies it into its collection. -->
         <provider
             android:name="androidx.core.content.FileProvider"

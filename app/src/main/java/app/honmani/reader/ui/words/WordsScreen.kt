@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.words
 
+import android.content.Intent
 import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -89,6 +91,7 @@ import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.lookup.LookupActivity
 import app.honmani.reader.ui.reader.GlossLines
 import app.honmani.reader.ui.theme.HonmaniTheme
 import kotlinx.coroutines.flow.first
@@ -239,6 +242,10 @@ private fun WordsContent(
                                 },
                             )
                         }
+                    }
+                    val context = LocalContext.current
+                    IconButton(onClick = { context.startActivity(Intent(context, LookupActivity::class.java)) }) {
+                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
                     }
                     val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
                     ExportMenu(onExport, onExportPackage, enabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null)

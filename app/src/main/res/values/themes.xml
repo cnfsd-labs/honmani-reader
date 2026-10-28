@@ -2,4 +2,12 @@
 <resources>
     <!-- Compose draws all UI; this theme only covers the window before the first frame. -->
     <style name="Theme.Honmani" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- The lookup outside a book: see-through, so the app it came from stays in view. -->
+    <style name="Theme.Honmani.Lookup">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Translucent</item>
+    </style>
 </resources>
