@@ -8,9 +8,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -45,6 +49,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.ui.HomeNavigationBar
+import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
@@ -255,45 +260,57 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         } else if (atLibrary) {
             // Opaque, and on top: the tabs take all touches while ttu's list stays loaded below.
             BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
-            val bottomBar = @Composable {
-                HomeNavigationBar(
-                    selected = tab,
-                    onSelect = {
-                        tab = it
-                        // A tab opens at its top level.
-                        dictionariesShown = false
-                    },
-                    badges = if (dictionaryUpdates.isNotEmpty()) setOf(HomeTab.SETTINGS) else emptySet(),
-                )
+            val onSelectTab = { selected: HomeTab ->
+                tab = selected
+                // A tab opens at its top level.
+                dictionariesShown = false
             }
-            when (tab) {
-                HomeTab.LIBRARY -> LibraryScreen(
-                    bottomBar = bottomBar,
-                    viewModel = library,
-                    addBookOnStart = addBookOnStart,
-                    onAddBookStarted = { addBookOnStart = null },
-                    onShowProgress = { tab = HomeTab.PROGRESS },
-                )
-                HomeTab.WORDS -> WordsScreen(bottomBar = bottomBar)
-                HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
-                HomeTab.SETTINGS -> SettingsScreen(
-                    bottomBar = bottomBar,
-                    showingDictionaries = dictionariesShown,
-                    onShowDictionaries = { dictionariesShown = it },
-                    onOpenReaderSettings = { readerSettings = true },
-                    onOpenSample = {
-                        // Back from the book is the library, where it now is.
-                        tab = HomeTab.LIBRARY
-                        library.addSample(it)
-                    },
-                    onShareDiagnostics = {
-                        val share = Intent(Intent.ACTION_SEND)
-                            .setType("text/plain")
-                            .putExtra(Intent.EXTRA_SUBJECT, "Honmani diagnostics")
-                            .putExtra(Intent.EXTRA_TEXT, viewModel.diagnostics.report(context))
-                        context.startActivity(Intent.createChooser(share, shareTitle))
-                    },
-                )
+            val badges = if (dictionaryUpdates.isNotEmpty()) setOf(HomeTab.SETTINGS) else emptySet()
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                // In landscape (wider than tall) the tabs go at the side and the screens get no bottom bar.
+                val atTheSide = maxWidth > maxHeight
+                val bottomBar = @Composable {
+                    if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges)
+                }
+                Row(modifier = Modifier.fillMaxSize()) {
+                    if (atTheSide) HomeNavigationRail(selected = tab, onSelect = onSelectTab, badges = badges)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            // The rail keeps clear of the system bars on its side.
+                            .then(if (atTheSide) Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start)) else Modifier),
+                    ) {
+                        when (tab) {
+                            HomeTab.LIBRARY -> LibraryScreen(
+                                bottomBar = bottomBar,
+                                viewModel = library,
+                                addBookOnStart = addBookOnStart,
+                                onAddBookStarted = { addBookOnStart = null },
+                                onShowProgress = { tab = HomeTab.PROGRESS },
+                            )
+                            HomeTab.WORDS -> WordsScreen(bottomBar = bottomBar)
+                            HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
+                            HomeTab.SETTINGS -> SettingsScreen(
+                                bottomBar = bottomBar,
+                                showingDictionaries = dictionariesShown,
+                                onShowDictionaries = { dictionariesShown = it },
+                                onOpenReaderSettings = { readerSettings = true },
+                                onOpenSample = {
+                                    // Back from the book is the library, where it now is.
+                                    tab = HomeTab.LIBRARY
+                                    library.addSample(it)
+                                },
+                                onShareDiagnostics = {
+                                    val share = Intent(Intent.ACTION_SEND)
+                                        .setType("text/plain")
+                                        .putExtra(Intent.EXTRA_SUBJECT, "Honmani diagnostics")
+                                        .putExtra(Intent.EXTRA_TEXT, viewModel.diagnostics.report(context))
+                                    context.startActivity(Intent.createChooser(share, shareTitle))
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
         // Progress sync asks before going back to another device's earlier place in a book.

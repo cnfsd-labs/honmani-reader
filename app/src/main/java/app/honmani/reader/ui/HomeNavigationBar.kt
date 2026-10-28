@@ -12,6 +12,8 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,8 +27,8 @@ import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 
 /**
- * The home screen's sections, switched with the bar at the bottom (within thumb reach), in bar
- * order: most used first.
+ * The home screen's sections, switched with the bar at the bottom (within thumb reach), or at
+ * the side in landscape ([HomeNavigationRail]), in bar order: most used first.
  */
 enum class HomeTab(
     @StringRes val label: Int,
@@ -75,6 +77,30 @@ fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Se
             )
         }
         Spacer(modifier = Modifier.width(EDGE_INSET))
+    }
+}
+
+/**
+ * The tabs at the side, for landscape: a bar at the bottom took a quarter of a phone's height
+ * there. Centred top to bottom, so the thumb reaches every tab.
+ */
+@Composable
+fun HomeNavigationRail(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet()) {
+    NavigationRail {
+        Spacer(modifier = Modifier.weight(1f))
+        for (tab in HomeTab.entries) {
+            NavigationRailItem(
+                selected = tab == selected,
+                onClick = { onSelect(tab) },
+                icon = {
+                    BadgedBox(badge = { if (tab in badges) Badge() }) {
+                        tab.TabIcon()
+                    }
+                },
+                label = { Text(stringResource(tab.label)) },
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
