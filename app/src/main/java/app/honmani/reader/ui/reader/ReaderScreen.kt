@@ -139,6 +139,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
+    // Books opened with Honmani from other apps: added in the library, a single one opened.
+    LaunchedEffect(library) {
+        container.openedBooks.received.collect { uris ->
+            tab = HomeTab.LIBRARY
+            library.addOpened(uris)
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
     }

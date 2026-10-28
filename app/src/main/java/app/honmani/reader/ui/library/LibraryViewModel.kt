@@ -236,6 +236,17 @@ class LibraryViewModel(
         }
     }
 
+    /**
+     * Adds books another app opened or shared with Honmani; a single one is opened as well (also
+     * if it is in the library already), as "Open with" asks for.
+     */
+    fun addOpened(uris: List<Uri>) {
+        viewModelScope.launch {
+            val books = uris.map { uri -> addMutex.withLock { addOne(uri) } }
+            books.singleOrNull()?.let { open(it.id) }
+        }
+    }
+
     /** Adds a sample book and opens it (also if it is in the library already). */
     fun addSample(sample: SampleBook = SampleBook.FIRST) {
         viewModelScope.launch {
@@ -247,14 +258,15 @@ class LibraryViewModel(
         }
     }
 
-    private suspend fun addOne(uri: Uri) {
+    /** Adds the file at [uri]; returns the book if it is in the library now. */
+    private suspend fun addOne(uri: Uri): BookEntity? {
         val fallbackName = uri.lastPathSegment.orEmpty()
         val picked = withContext(Dispatchers.IO) { openFile(uri) }
         if (picked == null) {
             _notices.send(LibraryNotice.Unreadable(fallbackName))
-            return
+            return null
         }
-        add(picked)
+        return add(picked)
     }
 
     /** Adds [picked]; returns the book if it is in the library now. */

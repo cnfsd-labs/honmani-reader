@@ -1,5 +1,6 @@
 package app.honmani.reader
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
             container.opdsAutoImport.start()
             container.dictionaryUpdateChecker.start()
             container.startGrading()
+            container.openedBooks.receive(intent)
         }
         setContent {
             val accent by appearance.accent.collectAsStateWithLifecycle()
@@ -30,5 +32,11 @@ class MainActivity : ComponentActivity() {
                 HonmaniApp()
             }
         }
+    }
+
+    /** Another app opened or shared a book while Honmani was running (one task: `singleTask`). */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        (application as HonmaniApplication).container.openedBooks.receive(intent)
     }
 }

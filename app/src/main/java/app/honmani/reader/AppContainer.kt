@@ -12,6 +12,12 @@ import app.honmani.reader.anki.WordDetails
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.backup.Backup
 import app.honmani.reader.data.backup.RestoredBooks
+import app.honmani.reader.data.dictionary.DictionaryDownloader
+import app.honmani.reader.data.dictionary.DictionaryImportScheduler
+import app.honmani.reader.data.dictionary.DictionaryImporter
+import app.honmani.reader.data.dictionary.DictionaryRepository
+import app.honmani.reader.data.dictionary.DictionaryUpdateChecker
+import app.honmani.reader.data.dictionary.WorkManagerDictionaryImportScheduler
 import app.honmani.reader.data.difficulty.BookGrader
 import app.honmani.reader.data.difficulty.BookWords
 import app.honmani.reader.data.difficulty.DifficultyStore
@@ -20,20 +26,14 @@ import app.honmani.reader.data.difficulty.Lexicon
 import app.honmani.reader.data.difficulty.LexiconLoader
 import app.honmani.reader.data.difficulty.LexiconSources
 import app.honmani.reader.data.difficulty.StoredDifficulty
-import app.honmani.reader.data.dictionary.DictionaryDownloader
 import app.honmani.reader.data.fonts.FontStore
-import app.honmani.reader.data.dictionary.DictionaryImportScheduler
-import app.honmani.reader.data.dictionary.DictionaryImporter
-import app.honmani.reader.data.dictionary.DictionaryRepository
-import app.honmani.reader.data.dictionary.DictionaryUpdateChecker
-import app.honmani.reader.data.dictionary.WorkManagerDictionaryImportScheduler
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
-import app.honmani.reader.data.opds.KeystoreCredentialCipher
-import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.NetworkWatch
+import app.honmani.reader.data.opds.KeystoreCredentialCipher
+import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
 import app.honmani.reader.data.settings.AppearanceSettings
@@ -48,8 +48,8 @@ import app.honmani.reader.data.sync.EpubPositions
 import app.honmani.reader.data.sync.KoSyncClient
 import app.honmani.reader.data.sync.KoSyncSettings
 import app.honmani.reader.data.sync.ProgressSync
-import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.sync.RubyText
+import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.ReadStretchStore
 import app.honmani.reader.data.words.SpellingVariants
@@ -61,6 +61,7 @@ import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.DictionaryLookup
 import app.honmani.reader.lookup.LookupGroups
+import app.honmani.reader.ui.library.OpenedBooks
 import app.honmani.reader.ui.reader.TtuLibrary
 import java.io.File
 import java.util.UUID
@@ -112,6 +113,9 @@ class AppContainer(context: Context) {
     }
 
     val readerDiagnostics = ReaderDiagnostics()
+
+    /** Book files from other apps, on their way to the library. */
+    val openedBooks = OpenedBooks()
 
     /** The reader's choices; the only file cloud backup keeps (`res/xml/data_extraction_rules.xml`). */
     private val settingsPreferences by lazy { appContext.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE) }
