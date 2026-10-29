@@ -43,6 +43,8 @@ data class ReaderSettings(
     /** Which words get a tint in the book (`word-marks.js`). */
     val wordMarks: WordMarksMode = WordMarksMode.DEFAULT,
     val keepScreenOn: Boolean = false,
+    /** The phone's volume buttons turn pages in a book (down: next, up: previous). */
+    val volumeKeys: Boolean = true,
 ) {
     /** The values to store, as ttu writes them. */
     fun toStorage(): Map<String, String> = buildMap {
@@ -58,6 +60,7 @@ data class ReaderSettings(
         put(PROGRESS_BAR, flag(progressBar))
         put(WORD_MARKS, wordMarks.storage)
         put(WAKE_LOCK, flag(keepScreenOn))
+        put(VOLUME_KEYS, flag(volumeKeys))
     }
 
     companion object {
@@ -79,6 +82,7 @@ data class ReaderSettings(
         private const val WAKE_LOCK = "enableReaderWakeLock"
         private const val PROGRESS_BAR = "honmaniProgressBar"
         private const val WORD_MARKS = "honmaniWordMarks"
+        private const val VOLUME_KEYS = "honmaniVolumeKeys"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -103,6 +107,7 @@ data class ReaderSettings(
                 progressBar = flag(PROGRESS_BAR, defaults.progressBar),
                 wordMarks = WordMarksMode.fromStorage(values[WORD_MARKS]),
                 keepScreenOn = flag(WAKE_LOCK, defaults.keepScreenOn),
+                volumeKeys = flag(VOLUME_KEYS, defaults.volumeKeys),
             )
         }
     }

@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.data.settings.ReaderSettings
 import app.honmani.reader.ui.HomeNavigationBar
 import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.HomeTab
@@ -63,6 +64,7 @@ import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
 import app.honmani.reader.ui.settings.SettingsScreen
 import app.honmani.reader.ui.words.WordsScreen
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -168,6 +170,19 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (!atLibrary) container.wordKnowledge.map { it.learning to it.learningForms }.distinctUntilChanged().collect { value = it }
     }
 
+    // Whether the volume buttons turn pages: a reader setting, kept in ttu's storage, read again
+    // when a book opens and after the reader settings close.
+    val volumeKeys by produceState(ReaderSettings().volumeKeys, atLibrary, readerSettings) {
+        if (atLibrary || readerSettings) return@produceState
+        value = try {
+            ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings()).volumeKeys
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            value
+        }
+    }
+
     // The book's background, also behind the status and navigation bars while a book is shown.
     var bookBackground by remember { mutableStateOf<Color?>(null) }
     val frame = bookBackground.takeIf { !atLibrary && !readerSettings }
@@ -202,6 +217,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onBackground = { bookBackground = Color(it) },
                 marks = { texts, mode -> container.wordMarker.mark(texts, mode) },
                 marksKey = learning,
+                volumeKeysTurnPages = volumeKeys,
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing),

@@ -39,7 +39,8 @@ device and WebView versions, the reader's console messages and how the last book
 
 A quick pass over what users hit first, on a fresh install of the release build (10 minutes):
 first start with the sample book; tap a few words (conjugated forms, furigana); add your own EPUB
-and an Aozora `.txt`; vertical and horizontal mode; rotate; back to the library; dark mode;
+and an Aozora `.txt`; vertical and horizontal mode; volume down/up turn to the next/previous
+page in a book (and change the volume in the library); rotate; back to the library; dark mode;
 add a card to AnkiDroid; Words → export (arrow up) → "Anki package" and import the .apkg in Anki on a
 computer (cards with audio in the chosen deck); force-stop and reopen (books, dictionaries,
 position kept).

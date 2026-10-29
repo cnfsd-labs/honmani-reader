@@ -204,6 +204,9 @@ private fun ReaderSettingsContent(
             onChange(settings.copy(progressBar = it))
         }
         SwitchRow(R.string.reader_settings_keep_screen_on, null, settings.keepScreenOn) { onChange(settings.copy(keepScreenOn = it)) }
+        SwitchRow(R.string.reader_settings_volume_keys, R.string.reader_settings_volume_keys_details, settings.volumeKeys) {
+            onChange(settings.copy(volumeKeys = it))
+        }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         ListItem(
             headlineContent = { Text(stringResource(R.string.reader_settings_all)) },

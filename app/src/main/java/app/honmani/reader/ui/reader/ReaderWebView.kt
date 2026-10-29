@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Looper
+import android.view.KeyEvent
 import android.webkit.ConsoleMessage
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.ValueCallback
@@ -18,9 +19,11 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -36,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
+import app.honmani.reader.MainActivity
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.data.words.WordMark
 import app.honmani.reader.data.words.WordMarksMode
@@ -144,6 +148,8 @@ fun ReaderWebView(
     marks: suspend (texts: List<String>, mode: WordMarksMode) -> List<List<WordMark>>? = { _, _ -> null },
     /** Changes when the reader's words change, so the page asks for its marks again. */
     marksKey: Any? = null,
+    /** The volume buttons turn pages while a book is open (they close the lookup panel first). */
+    volumeKeysTurnPages: Boolean = false,
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -157,6 +163,7 @@ fun ReaderWebView(
     val currentHighlightColor by rememberUpdatedState(highlightColor)
     val webViewRef = remember { WebViewRef() }
     var atLibrary by remember { mutableStateOf(true) }
+    var inBook by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     // While a book opens, the caller keeps covering the reader until the book is on screen (or
     // a little while has passed), so ttu's blank page and spinner don't flash up.
@@ -182,6 +189,20 @@ fun ReaderWebView(
     }
 
     BackHandler(enabled = !atLibrary) { webViewRef.view?.let(::goBack) }
+
+    // ttu turns pages on PageDown and PageUp in every reading mode and direction.
+    val activity = LocalActivity.current as? MainActivity
+    DisposableEffect(activity, volumeKeysTurnPages && inBook) {
+        if (activity != null && volumeKeysTurnPages && inBook) {
+            activity.volumePageTurn = { next ->
+                webViewRef.view?.let { view ->
+                    currentOnDismiss()
+                    turnPage(view, next)
+                }
+            }
+        }
+        onDispose { activity?.volumePageTurn = null }
+    }
 
     // ttu's settings use the app's accent colour for selected options.
     val accent = MaterialTheme.colorScheme.primary
@@ -255,6 +276,7 @@ fun ReaderWebView(
                     onPathChanged = { path, bookId ->
                         val wasAtLibrary = atLibrary
                         atLibrary = path in ReaderBack.LIBRARY_PATHS
+                        inBook = bookId != null
                         when {
                             wasAtLibrary && !atLibrary && bookId != null -> uncoverAfter(UNCOVER_TIMEOUT_MS)
                             // ttu's settings likewise stay covered until drawn, or the book list shows.
@@ -418,6 +440,14 @@ private fun createReaderWebView(
 }
 
 /** Handles back anywhere but on ttu's book list; see [ReaderBack.from]. */
+/** Sends PageDown (next) or PageUp to the page, as a keyboard would. */
+private fun turnPage(view: WebView, next: Boolean) {
+    val code = if (next) KeyEvent.KEYCODE_PAGE_DOWN else KeyEvent.KEYCODE_PAGE_UP
+    view.requestFocus()
+    view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+    view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+}
+
 private fun goBack(view: WebView) {
     val history = view.copyBackForwardList()
     val paths = (0 until history.size).map { history.getItemAtIndex(it).url.toUri().path.orEmpty() }

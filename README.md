@@ -6,7 +6,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 
 - Dictionaries with one tap on the first start (English or Japanese definitions), or any
   Yomitan dictionary
-- EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts
+- EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts;
+  pages turn with a tap, a swipe or the volume buttons
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap
 - Every word you look up is saved with its sentence; send words to Anki (AnkiDroid or an
   `.apkg` for Anki on a computer)
