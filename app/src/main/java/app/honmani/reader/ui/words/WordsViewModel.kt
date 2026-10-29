@@ -56,7 +56,7 @@ data class WordsUiState(
     /** Progress of saved words in steps of `WordProgress.KNOWN`, by id. */
     val steps: Map<Long, Int> = emptyMap(),
     val knownCount: Int = 0,
-    /** Words in the learning list without an Anki card, for "Add all to Anki". */
+    /** Words in the learning list without an Anki card, for "Add all to Anki" (grammar words it left out not counted). */
     val notInAnki: Int = 0,
     /** The word whose details are shown, if any. */
     val expanded: Long? = null,
@@ -77,11 +77,16 @@ sealed interface AnkiOutcome {
     data class One(val expression: String, val result: AnkiResult) : AnkiOutcome
 
     /**
-     * "Add all" finished: [added] new cards; [stopped] is the result that ended it early, and
-     * [audioProblem] why some cards went in without audio, if so.
+     * "Add all" finished: [added] new cards; [stopped] is the result that ended it early,
+     * [audioProblem] why some cards went in without audio, if so, and [leftOut] how many
+     * grammar words (の, です) were passed over.
      */
-    data class Many(val added: Int, val stopped: AnkiResult? = null, val audioProblem: VoiceProblem? = null) :
-        AnkiOutcome
+    data class Many(
+        val added: Int,
+        val stopped: AnkiResult? = null,
+        val audioProblem: VoiceProblem? = null,
+        val leftOut: Int = 0,
+    ) : AnkiOutcome
 
     /**
      * [count] words were written to a file for Anki's import: a package with audio if
@@ -131,6 +136,9 @@ class WordsViewModel(
     private val ankiProgress = MutableStateFlow<Pair<Int, Int>?>(null)
     private val savingPackage = MutableStateFlow(false)
     private val addingToAnki = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** Grammar words "Add all" passed over, so it neither counts nor checks them again. */
+    private val grammarWords = MutableStateFlow<Set<Long>>(emptySet())
     private val readWord = MutableStateFlow<ReadWordDetails?>(null)
     private var readWordJob: Job? = null
 
@@ -169,6 +177,9 @@ class WordsViewModel(
             .combine(addingToAnki) { state, adding -> state.copy(addingToAnki = adding) }
             .combine(savingPackage) { state, saving -> state.copy(savingPackage = saving) }
             .combine(readWord) { state, word -> state.copy(readWord = word) }
+            .combine(grammarWords) { state, grammar ->
+                state.copy(notInAnki = state.learning.orEmpty().count { it.ankiNoteId == null && it.id !in grammar })
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WordsUiState())
 
     fun setFilter(value: WordFilter) {
@@ -246,17 +257,27 @@ class WordsViewModel(
         }
     }
 
-    /** Adds every word being learned that has no card to Anki, one after another; stops if AnkiDroid can't take them. */
+    /**
+     * Adds every word being learned that has no card to Anki, one after another, except grammar
+     * words (の, です: [LookupGroups.isGrammarWord]); stops if AnkiDroid can't take them. A
+     * single word's button still adds a grammar word.
+     */
     fun addAllToAnki() {
         if (ankiProgress.value != null) return
         viewModelScope.launch {
-            val suggested = lists.first().learning.filter { it.ankiNoteId == null }
+            val suggested = lists.first().learning.filter { it.ankiNoteId == null && it.id !in grammarWords.value }
             var added = 0
+            var leftOut = 0
             var stopped: AnkiResult? = null
             var audioProblem: VoiceProblem? = null
             try {
                 for ((i, word) in suggested.withIndex()) {
                     ankiProgress.value = i to suggested.size
+                    if (isGrammarWord(word)) {
+                        grammarWords.update { it + word.id }
+                        leftOut++
+                        continue
+                    }
                     when (val result = addCard(word, null)) {
                         is AnkiResult.Added -> {
                             added++
@@ -272,8 +293,18 @@ class WordsViewModel(
             } finally {
                 ankiProgress.value = null
             }
-            _ankiOutcomes.send(AnkiOutcome.Many(added, stopped, audioProblem))
+            _ankiOutcomes.send(AnkiOutcome.Many(added, stopped, audioProblem, leftOut))
         }
+    }
+
+    private suspend fun isGrammarWord(word: WordEntity): Boolean = try {
+        withContext(Dispatchers.Default) { lookUp(word.expression) }
+            .firstOrNull { it.expression == word.expression && it.reading == word.reading }
+            ?.let(LookupGroups::isGrammarWord) == true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        false
     }
 
     /** Writes the words of the current list to [uri] as a file for Anki's import. */

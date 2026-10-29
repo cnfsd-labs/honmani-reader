@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -243,7 +244,7 @@ private fun AnkiSettingsContent() {
                 val status = when (val current = check) {
                     null -> if (hasKey) stringResource(R.string.google_key_saved) else null
                     KeyCheck.Checking -> stringResource(R.string.google_key_checking)
-                    is KeyCheck.Works -> stringResource(R.string.google_key_ok, current.voices.size)
+                    is KeyCheck.Works -> pluralStringResource(R.plurals.google_key_ok, current.voices.size, current.voices.size)
                     is KeyCheck.Failed -> stringResource(current.message)
                 }
                 status?.let {

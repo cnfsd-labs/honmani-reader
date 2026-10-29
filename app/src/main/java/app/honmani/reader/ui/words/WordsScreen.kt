@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -53,6 +54,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,6 +98,9 @@ import app.honmani.reader.ui.reader.GlossLines
 import app.honmani.reader.ui.theme.HonmaniTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+
+/** "Add all" asks first when it would make more cards than this. */
+private const val ADD_ALL_WITHOUT_ASKING = 10
 
 /** The words looked up while reading, most looked up (recently) first. */
 @Composable
@@ -141,14 +146,22 @@ fun WordsScreen(
                     val stopped = outcome.stopped
                     if (stopped != null && outcome.added == 0) {
                         showAnkiResult(context, "", stopped)
+                    } else if (outcome.added == 0 && outcome.leftOut > 0) {
+                        val text = resources.getQuantityString(R.plurals.anki_only_grammar_left, outcome.leftOut, outcome.leftOut)
+                        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
                     } else {
                         val added = resources.getQuantityString(
                             R.plurals.anki_added_many,
                             outcome.added,
                             outcome.added,
                         )
+                        val leftOut = if (outcome.leftOut > 0) {
+                            " – " + resources.getQuantityString(R.plurals.anki_left_out, outcome.leftOut, outcome.leftOut)
+                        } else {
+                            ""
+                        }
                         val audio = outcome.audioProblem?.let { " – " + resources.getString(it.label()) }.orEmpty()
-                        Toast.makeText(context, added + audio, Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, added + leftOut + audio, Toast.LENGTH_LONG).show()
                         if (stopped != null) showAnkiResult(context, "", stopped)
                     }
                 }
@@ -165,6 +178,23 @@ fun WordsScreen(
                     Toast.makeText(context, R.string.anki_export_failed, Toast.LENGTH_LONG).show()
             }
         }
+    }
+    var confirmAddAll by remember { mutableStateOf(false) }
+    if (confirmAddAll) {
+        AlertDialog(
+            onDismissRequest = { confirmAddAll = false },
+            title = { Text(stringResource(R.string.anki_add_all_title, uiState.notInAnki)) },
+            text = { Text(stringResource(R.string.anki_add_all_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmAddAll = false
+                    anki.whenReady(viewModel::addAllToAnki)
+                }) { Text(stringResource(R.string.action_add)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmAddAll = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
     LaunchedEffect(current) {
         if (current != null && message != null) {
@@ -187,7 +217,9 @@ fun WordsScreen(
         onMarkLearning = viewModel::markLearning,
         onDelete = viewModel::delete,
         onAddToAnki = { word, lookup -> anki.whenReady { viewModel.addToAnki(word, lookup) } },
-        onAddAllToAnki = { anki.whenReady(viewModel::addAllToAnki) },
+        onAddAllToAnki = {
+            if (uiState.notInAnki > ADD_ALL_WITHOUT_ASKING) confirmAddAll = true else anki.whenReady(viewModel::addAllToAnki)
+        },
         onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
         onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
     )

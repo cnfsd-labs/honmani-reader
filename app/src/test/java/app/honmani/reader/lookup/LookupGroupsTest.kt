@@ -124,6 +124,32 @@ class LookupGroupsTest {
     }
 
     @Test
+    fun grammarWordsAreParticlesAuxiliariesAndTheCopula_notWordsWithAContentClass() {
+        fun group(vararg tags: String) = LookupGroup(
+            expression = "x",
+            reading = "x",
+            source = "x",
+            inflections = emptyList(),
+            sections = listOf(
+                DictionarySection(
+                    dictionaryTitle = "Jitendex",
+                    senses = emptyList(),
+                    lines = listOf(GlossLine(tags.map(GlossItem::Tag) + GlossItem.Text("meaning"))),
+                ),
+            ),
+        )
+
+        assertEquals(true, LookupGroups.isGrammarWord(group("particle")))
+        assertEquals(true, LookupGroups.isGrammarWord(group("copula", "auxiliary verb")))
+        assertEquals(true, LookupGroups.isGrammarWord(group("auxiliary adjective", "suffix")))
+        assertEquals(true, LookupGroups.isGrammarWord(group("prt")))
+        assertEquals(false, LookupGroups.isGrammarWord(group("noun (common) (futsuumeishi)")))
+        assertEquals(false, LookupGroups.isGrammarWord(group("noun", "particle")))
+        assertEquals(false, LookupGroups.isGrammarWord(group("adv", "prt")))
+        assertEquals(false, LookupGroups.isGrammarWord(group()))
+    }
+
+    @Test
     fun theStemIsOnlyShownWhenNothingElseWasUndone() {
         assertEquals(
             listOf(Inflection.POLITE, Inflection.PAST),

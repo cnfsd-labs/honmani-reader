@@ -164,4 +164,27 @@ object LookupGroups {
      */
     fun visibleInflections(inflections: List<Inflection>): List<Inflection> =
         inflections.filter { it != Inflection.STEM }.ifEmpty { inflections }
+
+    /**
+     * Whether [group] is a grammar word (の, です, ない): the word classes of its first meaning,
+     * from the first dictionary that labels them, are particles, auxiliaries, the copula or
+     * conjunctions, and none is a noun, verb, adjective or adverb. Jitendex writes the classes
+     * out ("particle"), JMdict as codes ("prt"). Unlabelled words are not grammar words.
+     */
+    fun isGrammarWord(group: LookupGroup): Boolean {
+        val tags = group.sections.firstNotNullOfOrNull { section ->
+            section.lines.firstOrNull()?.items?.filterIsInstance<GlossItem.Tag>()?.map { it.text }?.ifEmpty { null }
+        } ?: return false
+        return tags.any { it in GRAMMAR_CLASSES } && tags.none { it !in GRAMMAR_CLASSES && isContentClass(it) }
+    }
+
+    private fun isContentClass(tag: String): Boolean =
+        CONTENT_WORDS.any { tag.contains(it) } || CONTENT_CODE.matches(tag)
+
+    private val GRAMMAR_CLASSES = setOf(
+        "particle", "prt", "auxiliary", "aux", "auxiliary verb", "aux-v", "auxiliary adjective", "aux-adj",
+        "copula", "cop", "conjunction", "conj", "助詞", "助動詞", "接続詞",
+    )
+    private val CONTENT_WORDS = listOf("noun", "verb", "adjective", "adverb", "pronoun", "interjection", "名詞", "動詞", "形容詞", "副詞")
+    private val CONTENT_CODE = Regex("n|n-.*|pn|v.*|adj-.*|adv.*|int")
 }

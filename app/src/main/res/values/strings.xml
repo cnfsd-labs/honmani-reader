@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="app_name">Honmani?!</string>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- The launcher name of release builds (manifest placeholder, so lint sees no use). -->
+    <string name="app_name" tools:ignore="UnusedResources">Honmani?!</string>
 
     <string name="action_back">Back</string>
     <string name="action_delete">Delete</string>
@@ -80,7 +81,6 @@
     <string name="library_unsupported">%1$s is not a book Honmani can open. Add an EPUB or a TXT file.</string>
     <string name="library_unreadable">%1$s could not be read as a book.</string>
     <string name="library_reader_failed">The reader could not open “%1$s”.</string>
-    <string name="action_remove_book">Remove from library</string>
     <string name="action_reset_progress">Reset progress</string>
     <string name="action_reset">Reset</string>
     <string name="reset_progress_title">Reset progress of “%1$s”?</string>
@@ -195,6 +195,17 @@
     <string name="action_add_to_anki_with_sentence">Add to Anki with this sentence</string>
     <string name="word_in_anki">In Anki</string>
     <string name="action_add_all_to_anki">Add all %1$d to Anki</string>
+    <string name="anki_add_all_title" tools:ignore="PluralsCandidate">Add %1$d words to Anki?</string>
+    <string name="anki_add_all_text">Each becomes a card in Anki. Particles and other grammar words (の, です) are left out; their own Anki button still adds them.</string>
+    <string name="action_add">Add</string>
+    <plurals name="anki_left_out">
+        <item quantity="one">%1$d grammar word left out</item>
+        <item quantity="other">%1$d grammar words left out</item>
+    </plurals>
+    <plurals name="anki_only_grammar_left">
+        <item quantity="one">Nothing to add: the word left is a grammar word</item>
+        <item quantity="other">Nothing to add: the %1$d words left are grammar words</item>
+    </plurals>
     <string name="anki_adding_progress">Adding to Anki: %1$d of %2$d…</string>
     <string name="anki_added">%1$s added to Anki</string>
     <plurals name="anki_added_many">
@@ -249,7 +260,10 @@
     <string name="google_key_saved">Saved key (hidden). Enter a new one to replace it.</string>
     <string name="google_key_help">How to get a key: open console.cloud.google.com, create a project, enable “Cloud Text-to-Speech API”, then Credentials → Create credentials → API key. Restrict the key to the Cloud Text-to-Speech API. The key is stored encrypted on this phone and only sent to Google.</string>
     <string name="google_key_checking">Checking the key…</string>
-    <string name="google_key_ok">Key works: %1$d Japanese voices</string>
+    <plurals name="google_key_ok">
+        <item quantity="one">Key works: %1$d Japanese voice</item>
+        <item quantity="other">Key works: %1$d Japanese voices</item>
+    </plurals>
     <string name="google_voice">Voice</string>
     <string name="action_listen">Listen</string>
     <string name="reader_settings_font_phone">On this phone</string>
@@ -316,7 +330,6 @@
     <string name="catalog_kind_japanese">Japanese definitions</string>
     <string name="catalog_wiktionary_japanese">Meanings explained in Japanese, with examples and synonyms, from the Japanese Wiktionary. For advanced learners; put it first under Installed to see it before English.</string>
     <string name="catalog_kanjidic">Meanings, readings and stroke counts of over 10,000 kanji. Tap a kanji in a looked-up word to see it.</string>
-    <string name="lookup_frequency">%1$s #%2$s</string>
     <string name="lookup_back">Back to the previous word</string>
     <string name="lookup_kanji_title">Kanji</string>
     <string name="kanji_onyomi">On</string>
@@ -400,10 +413,13 @@
     <string name="progress_skill">Skill</string>
     <string name="skill_value">Skill %1$d</string>
     <string name="skill_based_on">Based on %1$s of reading in books with a difficulty</string>
-    <string name="skill_measuring">Still measuring: %1$d of %2$d minutes read in books with a difficulty.</string>
+    <string name="skill_measuring" tools:ignore="PluralsCandidate">Still measuring: %1$d of %2$d minutes read in books with a difficulty.</string>
     <string name="skill_parts">Vocabulary %1$d (about %2$s words) · Fluency %3$d</string>
     <string name="skill_vocabulary_waiting">Your vocabulary joins in after %1$s characters in books with a difficulty (%2$s so far).</string>
-    <string name="skill_trend">Reading fluency over the last %1$d weeks</string>
+    <plurals name="skill_trend">
+        <item quantity="one">Reading fluency over the last week</item>
+        <item quantity="other">Reading fluency over the last %1$d weeks</item>
+    </plurals>
     <string name="skill_fitting">Books that fit you</string>
     <string name="skill_how">Skill is on the same scale as book difficulty and has two parts. Fluency comes from how fast you read books of known difficulty: a book of difficulty 50 read at 8,000 characters an hour counts as 50, twice as fast as 60; recent weeks count more, and reading a book again doesn\'t count (you remember it). Speed depends on your screen and settings, so compare it only with itself. Vocabulary comes from the words on the pages you have read in those books (pages flicked past or skipped don\'t count): words you looked up and haven\'t marked as learned count as unknown, all others as known. It is an estimate, a little high when you skip lookups.</string>
     <string name="progress_empty">Nothing read yet. Your level and milestones grow as you read.</string>
@@ -497,7 +513,7 @@
     <string name="book_open_again">Open again</string>
     <string name="book_hidden">Hidden from the library</string>
     <string name="book_difficulty">Difficulty %1$d</string>
-    <string name="book_difficulty_detail">Counting a word\'s first few uses: %1$d%% of its words are beyond the 10,000 most common, kanji in %2$d%% of the words. %3$d characters per sentence; %4$s different words in %5$s.</string>
+    <string name="book_difficulty_detail" tools:ignore="PluralsCandidate">Counting a word\'s first few uses: %1$d%% of its words are beyond the 10,000 most common, kanji in %2$d%% of the words. %3$d characters per sentence; %4$s different words in %5$s.</string>
     <string name="book_difficulty_grading">Working out how hard this book is…</string>
     <string name="book_difficulty_no_dictionaries">The difficulty needs a dictionary and a frequency list, such as Jiten. Get them in Settings → Dictionaries.</string>
     <string name="book_time_whole">About %1$s to read</string>
