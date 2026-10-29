@@ -8,16 +8,30 @@ import java.io.FileNotFoundException
 
 /**
  * Serves the bundled ッツ Ebook Reader build. Missing files get an explicit 404 so that no
- * request on the reader origin ever falls through to the network.
+ * request on the reader origin ever falls through to the network. Pages carry
+ * [ReaderPolicy.contentSecurityPolicy].
  */
 class TtuPathHandler(private val assets: AssetManager) : WebViewAssetLoader.PathHandler {
     override fun handle(path: String): WebResourceResponse {
         val resolved = TtuAssetResolver.resolve(path) ?: return notFound()
         return try {
-            WebResourceResponse(resolved.mimeType, null, assets.open(resolved.assetPath))
+            if (resolved.mimeType == "text/html") page(resolved.assetPath)
+            else WebResourceResponse(resolved.mimeType, null, assets.open(resolved.assetPath))
         } catch (_: FileNotFoundException) {
             notFound()
         }
+    }
+
+    private fun page(assetPath: String): WebResourceResponse {
+        val bytes = assets.open(assetPath).use { it.readBytes() }
+        return WebResourceResponse(
+            "text/html",
+            "utf-8",
+            200,
+            "OK",
+            mapOf("Content-Security-Policy" to ReaderPolicy.contentSecurityPolicy(bytes.decodeToString())),
+            ByteArrayInputStream(bytes),
+        )
     }
 
     private fun notFound() = WebResourceResponse(

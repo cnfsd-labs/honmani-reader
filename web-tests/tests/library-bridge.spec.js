@@ -46,6 +46,20 @@ const BOOKS = {
     title: 'ルビの本',
     paragraphs: Array.from({ length: 120 }, (_, i) => `第${i + 1}段落。` + '<ruby>吾輩<rt>わがはい</rt></ruby>は<ruby>猫<rt>ねこ</rt></ruby>である。'.repeat(25)),
   }),
+  // Scripts a book brings along, in the ways that ran in ttu before the reader's policy.
+  'scripts.epub': buildEpub({
+    title: 'スクリプトの本',
+    raw: true,
+    paragraphs: [
+      '<p>本文はここ。</p>',
+      '<details open="open" ontoggle="window.__ran=(window.__ran||[]).concat(\'ontoggle\')"><summary>a</summary>b</details>',
+      '<iframe srcdoc="&lt;script&gt;parent.__ran=(parent.__ran||[]).concat(\'iframe\')&lt;/script&gt;"></iframe>',
+      '<video src="missing.mp4" onerror="window.__ran=(window.__ran||[]).concat(\'onerror\')"></video>',
+      '<img src="missing.png" onerror="window.__ran=(window.__ran||[]).concat(\'img\')"/>',
+      '<svg xmlns="http://www.w3.org/2000/svg" onload="window.__ran=(window.__ran||[]).concat(\'svg\')"><rect width="1" height="1"/></svg>',
+      '<script>window.__ran=(window.__ran||[]).concat(\'script\')</script>',
+    ],
+  }),
   'broken.epub': Buffer.from('PK this is not really a zip'),
 };
 /** The sample books that come with the app. */
@@ -110,6 +124,18 @@ test('a new book is imported through ttu and opens by id', async ({ page }) => {
   await page.waitForURL(new RegExp(`/b\\?id=${reply.id}$`));
   await expect(page.locator('.book-content')).toContainText('名前はまだ無い');
   expect(await page.evaluate(() => window.__samePage)).toBe(true);
+});
+
+test("a book's own scripts don't run in the reader", async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+
+  const reply = await ensure(page, 'scripts.epub');
+  await page.evaluate((ttuId) => window.honmaniLibrary.open({ ttuId }), reply.id);
+  await page.waitForURL(new RegExp(`/b\\?id=${reply.id}$`));
+  await expect(page.locator('.book-content')).toContainText('本文はここ');
+  await page.waitForTimeout(1_000);
+  expect(await page.evaluate(() => window.__ran ?? [])).toEqual([]);
 });
 
 test('a book ttu already holds is not imported again', async ({ page }) => {

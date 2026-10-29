@@ -509,10 +509,17 @@ private class ReaderWebViewClient(
         request: WebResourceRequest,
     ): WebResourceResponse? = assetLoader.shouldInterceptRequest(request.url)
 
-    /** Links that leave the reader origin open in the user's browser. */
+    /**
+     * Links that leave the reader origin open in the user's browser, only when tapped: a page
+     * leaving on its own (a script in a book) could otherwise carry data out in the address.
+     */
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url
         if (url.scheme == "https" && url.host == WebViewAssetLoader.DEFAULT_DOMAIN) return false
+        if (!request.hasGesture()) {
+            diagnostics.log("blocked a navigation without a tap to ${url.scheme}://${url.host}")
+            return true
+        }
         if (url.scheme == "http" || url.scheme == "https") {
             try {
                 view.context.startActivity(
