@@ -82,7 +82,8 @@ come back: the word and its other forms (食べた, 食べない) have a light a
 "Learned" in Words it loses it. Other spellings of it count as the same word: after looking up
 当たり前, 当り前 has the tint too (with or without furigana, one unbroken mark). "+ New" adds a grey tint on words never met in your reading
 (at first nearly everything, particles too); words read once lose it the next time they come up.
-"Off" shows none. The first marks after a new install or a dictionary change take a few seconds
+"Off" shows none. On a dark page (black, grey or dark system theme) both tints are stronger,
+so they still show at low screen brightness. The first marks after a new install or a dictionary change take a few seconds
 (the word list is built once); after that they fade in within about a second of opening a book,
 and a turned page shows its marks at once. Book sheet, after some reading in graded books: "You
 know about N% of its words; about M are new to you", higher for easy books.

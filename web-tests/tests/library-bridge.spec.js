@@ -498,6 +498,38 @@ test('word marks: the page asks about the paragraphs on screen and marks what th
   await expect.poll(() => marked(page)).toEqual({ 'honmani-learning': ['吾輩'], 'honmani-new': ['名前'] });
 });
 
+test('word marks are stronger on a dark page, so they show at low screen brightness', async ({ page }) => {
+  await openWithMarks(page, 'neko.epub', 'new');
+  await expect.poll(async () => (await markRequests(page)).flatMap((m) => m.blocks.map((b) => b.text))).toContain('吾輩は猫である。名前はまだ無い。');
+  const request = (await markRequests(page)).find((m) => m.blocks.some((b) => b.text.startsWith('吾輩')));
+  const block = request.blocks.find((b) => b.text.startsWith('吾輩'));
+  const answer = (requestId) =>
+    page.evaluate(
+      ([requestId, id]) => window.__reply({ type: 'marks', requestId, color: '#e91e63', blocks: [{ id, marks: [[0, 2, 0], [3, 1, 1]] }] }),
+      [requestId, block.id],
+    );
+  const tints = () => page.evaluate(() => document.getElementById('honmani-marks-style').textContent.split('\n').slice(0, 2));
+
+  await page.evaluate(() => (document.body.style.backgroundColor = 'rgb(255, 255, 255)'));
+  await answer(request.requestId);
+  await expect.poll(tints).toEqual([
+    '::highlight(honmani-learning) { background-color: rgba(233, 30, 99, 0.280); }',
+    '::highlight(honmani-new) { background-color: rgba(128, 128, 128, 0.200); }',
+  ]);
+
+  // A dark theme: the next answer brings the stronger tints.
+  await page.evaluate(() => (document.body.style.backgroundColor = 'rgb(0, 0, 0)'));
+  const before = (await markRequests(page)).length;
+  await page.evaluate(() => window.__reply({ type: 'marks.reset' }));
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(before);
+  const again = (await markRequests(page)).slice(before).find((m) => m.blocks.some((b) => b.id === block.id));
+  await answer(again.requestId);
+  await expect.poll(tints).toEqual([
+    '::highlight(honmani-learning) { background-color: rgba(233, 30, 99, 0.450); }',
+    '::highlight(honmani-new) { background-color: rgba(128, 128, 128, 0.450); }',
+  ]);
+});
+
 test('a word just looked up is marked as being learned at once, before the app answers again', async ({ page }) => {
   await openWithMarks(page, 'neko.epub', 'new');
   await expect.poll(async () => (await markRequests(page)).flatMap((m) => m.blocks.map((b) => b.text))).toContain('吾輩は猫である。名前はまだ無い。');

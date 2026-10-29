@@ -107,10 +107,26 @@
       parent.appendChild(style);
     }
     const alpha = Math.min(1, Math.max(0, fade));
+    // Faint tints vanish on a dark page at low screen brightness (AMOLED), so dark pages get more.
+    const dark = darkPage();
+    const learning = dark ? 0.45 : 0.28;
+    const fresh = dark ? 0.45 : 0.2;
     const tints = (names, share) =>
-      `::highlight(${names[0]}) { background-color: rgba(${rgb}, ${(0.28 * share).toFixed(3)}); }\n` +
-      `::highlight(${names[1]}) { background-color: rgba(128, 128, 128, ${(0.2 * share).toFixed(3)}); }\n`;
+      `::highlight(${names[0]}) { background-color: rgba(${rgb}, ${(learning * share).toFixed(3)}); }\n` +
+      `::highlight(${names[1]}) { background-color: rgba(128, 128, 128, ${(fresh * share).toFixed(3)}); }\n`;
     style.textContent = tints(NAMES, 1) + tints(FRESH_NAMES, alpha);
+  }
+
+  /** Whether the page behind the text is dark (ttu's dark themes set it on <body>). */
+  function darkPage() {
+    for (const element of [document.body, document.documentElement]) {
+      if (!element) continue;
+      const parts = getComputedStyle(element).backgroundColor.replace(/^rgba?\(|\)$/g, '').split(',').map(Number);
+      if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) continue;
+      if (parts.length > 3 && parts[3] === 0) continue;
+      return 0.299 * parts[0] + 0.587 * parts[1] + 0.114 * parts[2] < 128;
+    }
+    return false;
   }
 
   function reducedMotion() {
