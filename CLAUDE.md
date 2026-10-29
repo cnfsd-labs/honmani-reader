@@ -27,7 +27,9 @@ repository is public: never copy those notes, personal details or discussions in
   Keep patches minimal; prefer scripts injected from `app/src/main/assets/honmani/`. Patches 0001
   and 0003 are proposed upstream (ttu-ttu/ebook-reader#549, #548): drop them once merged.
 - **Reader origin** `https://appassets.androidplatform.net` (`WebViewAssetLoader`) must never
-  change: ttu's library lives in its IndexedDB. The WebView blocks network loads.
+  change: ttu's library lives in its IndexedDB. The WebView blocks network loads. ttu doesn't
+  sanitise book HTML: pages carry a Content-Security-Policy (`ReaderPolicy`, mirrored in
+  `web-tests/support/ttu-server.js`), and links leave the reader only on a tap.
 - **Network use** (dictionaries, fonts, book servers, progress sync, Google voices) is listed in
   `docs/privacy-policy.md`, which must change with any new network use.
 - **Library:** Honmani owns the book files (app storage, named by SHA-256); ttu's IndexedDB is a
