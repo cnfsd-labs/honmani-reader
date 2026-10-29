@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Book catalogues are often servers at home: plain http on the local network, or https with a
      certificate from the user's own CA (installed in the phone's settings). Both are allowed; the
-     catalogue dialog warns when a password would go over plain http. Dictionary downloads use
-     https with public certificates. -->
+     catalogue dialog warns when a password would go over plain http. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
@@ -10,4 +9,19 @@
             <certificates src="user" />
         </trust-anchors>
     </base-config>
+    <!-- The public services Honmani uses itself (dictionaries, fonts, Google voices with the
+         user's key): https with public certificates only, so a CA installed on the phone (a
+         company's or school's network, for instance) can't read them. Downloads redirect to
+         subdomains (release-assets.githubusercontent.com, cas-bridge.xethub.hf.co). -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">github.com</domain>
+        <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">huggingface.co</domain>
+        <domain includeSubdomains="true">hf.co</domain>
+        <domain includeSubdomains="true">jiten.moe</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>
