@@ -1,6 +1,6 @@
 # Privacy policy for Honmani
 
-*Last updated: 2026-10-22.*
+*Last updated: 2026-10-29.*
 
 Honmani is a free reader for Japanese books, published by CNFSD Labs. It has no account, no ads,
 no analytics and no tracking. CNFSD Labs does not receive any data from the app.
@@ -27,8 +27,9 @@ Honmani only connects to the internet for these things, and only to these places
 
 - **Dictionaries and reader fonts** you choose to download, and a check for dictionary
   updates when the app starts: GitHub (github.com, raw.githubusercontent.com), Hugging Face
-  (huggingface.co) and Jiten (api.jiten.moe). These sites see an ordinary download request
-  (your IP address and the app's name); Honmani sends no personal data. Their own privacy
+  (huggingface.co) and Jiten (api.jiten.moe), always over an encrypted connection (https).
+  These sites see an ordinary download request (your IP address and the app's name); Honmani
+  sends no personal data. Their own privacy
   policies apply.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
   to the addresses you enter. If you give a user name and password, the password is stored
@@ -53,7 +54,7 @@ Honmani only connects to the internet for these things, and only to these places
 - **Google Cloud text-to-speech, only if you turn it on** and enter your own Google Cloud API
   key: to make audio for Anki cards, and to say a word when you tap its speaker in a lookup,
   Honmani sends the word or example sentence and your key to Google
-  (texttospeech.googleapis.com). Google's privacy policy applies. The default voice is your
+  (texttospeech.googleapis.com), over an encrypted connection. Google's privacy policy applies. The default voice is your
   phone's own, which works offline.
 
 The book reader itself never loads anything from the internet.

@@ -51,7 +51,9 @@ libraries, a complete bundled reader, and no Play-restricted permissions.
   submodule, built with the small patches in `third_party/patches/` (each explained in its
   README) and served offline in a WebView on `https://appassets.androidplatform.net`. Scripts
   in `app/src/main/assets/honmani/` are injected at document start: they report taps, page turns
-  and positions to the app, hand books to ttu, and read and write ttu's settings.
+  and positions to the app, hand books to ttu, and read and write ttu's settings. ttu shows a
+  book's HTML as it is, so the pages carry a Content-Security-Policy that keeps scripts in books
+  from running (`ReaderPolicy`), and links leave the reader only on a tap.
 - **App.** Kotlin, Jetpack Compose (Material 3), Room, manual dependency injection
   (`AppContainer`). One screen: the library, words, progress and settings tabs are drawn over
   the reader, which stays loaded underneath.
@@ -69,7 +71,10 @@ libraries, a complete bundled reader, and no Play-restricted permissions.
 - **Book servers and sync.** OPDS 1.x catalogues with Basic or Digest login (`data/opds/`),
   and KOReader's sync protocol with exact positions between KOReader's XPointers and ttu's
   character count (`data/sync/`). Passwords are encrypted with an Android Keystore key; over
-  plain http a login is only sent once the server asks for it (`data/net/`).
+  plain http a login is only sent once the server asks for it (`data/net/`). Plain http and
+  certificates from the user's own CA are allowed for these home servers only; the public
+  services Honmani downloads from need https with a public certificate
+  (`res/xml/network_security_config.xml`).
 - **Statistics.** Reading time and characters per book and day (`data/stats/`).
 - **Backups.** One zip of JSON through the system file picker (`data/backup/`): everything but
   the books, which are named by content hash; a restore merges and keeps what books not in the
