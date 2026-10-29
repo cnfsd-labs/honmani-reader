@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.data.backup.BackupCodec
+import app.honmani.reader.data.backup.BackupFile
 import app.honmani.reader.data.backup.BackupFormatException
 import app.honmani.reader.data.backup.RestoreSummary
 import app.honmani.reader.data.fonts.FontCatalog
@@ -71,6 +72,20 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
             val input = resolver.openInputStream(uri) ?: throw IOException("Cannot read $uri")
             input.use { BackupCodec.read(it.buffered()) }
         }
+        restore(backup)
+    }
+
+    /** Restores the backup the old phone left ([AutoBackup.offer]); asked once, so it is answered either way. */
+    fun restoreAutoBackup() = launchWork {
+        try {
+            restore(container.autoBackup.read())
+        } finally {
+            container.autoBackup.answered()
+        }
+    }
+
+    /** Merges [backup] into this phone's data and hands positions and reader settings to ttu. */
+    private suspend fun restore(backup: BackupFile): BackupState {
         val summary = container.backup.restore(backup)
         container.appearanceSettings.reload()
         container.ankiSettings.reload()
@@ -103,7 +118,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
             }
         }
         if (summary.catalogsAdded > 0) container.opdsAutoImport.start(force = true)
-        BackupState.Restored(summary)
+        return BackupState.Restored(summary)
     }
 
     fun dismiss() {

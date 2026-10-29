@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Only the reader's choices (shared preferences "settings": accent colour, Anki deck and voice)
-     are backed up and moved to a new phone. The database is left out (dictionaries can be
-     hundreds of MB and are downloaded again), so the book files, fonts and ttu's copies of the
-     books would only be orphans that push the backup past Android's 25 MB limit, where it is
-     skipped entirely. "device" preferences (first start done, the Keystore-encrypted Google key,
+<!-- The reader's choices (shared preferences "settings": accent colour, Anki deck and voice) and
+     Honmani's own backup of itself (files/auto-backup/: saved words, progress, statistics; see
+     AutoBackup, kept under 10 MB) are backed up and moved to a new phone. The database is left
+     out (dictionaries can be hundreds of MB and are downloaded again), so the book files, fonts
+     and ttu's copies of the books would only be orphans that push the backup past Android's
+     25 MB limit, where it is skipped entirely. "device" preferences (first start done, the Keystore-encrypted Google key,
      AnkiDroid ids) belong to this phone. -->
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="settings.xml" />
+        <include domain="file" path="auto-backup/" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="settings.xml" />
+        <include domain="file" path="auto-backup/" />
     </device-transfer>
 </data-extraction-rules>

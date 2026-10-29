@@ -11,6 +11,7 @@ import app.honmani.reader.anki.PhoneVoice
 import app.honmani.reader.anki.WordAudio
 import app.honmani.reader.anki.WordDetails
 import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.data.backup.AutoBackup
 import app.honmani.reader.data.backup.Backup
 import app.honmani.reader.data.backup.RestoredBooks
 import app.honmani.reader.data.dictionary.DictionaryDownloader
@@ -64,6 +65,7 @@ import app.honmani.reader.lookup.DictionaryLookup
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.library.OpenedBooks
 import app.honmani.reader.ui.reader.TtuLibrary
+import app.honmani.reader.ui.reader.TtuLibraryException
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -437,6 +439,31 @@ class AppContainer(context: Context) {
      * Grades books in the background whenever the library or the dictionaries change, once per
      * app start; the stored grades are read first, for the book sheets.
      */
+    /** Honmani's own backup of itself, taken along by Android's backup; see [AutoBackup]. */
+    val autoBackup: AutoBackup by lazy { AutoBackup(File(appContext.filesDir, AutoBackup.DIRECTORY), devicePreferences) }
+
+    /**
+     * Brings [autoBackup] up to date when it is due, as the app goes to the background. ttu's
+     * reader settings come from the reader page, so this starts on the main thread.
+     */
+    fun saveAutoBackup() {
+        applicationScope.launch(Dispatchers.Main) {
+            autoBackup.saveIfDue {
+                val readerSettings = try {
+                    ttuLibrary.readSettings()
+                } catch (_: TtuLibraryException) {
+                    null
+                }
+                backup.export(readerSettings)
+            }
+        }
+    }
+
+    /** Once per app start: a backup another phone left is offered (see [AutoBackup.offer]). */
+    fun checkAutoBackupOffer() {
+        applicationScope.launch { autoBackup.checkOffer() }
+    }
+
     fun startGrading() {
         applicationScope.launch {
             withContext(Dispatchers.IO) { difficultyStore.load() }

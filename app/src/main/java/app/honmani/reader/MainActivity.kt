@@ -23,6 +23,7 @@ class MainActivity : ComponentActivity() {
             container.opdsAutoImport.start()
             container.dictionaryUpdateChecker.start()
             container.startGrading()
+            container.checkAutoBackupOffer()
             container.openedBooks.receive(intent)
         }
         setContent {

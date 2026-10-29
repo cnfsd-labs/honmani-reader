@@ -15,18 +15,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.RestoreSummary
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * Settings → Back up and restore: settings, progress, statistics and saved words in one file the
@@ -68,6 +73,12 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
             },
         )
     }
+    BackupStateDialog(state, onDismiss = viewModel::dismiss)
+}
+
+/** While a backup is made or restored, and how it went. */
+@Composable
+fun BackupStateDialog(state: BackupState, onDismiss: () -> Unit) {
     when (val current = state) {
         BackupState.Idle -> Unit
         BackupState.Working -> AlertDialog(
@@ -81,7 +92,7 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
             confirmButton = {},
         )
         else -> AlertDialog(
-            onDismissRequest = viewModel::dismiss,
+            onDismissRequest = onDismiss,
             title = {
                 Text(
                     stringResource(
@@ -101,8 +112,45 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
                     else -> Text(stringResource(R.string.backup_failed))
                 }
             },
-            confirmButton = { TextButton(onClick = viewModel::dismiss) { Text(stringResource(R.string.action_close)) } },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
         )
+    }
+}
+
+/**
+ * Offers the backup Android brought back from the reader's previous phone ([app.honmani.reader.data.backup.AutoBackup]),
+ * once, on the first start of a new install; the progress and result show as for a restore from a file.
+ */
+@Composable
+fun AutoBackupOffer(viewModel: BackupViewModel = viewModel(factory = BackupViewModel.Factory)) {
+    val context = LocalContext.current
+    val autoBackup = remember { (context.applicationContext as HonmaniApplication).container.autoBackup }
+    val offer by autoBackup.offer.collectAsStateWithLifecycle()
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    // Its own restore's progress and result only: Settings shows those of its own.
+    var restoring by rememberSaveable { mutableStateOf(false) }
+    offer?.let { madeAt ->
+        val date = remember(madeAt) { DateFormat.getDateInstance(DateFormat.LONG).format(Date(madeAt)) }
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text(stringResource(R.string.auto_backup_offer_title)) },
+            text = { Text(stringResource(R.string.auto_backup_offer, date)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    restoring = true
+                    viewModel.restoreAutoBackup()
+                }) { Text(stringResource(R.string.auto_backup_restore)) }
+            },
+            dismissButton = {
+                TextButton(onClick = autoBackup::answered) { Text(stringResource(R.string.auto_backup_start_fresh)) }
+            },
+        )
+    }
+    if (restoring) {
+        BackupStateDialog(state, onDismiss = {
+            restoring = false
+            viewModel.dismiss()
+        })
     }
 }
 

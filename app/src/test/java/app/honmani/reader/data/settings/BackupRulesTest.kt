@@ -1,6 +1,7 @@
 package app.honmani.reader.data.settings
 
 import app.honmani.reader.AppContainer
+import app.honmani.reader.data.backup.AutoBackup
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import org.junit.Assert.assertEquals
@@ -8,14 +9,18 @@ import org.junit.Test
 import org.w3c.dom.Element
 
 /**
- * Cloud backup and device transfer keep only the reader's choices: anything more (books, fonts,
- * ttu's copies) would be orphans without the database and push the backup past Android's limit.
+ * Cloud backup and device transfer keep only the reader's choices and Honmani's own backup of
+ * itself: anything more (books, fonts, ttu's copies) would be orphans without the database and
+ * push the backup past Android's limit.
  */
 class BackupRulesTest {
-    private val onlySettings = listOf("include sharedpref ${AppContainer.SETTINGS}.xml")
+    private val onlySettings = listOf(
+        "include sharedpref ${AppContainer.SETTINGS}.xml",
+        "include file ${AutoBackup.DIRECTORY}/",
+    )
 
     @Test
-    fun backupKeepsOnlyTheSettings() {
+    fun backupKeepsOnlyTheSettingsAndTheAutoBackup() {
         val rules = rules("data_extraction_rules.xml")
 
         assertEquals(onlySettings, rules.section("cloud-backup"))

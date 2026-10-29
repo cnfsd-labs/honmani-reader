@@ -59,6 +59,7 @@ import app.honmani.reader.ui.library.LibraryScreen
 import app.honmani.reader.ui.library.LibraryViewModel
 import app.honmani.reader.ui.onboarding.OnboardingScreen
 import app.honmani.reader.ui.progress.ProgressTab
+import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
 import app.honmani.reader.ui.settings.SettingsScreen
 import app.honmani.reader.ui.words.WordsScreen
@@ -115,6 +116,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             if (event == Lifecycle.Event.ON_STOP) {
                 container.ttuLibrary.requestProgress()
                 container.progressSync.flush()
+                container.saveAutoBackup()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -313,6 +315,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 }
             }
         }
+        // A backup Android brought back from the previous phone, offered once on a new install.
+        AutoBackupOffer()
         // Progress sync asks before going back to another device's earlier place in a book.
         val syncQuestion by library.syncQuestion.collectAsStateWithLifecycle()
         syncQuestion?.let { question ->

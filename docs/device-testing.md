@@ -55,6 +55,11 @@ same file again changes nothing.
 With progress sync signed in: read on in KOReader after the backup, then restore and add the
 book: it opens at KOReader's page ("Continued at …"), not at the backup's.
 
+Without a backup file: Honmani keeps one of its own (rewritten when it goes to the background,
+at most every 6 hours), which Android's backup to the Google account or a phone-to-phone
+transfer takes along. On the new phone, the first start asks "Restore from your previous
+phone?"; Restore brings back the same as a restore from a file.
+
 ## Reading progress sync (KOReader)
 
 With KOReader on an e-reader (or Calibre-Web Automated, whose own KOReader plugin "CWA Progress

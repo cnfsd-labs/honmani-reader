@@ -35,9 +35,11 @@ repository is public: never copy those notes, personal details or discussions in
 - **Database:** one Room database, **schema frozen** (version 1 in `app/schemas`). A change needs
   a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test in `DatabaseMigrationTest` and
   the exported JSON committed. No destructive fallback. Manual DI in `AppContainer`, no Hilt.
-- **Backup** keeps only the `settings` preferences. Everything tied to this phone (first start,
-  encrypted keys, AnkiDroid ids, sync account) is in `device` preferences, never backed up
-  (`BackupRulesTest`).
+- **Android backup** keeps the `settings` preferences and `files/auto-backup/` (`AutoBackup`:
+  the Settings backup zip, rewritten at most every 6 h when the app goes to the background,
+  dropped over 10 MB; offered once on a new install and not overwritten until answered).
+  Everything tied to this phone (first start, encrypted keys, AnkiDroid ids, sync account) is in
+  `device` preferences, never backed up (`BackupRulesTest`).
 - **Application ID** `app.honmani.reader` is permanent. Play bundles come from the "Release
   bundle" workflow (tag `release/*`; run number = version code); other builds stay unsigned or
   debug-signed.

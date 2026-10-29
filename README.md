@@ -14,7 +14,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Book difficulty from 1 to 100, worked out on the phone from the text
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download
 - Reading progress sync with KOReader (e-readers, Calibre-Web Automated), to the character
-- Back up settings, progress, statistics and saved words to one file, for a new phone
+- Back up settings, progress, statistics and saved words to one file, for a new phone; Android's
+  own backup takes them along too, and a new install offers to restore them
 - No account, no ads, no tracking ([privacy policy](docs/privacy-policy.md))
 
 ## Status

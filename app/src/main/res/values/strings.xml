@@ -636,6 +636,10 @@
         <item quantity="other">%d book servers added: enter their passwords again if they have one.</item>
     </plurals>
     <string name="backup_restored_not_included">Not in a backup: dictionaries and fonts (download them again), the reading progress sync login and the Google Cloud key.</string>
+    <string name="auto_backup_offer_title">Restore from your previous phone?</string>
+    <string name="auto_backup_offer">Android brought back Honmani\'s backup from %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
+    <string name="auto_backup_restore">Restore</string>
+    <string name="auto_backup_start_fresh">Start fresh</string>
     <string name="backup_failed_title">Not restored</string>
     <string name="backup_not_a_backup">This file is not a Honmani backup, or it comes from a newer version of Honmani. Update Honmani and try again.</string>
     <string name="backup_failed">The file could not be read or written. Try again, or pick another place for it.</string>

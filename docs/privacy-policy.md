@@ -10,9 +10,11 @@ no analytics and no tracking. CNFSD Labs does not receive any data from the app.
 Your books, imported dictionaries, saved words, reading statistics and settings are stored only
 on your phone, in Honmani's own app storage. Uninstalling the app deletes them.
 
-If you have turned on Android's backup to your Google account, Android includes only Honmani's
-settings (such as the accent colour and the Anki deck) in that backup. Books, dictionaries,
-saved words, statistics and passwords are never part of it.
+If you have turned on Android's backup to your Google account (or move to a new phone with
+Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki
+deck) and a copy Honmani keeps of its own backup file (see below: your saved words with their
+sentences, reading progress, statistics and the titles of your books). On a new phone Honmani
+offers to restore it. Books, dictionaries, passwords and keys are never part of it.
 
 Settings → Back up and restore writes your settings, reading progress, statistics and saved words
 to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
