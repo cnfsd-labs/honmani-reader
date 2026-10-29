@@ -26,14 +26,10 @@ device and WebView versions, the reader's console messages and how the last book
 ## Test files
 
 - **Sample book:** [`docs/samples/tebukuro.epub`](samples/tebukuro.epub), 新美南吉's 手袋を買いに with
-  furigana, converted from Aozora Bunko (also built into the app: the first-start screen offers
-  it; Settings → Sample books has eight more, built by `scripts/sample-books/`). It is known to be well-formed, so if it shows no text the
-  problem is in the app, not the file.
+  furigana (also built in: the first-start screen offers it, Settings → Sample books has eight
+  more). It is known to be well-formed, so if it shows no text the problem is in the app.
 - Any other DRM-free Japanese EPUB, or an Aozora Bunko `.txt` file (from a work's page on
   aozora.gr.jp, the zip under "テキストファイル(ルビあり)"; unzip it first).
-- JMdict for Yomitan: `JMdict_english.zip` from
-  https://github.com/yomidevs/jmdict-yomitan/releases/latest
-- Jitendex for Yomitan: `jitendex-yomitan.zip` from https://jitendex.org
 
 ## Before a release
 
@@ -85,9 +81,10 @@ Reader settings → Mark words. "Learning" (the default): look up a word, turn a
 come back: the word and its other forms (食べた, 食べない) have a light accent tint; after
 "Learned" in Words it loses it. Other spellings of it count as the same word: after looking up
 当たり前, 当り前 has the tint too (with or without furigana, one unbroken mark). "+ New" adds a grey tint on words never met in your reading
-(at first nearly everything, particles too); words read once lose it the next time they come up. "Off" shows none. The first marks after opening Honmani take a
-few seconds (the dictionaries are read) and fade in; after that, a turned page shows its marks at
-once. Between two chapters there is no empty page (銀河鉄道の夜 had four). Book sheet, after some reading in graded books: "You
+(at first nearly everything, particles too); words read once lose it the next time they come up.
+"Off" shows none. The first marks after a new install or a dictionary change take a few seconds
+(the word list is built once); after that they fade in within about a second of opening a book,
+and a turned page shows its marks at once. Book sheet, after some reading in graded books: "You
 know about N% of its words; about M are new to you", higher for easy books.
 
 ## Known limitations (no need to report)

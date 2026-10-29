@@ -46,12 +46,13 @@ repository is public: never copy those notes, personal details or discussions in
 - **Versions:** AGP 9.4 with built-in Kotlin (no `org.jetbrains.kotlin.android`), Gradle 9.8,
   Kotlin 2.4.21, KSP 2.3, compileSdk 37, targetSdk 36 (raise deliberately). Kotlin and KSP move
   together.
-- **Reader settings:** ttu's localStorage is the only store, so Honmani's screen and ttu's own
-  settings page never disagree. The theme follows the system until the reader picks one
-  (`honmaniAutoTheme`).
+- **Reader settings:** ttu's localStorage is the only store (Honmani's own too, as `honmani*`
+  keys), so Honmani's screen and ttu's own settings page never disagree. The theme follows the
+  system until the reader picks one (`honmaniAutoTheme`).
 - **Lookup** is tap-based, scan length 20, longest match first, except that an entry the book's
   furigana contradicts ranks below the entries it agrees with (誰が with だれ is 誰, not 誰が
-  たが); deinflection rules are Honmani's own (`lookup/Deinflector`). Glossaries are always stored deflated (`GlossaryPacker`).
+  たが); deinflection rules are Honmani's own (`lookup/Deinflector`). Glossaries are always
+  stored deflated (`GlossaryPacker`).
 - **Saved words** are recorded on every lookup, ranked by a decayed score (half-life 14 days),
   never deleted for age. "Learned", not "Known". Anki cards are suggested, never pushed.
 - **Spelling variants** (`SpellingVariants`): forms with kanji, two characters or more, that one
@@ -105,7 +106,8 @@ repository is public: never copy those notes, personal details or discussions in
   `= runBlocking { … }` test must end in a statement.
 - Android's ICU regex is stricter than the JVM's: always escape `{` and `}`; parse bridge
   messages as JSON, not with regexes.
-- Lint fails on a literal BOM in source: write such characters as escapes.
+- Lint fails on a literal BOM in source: write such characters as escapes. Overriding
+  `ComponentActivity.dispatchKeyEvent` is a RestrictedApi error: use `onKeyDown`/`onKeyUp`.
 - Assert the part of a UI state a test is about, not the whole object.
 - Room in-memory test DBs need `allowMainThreadQueries()` for raw queries. `MigrationTestHelper`
   fails on Windows (path separators); it passes on Linux CI.
