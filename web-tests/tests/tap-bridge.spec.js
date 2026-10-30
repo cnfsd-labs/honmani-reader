@@ -233,6 +233,16 @@ test('characters outside the BMP are kept whole', async ({ page }) => {
   expect(message.text).toBe('𠮟られた。');
 });
 
+test('a tap on an anchor without href is book text; a link is not', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector('#h2').innerHTML = '<a id="anchor">アンカー</a>の文。';
+  });
+  await tapChar(page, '#anchor', 'ン');
+
+  const lookups = (await messages(page)).filter((message) => message.type === 'lookup');
+  expect(lookups.map((message) => message.text)).toEqual(['ンカーの文。']);
+});
+
 test('taps on links, empty space and non-book text start no lookup', async ({ page }) => {
   await tapChar(page, '#h1', 'リ');
   await page.click('#blank');

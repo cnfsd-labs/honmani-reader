@@ -47,7 +47,7 @@
   const MAX_SENTENCE_LENGTH = 400;
   const BOOK_ROOT_SELECTOR = '.book-content';
   const SKIPPED_SELECTOR = 'rt, rp, script, style';
-  const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, [role="button"]';
+  const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   const SENTENCE_END = '。！？!?…\n';
   const CLOSING_QUOTES = '」』）〉》】"\'';
   const OPENING_BRACKETS = '「『（(〈《【〔［｛“‘〝"\'';
