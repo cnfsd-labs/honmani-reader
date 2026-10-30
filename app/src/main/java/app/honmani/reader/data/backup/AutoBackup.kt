@@ -61,12 +61,26 @@ class AutoBackup(
         if (!device.getBoolean(KEY_ANSWERED, false)) return false
         val last = withContext(Dispatchers.IO) { file.takeIf { it.isFile }?.lastModified() }
         if (!force && last != null && now() - last < MIN_INTERVAL_MS) return false
-        val backup = try {
+        val made = try {
             make()
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             return false
+        }
+        // The reader page wasn't loaded, so ttu's settings are missing: keep the ones the last
+        // backup had rather than dropping them.
+        val backup = if (made.readerSettings != null) made else {
+            val earlier = withContext(Dispatchers.IO) {
+                try {
+                    file.takeIf { it.isFile }?.inputStream()?.buffered()?.use(BackupCodec::read)?.readerSettings
+                } catch (_: IOException) {
+                    null
+                } catch (_: BackupFormatException) {
+                    null
+                }
+            }
+            if (earlier != null) made.copy(readerSettings = earlier) else made
         }
         withContext(Dispatchers.IO) {
             // A full storage must not take the app down as it goes to the background: the last

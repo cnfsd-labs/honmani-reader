@@ -48,6 +48,23 @@ class AutoBackupTest {
     }
 
     @Test
+    fun readerSettingsOfTheLastBackupSurviveAnotherWithoutThePage() = runBlocking {
+        auto.checkOffer()
+        val settings = mapOf("fontSize" to "22", "theme" to null)
+        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = settings) })
+
+        clock += AutoBackup.MIN_INTERVAL_MS
+        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = null) })
+        assertEquals(clock, auto.read().exportedAt)
+        assertEquals(settings, auto.read().readerSettings)
+
+        clock += AutoBackup.MIN_INTERVAL_MS
+        val newer = mapOf("fontSize" to "30")
+        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = newer) })
+        assertEquals(newer, auto.read().readerSettings)
+    }
+
+    @Test
     fun theOldPhonesBackupIsOfferedAndKeptUntilAnswered() = runBlocking {
         // Android brought back the old phone's file before the first start.
         dir.mkdirs()
