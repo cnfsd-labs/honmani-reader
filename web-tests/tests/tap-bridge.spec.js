@@ -57,6 +57,7 @@ test('vertical text: scans forward from the tapped character, skipping furigana'
       text: '吾輩は猫である。名前はまだ無い。」',
       sentence: '「吾輩は猫である。',
       sentenceOffset: 1,
+      tap: 1,
       ruby: [{ start: 3, end: 4, reading: 'ねこ' }],
     },
   ]);
@@ -273,6 +274,18 @@ test('the app can highlight the matched text, skipping furigana, and clear it', 
 
   await reply(page, { type: 'clear' });
   expect(await highlighted(page)).toBeNull();
+});
+
+test('a highlight answering an older tap is ignored; one for the latest tap is drawn', async ({ page }) => {
+  await tapChar(page, '#h2', '𠮟');
+  await tapChar(page, '#h1', '昨');
+  const taps = (await messages(page)).filter((message) => message.type === 'lookup').map((m) => m.tap);
+  expect(taps).toEqual([1, 2]);
+
+  await reply(page, { type: 'highlight', length: 2, tap: 1 });
+  expect(await highlighted(page)).toBeNull();
+  await reply(page, { type: 'highlight', length: 2, tap: 2 });
+  expect(await highlighted(page)).toEqual(['昨日']);
 });
 
 test('each tap logs how long its steps took until its mark was painted, once', async ({ page }) => {

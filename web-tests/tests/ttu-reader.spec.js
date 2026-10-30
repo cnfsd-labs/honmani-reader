@@ -365,6 +365,7 @@ for (const viewMode of ['paginated', 'continuous']) {
           text: '猫である。名前はまだ無い。',
           sentence: '吾輩は猫である。',
           sentenceOffset: 3,
+          tap: 1,
           ruby: [{ start: 0, end: 1, reading: 'ねこ' }],
         },
       ]);

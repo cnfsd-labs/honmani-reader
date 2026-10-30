@@ -160,6 +160,8 @@ data class TapLookup(
     val sentenceOffset: Int,
     /** Furigana over ruby bases inside [text], sorted. */
     val ruby: List<RubySpan> = emptyList(),
+    /** The bridge's number of this tap, echoed in the highlight; 0 if unnumbered. */
+    val tapNumber: Int = 0,
 ) {
     companion object {
         // Generous bounds; the bridge sends at most 20 code points and 400 sentence chars.
@@ -184,7 +186,10 @@ data class TapLookup(
                 return null
             }
             if (envelope.type != "lookup") return null
-            val lookup = TapLookup(envelope.text, envelope.sentence, envelope.sentenceOffset)
+            val lookup = TapLookup(
+                envelope.text, envelope.sentence, envelope.sentenceOffset,
+                tapNumber = envelope.tap.coerceAtLeast(0),
+            )
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
             val ruby = envelope.ruby.map { RubySpan(it.start, it.end, it.reading) }
@@ -211,6 +216,7 @@ data class TapLookup(
         val sentence: String = "",
         val sentenceOffset: Int = 0,
         val ruby: List<RubyEnvelope> = emptyList(),
+        val tap: Int = 0,
     )
 
     @Serializable

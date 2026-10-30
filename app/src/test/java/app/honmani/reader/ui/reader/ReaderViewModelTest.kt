@@ -189,6 +189,14 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun theHighlightEchoesTheTapNumber() {
+        viewModel.onTap(tap("猫").copy(tapNumber = 5))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+
+        assertEquals(5, viewModel.highlight.value?.tapNumber)
+    }
+
+    @Test
     fun withoutDictionariesThePanelSaysSo() {
         viewModel.onTap(tap("猫"))
         pending.getValue("猫").complete(LookupResult(emptyList(), dictionariesAvailable = false))

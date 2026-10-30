@@ -78,6 +78,13 @@ class TapLookupTest {
     }
 
     @Test
+    fun parse_keepsTheTapNumber() {
+        val lookup = TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫だ。","sentenceOffset":0,"tap":7}""")
+
+        assertEquals(7, lookup?.tapNumber)
+    }
+
+    @Test
     fun bridgeMessage_parsesLookupsAndDismiss() {
         val lookup = """{"type":"lookup","text":"猫","sentence":"猫だ。","sentenceOffset":0}"""
 

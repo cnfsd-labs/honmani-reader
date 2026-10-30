@@ -142,7 +142,7 @@ class ReaderViewModel(
             val result = withContext(compute) { lookup(tap.text, tap.ruby) }
             log("Lookup of ${tap.text.length} chars: ${result.entries.size} entries in ${start.elapsedNow()}")
             if (result.entries.isNotEmpty()) {
-                _highlight.value = Highlight(lookupId, result.matchedLength)
+                _highlight.value = Highlight(lookupId, result.matchedLength, tap.tapNumber)
                 log("Mark sent ${start.elapsedNow()} after the tap's message")
             }
             // Keep the previous panel on screen until the new result is ready, to avoid flicker.
@@ -153,13 +153,13 @@ class ReaderViewModel(
                     val first = tap.text.takeIf { it.isNotEmpty() }
                         ?.let { String(Character.toChars(it.codePointAt(0))) }.orEmpty()
                     kanjiOf(first)[first]
-                        ?.let { LookupPanelState.Kanji(tap, it, highlight = Highlight(lookupId, first.length)) }
+                        ?.let { LookupPanelState.Kanji(tap, it, highlight = Highlight(lookupId, first.length, tap.tapNumber)) }
                         ?: LookupPanelState.NothingFound(tap)
                 }
                 else -> {
                     val groups = withContext(compute) { LookupGroups.from(result) }
                     record(tap, groups.first())
-                    LookupPanelState.Results(tap = tap, groups = groups, highlight = Highlight(lookupId, result.matchedLength))
+                    LookupPanelState.Results(tap = tap, groups = groups, highlight = Highlight(lookupId, result.matchedLength, tap.tapNumber))
                 }
             })
             log("Panel shown ${start.elapsedNow()} after the tap's message")

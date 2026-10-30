@@ -6,6 +6,7 @@
  *
  *   { "type": "lookup", "text": "<up to SCAN_LENGTH chars from the tapped char>",
  *     "sentence": "<sentence around it>", "sentenceOffset": <index of text in sentence>,
+ *     "tap": <number of this tap, counting up from 1>,
  *     "ruby": [{ "start": <n>, "end": <n>, "reading": "<furigana>" }] }
  *
  * "ruby" lists furigana for ruby bases that lie wholly inside "text" (indexes into "text"); it is
@@ -19,9 +20,11 @@
  *
  * Messages from the app (replies on the same object):
  *
- *   { "type": "highlight", "length": <n>, "color": "#rrggbb" }
+ *   { "type": "highlight", "length": <n>, "color": "#rrggbb", "tap": <n> }
  *                                             marks n characters from the last tapped one, in
- *                                             the app's accent colour (optional)
+ *                                             the app's accent colour (optional); "tap" is the
+ *                                             number of the lookup it answers: a mark for an
+ *                                             older tap than the latest one is ignored
  *   { "type": "clear" }                      removes the mark
  *
  * The mark uses the CSS Custom Highlight API, so ttu's DOM is never modified. WebViews before
@@ -57,6 +60,9 @@
    * between the tapped character and the scanned text.
    */
   let lastTap = null;
+
+  /** Counts taps (lookups and dismissals); the app echoes a lookup's number in its highlight. */
+  let tapNumber = 0;
 
   /** The fallback mark: { ranges, background }, or null. */
   let overlayMark = null;
@@ -266,7 +272,7 @@
 
     const { sentence, offset } = sentenceAround(paragraph, start);
     lastTap = { block, node, index, skip: start - position };
-    const message = { type: 'lookup', text, sentence, sentenceOffset: offset };
+    const message = { type: 'lookup', text, sentence, sentenceOffset: offset, tap: ++tapNumber };
     const ruby = rubyWithin(paragraphRuby, start, text.length);
     if (ruby.length > 0) message.ruby = ruby;
     return message;
@@ -386,6 +392,8 @@
       return;
     }
     if (message.type === 'highlight' && Number.isInteger(message.length)) {
+      // A reply that comes after a newer tap would mark the wrong text.
+      if (Number.isInteger(message.tap) && message.tap < tapNumber) return;
       highlight(message.length, message.color);
     } else if (message.type === 'clear') {
       clearHighlight();
@@ -435,6 +443,7 @@
       tapTiming = { up: lastUp || arrived, arrived, posted: performance.now(), via };
     } else if (isBookBackground(target)) {
       clearHighlight();
+      tapNumber++;
       post({ type: 'dismiss' });
     }
   }
