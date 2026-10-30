@@ -290,6 +290,19 @@ class BackupTest {
     }
 
     @Test
+    fun aFailedMoveLeavesTheRestoredBookWaiting() = runTest {
+        val old = oldPhone()
+        val new = Phone("new")
+        new.backup.restore(throughFile(old.backup.export(readerSettings = null)))
+        val added = new.addBook("hash-a")
+        new.database.close()
+
+        runCatching { new.backup.onBookAdded(added) }.also { assertTrue(it.isFailure) }
+
+        assertTrue(new.restored.waiting().any { it.key == "hash-a" })
+    }
+
+    @Test
     fun aBookWithoutAnOpeningDateTakesTheBackupsTimeForItsPosition() = runTest {
         val old = Phone("old")
         old.addBook("hash-b", characters = 800, progress = 0.5f)

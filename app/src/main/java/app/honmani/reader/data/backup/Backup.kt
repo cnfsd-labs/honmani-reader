@@ -289,7 +289,7 @@ class Backup(
      * statistics move to it. Returns the book as it is now.
      */
     suspend fun onBookAdded(book: BookEntity): BookEntity {
-        val waiting = restored.take(book.contentHash) ?: return book
+        val waiting = restored.find(book.contentHash) ?: return book
         val details = waiting.details ?: return book
         val merged = merge(book, details)
         database.withTransaction {
@@ -298,6 +298,8 @@ class Backup(
             dao.moveWordLookups(waiting.id, book.id)
             if (merged != book) dao.updateBook(merged)
         }
+        // Only now: if the move failed, the book keeps waiting and the next add tries again.
+        restored.remove(waiting)
         if (merged.characters > book.characters) {
             restored.setPosition(book.contentHash, position(merged, details.lastOpenedAt ?: details.addedAt))
         }

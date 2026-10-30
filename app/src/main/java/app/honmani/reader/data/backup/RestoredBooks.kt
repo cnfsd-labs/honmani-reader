@@ -59,15 +59,12 @@ class RestoredBooks(private val file: File) {
         }
     }
 
-    /** The waiting book with content hash [hash], no longer waiting; null if there is none. */
-    fun take(hash: String): WaitingBook? {
-        var taken: WaitingBook? = null
-        update { state ->
-            taken = state.waiting.firstOrNull { it.key == hash && it.details != null }
-            if (taken == null) state else state.copy(waiting = state.waiting - taken!!)
-        }
-        return taken
-    }
+    /** The waiting book with content hash [hash], still waiting; null if there is none. */
+    fun find(hash: String): WaitingBook? =
+        synchronized(lock) { current().waiting.firstOrNull { it.key == hash && it.details != null } }
+
+    /** [book] is back in the library: it no longer waits. */
+    fun remove(book: WaitingBook) = update { state -> state.copy(waiting = state.waiting - book) }
 
     fun setPosition(hash: String, position: RestoredPosition) = update { it.copy(positions = it.positions + (hash to position)) }
 
