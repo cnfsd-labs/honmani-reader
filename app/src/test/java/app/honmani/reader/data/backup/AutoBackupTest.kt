@@ -76,4 +76,14 @@ class AutoBackupTest {
         assertFalse(auto.saveIfDue { throw IllegalStateException("reader busy") })
         assertTrue(auto.file.isFile)
     }
+
+    @Test
+    fun aBackupThatCouldNotBeWrittenIsSkipped() = runBlocking {
+        val blocked = File(dir, "not-a-directory").apply { writeText("") }
+        val auto = AutoBackup(blocked, device, now = { clock })
+        auto.checkOffer()
+
+        assertFalse(auto.saveIfDue { backup() })
+        assertFalse(File(blocked, "${AutoBackup.FILE_NAME}.part").exists())
+    }
 }

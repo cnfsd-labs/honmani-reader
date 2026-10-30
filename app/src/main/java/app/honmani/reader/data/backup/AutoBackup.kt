@@ -2,6 +2,7 @@ package app.honmani.reader.data.backup
 
 import android.content.SharedPreferences
 import java.io.File
+import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,15 +69,22 @@ class AutoBackup(
             return false
         }
         withContext(Dispatchers.IO) {
-            dir.mkdirs()
+            // A full storage must not take the app down as it goes to the background: the last
+            // backup stays, and the next one is tried next time.
             val partial = File(dir, "$FILE_NAME.part")
-            partial.outputStream().use { BackupCodec.write(backup, it) }
-            if (partial.length() > MAX_BYTES) {
+            try {
+                dir.mkdirs()
+                partial.outputStream().use { BackupCodec.write(backup, it) }
+                if (partial.length() > MAX_BYTES) {
+                    partial.delete()
+                    file.delete()
+                    false
+                } else {
+                    partial.renameTo(file).also { if (it) file.setLastModified(now()) }
+                }
+            } catch (_: IOException) {
                 partial.delete()
-                file.delete()
                 false
-            } else {
-                partial.renameTo(file).also { if (it) file.setLastModified(now()) }
             }
         }
     }
