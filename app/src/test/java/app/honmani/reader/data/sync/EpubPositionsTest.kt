@@ -48,6 +48,7 @@ class EpubPositionsTest {
     @Test
     fun positionsOutsideTheBookAreNull() {
         assertNull(positions.charactersAt("/body/DocFragment[3]/body/p/text().0"))
+        assertNull(positions.charactersAt("/body/DocFragment[99999999999]/body/p/text().0"))
         assertNull(positions.charactersAt("42"))
         assertNull(positions.charactersAt(""))
     }

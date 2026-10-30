@@ -35,7 +35,7 @@ class EpubPositions private constructor(
     /** ttu's character count at [xpointer], or null if it doesn't point into this book. */
     fun charactersAt(xpointer: String): Int? {
         val match = DOC_FRAGMENT.find(xpointer) ?: return null
-        val index = match.groupValues[1].toInt() - 1
+        val index = (match.groupValues[1].toIntOrNull() ?: return null) - 1
         if (index !in spine.indices) return null
         val body = document(index) ?: return null
         val steps = xpointer.substring(match.range.last + 1).split('/').filter { it.isNotEmpty() }
