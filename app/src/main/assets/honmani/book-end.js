@@ -46,7 +46,10 @@
   let total = null;
   let refusedLogged = null;
 
-  /** The last character of book text that isn't blank (furigana skipped): { node, offset }. */
+  /**
+   * The last character of book text that isn't blank (furigana skipped): { node, offset }. Found
+   * from the end of the book, so the cost does not grow with the book's length.
+   */
   function lastChar(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) =>
@@ -54,10 +57,8 @@
           ? NodeFilter.FILTER_REJECT
           : NodeFilter.FILTER_ACCEPT,
     });
-    let last = null;
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (node.data.trim()) last = node;
-    }
+    let last = walker.lastChild();
+    while (last && !last.data.trim()) last = walker.previousNode();
     if (!last) return null;
     let offset = last.data.length - 1;
     while (offset > 0 && !last.data[offset].trim()) offset--;
