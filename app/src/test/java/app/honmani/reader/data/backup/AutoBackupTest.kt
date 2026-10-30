@@ -103,4 +103,27 @@ class AutoBackupTest {
         assertFalse(auto.saveIfDue { backup() })
         assertFalse(File(blocked, "${AutoBackup.FILE_NAME}.part").exists())
     }
+
+    @Test
+    fun aFailedWriteKeepsTheLastBackupAndLeavesNoPartFile() = runBlocking {
+        auto.checkOffer()
+        assertTrue(auto.saveIfDue { backup() })
+        val before = auto.file.readBytes()
+        val stamp = auto.file.lastModified()
+
+        // The temporary file can't be opened: its name is taken by a directory.
+        val partial = File(dir, "${AutoBackup.FILE_NAME}.part").apply { mkdirs() }
+        clock += AutoBackup.MIN_INTERVAL_MS
+        assertFalse(auto.saveIfDue { backup() })
+
+        assertFalse(partial.exists())
+        assertTrue(before.contentEquals(auto.file.readBytes()))
+        assertEquals(stamp, auto.file.lastModified())
+        assertEquals(1_000_000_000_000L, auto.read().exportedAt)
+        assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+
+        // The next attempt works again.
+        assertTrue(auto.saveIfDue(force = true) { backup() })
+        assertEquals(clock, auto.read().exportedAt)
+    }
 }
