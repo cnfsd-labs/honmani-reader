@@ -633,6 +633,31 @@ test('word marks leave furigana out of the text and the marks', async ({ page })
   await expect.poll(() => marked(page)).toEqual({ 'honmani-learning': ['吾輩', 'は', '猫'], 'honmani-new': [] });
 });
 
+test('word marks ask about a paragraph longer than a request in pieces, and mark all of it', async ({ page }) => {
+  await openWithMarks(page, 'one-paragraph.epub', null);
+  const paragraph = Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('');
+  expect(paragraph.length).toBeGreaterThan(4_000);
+
+  const sent = async () => (await markRequests(page)).flatMap((m) => m.blocks.map((b) => ({ ...b, requestId: m.requestId }))).filter((b) => b.text.includes('番目の文'));
+  await expect.poll(async () => (await sent()).map((b) => b.text).join('')).toBe(paragraph);
+  const pieces = await sent();
+  expect(pieces.length).toBe(2);
+  // Each piece ends after a sentence, within the limit.
+  expect(pieces[0].text.length).toBeLessThanOrEqual(4_000);
+  expect(pieces[0].text.endsWith('。')).toBe(true);
+
+  // Marks in both pieces, each at its place in the paragraph.
+  const answers = new Map();
+  for (const [piece, word] of [[pieces[0], '1番目'], [pieces[1], '400番目']]) {
+    if (!answers.has(piece.requestId)) answers.set(piece.requestId, []);
+    answers.get(piece.requestId).push({ id: piece.id, marks: [[piece.text.indexOf(word), word.length, 0]] });
+  }
+  for (const [requestId, blocks] of answers) {
+    await page.evaluate(([requestId, blocks]) => window.__reply({ type: 'marks', requestId, blocks }), [requestId, blocks]);
+  }
+  await expect.poll(async () => (await marked(page))['honmani-learning'].sort()).toEqual(['1番目', '400番目']);
+});
+
 test('word marks let go of the paragraphs of chapters ttu took out of the page', async ({ page }) => {
   // Which paragraphs the marks watch: a reset observes each of them again.
   await page.addInitScript(() => {

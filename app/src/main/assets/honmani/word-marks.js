@@ -8,13 +8,15 @@
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
  *
  *   { type: 'marks.request', requestId, mode, blocks: [{ id, text }] }
- *     text: the paragraph without furigana (<rt>, <rp>), as the tap bridge reads it
+ *     text: the paragraph without furigana (<rt>, <rp>), as the tap bridge reads it; a long
+ *     paragraph comes in pieces of up to 4,000 characters, each a block of its own (id: the
+ *     piece's, unique on the page)
  *
  * and the app answers on the same object:
  *
  *   { type: 'marks', requestId, color: '#rrggbb', blocks: [{ id, marks: [[start, length, kind]] }] }
- *     kind 0: learning, 1: new; start and length in UTF-16 units of text; color: the app's
- *     accent, for the learning words' tint
+ *     kind 0: learning, 1: new; start and length in UTF-16 units of the block's text; color:
+ *     the app's accent, for the learning words' tint
  *   { type: 'marks.reset' }   the reader's words changed: paragraphs are asked about again
  *
  * Marks use the CSS Custom Highlight API (Chromium 105+), so ttu's DOM, its character counts
@@ -43,7 +45,9 @@
   const AHEAD = '100%';
   const FADE_MS = 250;
   const MAX_BATCH_TEXT = 6_000;
+  /** Longer paragraphs go in pieces (piecesOf), which end after one of PIECE_ENDS where they can. */
   const MAX_BLOCK_TEXT = 4_000;
+  const PIECE_ENDS = '。．！？!?\n';
   const BATCH_DELAY_MS = 80;
 
   if (!(window.CSS && CSS.highlights && window.Highlight)) return;
@@ -68,10 +72,14 @@
   const ids = new WeakMap();
   let nextId = 1;
   let nextRequest = 1;
+  /** Ids of later pieces of long blocks, by block and start (a first piece has the block's). */
+  const pieceIds = new Map();
   let root = null;
   let observer = null;
   let mutations = null;
+  /** Blocks to ask about, and the pieces of the one being sent. */
   let queue = new Set();
+  let pieces = [];
   let timer = 0;
   /** Bumped by a reset: answers to older requests are dropped. */
   let generation = 0;
@@ -205,6 +213,8 @@
       ids.delete(element);
       blocks.delete(id);
       queue.delete(id);
+      pieces = pieces.filter((piece) => piece.block !== id);
+      pieceIds.delete(id);
       for (const mark of (shown.get(id) || new Map()).values()) {
         for (const range of mark.ranges) {
           highlights[mark.kind].delete(range);
@@ -246,31 +256,76 @@
     return (blocks.get(id) || []).map((node) => node.data).join('');
   }
 
+  /**
+   * Block `id`'s text in pieces of at most MAX_BLOCK_TEXT, as { block, start, text }: a chapter
+   * can be one long paragraph (or a <div> with <br>s). A piece ends after a sentence where it
+   * can, so no word is cut in two.
+   */
+  function piecesOf(id) {
+    const text = textOf(id);
+    const pieces = [];
+    for (let start = 0; start < text.length; ) {
+      let end = Math.min(text.length, start + MAX_BLOCK_TEXT);
+      if (end < text.length) {
+        let cut = -1;
+        for (let i = end - 1; i > start + MAX_BLOCK_TEXT / 2 && cut < 0; i--) {
+          if (PIECE_ENDS.includes(text[i])) cut = i + 1;
+        }
+        if (cut > 0) end = cut;
+        // No surrogate pair cut in two.
+        else if (/[\ud800-\udbff]/.test(text[end - 1])) end--;
+      }
+      pieces.push({ block: id, start, text: text.slice(start, end) });
+      start = end;
+    }
+    return pieces;
+  }
+
+  /** The same on every request, so answers and diagnostics read alike. */
+  function pieceId(piece) {
+    if (piece.start === 0) return piece.block;
+    if (!pieceIds.has(piece.block)) pieceIds.set(piece.block, new Map());
+    const own = pieceIds.get(piece.block);
+    if (!own.has(piece.start)) own.set(piece.start, nextId++);
+    return own.get(piece.start);
+  }
+
   function send() {
     timer = 0;
     const app = window.honmani;
-    if (!app || queue.size === 0) return;
+    if (!app || (queue.size === 0 && pieces.length === 0)) return;
     const wanted = mode();
     if (wanted === 'off') {
       queue.clear();
+      pieces = [];
       return;
     }
     let size = 0;
     const batch = [];
-    for (const id of queue) {
-      const text = textOf(id).slice(0, MAX_BLOCK_TEXT);
-      if (batch.length > 0 && size + text.length > MAX_BATCH_TEXT) break;
-      queue.delete(id);
-      if (!text.trim()) continue;
-      batch.push({ id, text });
-      size += text.length;
+    const parts = new Map();
+    for (;;) {
+      if (pieces.length === 0) {
+        const next = queue.values().next();
+        if (next.done) break;
+        queue.delete(next.value);
+        pieces = piecesOf(next.value);
+        continue;
+      }
+      const piece = pieces[0];
+      if (batch.length > 0 && size + piece.text.length > MAX_BATCH_TEXT) break;
+      pieces.shift();
+      if (!piece.text.trim()) continue;
+      const id = pieceId(piece);
+      batch.push({ id, text: piece.text });
+      parts.set(id, piece);
+      size += piece.text.length;
     }
     if (batch.length > 0) {
       const requestId = nextRequest++;
-      pending.set(requestId, { generation, texts: new Map(batch.map((block) => [block.id, block.text])) });
+      pending.set(requestId, { generation, parts });
       app.postMessage(JSON.stringify({ type: 'marks.request', requestId, mode: wanted, blocks: batch }));
     }
-    if (queue.size > 0) timer = setTimeout(send, BATCH_DELAY_MS);
+    if (queue.size > 0 || pieces.length > 0) timer = setTimeout(send, BATCH_DELAY_MS);
   }
 
   function ask(id) {
@@ -302,29 +357,39 @@
     pending.delete(message.requestId);
     if (!request || request.generation !== generation || !Array.isArray(message.blocks)) return;
     setColor(message.color);
-    for (const block of message.blocks) {
+    for (const answer of message.blocks) {
+      const piece = answer ? request.parts.get(answer.id) : undefined;
+      if (!piece) continue;
+      const id = piece.block;
+      const end = piece.start + piece.text.length;
       // The paragraph changed since it was sent: ask again.
-      if (!block || request.texts.get(block.id) !== textOf(block.id).slice(0, MAX_BLOCK_TEXT)) {
-        if (block && blocks.has(block.id)) ask(block.id);
+      if (piece.text !== textOf(id).slice(piece.start, end)) {
+        if (blocks.has(id)) ask(id);
         continue;
       }
-      const before = shown.get(block.id) || new Map();
+      const before = shown.get(id) || new Map();
       const now = new Map();
-      for (const mark of Array.isArray(block.marks) ? block.marks : []) {
-        const [start, length, kind] = mark;
-        if (!Number.isInteger(start) || !Number.isInteger(length) || !highlights[kind]) continue;
+      // The marks of the paragraph's other pieces stay as they are.
+      const within = (mark) => mark.start >= piece.start && mark.start < end;
+      for (const [key, mark] of before) {
+        if (!within(mark)) now.set(key, mark);
+      }
+      for (const mark of Array.isArray(answer.marks) ? answer.marks : []) {
+        const [at, length, kind] = mark;
+        if (!Number.isInteger(at) || !Number.isInteger(length) || !highlights[kind]) continue;
+        const start = piece.start + at;
         const key = `${start}:${length}:${kind}`;
         const kept = before.get(key);
         if (kept && kept.ranges.every((range) => range.startContainer.isConnected)) {
           now.set(key, kept);
           continue;
         }
-        const ranges = rangesOf(block.id, start, length);
+        const ranges = rangesOf(id, start, length);
         for (const range of ranges) fresh[kind].add(range);
-        now.set(key, { kind, ranges });
+        now.set(key, { kind, start, ranges });
       }
       for (const [key, mark] of before) {
-        if (now.get(key) === mark) continue;
+        if (now.get(key) === mark || !within(mark)) continue;
         // Marked at a lookup, and this answer was asked for before the app counted it: kept
         // until the answers after the lookup's reset.
         if (mark.lookedUp === request.generation) {
@@ -336,7 +401,7 @@
           fresh[mark.kind].delete(range);
         }
       }
-      shown.set(block.id, now);
+      shown.set(id, now);
     }
     if (fresh.some((highlight) => highlight.size > 0)) fadeIn();
     if (resetAt) {
@@ -364,6 +429,7 @@
     resetAt = performance.now();
     pending.clear();
     queue.clear();
+    pieces = [];
     if (!observer) return;
     // Observing again reports what is near the screen now.
     for (const element of elements.values()) {
@@ -380,6 +446,7 @@
     root = null;
     blocks.clear();
     elements.clear();
+    pieceIds.clear();
     clear();
   }
 
@@ -457,7 +524,7 @@
     if (!marks.has(key)) {
       const own = rangesOf(id, start, length);
       for (const range of own) highlights[0].add(range);
-      marks.set(key, { kind: 0, ranges: own, lookedUp: generation });
+      marks.set(key, { kind: 0, start, ranges: own, lookedUp: generation });
     } else {
       marks.get(key).lookedUp = generation;
     }
