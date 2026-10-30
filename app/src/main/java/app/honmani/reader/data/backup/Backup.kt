@@ -166,8 +166,12 @@ class Backup(
             val library = dao.books().associateBy { it.contentHash }
             var nextId = minOf(-1L, (waitingBefore.values.minOfOrNull { it.id } ?: 0L) - 1)
             val ids = HashMap<String, Long>()
+            val ownPrefix = "book:${installationId()}:"
             fun idOf(key: String): Long = ids.getOrPut(key) {
-                library[key]?.id ?: waitingBefore[key]?.id ?: (nextId--).also { newWaiting += WaitingBook(key, it) }
+                library[key]?.id ?: waitingBefore[key]?.id
+                    // Removed from this phone's library: its statistics are still under that id.
+                    ?: key.removePrefix(ownPrefix).takeIf { key.startsWith(ownPrefix) }?.toLongOrNull()?.takeIf { it > 0 }
+                    ?: (nextId--).also { newWaiting += WaitingBook(key, it) }
             }
             for (entry in backup.books) {
                 val book = library[entry.key]

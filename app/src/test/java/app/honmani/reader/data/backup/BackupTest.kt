@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -269,6 +270,23 @@ class BackupTest {
         assertEquals(100L, days.getValue("2026-10-22").seconds)
         assertEquals(1, new.database.backupDao().words().count { it.expression == "猫" })
         assertEquals(RestoredPosition(5_000, 0.25f, savedAt = LAST_OPENED), new.restored.takePosition("hash-a"))
+    }
+
+    @Test
+    fun restoringOnTheSamePhoneDoesNotCountTheReadingOfRemovedBooksTwice() = runTest {
+        val phone = oldPhone()
+        // A lookup in the removed book (id 99), too.
+        phone.database.backupDao().insertLookupEvents(listOf(LookupEventEntity(lookedUpAt = 5, bookId = 99)))
+        val before = phone.snapshot()
+        val backup = throughFile(phone.backup.export(readerSettings = null))
+
+        phone.backup.restore(backup)
+
+        assertEquals(6_000L, phone.days().sumOf { it.characters })
+        assertTrue(phone.days().none { it.bookId < 0 })
+        assertEquals(1, phone.database.backupDao().lookupEvents().count { it.bookId == 99L })
+        assertTrue(phone.restored.waiting().isEmpty())
+        assertEquals(before, phone.snapshot())
     }
 
     @Test
