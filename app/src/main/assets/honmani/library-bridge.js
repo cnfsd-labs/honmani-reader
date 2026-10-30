@@ -323,7 +323,15 @@
   function navigate({ path }) {
     // Only paths on the reader's own origin.
     if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//')) return;
-    const target = path;
+    // Browsers read a backslash as a slash, so "/\host" is protocol-relative: check what it resolves to.
+    let resolved;
+    try {
+      resolved = new URL(path, location.href);
+    } catch (error) {
+      return;
+    }
+    if (resolved.origin !== location.origin) return;
+    const target = resolved.pathname + resolved.search + resolved.hash;
     // ttu's router listens for link clicks on its root element, the first child of <body>.
     const root = document.body && document.body.firstElementChild;
     if (!root) {

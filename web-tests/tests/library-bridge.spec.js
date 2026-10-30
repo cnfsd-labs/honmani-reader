@@ -215,6 +215,19 @@ test('reading progress comes from ttu’s bookmarks', async ({ page }) => {
   expect(characters).toBeGreaterThan(0);
 });
 
+test('navigate rejects targets that leave the reader origin', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  await page.evaluate(() => window.honmaniLibrary.navigate({ path: '/settings' }));
+  await page.waitForURL(/\/settings$/);
+  for (const path of ['/\\example.com/x', '/\\/example.com/x', '//example.com/x', '/\t/example.com/x', 'https://example.com/']) {
+    await page.evaluate((path) => window.honmaniLibrary.navigate({ path }), path);
+    await page.waitForTimeout(200);
+    expect(page.url().startsWith(server.url)).toBe(true);
+    expect(new URL(page.url()).pathname).toBe('/settings');
+  }
+});
+
 test('other ttu pages open inside the running page, without a page load', async ({ page }) => {
   await setUp(page);
   await page.goto(`${server.url}/manage`);
@@ -447,6 +460,26 @@ test('the book page reports its background and shows the reading position as a b
   const vertical = await page.evaluate(() => getComputedStyle(document.documentElement).writingMode.startsWith('vertical-rl'));
   if (vertical) expect(box.x + box.width).toBeCloseTo(viewport.width, 0);
   else expect(box.x).toBeCloseTo(0, 0);
+});
+
+test('a book element with the progress bar id is left alone; the bar is the script\'s own', async ({ page }) => {
+  await setUp(page);
+  await page.addInitScript(() => {
+    window.addEventListener('DOMContentLoaded', () => {
+      document.body.insertAdjacentHTML('beforeend', '<div id="honmani-progress" data-book="1"></div>');
+    });
+  });
+  await page.addInitScript({ path: path.join(ASSETS, 'reading-activity.js') });
+  await page.addInitScript({ path: path.join(ASSETS, 'book-frame.js') });
+  await page.goto(`${server.url}/manage`);
+  const book = await ensure(page, 'long.epub');
+  await page.goto(`${server.url}/b?id=${book.id}`);
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 5_000 });
+
+  for (let turn = 1; turn <= 3; turn++) await page.keyboard.press('ArrowDown');
+  const bar = page.locator('#honmani-progress:not([data-book])');
+  await expect.poll(async () => (await bar.boundingBox())?.width ?? 0).toBeGreaterThan(0);
+  expect(await page.locator('#honmani-progress[data-book]').evaluate((e) => e.getAttribute('style'))).toBeNull();
 });
 
 test('the progress bar stays off when the reader turned it off', async ({ page }) => {
