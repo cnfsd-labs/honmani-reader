@@ -278,23 +278,27 @@
     return message;
   }
 
+  // The elements this script created, kept by reference: a book may carry the same ids.
+  let overlayElement = null;
+  let styleElement = null;
+
   function clearHighlight() {
     if (hasHighlightApi()) CSS.highlights.delete(HIGHLIGHT_NAME);
     overlayMark = null;
-    const overlay = document.getElementById(OVERLAY_ID);
-    if (overlay) overlay.remove();
+    if (overlayElement) overlayElement.remove();
   }
 
   /** Draws the fallback mark's boxes; it never takes taps, so lookups still reach the book. */
   function drawOverlay() {
-    let overlay = document.getElementById(OVERLAY_ID);
+    let overlay = overlayElement;
     if (!overlayMark) {
       if (overlay) overlay.remove();
       return;
     }
-    if (!overlay) {
+    if (!overlay || !overlay.isConnected) {
       overlay = document.createElement('div');
       overlay.id = OVERLAY_ID;
+      overlayElement = overlay;
       overlay.style.cssText =
         'position: fixed; inset: 0; pointer-events: none; z-index: 2147483647; overflow: hidden;';
       document.documentElement.appendChild(overlay);
@@ -323,10 +327,11 @@
   }
 
   function setHighlightStyle(color) {
-    let style = document.getElementById('honmani-style');
-    if (!style) {
+    let style = styleElement;
+    if (!style || !style.isConnected) {
       style = document.createElement('style');
       style.id = 'honmani-style';
+      styleElement = style;
       (document.head || document.documentElement).appendChild(style);
     }
     style.textContent = `::highlight(${HIGHLIGHT_NAME}) { background-color: ${highlightBackground(color)}; }`;

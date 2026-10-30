@@ -102,16 +102,20 @@
     writeStyle(fadeFrame ? (performance.now() - fadeStart) / FADE_MS : 1);
   }
 
+  // The style element this script created, by reference: a book may carry the same id.
+  let styleElement = null;
+
   /** The marks' tints; `fade` (0 to 1): how far the fresh marks have faded in. */
   function writeStyle(fade) {
     if (rgb === null) return;
-    let style = document.getElementById('honmani-marks-style');
-    if (!style) {
+    let style = styleElement;
+    if (!style || !style.isConnected) {
       // Only with the first answer: at document start there is no document element yet.
       const parent = document.head || document.documentElement;
       if (!parent) return;
       style = document.createElement('style');
       style.id = 'honmani-marks-style';
+      styleElement = style;
       parent.appendChild(style);
     }
     const alpha = Math.min(1, Math.max(0, fade));

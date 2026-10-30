@@ -438,3 +438,24 @@ test('no lookup while text is selected', async ({ page }) => {
 
   expect(await messages(page)).toEqual([]);
 });
+
+test('elements in the book with the script\'s ids are not taken over', async ({ page }) => {
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<style id="honmani-style" data-book>p { color: red }</style><div id="honmani-highlight-overlay" data-book></div>',
+    );
+  });
+  await tapChar(page, '#v1', '猫');
+  await reply(page, { type: 'highlight', length: 3 });
+
+  const book = await page.evaluate(() => ({
+    style: document.querySelector('style[data-book]').textContent,
+    overlayChildren: document.querySelector('div[data-book]').children.length,
+    styles: Array.from(document.querySelectorAll('style')).filter((e) => e.textContent.includes('::highlight(honmani-lookup)')).length,
+  }));
+  // The book's own elements are untouched; the script made its own.
+  expect(book.style).toBe('p { color: red }');
+  expect(book.overlayChildren).toBe(0);
+  expect(book.styles).toBe(1);
+});

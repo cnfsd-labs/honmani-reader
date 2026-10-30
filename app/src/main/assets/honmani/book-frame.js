@@ -66,9 +66,12 @@
     }
   }
 
+  // The bar this script created, by reference: a book may carry the same id.
+  let barElement = null;
+
   function drawBar() {
     const id = bookId();
-    let bar = document.getElementById(BAR_ID);
+    let bar = barElement;
     if (id === null || id !== progressBook || progress === null || !document.body || !barWanted()) {
       if (bar) bar.remove();
       return;
@@ -76,6 +79,7 @@
     if (!bar) {
       bar = document.createElement('div');
       bar.id = BAR_ID;
+      barElement = bar;
       bar.setAttribute('aria-hidden', 'true');
       bar.style.cssText = `position: fixed; bottom: 0; height: ${BAR_HEIGHT_PX}px; z-index: 2147483647;
         pointer-events: none; background-color: var(--honmani-accent, #888888);
