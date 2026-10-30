@@ -126,4 +126,16 @@ class AutoBackupTest {
         assertTrue(auto.saveIfDue(force = true) { backup() })
         assertEquals(clock, auto.read().exportedAt)
     }
+
+    @Test
+    fun aBackupThatCouldNotReplaceTheOldFileLeavesNoPartFile() = runBlocking {
+        auto.checkOffer()
+        // The rename fails: the backup's name is taken by a directory that isn't empty.
+        File(auto.file, "in-the-way").apply { parentFile?.mkdirs() }.writeText("x")
+
+        assertFalse(auto.saveIfDue { backup() })
+
+        assertFalse(File(dir, "${AutoBackup.FILE_NAME}.part").exists())
+        assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+    }
 }

@@ -96,7 +96,9 @@ class AutoBackup(
                     file.delete()
                     false
                 } else {
-                    partial.renameTo(file).also { if (it) file.setLastModified(now()) }
+                    val renamed = partial.renameTo(file)
+                    if (renamed) file.setLastModified(now()) else partial.delete()
+                    renamed
                 }
             } catch (_: IOException) {
                 partial.delete()
