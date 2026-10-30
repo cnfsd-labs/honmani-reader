@@ -2,6 +2,22 @@ package app.honmani.reader.ui.reader
 
 import java.security.MessageDigest
 import java.util.Base64
+import androidx.webkit.WebViewAssetLoader
+
+/** What the reader does with a navigation the WebView is about to make. */
+enum class Navigation {
+    /** The reader's own origin: the WebView loads it. */
+    LOAD,
+
+    /** A web link the reader tapped: opened in the user's browser, not in the reader. */
+    OPEN_EXTERNALLY,
+
+    /** Any other link the reader tapped (javascript:, intent:, file:, content:, data:, ...). */
+    BLOCK,
+
+    /** A navigation the page made on its own, without a tap. */
+    BLOCK_WITHOUT_TAP,
+}
 
 /**
  * The Content-Security-Policy of ttu's pages. ttu puts a book's HTML into its page as it is, so
@@ -25,6 +41,14 @@ object ReaderPolicy {
             "base-uri 'self'",
             "form-action 'none'",
         ).joinToString("; ")
+    }
+
+    /** Decides a navigation from its URL's [scheme] and [host] and whether a tap caused it. */
+    fun navigation(scheme: String?, host: String?, hasGesture: Boolean): Navigation = when {
+        scheme == "https" && host == WebViewAssetLoader.DEFAULT_DOMAIN -> Navigation.LOAD
+        !hasGesture -> Navigation.BLOCK_WITHOUT_TAP
+        scheme == "http" || scheme == "https" -> Navigation.OPEN_EXTERNALLY
+        else -> Navigation.BLOCK
     }
 
     private fun sha256(text: String): String =

@@ -545,19 +545,18 @@ private class ReaderWebViewClient(
      */
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         val url = request.url
-        if (url.scheme == "https" && url.host == WebViewAssetLoader.DEFAULT_DOMAIN) return false
-        if (!request.hasGesture()) {
-            diagnostics.log("blocked a navigation without a tap to ${url.scheme}://${url.host}")
-            return true
-        }
-        if (url.scheme == "http" || url.scheme == "https") {
-            try {
+        when (ReaderPolicy.navigation(url.scheme, url.host, request.hasGesture())) {
+            Navigation.LOAD -> return false
+            Navigation.BLOCK_WITHOUT_TAP ->
+                diagnostics.log("blocked a navigation without a tap to ${url.scheme}://${url.host}")
+            Navigation.OPEN_EXTERNALLY -> try {
                 view.context.startActivity(
                     Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 )
             } catch (_: ActivityNotFoundException) {
                 // No browser installed; ignore the link.
             }
+            Navigation.BLOCK -> Unit
         }
         return true
     }

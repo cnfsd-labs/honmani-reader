@@ -36,4 +36,40 @@ class ReaderPolicyTest {
         assertTrue(one.contains("'sha256-"))
         assertFalse(one == other)
     }
+
+    private val own = "appassets.androidplatform.net"
+
+    @Test
+    fun theReadersOwnOrigin_loadsInTheWebView() {
+        assertEquals(Navigation.LOAD, ReaderPolicy.navigation("https", own, hasGesture = false))
+        assertEquals(Navigation.LOAD, ReaderPolicy.navigation("https", own, hasGesture = true))
+    }
+
+    @Test
+    fun theOwnHostOnAnotherSchemeIsNotTheReadersOrigin() {
+        assertEquals(Navigation.BLOCK_WITHOUT_TAP, ReaderPolicy.navigation("http", own, hasGesture = false))
+        assertEquals(Navigation.OPEN_EXTERNALLY, ReaderPolicy.navigation("http", own, hasGesture = true))
+    }
+
+    @Test
+    fun aWebLinkOpensInTheBrowserOnlyOnATap() {
+        assertEquals(Navigation.OPEN_EXTERNALLY, ReaderPolicy.navigation("https", "example.org", true))
+        assertEquals(Navigation.OPEN_EXTERNALLY, ReaderPolicy.navigation("http", "example.org", true))
+        assertEquals(Navigation.BLOCK_WITHOUT_TAP, ReaderPolicy.navigation("https", "example.org", false))
+        assertEquals(Navigation.BLOCK_WITHOUT_TAP, ReaderPolicy.navigation("http", "example.org", false))
+    }
+
+    @Test
+    fun aHostThatOnlyLooksLikeTheReadersOwn_isAnExternalLink() {
+        assertEquals(Navigation.OPEN_EXTERNALLY, ReaderPolicy.navigation("https", "$own.evil.example", true))
+        assertEquals(Navigation.BLOCK_WITHOUT_TAP, ReaderPolicy.navigation("https", "evil-$own", false))
+    }
+
+    @Test
+    fun otherSchemesAreNeverOpened_withOrWithoutATap() {
+        for (scheme in listOf("javascript", "intent", "file", "content", "data", "market", "ftp", "about", null)) {
+            assertEquals(scheme, Navigation.BLOCK, ReaderPolicy.navigation(scheme, null, hasGesture = true))
+            assertEquals(scheme, Navigation.BLOCK_WITHOUT_TAP, ReaderPolicy.navigation(scheme, null, hasGesture = false))
+        }
+    }
 }
