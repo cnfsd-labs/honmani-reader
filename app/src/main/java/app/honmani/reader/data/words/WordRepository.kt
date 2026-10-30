@@ -102,6 +102,9 @@ class WordRepository(
                     ),
                 )
             } else {
+                // The same word tapped again in the same sentence within REPEAT_WINDOW_MS counts as
+                // one lookup: nothing is saved, including the lookup event, so the statistics count
+                // at most one lookup event per hour per word and sentence.
                 val latest = dao.latestLookup(existing.id)
                 if (latest != null && latest.sentence == sentence && time - latest.lookedUpAt < REPEAT_WINDOW_MS) {
                     return@withTransaction
