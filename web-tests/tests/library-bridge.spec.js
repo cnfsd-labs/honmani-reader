@@ -41,6 +41,12 @@ const BOOKS = {
     title: '一段落の本',
     paragraphs: [Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('')],
   }),
+  // Lines split by <br> in one block, and words in their own elements with a space between.
+  'lines.epub': buildEpub({
+    title: '行の本',
+    raw: true,
+    paragraphs: ['<div>東京<br/>都庁へ行く。<span>猫</span> <span>犬</span></div>'],
+  }),
   // Furigana on every word: many text nodes per page.
   'ruby.epub': buildEpub({
     title: 'ルビの本',
@@ -656,6 +662,30 @@ test('word marks ask about a paragraph longer than a request in pieces, and mark
     await page.evaluate(([requestId, blocks]) => window.__reply({ type: 'marks', requestId, blocks }), [requestId, blocks]);
   }
   await expect.poll(async () => (await marked(page))['honmani-learning'].sort()).toEqual(['1番目', '400番目']);
+});
+
+test('word marks read a block\'s text as the tap bridge does: a <br> ends a line, spaces stay', async ({ page }) => {
+  await openWithMarks(page, 'lines.epub', null);
+  const text = '東京\n都庁へ行く。猫 犬';
+  await expect.poll(async () => (await markRequests(page)).flatMap((m) => m.blocks.map((b) => b.text))).toContain(text);
+  const request = (await markRequests(page)).find((m) => m.blocks.some((b) => b.text === text));
+  const block = request.blocks.find((b) => b.text === text);
+  await page.evaluate(
+    ([requestId, id]) => window.__reply({ type: 'marks', requestId, blocks: [{ id, marks: [[0, 2, 0], [3, 2, 0], [11, 1, 1]] }] }),
+    [request.requestId, block.id],
+  );
+  await expect.poll(() => marked(page)).toEqual({ 'honmani-learning': ['東京', '都庁'], 'honmani-new': ['犬'] });
+
+  // A word looked up after the line break gets its mark at the same place.
+  await page.evaluate(() => {
+    const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node && node.data !== '犬') node = walker.nextNode();
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    window.dispatchEvent(new CustomEvent('honmani-looked-up', { detail: { ranges: [range], color: '#e91e63' } }));
+  });
+  expect(await marked(page)).toEqual({ 'honmani-learning': ['東京', '都庁', '犬'], 'honmani-new': [] });
 });
 
 test('word marks let go of the paragraphs of chapters ttu took out of the page', async ({ page }) => {

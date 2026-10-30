@@ -8,9 +8,9 @@
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
  *
  *   { type: 'marks.request', requestId, mode, blocks: [{ id, text }] }
- *     text: the paragraph without furigana (<rt>, <rp>), as the tap bridge reads it; a long
- *     paragraph comes in pieces of up to 4,000 characters, each a block of its own (id: the
- *     piece's, unique on the page)
+ *     text: the paragraph without furigana (<rt>, <rp>), a <br> as "\n", as the tap bridge
+ *     reads it; a long paragraph comes in pieces of up to 4,000 characters, each a block of its
+ *     own (id: the piece's, unique on the page)
  *
  * and the app answers on the same object:
  *
@@ -225,19 +225,36 @@
     }
   }
 
+  /**
+   * A block's text as the tap bridge reads it (blockText in tap-bridge.js): its text nodes,
+   * spaces included, and a <br> as a line break, so no word runs across one.
+   */
+  function dataOf(node) {
+    return node.nodeType === Node.TEXT_NODE ? node.data : '\n';
+  }
+
   /** Groups the book's text into paragraphs and watches which come near the screen. */
   function scan() {
     forgetDetached();
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) => (isSkipped(node) || !node.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          return node.tagName === 'BR' && !isSkipped(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        }
+        return isSkipped(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      },
     });
     const found = new Map();
+    const withText = new Set();
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const block = blockAncestor(node);
       if (!found.has(block)) found.set(block, []);
       found.get(block).push(node);
+      if (node.nodeType === Node.TEXT_NODE && node.data.trim()) withText.add(block);
     }
     for (const [element, nodes] of found) {
+      // Only spaces between other blocks: nothing to ask about.
+      if (!withText.has(element)) continue;
       let id = ids.get(element);
       if (id === undefined) {
         id = nextId++;
@@ -253,7 +270,7 @@
   let resetAt = 0;
 
   function textOf(id) {
-    return (blocks.get(id) || []).map((node) => node.data).join('');
+    return (blocks.get(id) || []).map(dataOf).join('');
   }
 
   /**
@@ -339,14 +356,15 @@
     let offset = 0;
     for (const node of blocks.get(id) || []) {
       const from = Math.max(start, offset);
-      const to = Math.min(start + length, offset + node.data.length);
-      if (from < to && node.isConnected) {
+      const size = dataOf(node).length;
+      const to = Math.min(start + length, offset + size);
+      if (from < to && node.nodeType === Node.TEXT_NODE && node.isConnected) {
         const range = document.createRange();
         range.setStart(node, from - offset);
         range.setEnd(node, to - offset);
         ranges.push(range);
       }
-      offset += node.data.length;
+      offset += size;
       if (offset >= start + length) break;
     }
     return ranges;
@@ -506,7 +524,7 @@
         start = offset + first.startOffset;
         break;
       }
-      offset += node.data.length;
+      offset += dataOf(node).length;
     }
     if (start < 0) return;
     const length = ranges.reduce((sum, range) => sum + range.endOffset - range.startOffset, 0);
