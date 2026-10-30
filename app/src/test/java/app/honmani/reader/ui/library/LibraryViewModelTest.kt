@@ -324,6 +324,27 @@ class LibraryViewModelTest {
         assertEquals(book.ttuId, remove["ttuId"]!!.jsonPrimitive.long)
         assertNull(dao.find(book.id))
     }
+
+    @Test
+    fun removingABookForgetsItsDerivedDataButNotOtherBooks() = runBlocking {
+        val forgotten = mutableListOf<String>()
+        viewModel = LibraryViewModel(
+            dao = dao,
+            importer = importer,
+            ttu = ttu,
+            openFile = { uri -> files[uri.lastPathSegment]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) } },
+            now = { 42L },
+            forgetDerivedData = { synchronized(forgotten) { forgotten += it } },
+        )
+        val first = addAndWait("neko.epub", TestBooks.epub())
+        val second = addAndWait("botchan.epub", TestBooks.epub(title = "坊っちゃん", author = "夏目漱石"))
+
+        viewModel.remove(first.id)
+        eventually { synchronized(forgotten) { forgotten.toList() }.takeIf { it.isNotEmpty() } }
+
+        assertEquals(listOf(first.contentHash), synchronized(forgotten) { forgotten.toList() })
+        assertEquals(second.id, dao.books.value.single().id)
+    }
 }
 
 /** Answers commands at once, like the bridge on a loaded page. */

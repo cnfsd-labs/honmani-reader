@@ -77,6 +77,13 @@ class DifficultyStore(private val directory: File) {
         }.getOrNull()
     }
 
+    /** Drops one book's grade and words (the book was removed); they are recomputed if it comes back. */
+    fun forget(contentHash: String) {
+        File(directory, contentHash + SUFFIX).delete()
+        File(directory, contentHash + WORDS_SUFFIX).delete()
+        _grades.value -= contentHash
+    }
+
     /** Drops grades and words of books no longer in the library. */
     fun keepOnly(contentHashes: Set<String>) {
         val gone = _grades.value.keys - contentHashes

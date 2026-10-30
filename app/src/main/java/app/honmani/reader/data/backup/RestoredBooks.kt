@@ -70,6 +70,11 @@ class RestoredBooks(private val file: File) {
 
     fun setPosition(hash: String, position: RestoredPosition) = update { it.copy(positions = it.positions + (hash to position)) }
 
+    /** Drops the position waiting for the book with content hash [hash] (the book was removed). */
+    fun forgetPosition(hash: String) = update { state ->
+        if (hash in state.positions) state.copy(positions = state.positions - hash) else state
+    }
+
     /** The position to give ttu for the book with content hash [hash], once. */
     fun takePosition(hash: String): RestoredPosition? {
         var taken: RestoredPosition? = null

@@ -152,6 +152,11 @@ class LibraryViewModel(
     private val saveDismissedContinue: (String) -> Unit = {},
     /** Writes a book's file to a document the reader picked (a content URI). */
     private val writeDocument: suspend (File, Uri) -> Unit = { _, _ -> },
+    /**
+     * Drops what was worked out for a removed book (grade, words, a restored position waiting for
+     * it), by content hash; the statistics, lookups and saved words stay. Off the main thread.
+     */
+    private val forgetDerivedData: (String) -> Unit = {},
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -431,7 +436,10 @@ class LibraryViewModel(
             book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
                 dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
             }
-            withContext(Dispatchers.IO) { importer.deleteFiles(book) }
+            withContext(Dispatchers.IO) {
+                importer.deleteFiles(book)
+                forgetDerivedData(book.contentHash)
+            }
         }
     }
 
@@ -487,6 +495,10 @@ class LibraryViewModel(
                                 ?: throw IOException("Cannot write $uri")
                             out.use { output -> file.inputStream().use { it.copyTo(output) } }
                         }
+                    },
+                    forgetDerivedData = { hash ->
+                        container.difficultyStore.forget(hash)
+                        container.restoredBooks.forgetPosition(hash)
                     },
                     syncPosition = { book, ttuId, ask ->
                         val ttu = container.ttuLibrary
