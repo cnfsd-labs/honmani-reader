@@ -1,5 +1,6 @@
 package app.honmani.reader.data.difficulty
 
+import app.honmani.reader.data.writeAtomically
 import java.io.BufferedOutputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -149,21 +150,20 @@ class Lexicon private constructor(
 
     /** Saves the lexicon for [read] with the same [signature]. */
     fun write(file: File, signature: String) {
-        file.parentFile?.mkdirs()
-        val temporary = File(file.path + ".tmp")
-        DataOutputStream(BufferedOutputStream(temporary.outputStream(), 1 shl 16)).use { out ->
-            out.writeInt(MAGIC)
-            val name = signature.toByteArray(Charsets.UTF_8)
-            out.writeInt(name.size)
-            out.write(name)
-            out.writeInt(chars.size)
-            out.writeInt(classes.size)
-            for (c in chars) out.writeChar(c.code)
-            for (start in starts) out.writeInt(start)
-            for (value in classes) out.writeInt(value)
-            for (rank in ranks) out.writeInt(rank)
+        writeAtomically(file) { temporary ->
+            DataOutputStream(BufferedOutputStream(temporary.outputStream(), 1 shl 16)).use { out ->
+                out.writeInt(MAGIC)
+                val name = signature.toByteArray(Charsets.UTF_8)
+                out.writeInt(name.size)
+                out.write(name)
+                out.writeInt(chars.size)
+                out.writeInt(classes.size)
+                for (c in chars) out.writeChar(c.code)
+                for (start in starts) out.writeInt(start)
+                for (value in classes) out.writeInt(value)
+                for (rank in ranks) out.writeInt(rank)
+            }
         }
-        temporary.renameTo(file)
     }
 
     companion object {

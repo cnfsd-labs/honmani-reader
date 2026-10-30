@@ -1,5 +1,7 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.data.readStored
+import app.honmani.reader.data.writeTextAtomically
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -93,13 +95,10 @@ class RestoredBooks(private val file: File) {
     /** Under [lock]. */
     private fun current(): State = loaded ?: load().also { loaded = it }
 
-    private fun load(): State = runCatching { json.decodeFromString(State.serializer(), file.readText()) }.getOrDefault(State())
+    private fun load(): State = readStored(file, State()) { json.decodeFromString(State.serializer(), it.readText()) }
 
     private fun save(state: State) {
-        file.parentFile?.mkdirs()
-        val temporary = File(file.path + ".tmp")
-        temporary.writeText(json.encodeToString(State.serializer(), state))
-        temporary.renameTo(file)
+        writeTextAtomically(file, json.encodeToString(State.serializer(), state))
     }
 
     private companion object {

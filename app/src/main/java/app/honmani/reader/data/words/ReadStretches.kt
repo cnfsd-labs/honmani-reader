@@ -1,5 +1,7 @@
 package app.honmani.reader.data.words
 
+import app.honmani.reader.data.readStored
+import app.honmani.reader.data.writeTextAtomically
 import app.honmani.reader.data.difficulty.BookWords
 import java.io.File
 import kotlin.math.roundToInt
@@ -100,19 +102,16 @@ class ReadStretchStore(private val file: File) {
     private fun current(): Map<String, IntArray> = loaded ?: load().also { loaded = it }
 
     /** One line per book: its content hash, then its stretches' steps, separated by spaces. */
-    private fun load(): Map<String, IntArray> = runCatching {
-        file.readLines().mapNotNull { line ->
+    private fun load(): Map<String, IntArray> = readStored(file, emptyMap()) {
+        it.readLines().mapNotNull { line ->
             val parts = line.trim().split(' ').filter { it.isNotEmpty() }
             val steps = parts.drop(1).map { it.toIntOrNull() ?: return@mapNotNull null }
             if (parts.isEmpty() || steps.size % 2 != 0) null else parts[0] to steps.toIntArray()
         }.toMap()
-    }.getOrDefault(emptyMap())
+    }
 
     private fun save(stretches: Map<String, IntArray>) {
         val text = stretches.entries.joinToString("") { (hash, steps) -> hash + steps.joinToString("") { " $it" } + "\n" }
-        file.parentFile?.mkdirs()
-        val temporary = File(file.path + ".tmp")
-        temporary.writeText(text)
-        temporary.renameTo(file)
+        writeTextAtomically(file, text)
     }
 }

@@ -1,5 +1,7 @@
 package app.honmani.reader.data.difficulty
 
+import app.honmani.reader.data.writeAtomically
+import app.honmani.reader.data.writeTextAtomically
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.File
@@ -32,29 +34,26 @@ class DifficultyStore(private val directory: File) {
 
     fun save(contentHash: String, grade: StoredDifficulty) {
         directory.mkdirs()
-        val file = File(directory, contentHash + SUFFIX)
-        val temporary = File(directory, "$contentHash$SUFFIX.tmp")
-        temporary.writeText(encode(grade).toString())
-        temporary.renameTo(file)
+        writeTextAtomically(File(directory, contentHash + SUFFIX), encode(grade).toString())
         _grades.value += contentHash to grade
     }
 
     /** Keeps a book's words; save them before the grade, so a graded book has its words. */
     fun saveWords(contentHash: String, words: BookWords) {
         directory.mkdirs()
-        val temporary = File(directory, "$contentHash$WORDS_SUFFIX.tmp")
-        DataOutputStream(temporary.outputStream().buffered()).use { out ->
-            out.writeInt(WORDS_FORMAT)
-            out.writeInt(words.size)
-            for (i in 0 until words.size) {
-                out.writeUTF(words.keys[i])
-                out.writeInt(words.ranks[i])
-                val positions = words.positions[i]
-                out.writeInt(positions.size)
-                for (position in positions) out.writeShort(position.toInt())
+        writeAtomically(File(directory, contentHash + WORDS_SUFFIX)) { temporary ->
+            DataOutputStream(temporary.outputStream().buffered()).use { out ->
+                out.writeInt(WORDS_FORMAT)
+                out.writeInt(words.size)
+                for (i in 0 until words.size) {
+                    out.writeUTF(words.keys[i])
+                    out.writeInt(words.ranks[i])
+                    val positions = words.positions[i]
+                    out.writeInt(positions.size)
+                    for (position in positions) out.writeShort(position.toInt())
+                }
             }
         }
-        temporary.renameTo(File(directory, contentHash + WORDS_SUFFIX))
     }
 
     /** A book's words; null if it has none (not graded, or graded before words were kept). Off the main thread. */

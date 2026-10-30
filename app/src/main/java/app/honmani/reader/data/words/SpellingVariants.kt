@@ -1,5 +1,6 @@
 package app.honmani.reader.data.words
 
+import app.honmani.reader.data.writeAtomically
 import app.honmani.reader.data.difficulty.DifficultyDao
 import app.honmani.reader.lookup.JapaneseText
 import java.io.File
@@ -89,13 +90,12 @@ class SpellingVariants(private val variants: Map<String, Array<String>>) {
 
         internal fun write(cache: File, signature: String, groups: List<List<String>>) {
             runCatching {
-                cache.parentFile?.mkdirs()
-                val temporary = File(cache.path + ".tmp")
-                temporary.bufferedWriter().use { writer ->
-                    writer.append(signature).append('\n')
-                    for (forms in groups) forms.joinTo(writer, "\t").append('\n')
+                writeAtomically(cache) { temporary ->
+                    temporary.bufferedWriter().use { writer ->
+                        writer.append(signature).append('\n')
+                        for (forms in groups) forms.joinTo(writer, "\t").append('\n')
+                    }
                 }
-                temporary.renameTo(cache)
             }
         }
     }

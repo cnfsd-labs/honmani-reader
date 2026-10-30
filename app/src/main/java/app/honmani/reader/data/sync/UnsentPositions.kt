@@ -1,5 +1,6 @@
 package app.honmani.reader.data.sync
 
+import app.honmani.reader.data.writeTextAtomically
 import java.io.File
 import java.io.IOException
 import kotlinx.serialization.Serializable
@@ -86,13 +87,7 @@ class UnsentPositions(private val file: File) {
                 file.delete()
                 return
             }
-            file.parentFile?.mkdirs()
-            val temporary = File(file.path + ".tmp")
-            temporary.writeText(json.encodeToString(saved.values.toList()))
-            if (!temporary.renameTo(file)) {
-                file.delete()
-                temporary.renameTo(file)
-            }
+            writeTextAtomically(file, json.encodeToString(saved.values.toList()))
         } catch (_: IOException) {
             // Kept in memory until the app closes.
         }

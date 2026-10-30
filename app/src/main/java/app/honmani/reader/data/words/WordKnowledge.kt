@@ -1,5 +1,7 @@
 package app.honmani.reader.data.words
 
+import app.honmani.reader.data.readStored
+import app.honmani.reader.data.writeTextAtomically
 import app.honmani.reader.data.difficulty.BookWords
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
@@ -105,13 +107,13 @@ class WordProgressStore(private val file: File) {
         }
     }
 
-    private fun read(): Map<Long, WordStep> = runCatching {
-        val json = JSONObject(file.readText())
+    private fun read(): Map<Long, WordStep> = readStored(file, emptyMap()) {
+        val json = JSONObject(it.readText())
         json.keys().asSequence().associate { id ->
             val values = json.getJSONArray(id)
             id.toLong() to WordStep(values.getInt(0), values.getInt(1), values.getInt(2), values.getBoolean(3), values.optBoolean(4))
         }
-    }.getOrDefault(emptyMap())
+    }
 
     fun save(progress: Map<Long, WordStep>) {
         synchronized(this) {
@@ -119,10 +121,7 @@ class WordProgressStore(private val file: File) {
             for ((id, step) in progress) {
                 json.put(id.toString(), JSONArray().put(step.steps).put(step.reads).put(step.lookups).put(step.learned).put(step.kana))
             }
-            file.parentFile?.mkdirs()
-            val temporary = File(file.path + ".tmp")
-            temporary.writeText(json.toString())
-            temporary.renameTo(file)
+            writeTextAtomically(file, json.toString())
         }
     }
 }
