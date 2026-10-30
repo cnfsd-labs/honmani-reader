@@ -21,6 +21,8 @@ import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -192,6 +194,26 @@ class BackupTest {
         assertEquals(RestoredPosition(5_000, 0.25f, savedAt = LAST_OPENED), new.restored.takePosition("hash-a"))
         assertNull(new.restored.takePosition("hash-a"))
         assertTrue(new.restored.waiting().none { it.key == "hash-a" })
+    }
+
+    @Test
+    fun settingsOfAnotherTypeOrUnknownAreLeftOut() = runTest {
+        val backup = throughFile(
+            BackupFile(
+                exportedAt = 1,
+                settings = mapOf(
+                    "accent" to BackupValue(BackupValue.INT, JsonPrimitive(3)),
+                    "show_difficulty" to BackupValue(BackupValue.STRING, JsonArray(listOf(JsonPrimitive("x")))),
+                    "anki_deck" to BackupValue(BackupValue.STRING, JsonPrimitive("Mining")),
+                    "something_else" to BackupValue(BackupValue.STRING, JsonPrimitive("x")),
+                ),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        assertEquals(mapOf("anki_deck" to "Mining"), new.settings.all)
     }
 
     @Test

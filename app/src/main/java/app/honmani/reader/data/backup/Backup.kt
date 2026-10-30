@@ -2,12 +2,14 @@ package app.honmani.reader.data.backup
 
 import android.content.SharedPreferences
 import androidx.room.withTransaction
+import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
+import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
@@ -24,7 +26,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /** What a restore brought back. */
@@ -299,26 +300,38 @@ class Backup(
         return merged
     }
 
+    /**
+     * Restores the settings Honmani knows ([SETTING_TYPES]) with the type it reads them with: a
+     * value of another type would make reading the setting throw at every start.
+     */
     private fun restoreSettings(values: Map<String, BackupValue>) {
         if (values.isEmpty()) return
         val editor = settings.edit()
         for ((key, typed) in values) {
-            val value = typed.value
+            if (SETTING_TYPES[key] != typed.type) continue
+            val value = typed.value as? JsonPrimitive ?: continue
             when (typed.type) {
-                BackupValue.STRING -> value.jsonPrimitive.contentOrNull?.let { editor.putString(key, it) }
-                BackupValue.BOOLEAN -> value.jsonPrimitive.booleanOrNull?.let { editor.putBoolean(key, it) }
-                BackupValue.INT -> value.jsonPrimitive.longOrNull?.let { editor.putInt(key, it.toInt()) }
-                BackupValue.LONG -> value.jsonPrimitive.longOrNull?.let { editor.putLong(key, it) }
-                BackupValue.FLOAT -> value.jsonPrimitive.doubleOrNull?.let { editor.putFloat(key, it.toFloat()) }
-                BackupValue.STRING_SET -> (value as? JsonArray)?.let { array ->
-                    editor.putStringSet(key, array.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet())
-                }
+                BackupValue.STRING -> value.contentOrNull?.let { editor.putString(key, it) }
+                BackupValue.BOOLEAN -> value.booleanOrNull?.let { editor.putBoolean(key, it) }
+                BackupValue.FLOAT -> value.doubleOrNull?.let { editor.putFloat(key, it.toFloat()) }
             }
         }
         editor.apply()
     }
 
     private companion object {
+        /** The `settings` preferences a backup brings back, and their types. Add new settings here. */
+        val SETTING_TYPES = mapOf(
+            AppearanceSettings.KEY_ACCENT to BackupValue.STRING,
+            AppearanceSettings.KEY_CUSTOM_HUE to BackupValue.FLOAT,
+            AppearanceSettings.KEY_SHOW_DIFFICULTY to BackupValue.BOOLEAN,
+            AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
+            AnkiSettings.KEY_AUDIO to BackupValue.STRING,
+            AnkiSettings.KEY_SENTENCE_SPEED to BackupValue.STRING,
+            AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,
+            AnkiSettings.KEY_DECK to BackupValue.STRING,
+        )
+
         fun typed(value: Any?): BackupValue? = when (value) {
             is String -> BackupValue(BackupValue.STRING, JsonPrimitive(value))
             is Boolean -> BackupValue(BackupValue.BOOLEAN, JsonPrimitive(value))

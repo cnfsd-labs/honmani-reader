@@ -143,7 +143,7 @@ class AnkiSettings(
             editor.apply()
         }
 
-    private companion object {
+    companion object {
         const val KEY_AUDIO = "anki_audio"
         const val KEY_GOOGLE_KEY = "anki_google_key"
         const val KEY_GOOGLE_VOICE = "anki_google_voice"

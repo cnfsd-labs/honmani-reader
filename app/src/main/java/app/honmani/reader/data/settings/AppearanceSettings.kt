@@ -104,7 +104,7 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
         _librarySort.value = preferences.getString(KEY_LIBRARY_SORT, null)
     }
 
-    private companion object {
+    companion object {
         const val KEY_ACCENT = "accent"
         const val KEY_SHOW_DIFFICULTY = "show_difficulty"
         const val KEY_LIBRARY_SORT = "library_sort"
