@@ -5,6 +5,9 @@ import app.honmani.reader.lookup.RubySpan
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
 
 /** A message from `assets/honmani/tap-bridge.js` or `library-bridge.js`. */
 sealed interface BridgeMessage {
@@ -44,18 +47,28 @@ sealed interface BridgeMessage {
     data class MarksBlock(val id: Long = 0, val text: String = "")
 
     companion object {
-        /** Parses a bridge message, or returns null for anything unknown or malformed. */
-        fun parse(message: String?): BridgeMessage? =
-            TapLookup.parse(message)?.let(::Lookup)
-                ?: Dismiss.takeIf { message?.replace(" ", "") == """{"type":"dismiss"}""" }
-                ?: LibraryMessage.parse(message)?.let(::Library)
-                ?: parseBookShown(message)
-                ?: parsePosition(message)
-                ?: parseBackground(message)
-                ?: parseMarks(message)
-                ?: Activity.takeIf { message?.replace(" ", "") == ACTIVITY_MESSAGE }
-                ?: SettingsShown.takeIf { message?.replace(" ", "") == SETTINGS_SHOWN_MESSAGE }
-                ?: OpenSettings.takeIf { message?.replace(" ", "") == OPEN_SETTINGS_MESSAGE }
+        /**
+         * Parses a bridge message, or returns null for anything unknown or malformed. The `type`
+         * is read once and picks the parser; each kind has its own length cap.
+         */
+        fun parse(message: String?): BridgeMessage? {
+            if (message == null || message.length > MAX_MESSAGE_LENGTH) return null
+            val obj = parseObject(message) ?: return null
+            val type = (obj["type"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+            val compact by lazy { message.replace(" ", "") }
+            return when (type) {
+                "lookup" -> TapLookup.parse(message)?.let(::Lookup)
+                "dismiss" -> Dismiss.takeIf { compact == DISMISS_MESSAGE }
+                "bookShown" -> parseBookShown(message, obj)
+                "reader.position" -> parsePosition(message, obj)
+                "reader.background" -> parseBackground(message, obj)
+                "marks.request" -> parseMarks(message, obj)
+                "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
+                "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
+                "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
+                else -> if (type.startsWith("library.")) LibraryMessage.parse(message)?.let(::Library) else null
+            }
+        }
 
         // JSON, not a regular expression: Android's regex engine (ICU) rejects patterns the
         // JVM accepts, such as an unescaped "}", and that closed the app at its first message.
@@ -64,16 +77,28 @@ sealed interface BridgeMessage {
         @Serializable
         private data class BookShownEnvelope(val type: String = "", val id: Long = 0)
 
-        private fun parseBookShown(message: String?): BookShown? {
-            if (message == null || message.length > MAX_BOOK_SHOWN_LENGTH || "bookShown" !in message) return null
-            val envelope = try {
-                bookShownJson.decodeFromString<BookShownEnvelope>(message)
+        private fun parseObject(message: String): JsonObject? =
+            try {
+                bookShownJson.parseToJsonElement(message) as? JsonObject
             } catch (_: SerializationException) {
-                return null
+                null
             } catch (_: IllegalArgumentException) {
-                return null
+                null
             }
-            return if (envelope.type == "bookShown" && envelope.id > 0) BookShown(envelope.id) else null
+
+        private inline fun <reified T> decode(obj: JsonObject): T? =
+            try {
+                bookShownJson.decodeFromJsonElement<T>(obj)
+            } catch (_: SerializationException) {
+                null
+            } catch (_: IllegalArgumentException) {
+                null
+            }
+
+        private fun parseBookShown(message: String, obj: JsonObject): BookShown? {
+            if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
+            val envelope = decode<BookShownEnvelope>(obj) ?: return null
+            return if (envelope.id > 0) BookShown(envelope.id) else null
         }
 
         @Serializable
@@ -84,16 +109,10 @@ sealed interface BridgeMessage {
             val progress: Double = -1.0,
         )
 
-        private fun parsePosition(message: String?): Position? {
-            if (message == null || message.length > MAX_BOOK_SHOWN_LENGTH || "reader.position" !in message) return null
-            val envelope = try {
-                bookShownJson.decodeFromString<PositionEnvelope>(message)
-            } catch (_: SerializationException) {
-                return null
-            } catch (_: IllegalArgumentException) {
-                return null
-            }
-            val valid = envelope.type == "reader.position" && envelope.id > 0 && envelope.characters >= 0
+        private fun parsePosition(message: String, obj: JsonObject): Position? {
+            if (message.length > MAX_POSITION_LENGTH) return null
+            val envelope = decode<PositionEnvelope>(obj) ?: return null
+            val valid = envelope.id > 0 && envelope.characters >= 0
             val progress = envelope.progress.takeIf { it in 0.0..1.0 }?.toFloat()
             return if (valid) Position(envelope.id, envelope.characters, progress) else null
         }
@@ -101,17 +120,11 @@ sealed interface BridgeMessage {
         @Serializable
         private data class BackgroundEnvelope(val type: String = "", val color: String = "")
 
-        private fun parseBackground(message: String?): Background? {
-            if (message == null || message.length > MAX_BOOK_SHOWN_LENGTH || "reader.background" !in message) return null
-            val envelope = try {
-                bookShownJson.decodeFromString<BackgroundEnvelope>(message)
-            } catch (_: SerializationException) {
-                return null
-            } catch (_: IllegalArgumentException) {
-                return null
-            }
+        private fun parseBackground(message: String, obj: JsonObject): Background? {
+            if (message.length > MAX_BACKGROUND_LENGTH) return null
+            val envelope = decode<BackgroundEnvelope>(obj) ?: return null
             val digits = envelope.color.removePrefix("#")
-            val valid = envelope.type == "reader.background" && envelope.color.startsWith("#") && digits.length == 6 &&
+            val valid = envelope.color.startsWith("#") && digits.length == 6 &&
                 digits.all { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }
             return if (valid) Background(digits.toInt(16) or 0xFF000000.toInt()) else null
         }
@@ -124,26 +137,25 @@ sealed interface BridgeMessage {
             val blocks: List<MarksBlock> = emptyList(),
         )
 
-        private fun parseMarks(message: String?): Marks? {
-            if (message == null || message.length > MAX_MARKS_LENGTH || "marks.request" !in message) return null
-            val envelope = try {
-                bookShownJson.decodeFromString<MarksEnvelope>(message)
-            } catch (_: SerializationException) {
-                return null
-            } catch (_: IllegalArgumentException) {
-                return null
-            }
-            if (envelope.type != "marks.request" || envelope.blocks.size > MAX_MARKS_BLOCKS) return null
+        private fun parseMarks(message: String, obj: JsonObject): Marks? {
+            if (message.length > MAX_MARKS_LENGTH) return null
+            val envelope = decode<MarksEnvelope>(obj) ?: return null
+            if (envelope.blocks.size > MAX_MARKS_BLOCKS) return null
             val blocks = envelope.blocks.filter { it.text.length <= MAX_MARKS_TEXT }
             return Marks(envelope.requestId, WordMarksMode.fromStorage(envelope.mode), blocks)
         }
 
+        /** Largest of the per-kind caps (library messages); anything longer is dropped unread. */
+        private const val MAX_MESSAGE_LENGTH = 1_000_000
         private const val MAX_BOOK_SHOWN_LENGTH = 200
+        private const val MAX_POSITION_LENGTH = 200
+        private const val MAX_BACKGROUND_LENGTH = 200
 
         /** Generous bounds: the page sends up to about 6,000 characters, 4,000 per paragraph. */
         private const val MAX_MARKS_LENGTH = 64_000
         private const val MAX_MARKS_BLOCKS = 500
         private const val MAX_MARKS_TEXT = 8_000
+        private const val DISMISS_MESSAGE = """{"type":"dismiss"}"""
         private const val SETTINGS_SHOWN_MESSAGE = """{"type":"pageShown","path":"/settings"}"""
         private const val OPEN_SETTINGS_MESSAGE = """{"type":"reader.settings"}"""
         private const val ACTIVITY_MESSAGE = """{"type":"reader.activity"}"""

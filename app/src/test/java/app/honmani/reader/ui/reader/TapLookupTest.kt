@@ -137,4 +137,26 @@ class TapLookupTest {
         )
         assertNull(BridgeMessage.parse("""{"type":"marks.request","blocks":"x"}"""))
     }
+
+    @Test
+    fun bridgeMessage_capsEachKindSeparately() {
+        val padding = " ".repeat(200)
+
+        // Small messages of every kind are accepted, the same ones padded past 200 are not.
+        for ((message, expected) in listOf(
+            """{"type":"bookShown","id":7}""" to BridgeMessage.BookShown(7),
+            """{"type":"reader.position","id":3,"characters":1200}""" to BridgeMessage.Position(3, 1_200),
+            """{"type":"reader.background","color":"#000000"}""" to BridgeMessage.Background(0xFF000000.toInt()),
+        )) {
+            assertEquals(expected, BridgeMessage.parse(message))
+            assertNull(BridgeMessage.parse(message + padding))
+        }
+        // Mark requests may be far longer; an oversized one is still dropped.
+        val blocks = (1..100).joinToString(",") { """{"id":$it,"text":"${"猫".repeat(100)}"}""" }
+        assertEquals(100, (BridgeMessage.parse("""{"type":"marks.request","requestId":1,"mode":"new","blocks":[$blocks]}""") as BridgeMessage.Marks).blocks.size)
+        assertNull(BridgeMessage.parse("""{"type":"marks.request","requestId":1,"mode":"new","blocks":[$blocks]}""" + " ".repeat(64_000)))
+        // A type that belongs to another kind never reaches its parser.
+        assertNull(BridgeMessage.parse("""{"type":"library.unknown","requestId":1}"""))
+        assertNull(BridgeMessage.parse("""{"type":5}"""))
+    }
 }
