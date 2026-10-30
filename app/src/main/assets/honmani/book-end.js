@@ -24,7 +24,7 @@
   const BOOK_ROOT_SELECTOR = '.book-content';
   /** Only in ttu's paginated reader, which renders one chapter at a time. */
   const PAGINATED_SELECTOR = '.book-content-container';
-  const SKIPPED_SELECTOR = 'rt, rp, script, style';
+  const { SKIPPED_SELECTOR, bookId, onScreen } = window.honmaniText;
   const CHECK_MS = 400;
   /** ttu's own event, dispatched on document when the reading position changes. */
   const PAGE_CHANGE = 'ttsu:page.change';
@@ -45,17 +45,6 @@
   let explored = null;
   let total = null;
   let refusedLogged = null;
-
-  function bookId() {
-    if (!location.pathname.startsWith('/b')) return null;
-    const id = Number(new URLSearchParams(location.search).get('id'));
-    return Number.isInteger(id) && id > 0 ? id : null;
-  }
-
-  function onScreen(rect) {
-    return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < innerWidth &&
-      rect.bottom > 0 && rect.top < innerHeight;
-  }
 
   /** The last character of book text that isn't blank (furigana skipped): { node, offset }. */
   function lastChar(root) {

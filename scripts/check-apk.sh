@@ -55,7 +55,7 @@ for pattern in '^assets/ttu/_app/immutable/.*\.js$' '^assets/ttu/_app/immutable/
         failed=1
     fi
 done
-for script in 'assets/honmani/tap-bridge.js' 'assets/honmani/ttu-defaults.js' 'assets/honmani/keep-position.js' \
+for script in 'assets/honmani/text.js' 'assets/honmani/tap-bridge.js' 'assets/honmani/ttu-defaults.js' 'assets/honmani/keep-position.js' \
   'assets/honmani/library-bridge.js' 'assets/honmani/help-text.js' \
   'assets/honmani/book-end.js' \
   'assets/honmani/book-shown.js' 'assets/honmani/book-frame.js' 'assets/samples/tebukuro.epub'; do

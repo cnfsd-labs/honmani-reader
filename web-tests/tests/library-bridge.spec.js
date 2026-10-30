@@ -68,6 +68,11 @@ const BOOKS = {
   }),
   'broken.epub': Buffer.from('PK this is not really a zip'),
 };
+/** text.js comes first, as in DOCUMENT_START_SCRIPTS: the other scripts read what it defines. */
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript({ path: path.join(ASSETS, 'text.js') });
+});
+
 /** The sample books that come with the app. */
 const SAMPLES = path.join(__dirname, '../../app/src/main/assets/samples');
 for (const name of fs.readdirSync(SAMPLES)) BOOKS[`sample-${name}`] = fs.readFileSync(path.join(SAMPLES, name));

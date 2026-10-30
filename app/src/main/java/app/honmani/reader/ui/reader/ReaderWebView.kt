@@ -72,7 +72,21 @@ private const val START_URL = "$READER_ORIGIN/manage"
 
 /** Name of the object `tap-bridge.js` posts to. */
 private const val BRIDGE_OBJECT = "honmani"
+
+/**
+ * The scripts injected at document start, in the order they run (the web tests register them in
+ * the same order).
+ *
+ * - `text.js` comes first: it defines `window.honmaniText`, which the others read when they start.
+ * - Three scripts wrap `IDBObjectStore.put` / `add` (`get` too in `book-frame.js`):
+ *   `library-bridge.js`, then `reading-activity.js`, then `book-frame.js`. Each wrapper calls the
+ *   one registered before it, so the last runs outermost. None changes the value or the request;
+ *   they only listen for the request's success, so they do not depend on this order.
+ * - `book-shown.js` wraps `history.pushState` / `replaceState` the same way (the only history
+ *   wrapper); `goBack` steps through `history.go` in the page instead.
+ */
 private val DOCUMENT_START_SCRIPTS = listOf(
+    "honmani/text.js",
     "honmani/ttu-defaults.js",
     "honmani/tap-bridge.js",
     "honmani/keep-position.js",

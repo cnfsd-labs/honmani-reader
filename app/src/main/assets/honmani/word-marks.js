@@ -37,7 +37,7 @@
 
   const MODE_KEY = 'honmaniWordMarks';
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const SKIPPED_SELECTOR = 'rt, rp, script, style';
+  const { isSkipped } = window.honmaniText;
   const NAMES = ['honmani-learning', 'honmani-new'];
   /** New marks, while they fade in; then they move to NAMES. */
   const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh'];
@@ -177,27 +177,18 @@
     fadeFrame = requestAnimationFrame(step);
   }
 
-  function isSkipped(node) {
-    const parent = node.parentElement;
-    return !parent || parent.closest(SKIPPED_SELECTOR) !== null;
-  }
-
   const blockCache = new WeakMap();
   function isBlock(element) {
     let block = blockCache.get(element);
     if (block === undefined) {
-      const display = getComputedStyle(element).display;
-      block = !display.startsWith('inline') && !display.startsWith('ruby') && display !== 'contents';
+      block = window.honmaniText.isBlock(element);
       blockCache.set(element, block);
     }
     return block;
   }
 
   function blockAncestor(node) {
-    for (let element = node.parentElement; element && element !== root; element = element.parentElement) {
-      if (isBlock(element)) return element;
-    }
-    return root;
+    return window.honmaniText.blockAncestor(node, root, isBlock);
   }
 
   function clips(element) {

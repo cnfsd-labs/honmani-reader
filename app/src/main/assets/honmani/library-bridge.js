@@ -41,6 +41,7 @@
 
   if (window.honmaniLibrary) return;
 
+  const { toFraction } = window.honmaniText;
   const DB_NAME = 'books';
   const IMPORT_INPUT = 'input[type="file"][accept^="application/epub+zip"]';
   const INPUT_WAIT_MS = 15000;
@@ -287,11 +288,6 @@
       }
       post({ type: 'library.bookmarkSet', requestId });
     });
-  }
-
-  function toFraction(progress) {
-    const value = typeof progress === 'string' ? parseFloat(progress) / (progress.includes('%') ? 100 : 1) : progress;
-    return typeof value === 'number' && isFinite(value) ? Math.min(1, Math.max(0, value)) : null;
   }
 
   function progress() {

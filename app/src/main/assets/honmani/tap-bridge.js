@@ -46,7 +46,7 @@
   const MAX_READING_LENGTH = 32;
   const MAX_SENTENCE_LENGTH = 400;
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const SKIPPED_SELECTOR = 'rt, rp, script, style';
+  const { isSkipped, blockAncestor } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   const SENTENCE_END = '。！？!?…\n';
   const CLOSING_QUOTES = '」』）〉》】"\'';
@@ -69,11 +69,6 @@
 
   function hasHighlightApi() {
     return Boolean(window.CSS && CSS.highlights && window.Highlight);
-  }
-
-  function isSkipped(node) {
-    const parent = node.parentElement;
-    return !parent || parent.closest(SKIPPED_SELECTOR) !== null;
   }
 
   function caretAt(x, y) {
@@ -111,18 +106,6 @@
       }
     }
     return -1;
-  }
-
-  function isBlock(element) {
-    const display = getComputedStyle(element).display;
-    return !display.startsWith('inline') && !display.startsWith('ruby') && display !== 'contents';
-  }
-
-  function blockAncestor(node, root) {
-    for (let element = node.parentElement; element && element !== root; element = element.parentElement) {
-      if (isBlock(element)) return element;
-    }
-    return root;
   }
 
   function textWalker(block) {

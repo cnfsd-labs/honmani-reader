@@ -22,6 +22,11 @@ if (process.env.CI && !hasBuild) {
 test.skip(!hasBuild, `ttu build not found at ${TTU_DIR}; run ./gradlew :app:buildTtu`);
 
 let server;
+/** text.js comes first, as in DOCUMENT_START_SCRIPTS: the other scripts read what it defines. */
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript({ path: path.join(ASSETS, 'text.js') });
+});
+
 test.beforeAll(async () => {
   server = await startTtuServer(TTU_DIR);
 });

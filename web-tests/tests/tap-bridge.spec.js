@@ -3,9 +3,11 @@ const path = require('node:path');
 const { test, expect } = require('@playwright/test');
 
 const BRIDGE = path.join(__dirname, '../../app/src/main/assets/honmani/tap-bridge.js');
+const TEXT = path.join(__dirname, '../../app/src/main/assets/honmani/text.js');
 const FIXTURE = 'file://' + path.join(__dirname, '../fixtures/book.html');
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript({ path: TEXT });
   // Stand-in for the object WebViewCompat.addWebMessageListener injects.
   await page.addInitScript(() => {
     window.__messages = [];

@@ -18,18 +18,13 @@
   if (window.__honmaniBookFrame) return;
   window.__honmaniBookFrame = true;
 
+  const { bookId, toFraction } = window.honmaniText;
   const BAR_ID = 'honmani-progress';
   const BAR_HEIGHT_PX = 3;
   let lastColor = null;
   /** The reading position of the book on the page, 0 to 1, and which book it is. */
   let progress = null;
   let progressBook = null;
-
-  function bookId() {
-    if (!location.pathname.startsWith('/b')) return null;
-    const id = Number(new URLSearchParams(location.search).get('id'));
-    return Number.isInteger(id) && id > 0 ? id : null;
-  }
 
   function post(message) {
     if (window.honmani) window.honmani.postMessage(JSON.stringify(message));
@@ -50,12 +45,6 @@
     if (color === null || color === lastColor) return;
     lastColor = color;
     post({ type: 'reader.background', color });
-  }
-
-  /** ttu keeps the progress as a number or a string such as "12.3%". */
-  function toFraction(value) {
-    const number = typeof value === 'string' ? parseFloat(value) / (value.includes('%') ? 100 : 1) : value;
-    return typeof number === 'number' && isFinite(number) ? Math.min(1, Math.max(0, number)) : null;
   }
 
   function barWanted() {

@@ -17,6 +17,7 @@
   if (window.__honmaniReadingActivity) return;
   window.__honmaniReadingActivity = true;
 
+  const { toFraction } = window.honmaniText;
   const MIN_INTERVAL_MS = 15_000;
   let last = 0;
 
@@ -37,12 +38,6 @@
     const progress = toFraction(value.progress);
     if (progress !== null) message.progress = progress;
     if (window.honmani) window.honmani.postMessage(JSON.stringify(message));
-  }
-
-  /** ttu keeps the progress as a number or a string such as "12.3%". */
-  function toFraction(progress) {
-    const value = typeof progress === 'string' ? parseFloat(progress) / (progress.includes('%') ? 100 : 1) : progress;
-    return typeof value === 'number' && isFinite(value) ? Math.min(1, Math.max(0, value)) : null;
   }
 
   for (const method of ['put', 'add']) {

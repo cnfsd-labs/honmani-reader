@@ -19,7 +19,7 @@
   const BOOK_ROOT_SELECTOR = '.book-content';
   /** ttu's full-screen spinner while it lays out a book. */
   const SPINNER_SELECTOR = 'div.fixed.inset-0.text-7xl';
-  const SKIPPED_SELECTOR = 'rt, rp, script, style';
+  const { SKIPPED_SELECTOR, bookId, onScreen } = window.honmaniText;
   const CHECK_MS = 50;
   const NAVIGATION_GRACE_MS = 3000;
   /** textAtPoints probes a (GRID - 1) × (GRID - 1) grid of points. */
@@ -30,17 +30,6 @@
   let opening = null;
   let openedAt = 0;
   let settingsShown = false;
-
-  function bookId() {
-    if (!location.pathname.startsWith('/b')) return null;
-    const id = Number(new URLSearchParams(location.search).get('id'));
-    return Number.isInteger(id) && id > 0 ? id : null;
-  }
-
-  function onScreen(rect) {
-    return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < innerWidth &&
-      rect.bottom > 0 && rect.top < innerHeight;
-  }
 
   /** Whether some book text (furigana aside) or an image is drawn on screen. */
   function contentOnScreen(root) {
