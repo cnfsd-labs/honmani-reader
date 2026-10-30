@@ -23,8 +23,10 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,8 +96,8 @@ class ReaderViewModel(
     /** Where lookups run and results become what the panel shows (parsing definitions), off the main thread. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
-    private var book: ReadingBook? = null
-    private var bookJob: Job? = null
+    // The open library book, still being looked up right after ttu opens it.
+    private var book: Deferred<ReadingBook?>? = null
 
     private val _panel = MutableStateFlow<LookupPanelState?>(null)
     val panel: StateFlow<LookupPanelState?> = _panel.asStateFlow()
@@ -256,7 +258,7 @@ class ReaderViewModel(
                 sentence = if (fromBook) tap.sentence else "",
                 surfaceStart = if (fromBook) start else 0,
                 surfaceEnd = if (fromBook) (start + group.source.length).coerceAtMost(tap.sentence.length) else 0,
-                bookTitle = book?.title,
+                bookTitle = awaitBook(book)?.title,
                 pitches = group.pitches,
                 frequency = group.frequencies.firstOrNull()?.label,
             )
@@ -288,10 +290,18 @@ class ReaderViewModel(
 
     /** ttu opened a book (or closed it: null); lookups are recorded with the library book. */
     fun onBookChanged(ttuId: Long?) {
-        bookJob?.cancel()
-        book = null
-        if (ttuId != null) bookJob = viewModelScope.launch { book = findBook(ttuId) }
+        // Not cancelled: a lookup tapped just before still waits for it.
+        book = ttuId?.let { viewModelScope.async { findBook(it) } }
     }
+
+    private suspend fun awaitBook(open: Deferred<ReadingBook?>?): ReadingBook? =
+        try {
+            open?.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
 
     /** Saves a match (the best one on a tap) to the word list, independently of later taps. */
     private fun record(tap: TapLookup, best: LookupGroup): Job {
@@ -302,12 +312,13 @@ class ReaderViewModel(
             surface = best.source,
             sentence = tap.sentence,
             surfaceStart = tap.sentenceOffset,
-            bookId = book?.id,
-            bookTitle = book?.title,
         )
+        val openBook = book
         return viewModelScope.launch {
             try {
-                recordLookup(word)
+                // A tap right after the book opened comes before findBook has answered.
+                val found = awaitBook(openBook)
+                recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

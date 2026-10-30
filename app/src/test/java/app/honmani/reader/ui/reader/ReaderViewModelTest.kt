@@ -269,6 +269,27 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun aLookupBeforeTheBookIsFound_waitsForItAndIsTiedToIt() {
+        val found = CompletableDeferred<ReadingBook?>()
+        val slow = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { recorded += it },
+            findBook = { found.await() },
+            lookupKanji = { emptyMap() },
+        )
+        slow.onBookChanged(4)
+        slow.onTap(tap("猫"))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+        assertEquals(0, recorded.size)
+
+        found.complete(ReadingBook(id = 40, title = "Book 4"))
+
+        assertEquals(40L, recorded.single().bookId)
+        assertEquals("Book 4", recorded.single().bookTitle)
+    }
+
+    @Test
     fun lookupsOutsideALibraryBook_orWithoutResults_areNotTiedToABook() {
         viewModel.onBookChanged(4)
         viewModel.onBookChanged(null)
