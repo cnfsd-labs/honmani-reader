@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
 import app.honmani.reader.data.words.WordRepository
@@ -117,7 +118,8 @@ class AnkiExporter(
             details(word.expression, word.reading)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "Word details for a card failed", e)
             WordDetails()
         }
         return CardContent(

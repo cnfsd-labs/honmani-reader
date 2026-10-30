@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -178,7 +179,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings()).volumeKeys
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.reader", "Reading the volume key setting failed", e)
             value
         }
     }

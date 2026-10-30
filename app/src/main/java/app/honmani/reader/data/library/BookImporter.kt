@@ -1,5 +1,6 @@
 package app.honmani.reader.data.library
 
+import app.honmani.reader.diagnostics.logWarning
 import android.database.sqlite.SQLiteConstraintException
 import java.io.File
 import java.io.IOException
@@ -132,7 +133,8 @@ class BookImporter(
                     restore(added)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    logWarning("Honmani.library", "Restoring a backup's data for an added book failed", e)
                     // The book is in; only what a backup kept for it is missing.
                     added
                 },

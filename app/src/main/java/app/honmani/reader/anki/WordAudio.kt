@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.diagnostics.logWarning
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import java.io.File
@@ -34,7 +35,8 @@ class WordAudio(
             throw e
         } catch (e: VoiceException) {
             return e.problem
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "Making the word audio failed", e)
             return VoiceProblem.FAILED
         }
         return withContext(main) { start(file) }
@@ -73,7 +75,8 @@ class WordAudio(
                 start()
             }
             null
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "Playing the word audio failed", e)
             file.delete()
             VoiceProblem.FAILED
         }

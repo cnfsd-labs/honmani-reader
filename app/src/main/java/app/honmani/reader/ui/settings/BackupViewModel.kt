@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.settings
 
+import app.honmani.reader.diagnostics.logWarning
 import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -147,7 +148,8 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
                 throw e
             } catch (_: BackupFormatException) {
                 BackupState.NotABackup
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logWarning("Honmani.backup", "Backup could not be read or restored", e)
                 // IOException, SecurityException, or whatever the picked file's app throws.
                 BackupState.Failed
             }

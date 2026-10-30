@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.settings
 
+import app.honmani.reader.diagnostics.logWarning
 import android.media.MediaPlayer
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -188,7 +189,10 @@ private fun AnkiSettingsContent() {
                         val names = withContext(Dispatchers.IO) {
                             try {
                                 container.ankiDroid.deckNames()
-                            } catch (_: Exception) {
+                            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                logWarning("Honmani.anki", "Could not list the AnkiDroid decks", e)
                                 // Another app's provider: its problems must not close Honmani.
                                 emptyList()
                             }

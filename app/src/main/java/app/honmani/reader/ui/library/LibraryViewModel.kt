@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.library
 
+import app.honmani.reader.diagnostics.logWarning
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -372,7 +373,8 @@ class LibraryViewModel(
                     reading(text)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    logWarning("Honmani.library", "Reading of a book title failed", e)
                     text
                 }
                 readings.update { it + (book.id to kana) }
@@ -406,7 +408,8 @@ class LibraryViewModel(
                 LibraryNotice.CopySaved(book.title)
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logWarning("Honmani.library", "Saving a copy of a book failed", e)
                 LibraryNotice.CopyFailed(book.title)
             }
             _notices.send(notice)
@@ -545,7 +548,8 @@ class LibraryViewModel(
                 ?: uri.lastPathSegment
                 ?: "book"
             resolver.openInputStream(uri)?.let { PickedFile(name, it) }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.library", "Could not open the picked file", e)
             // SecurityException, FileNotFoundException, or whatever the other app's provider throws
             // (IllegalArgumentException for an address it doesn't know, say).
             null

@@ -1,5 +1,6 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.diagnostics.logWarning
 import android.content.SharedPreferences
 import java.io.File
 import java.io.IOException
@@ -65,7 +66,8 @@ class AutoBackup(
             make()
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            logWarning("Honmani.backup", "Automatic backup failed", e)
             return false
         }
         // The reader page wasn't loaded, so ttu's settings are missing: keep the ones the last

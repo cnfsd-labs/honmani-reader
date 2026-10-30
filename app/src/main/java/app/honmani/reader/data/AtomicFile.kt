@@ -1,6 +1,6 @@
 package app.honmani.reader.data
 
-import android.util.Log
+import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 
 private const val TAG = "Honmani.files"
@@ -50,11 +50,5 @@ inline fun <T> readStored(file: File, default: T, parse: (File) -> T): T {
 @PublishedApi
 internal fun warnUnreadable(file: File, e: Exception) = warn("Could not read ${file.name}: ${e.javaClass.simpleName}")
 
-private fun warn(message: String) {
-    try {
-        Log.w(TAG, message)
-    } catch (_: RuntimeException) {
-        // Plain JVM unit tests have no Log.
-    }
-}
+private fun warn(message: String) = logWarning(TAG, message)
 

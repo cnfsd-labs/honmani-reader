@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.words
 
+import app.honmani.reader.diagnostics.logWarning
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -303,7 +304,8 @@ class WordsViewModel(
             ?.let(LookupGroups::isGrammarWord) == true
     } catch (e: CancellationException) {
         throw e
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        logWarning("Honmani.words", "Grammar word check failed", e)
         false
     }
 
@@ -316,7 +318,8 @@ class WordsViewModel(
                 AnkiOutcome.Exported(list.size)
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logWarning("Honmani.words", "Anki text export failed", e)
                 AnkiOutcome.ExportFailed
             }
             _ankiOutcomes.send(outcome)
@@ -337,7 +340,8 @@ class WordsViewModel(
                 AnkiOutcome.Exported(list.size, packaged = true, audioProblem = problem)
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                logWarning("Honmani.words", "Anki package export failed", e)
                 AnkiOutcome.ExportFailed
             } finally {
                 ankiProgress.value = null
