@@ -1,6 +1,7 @@
 package app.honmani.reader.data.opds
 
 import app.honmani.reader.data.net.LoginGate
+import app.honmani.reader.data.net.originOf
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -9,7 +10,6 @@ import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URISyntaxException
 import java.net.URL
 import java.net.URLDecoder
 import java.net.UnknownHostException
@@ -196,7 +196,7 @@ class OpdsClient(
                             throw unauthorized
                         }
                         if (challenge != null) {
-                            digests[origin(current)!!] = challenge
+                            digests[originOf(current)!!] = challenge
                             digestTries++
                         }
                     }
@@ -218,7 +218,7 @@ class OpdsClient(
     private fun login(server: OpdsServer, url: String): String? {
         val basic = authorization(server, url) ?: return null
         if (!logins.maySend(url)) return null
-        val digest = digests[origin(url)] ?: return basic
+        val digest = digests[originOf(url)] ?: return basic
         val uri = URI(url)
         val target = (uri.rawPath?.ifEmpty { null } ?: "/") + (uri.rawQuery?.let { "?$it" } ?: "")
         return digest.authorization(server.username!!, server.password.orEmpty(), "GET", target)
@@ -239,21 +239,9 @@ class OpdsClient(
         /** Basic auth for requests to the catalogue's own scheme, host and port only. */
         internal fun authorization(server: OpdsServer, url: String): String? {
             val username = server.username?.takeIf { it.isNotEmpty() } ?: return null
-            if (origin(url) == null || origin(url) != origin(server.url)) return null
+            if (originOf(url) == null || originOf(url) != originOf(server.url)) return null
             val token = "$username:${server.password.orEmpty()}".toByteArray(Charsets.UTF_8)
             return "Basic " + Base64.getEncoder().encodeToString(token)
-        }
-
-        private fun origin(url: String): String? {
-            val uri = try {
-                URI(url)
-            } catch (_: URISyntaxException) {
-                return null
-            }
-            val scheme = uri.scheme?.lowercase() ?: return null
-            val host = uri.host?.lowercase() ?: return null
-            val port = if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80
-            return "$scheme://$host:$port"
         }
 
         private fun isWeb(url: String): Boolean {

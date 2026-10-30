@@ -1,7 +1,5 @@
 package app.honmani.reader.data.net
 
-import java.net.URI
-import java.net.URISyntaxException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -28,28 +26,16 @@ class LoginGate(
 
     /** Whether a login may go with a request to [url] now. */
     fun maySend(url: String): Boolean {
-        val origin = origin(url) ?: return false
+        val origin = originOf(url) ?: return false
         if (!origin.startsWith("http://")) return true
         return !hotspot() && (origin to network()) in asked
     }
 
     /** Whether a login for [url] is withheld even if the server asks: http on a hotspot. */
-    fun blocked(url: String): Boolean = origin(url)?.startsWith("http://") == true && hotspot()
+    fun blocked(url: String): Boolean = originOf(url)?.startsWith("http://") == true && hotspot()
 
     /** The server of [url] answered 401: it asked for the login on this network. */
     fun asked(url: String) {
-        origin(url)?.let { asked += it to network() }
-    }
-
-    private fun origin(url: String): String? {
-        val uri = try {
-            URI(url.trim())
-        } catch (_: URISyntaxException) {
-            return null
-        }
-        val scheme = uri.scheme?.lowercase() ?: return null
-        val host = uri.host?.lowercase() ?: return null
-        val port = if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80
-        return "$scheme://$host:$port"
+        originOf(url)?.let { asked += it to network() }
     }
 }
