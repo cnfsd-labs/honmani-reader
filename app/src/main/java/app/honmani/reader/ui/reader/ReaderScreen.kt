@@ -215,7 +215,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     if (it) viewModel.dismiss()
                 },
                 onBackground = { bookBackground = Color(it) },
-                marks = { texts, mode -> container.wordMarker.mark(texts, mode) },
+                marks = { texts, mode, isStale -> container.wordMarker.mark(texts, mode, isStale) },
                 marksKey = learning,
                 volumeKeysTurnPages = volumeKeys,
                 modifier = Modifier

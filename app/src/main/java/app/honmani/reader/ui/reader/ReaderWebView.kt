@@ -49,6 +49,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -145,7 +146,8 @@ fun ReaderWebView(
     onBackground: (Int) -> Unit = {},
     highlightColor: Color = MaterialTheme.colorScheme.primary,
     /** The words to mark in each paragraph (`word-marks.js`); null: none can be found. */
-    marks: suspend (texts: List<String>, mode: WordMarksMode) -> List<List<WordMark>>? = { _, _ -> null },
+    marks: suspend (texts: List<String>, mode: WordMarksMode, isStale: () -> Boolean) -> List<List<WordMark>>? =
+        { _, _, _ -> null },
     /** Changes when the reader's words change, so the page asks for its marks again. */
     marksKey: Any? = null,
     /** The volume buttons turn pages while a book is open (they close the lookup panel first). */
@@ -230,9 +232,12 @@ fun ReaderWebView(
 
     // Asked for again after the reader's words changed (a lookup, say), not when first known.
     var lastMarksKey by remember { mutableStateOf<Any?>(null) }
+    // Bumped at every reset: requests asked before it are skipped, the page has forgotten them.
+    val marksGeneration = remember { AtomicInteger() }
     LaunchedEffect(marksKey) {
         val changed = lastMarksKey != null && marksKey != null
         if (marksKey != null) lastMarksKey = marksKey
+        if (changed) marksGeneration.incrementAndGet()
         if (changed && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             webViewRef.replyProxy?.postMessage("""{"type":"marks.reset"}""")
         }
@@ -261,11 +266,19 @@ fun ReaderWebView(
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()
                             is BridgeMessage.Background -> currentOnBackground(message.color)
-                            is BridgeMessage.Marks -> scope.launch {
-                                val found = currentMarks(message.blocks.map { it.text }, message.mode) ?: return@launch
-                                val reply = marksReply(message, found, currentHighlightColor.toHex())
-                                if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
-                                    replyProxy.postMessage(reply)
+                            is BridgeMessage.Marks -> {
+                                val generation = marksGeneration.get()
+                                scope.launch {
+                                    val stale = { marksGeneration.get() != generation }
+                                    // A stale request needs no answer: the reset made the page forget it.
+                                    // Otherwise null (no dictionary) still answers, with no marks, so the
+                                    // page drops its pending entry.
+                                    val found = currentMarks(message.blocks.map { it.text }, message.mode, stale)
+                                    if (stale()) return@launch
+                                    val reply = marksReply(message, found.orEmpty(), currentHighlightColor.toHex())
+                                    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                                        replyProxy.postMessage(reply)
+                                    }
                                 }
                             }
                         }
