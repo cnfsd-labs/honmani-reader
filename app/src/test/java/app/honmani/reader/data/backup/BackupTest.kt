@@ -290,6 +290,21 @@ class BackupTest {
     }
 
     @Test
+    fun ankiNotesOfAnotherPhoneAreNotTakenOver() = runTest {
+        val old = oldPhone()
+        old.words.setAnkiNote(old.words.find("猫", "よみ")!!.id, 1234)
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val file = BackupCodec.read(ByteArrayInputStream(ByteArrayOutputStream().also { BackupCodec.write(backup, it) }.toByteArray()))
+        // A backup from an older version still names the note.
+        val withNote = file.copy(words = file.words.map { if (it.expression == "猫") it.copy(ankiNoteId = 1234) else it })
+        val new = Phone("new")
+        new.backup.restore(throughFile(withNote))
+
+        assertNull(new.words.find("猫", "よみ")!!.ankiNoteId)
+        assertNull(old.backup.export(readerSettings = null).words.first { it.expression == "猫" }.ankiNoteId)
+    }
+
+    @Test
     fun aFailedMoveLeavesTheRestoredBookWaiting() = runTest {
         val old = oldPhone()
         val new = Phone("new")

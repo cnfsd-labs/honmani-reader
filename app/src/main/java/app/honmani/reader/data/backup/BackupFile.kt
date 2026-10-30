@@ -128,7 +128,11 @@ data class BackupWord(
     val lastSurfaceStart: Int,
     val lastSurfaceEnd: Int,
     val lastBookTitle: String? = null,
-    /** The AnkiDroid note made from it: AnkiDroid keeps its notes when Honmani is installed again. */
+    /**
+     * Older backups carry the AnkiDroid note id; it is neither written nor restored now: it is
+     * only valid in the AnkiDroid it was made in, and on another phone it would show "in Anki"
+     * without a card. Adding the word again finds an existing note and marks it.
+     */
     val ankiNoteId: Long? = null,
     /** `WordProgress` steps, reads and lookups it was worked out from, and the learned mark. */
     val progress: BackupWordStep? = null,

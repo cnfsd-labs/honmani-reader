@@ -115,7 +115,6 @@ class Backup(
                 lastSurfaceStart = word.lastSurfaceStart,
                 lastSurfaceEnd = word.lastSurfaceEnd,
                 lastBookTitle = word.lastBookTitle,
-                ankiNoteId = word.ankiNoteId,
                 progress = progress[word.id]?.let { BackupWordStep(it.steps, it.reads, it.lookups, it.learned, it.kana) },
                 lookups = lookups[word.id].orEmpty().map { lookup ->
                     BackupWordLookup(
@@ -400,7 +399,6 @@ class Backup(
             lastSurfaceStart = word.lastSurfaceStart,
             lastSurfaceEnd = word.lastSurfaceEnd,
             lastBookTitle = word.lastBookTitle,
-            ankiNoteId = word.ankiNoteId,
         )
 
         /**
@@ -427,7 +425,6 @@ class Backup(
                 lastSurfaceStart = if (newer) backup.lastSurfaceStart else word.lastSurfaceStart,
                 lastSurfaceEnd = if (newer) backup.lastSurfaceEnd else word.lastSurfaceEnd,
                 lastBookTitle = if (newer) backup.lastBookTitle else word.lastBookTitle,
-                ankiNoteId = word.ankiNoteId ?: backup.ankiNoteId,
             )
         }
     }
