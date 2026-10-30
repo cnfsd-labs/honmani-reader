@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
             container.dictionaryUpdateChecker.start()
             container.startGrading()
             container.checkAutoBackupOffer()
+            container.sweepLeftovers()
             container.openedBooks.receive(intent)
         }
         setContent {

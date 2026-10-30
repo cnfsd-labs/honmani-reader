@@ -47,6 +47,16 @@ class BookImporterTest {
         database.close()
     }
 
+    @Test
+    fun sweepRemovesImportLeftoversOnly() = runTest {
+        booksDir.mkdirs()
+        val stale = File(booksDir, "import123.tmp").apply { writeText("x") }
+        val book = File(booksDir, "abc.epub").apply { writeText("x") }
+        importer.sweepTemporaryFiles()
+        assertFalse(stale.exists())
+        assertTrue(book.exists())
+    }
+
     private suspend fun import(bytes: ByteArray, name: String) = importer.import(bytes.inputStream(), name)
 
     @Test

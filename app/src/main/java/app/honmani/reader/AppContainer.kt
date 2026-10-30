@@ -464,6 +464,11 @@ class AppContainer(context: Context) {
         applicationScope.launch { autoBackup.checkOffer() }
     }
 
+    /** Once per app start: removes import copies a kill left in the books directory. */
+    fun sweepLeftovers() {
+        applicationScope.launch { bookImporter.sweepTemporaryFiles() }
+    }
+
     fun startGrading() {
         applicationScope.launch {
             withContext(Dispatchers.IO) { difficultyStore.load() }

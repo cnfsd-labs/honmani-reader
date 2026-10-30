@@ -151,6 +151,17 @@ class BookImporter(
         return book
     }
 
+    /**
+     * Deletes copies an import left behind when the app was killed half way. Waits for a running
+     * import, so it never removes the file of one in progress.
+     */
+    suspend fun sweepTemporaryFiles() = mutex.withLock {
+        withContext(Dispatchers.IO) {
+            booksDir.listFiles { file -> file.name.startsWith("import") && file.name.endsWith(".tmp") }
+                ?.forEach { it.delete() }
+        }
+    }
+
     /** Removes the book's files; the caller removes the row. */
     fun deleteFiles(book: BookEntity) {
         File(booksDir, book.fileName).delete()
