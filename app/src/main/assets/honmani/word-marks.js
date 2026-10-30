@@ -193,8 +193,31 @@
     return style.overflowX !== 'visible' || style.overflowY !== 'visible';
   }
 
+  /**
+   * Lets go of the paragraphs ttu took out of the book (in page mode it holds one chapter at a
+   * time, in the same box), so that a reset doesn't observe every chapter read so far again.
+   */
+  function forgetDetached() {
+    for (const [id, element] of elements) {
+      if (element.isConnected && root.contains(element)) continue;
+      observer.unobserve(element);
+      elements.delete(id);
+      ids.delete(element);
+      blocks.delete(id);
+      queue.delete(id);
+      for (const mark of (shown.get(id) || new Map()).values()) {
+        for (const range of mark.ranges) {
+          highlights[mark.kind].delete(range);
+          fresh[mark.kind].delete(range);
+        }
+      }
+      shown.delete(id);
+    }
+  }
+
   /** Groups the book's text into paragraphs and watches which come near the screen. */
   function scan() {
+    forgetDetached();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => (isSkipped(node) || !node.data.trim() ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
     });

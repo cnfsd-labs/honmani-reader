@@ -633,6 +633,37 @@ test('word marks leave furigana out of the text and the marks', async ({ page })
   await expect.poll(() => marked(page)).toEqual({ 'honmani-learning': ['吾輩', 'は', '猫'], 'honmani-new': [] });
 });
 
+test('word marks let go of the paragraphs of chapters ttu took out of the page', async ({ page }) => {
+  // Which paragraphs the marks watch: a reset observes each of them again.
+  await page.addInitScript(() => {
+    window.__observed = [];
+    const observe = IntersectionObserver.prototype.observe;
+    IntersectionObserver.prototype.observe = function (target) {
+      window.__observed.push(target);
+      return observe.call(this, target);
+    };
+  });
+  await openWithMarks(page, 'sample-ginga.epub', null);
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(0);
+
+  // Paginated, ttu holds one chapter at a time: on to the next one.
+  const first = await chapter(page);
+  for (let turn = 0; (await chapter(page)) === first; turn++) {
+    expect(turn, 'turns to reach the next chapter').toBeLessThan(200);
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(20);
+  }
+  // The marks' rescan after ttu's change, then a lookup's reset.
+  await page.waitForTimeout(500);
+  const watched = await page.evaluate(() => {
+    window.__observed = [];
+    window.__reply({ type: 'marks.reset' });
+    return { all: window.__observed.length, detached: window.__observed.filter((element) => !element.isConnected).length };
+  });
+  expect(watched.all).toBeGreaterThan(0);
+  expect(watched.detached).toBe(0);
+});
+
 test('word marks ask nothing when the reader turned them off', async ({ page }) => {
   await openWithMarks(page, 'neko.epub', 'off');
   await page.waitForTimeout(500);
