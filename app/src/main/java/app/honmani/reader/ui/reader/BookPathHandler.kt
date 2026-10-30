@@ -19,14 +19,17 @@ class BookPathHandler(private val booksDir: File) : WebViewAssetLoader.PathHandl
                 "utf-8",
                 404,
                 "Not Found",
-                emptyMap(),
+                NOSNIFF,
                 ByteArrayInputStream(ByteArray(0)),
             )
         }
-        return WebResourceResponse("application/octet-stream", null, file.inputStream())
+        return WebResourceResponse("application/octet-stream", null, 200, "OK", NOSNIFF, file.inputStream())
     }
 
     companion object {
+        /** Books are data: the WebView must never guess a type and run one as a page. */
+        val NOSNIFF = mapOf("X-Content-Type-Options" to "nosniff")
+
         private val LIBRARY_FILE_NAME = Regex("[0-9a-f]{64}\\.(epub|txt)")
 
         fun isLibraryFileName(name: String): Boolean = LIBRARY_FILE_NAME.matches(name)

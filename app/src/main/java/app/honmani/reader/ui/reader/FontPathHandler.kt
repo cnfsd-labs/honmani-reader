@@ -14,8 +14,8 @@ class FontPathHandler(private val fontsDir: File) : WebViewAssetLoader.PathHandl
     override fun handle(path: String): WebResourceResponse {
         val file = FontCatalog.byFileName(path)?.let { File(fontsDir, it.fileName) }
         if (file == null || !file.isFile) {
-            return WebResourceResponse("text/plain", "utf-8", 404, "Not Found", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+            return WebResourceResponse("text/plain", "utf-8", 404, "Not Found", BookPathHandler.NOSNIFF, ByteArrayInputStream(ByteArray(0)))
         }
-        return WebResourceResponse("font/ttf", null, file.inputStream())
+        return WebResourceResponse("font/ttf", null, 200, "OK", BookPathHandler.NOSNIFF, file.inputStream())
     }
 }

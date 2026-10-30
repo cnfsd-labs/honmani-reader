@@ -16,7 +16,7 @@ class TtuPathHandler(private val assets: AssetManager) : WebViewAssetLoader.Path
         val resolved = TtuAssetResolver.resolve(path) ?: return notFound()
         return try {
             if (resolved.mimeType == "text/html") page(resolved.assetPath)
-            else WebResourceResponse(resolved.mimeType, null, assets.open(resolved.assetPath))
+            else WebResourceResponse(resolved.mimeType, null, 200, "OK", BookPathHandler.NOSNIFF, assets.open(resolved.assetPath))
         } catch (_: FileNotFoundException) {
             notFound()
         }
@@ -29,7 +29,7 @@ class TtuPathHandler(private val assets: AssetManager) : WebViewAssetLoader.Path
             "utf-8",
             200,
             "OK",
-            mapOf("Content-Security-Policy" to ReaderPolicy.contentSecurityPolicy(bytes.decodeToString())),
+            BookPathHandler.NOSNIFF + ("Content-Security-Policy" to ReaderPolicy.contentSecurityPolicy(bytes.decodeToString())),
             ByteArrayInputStream(bytes),
         )
     }
@@ -39,7 +39,7 @@ class TtuPathHandler(private val assets: AssetManager) : WebViewAssetLoader.Path
         "utf-8",
         404,
         "Not Found",
-        emptyMap(),
+        BookPathHandler.NOSNIFF,
         ByteArrayInputStream(ByteArray(0)),
     )
 }
