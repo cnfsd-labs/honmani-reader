@@ -534,6 +534,67 @@ test('the end drawn on screen on the first page of a long book is not reported',
   expect(await page.evaluate(() => window.__messages.filter((message) => message.type === 'library.finished'))).toEqual([]);
 });
 
+// The paginated reader holds only the current chapter, so its last character is on screen at
+// every chapter end: a short last chapter must not make the end of the one before count.
+test('the end of a chapter before a short last one is not reported as the end of the book', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
+  await page.addInitScript({ path: path.join(ASSETS, 'book-end.js') });
+  const chapter = Array.from({ length: 40 }, (_, i) => `第${i + 1}段落。吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。`);
+  const afterword = Array.from({ length: 10 }, (_, i) => `あとがきの${i + 1}。読んでくださってありがとうございました。`);
+  const chapters = [chapter, afterword];
+  await importAndOpen(page, { ...nekoEpub, name: 'chapters.epub', buffer: buildEpub({ title: '章の本', chapters }) }, '章の本');
+  const finished = () => page.evaluate(() => window.__messages.filter((message) => message.type === 'library.finished'));
+  const onScreen = (text) => page.evaluate((text) => {
+    const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.data.includes(text)) continue;
+      const range = document.createRange();
+      range.selectNode(node);
+      return Array.from(range.getClientRects()).some((r) => r.width > 0 && r.right > 0 && r.left < innerWidth);
+    }
+    return false;
+  }, text);
+
+  for (let i = 0; i < 40 && !(await onScreen('第40段落')); i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+  }
+  expect(await onScreen('第40段落')).toBe(true);
+  await page.waitForTimeout(1_000);
+  expect(await finished()).toEqual([]);
+
+  const id = Number(new URL(page.url()).searchParams.get('id'));
+  for (let i = 0; i < 10 && !(await onScreen('あとがきの10')); i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+  }
+  await expect.poll(finished, { timeout: 5_000 }).toEqual([{ type: 'library.finished', id }]);
+});
+
+// ttu sends its counts some time after a chapter is drawn; a title page's end is on screen at once.
+test('a paginated chapter end is not reported before ttu has sent its counts', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
+  // Keeps ttu's page change events from book-end.js only.
+  await page.addInitScript(() => {
+    const add = document.addEventListener;
+    window.__dropPageChange = true;
+    document.addEventListener = function (type, ...rest) {
+      if (window.__dropPageChange && type === 'ttsu:page.change') return;
+      add.call(this, type, ...rest);
+    };
+  });
+  await page.addInitScript({ path: path.join(ASSETS, 'book-end.js') });
+  await page.addInitScript(() => {
+    window.__dropPageChange = false;
+  });
+  const story = Array.from({ length: 200 }, (_, i) => `第${i + 1}段落。吾輩は猫である。名前はまだ無い。`);
+  await importAndOpen(page, { ...nekoEpub, name: 'titled.epub', buffer: buildEpub({ title: '扉の本', chapters: [['扉の本'], story] }) }, '扉の本');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(2_000);
+  expect(await page.evaluate(() => window.__messages.filter((message) => message.type === 'library.finished'))).toEqual([]);
+});
+
 // ttu restores its position after a resize by paragraph; with paragraphs longer than a screen
 // (as in most novels) a rotation lost the place by pages. keep-position.js brings back the first
 // character that was on screen.
