@@ -11,8 +11,13 @@ internal class XNode(val name: String?, val text: String?, val attributes: Map<S
 
     val isText: Boolean get() = name == null
 
+    /** Elements above this one; the document is 0. */
+    var depth: Int = 0
+        private set
+
     fun add(child: XNode) {
         child.parent = this
+        child.depth = depth + 1
         children += child
     }
 
@@ -41,6 +46,12 @@ internal class XNode(val name: String?, val text: String?, val attributes: Map<S
  * CREngine drops it, so text node indexes match its XPointers.
  */
 internal object Xhtml {
+    /**
+     * The deepest element nesting kept. Books nest a few dozen levels; a hostile page with
+     * 100,000 open divs would overflow the stack of every recursive walk over the tree.
+     */
+    internal const val MAX_DEPTH = 256
+
     private val voidElements = setOf(
         "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr",
     )
@@ -135,7 +146,8 @@ internal object Xhtml {
                     }
                     val element = XNode(name, null, attributes)
                     current.add(element)
-                    if (!selfClosing && name !in voidElements) current = element
+                    // Past MAX_DEPTH the element stays a leaf: the tree walks recurse once per level.
+                    if (!selfClosing && name !in voidElements && element.depth < MAX_DEPTH) current = element
                     i = end + 1
                 }
             }

@@ -114,4 +114,33 @@ class EpubPositionsTest {
         assertNull(EpubPositions.read(file))
         assertNull(EpubPositions.texts(file))
     }
+
+    @Test
+    fun deeplyNestedMarkupDoesNotOverflowTheStack() {
+        val depth = 200_000
+        val file = epubWithChapter(
+            "deep.epub",
+            "<html><body>" + "<div>".repeat(depth) + "<p>吾輩は猫である。</p>" + "</div>".repeat(depth) + "</body></html>",
+        )
+
+        val deep = EpubPositions.read(file)!!
+        assertEquals(7, deep.total)
+        // Every position still maps back, however the tree was cut.
+        for (n in 0..deep.total) assertEquals(n, deep.charactersAt(deep.xpointerAt(n)!!))
+        assertEquals("吾輩は猫である。", EpubPositions.texts(file)!!.single().text.trim())
+    }
+
+    @Test
+    fun nestingIsCutOffAtAFixedDepth() {
+        val document = Xhtml.parse("<div>".repeat(Xhtml.MAX_DEPTH * 3) + "x")
+        var node = document
+        var levels = 0
+        while (true) {
+            node = node.children.firstOrNull { !it.isText } ?: break
+            levels++
+        }
+        assertEquals(Xhtml.MAX_DEPTH, levels)
+        assertEquals("div", document.find("div")?.name)
+        assertEquals(Xhtml.MAX_DEPTH * 3, document.findAll("div").size)
+    }
 }
