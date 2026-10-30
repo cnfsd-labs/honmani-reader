@@ -262,7 +262,6 @@ class DictionaryLookup(
         if (characters.isEmpty()) return emptyMap()
         val dictionaries = dictionaryDao.enabledReady().filter { it.kanjiCount > 0 }.associateBy { it.id }
         if (dictionaries.isEmpty()) return emptyMap()
-        val dictionaryOrder = compareBy<DictionaryEntity>({ it.priority }, { it.title })
         return dao.find(characters)
             .filter { it.dictionaryId in dictionaries }
             .groupBy { it.character }
@@ -285,17 +284,15 @@ class DictionaryLookup(
             .filter { it.dictionaryId in dictionaries }
         if (rows.isEmpty()) return emptyMap()
         val byExpression = rows.groupBy { it.expression }
-        val dictionaryOrder = compareBy<DictionaryEntity>({ it.priority }, { it.title })
         return words.associate { (expression, reading) ->
             val matching = byExpression[expression].orEmpty().filter { it.reading == null || it.reading == reading }
-            metaKey(expression, reading) to wordMeta(matching, dictionaries, dictionaryOrder)
+            metaKey(expression, reading) to wordMeta(matching, dictionaries)
         }.filterValues { it != WordMeta.NONE }
     }
 
     private fun wordMeta(
         rows: List<TermMetaEntity>,
         dictionaries: Map<Long, DictionaryEntity>,
-        dictionaryOrder: Comparator<DictionaryEntity>,
     ): WordMeta {
         if (rows.isEmpty()) return WordMeta.NONE
         val byDictionary = rows.groupBy { dictionaries.getValue(it.dictionaryId) }.toSortedMap(dictionaryOrder)
@@ -416,7 +413,15 @@ class DictionaryLookup(
         /** Hiragana after a kanji that are particles rather than okurigana. */
         const val PARTICLES = "はがをにへとでものや"
 
-        /** Better match for one term: longer source, then fewer inflections, then written form. */
+        /** Dictionaries in the order the user ranks them: priority, then title. */
+        val dictionaryOrder: Comparator<DictionaryEntity> =
+            compareBy<DictionaryEntity>({ it.priority }, { it.title })
+
+        /**
+         * Better match for one term: longer source, then fewer inflections, then written form.
+         * Fed to `maxWithOrNull`, so the best match compares greatest (hence the descending
+         * inflection count).
+         */
         val matchOrder: Comparator<Pair<Candidate, Boolean>> =
             compareBy<Pair<Candidate, Boolean>> { it.first.source.length }
                 .thenByDescending { it.first.deinflection.inflections.size }

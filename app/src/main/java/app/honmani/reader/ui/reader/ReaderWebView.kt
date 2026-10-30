@@ -455,7 +455,6 @@ private fun createReaderWebView(
     }
 }
 
-/** Handles back anywhere but on ttu's book list; see [ReaderBack.from]. */
 /** Sends PageDown (next) or PageUp to the page, as a keyboard would. */
 private fun turnPage(view: WebView, next: Boolean) {
     val code = if (next) KeyEvent.KEYCODE_PAGE_DOWN else KeyEvent.KEYCODE_PAGE_UP
@@ -464,6 +463,7 @@ private fun turnPage(view: WebView, next: Boolean) {
     view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
 }
 
+/** Handles back anywhere but on ttu's book list; see [ReaderBack.from]. */
 private fun goBack(view: WebView) {
     val history = view.copyBackForwardList()
     val paths = (0 until history.size).map { history.getItemAtIndex(it).url.toUri().path.orEmpty() }
