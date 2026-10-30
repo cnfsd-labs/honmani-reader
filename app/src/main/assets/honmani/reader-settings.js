@@ -134,6 +134,8 @@
    * it. Loading ttu's own face (not a second one) matters: ttu's check passes only once every
    * face of the family is loaded.
    */
+  const FONT_PRELOAD_GIVE_UP_MS = 30000;
+
   function preloadFont() {
     if (!document.fonts || !window.MutationObserver) return;
     let family;
@@ -155,6 +157,8 @@
       load();
     });
     observer.observe(document, { childList: true, subtree: true });
+    // ttu gives up on a font after 30 s; without its style element there is nothing to wait for.
+    setTimeout(() => observer.disconnect(), FONT_PRELOAD_GIVE_UP_MS);
   }
   preloadFont();
 

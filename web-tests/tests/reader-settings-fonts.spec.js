@@ -118,3 +118,36 @@ test('fonts not downloaded by Honmani are left to ttu', async ({ page }) => {
 
   expect(await faceStatuses(page)).toEqual(['Mine: unloaded']);
 });
+
+test('the font preload stops watching the page when ttu never declares the fonts', async ({ page }) => {
+  await page.evaluate(() => {
+    window.honmaniReaderSettings.fonts({ fonts: [{ name: 'Klee One', fileName: 'KleeOne-Regular.ttf' }] });
+    window.localStorage.setItem('fontFamilyGroupOne', 'Klee One');
+  });
+  // Runs the script again in the page, with the timers and the observers' disconnect watched.
+  const timers = await page.evaluate((source) => {
+    const timers = [];
+    const disconnected = [];
+    const realSetTimeout = window.setTimeout;
+    window.setTimeout = (callback, ms, ...rest) => {
+      timers.push({ callback, ms });
+      return realSetTimeout(() => {}, 0);
+    };
+    const original = MutationObserver.prototype.disconnect;
+    MutationObserver.prototype.disconnect = function () {
+      disconnected.push(this);
+      return original.call(this);
+    };
+    delete window.honmaniReaderSettings;
+    new Function(source)();
+    window.setTimeout = realSetTimeout;
+    const give = timers.find((timer) => timer.ms >= 10000);
+    const before = disconnected.length;
+    give.callback();
+    MutationObserver.prototype.disconnect = original;
+    return { ms: give.ms, disconnectedByTimeout: disconnected.length - before };
+  }, fs.readFileSync(SETTINGS, 'utf8'));
+
+  expect(timers.ms).toBeLessThanOrEqual(30000);
+  expect(timers.disconnectedByTimeout).toBe(1);
+});
