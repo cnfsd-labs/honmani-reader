@@ -10,6 +10,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -217,11 +218,29 @@ class ProgressSync(
         synchronized(this) {
             pending = ttuId to characters
             if (pushJob?.isActive == true) return
-            pushJob = scope.launch {
-                delay(pushDelayMs)
-                push()
+            schedulePush(pushDelayMs)
+        }
+    }
+
+    /** Sends [pending] after [wait]; under the lock. A position that arrived meanwhile follows. */
+    private fun schedulePush(wait: Long) {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            if (wait > 0) delay(wait)
+            push()
+        }
+        pushJob = job
+        job.invokeOnCompletion { finished ->
+            // A position turned in while this one was being sent had no job to wait for it.
+            if (finished == null) {
+                synchronized(this) {
+                    if (pushJob === job) {
+                        pushJob = null
+                        if (pending != null) schedulePush(pushDelayMs)
+                    }
+                }
             }
         }
+        job.start()
     }
 
     /** Sends the latest position now: the reader left the book or the app. */
@@ -229,7 +248,7 @@ class ProgressSync(
         synchronized(this) {
             if (pending == null) return
             pushJob?.cancel()
-            pushJob = scope.launch { push() }
+            schedulePush(0)
         }
     }
 

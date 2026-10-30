@@ -30,6 +30,10 @@ internal class FakeKoSyncServer(
     @Volatile
     var down = false
 
+    /** Milliseconds every answer is held back, like a slow connection. */
+    @Volatile
+    var delayMs = 0L
+
     private lateinit var http: HeaderServer
     val url: String get() = "http://127.0.0.1:${http.port}"
     val requests get() = http.requests
@@ -37,6 +41,7 @@ internal class FakeKoSyncServer(
     init {
         http = HeaderServer { fullPath, out ->
             val request = http.requests.last()
+            if (delayMs > 0) Thread.sleep(delayMs)
             val path = if (cwa) fullPath.removePrefix("/kosync") else fullPath
             val basic = "Basic " + Base64.getEncoder().encodeToString("$user:$password".toByteArray())
             val authorized = if (cwa) {

@@ -136,6 +136,17 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun aPageTurnWhileAPositionIsBeingSentIsSentToo() = runBlocking {
+        server.delayMs = 300
+        sync.onPosition(5, 3)
+        // The first position is on its way (the server is slow) when the reader turns the page.
+        waitFor { server.requests.isNotEmpty() }
+        sync.onPosition(5, 12)
+
+        waitFor { server.progress[document]?.get("percentage")?.jsonPrimitive?.double == 12.0 / 31 }
+    }
+
+    @Test
     fun thePageStartAfterAJumpIsNotSentBack_butTurningBackIs() = runBlocking {
         server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
         pull(local = 0, savedAtMs = 0)
