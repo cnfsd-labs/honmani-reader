@@ -6,7 +6,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ListItem
@@ -73,12 +79,16 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
             },
         )
     }
-    BackupStateDialog(state, onDismiss = viewModel::dismiss)
+    BackupStateDialog(state, onDismiss = viewModel::dismiss, onConfirm = { confirm, withCatalogs -> viewModel.confirmRestore(confirm.backup, withCatalogs) })
 }
 
 /** While a backup is made or restored, and how it went. */
 @Composable
-fun BackupStateDialog(state: BackupState, onDismiss: () -> Unit) {
+fun BackupStateDialog(
+    state: BackupState,
+    onDismiss: () -> Unit,
+    onConfirm: (BackupState.Confirm, Boolean) -> Unit = { _, _ -> },
+) {
     when (val current = state) {
         BackupState.Idle -> Unit
         BackupState.Working -> AlertDialog(
@@ -91,6 +101,7 @@ fun BackupStateDialog(state: BackupState, onDismiss: () -> Unit) {
             },
             confirmButton = {},
         )
+        is BackupState.Confirm -> RestoreConfirmDialog(current, onConfirm, onDismiss)
         else -> AlertDialog(
             onDismissRequest = onDismiss,
             title = {
@@ -152,6 +163,51 @@ fun AutoBackupOffer(viewModel: BackupViewModel = viewModel(factory = BackupViewM
             viewModel.dismiss()
         })
     }
+}
+
+/** What the file holds, before anything is restored; its book servers can be left out. */
+@Composable
+private fun RestoreConfirmDialog(state: BackupState.Confirm, onConfirm: (BackupState.Confirm, Boolean) -> Unit, onDismiss: () -> Unit) {
+    val contents = state.contents
+    var withCatalogs by rememberSaveable { mutableStateOf(true) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.backup_confirm_title)) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            ) {
+                Text(stringResource(R.string.backup_confirm_intro))
+                Text(pluralStringResource(R.plurals.backup_confirm_books, contents.books, contents.books))
+                Text(pluralStringResource(R.plurals.backup_confirm_words, contents.words, contents.words))
+                Text(pluralStringResource(R.plurals.backup_confirm_days, contents.readingDays, contents.readingDays))
+                if (contents.hasReaderSettings) Text(stringResource(R.string.backup_confirm_reader_settings))
+                if (contents.catalogs.isNotEmpty()) {
+                    Text(stringResource(R.string.backup_confirm_catalogs))
+                    for (catalog in contents.catalogs) {
+                        Text(stringResource(R.string.backup_confirm_catalog, catalog.title, catalog.host))
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.toggleable(withCatalogs, role = Role.Checkbox) { withCatalogs = it },
+                    ) {
+                        Checkbox(checked = withCatalogs, onCheckedChange = null)
+                        Text(
+                            stringResource(R.string.backup_confirm_with_catalogs, contents.catalogs.size),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state, withCatalogs || contents.catalogs.isEmpty()) }) {
+                Text(stringResource(R.string.backup_confirm_restore))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable

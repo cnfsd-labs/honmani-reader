@@ -357,4 +357,17 @@ class BackupTest {
         }.toByteArray()
         BackupCodec.read(ByteArrayInputStream(bytes), maxJsonBytes = 5_000)
     }
+
+    @Test
+    fun aBackupWithoutItsCatalogsAddsNone() = runTest {
+        val old = Phone("old")
+        old.database.opdsCatalogDao().insert(OpdsCatalogEntity(title = "Home", url = "http://nas/opds", addedAt = 1))
+        val file = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+
+        val summary = new.backup.restore(file.withoutCatalogs())
+
+        assertEquals(0, summary.catalogsAdded)
+        assertTrue(new.database.backupDao().catalogs().isEmpty())
+    }
 }

@@ -12,7 +12,11 @@ import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.BackupFile
 import app.honmani.reader.data.backup.BackupFormatException
+import app.honmani.reader.data.backup.BackupContents
+import app.honmani.reader.data.backup.ReaderSettingsCheck
 import app.honmani.reader.data.backup.RestoreSummary
+import app.honmani.reader.data.backup.contents
+import app.honmani.reader.data.backup.withoutCatalogs
 import app.honmani.reader.data.fonts.FontCatalog
 import app.honmani.reader.data.fonts.FontState
 import app.honmani.reader.data.settings.ReaderFont
@@ -33,6 +37,9 @@ sealed interface BackupState {
     data object Working : BackupState
 
     data object Saved : BackupState
+
+    /** A backup file was read; nothing is restored until the reader confirms. */
+    data class Confirm(val backup: BackupFile, val contents: BackupContents) : BackupState
 
     data class Restored(val summary: RestoreSummary) : BackupState
 
@@ -72,7 +79,12 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
             val input = resolver.openInputStream(uri) ?: throw IOException("Cannot read $uri")
             input.use { BackupCodec.read(it.buffered()) }
         }
-        restore(backup)
+        BackupState.Confirm(backup, backup.contents())
+    }
+
+    /** The reader confirmed the [BackupState.Confirm]; [withCatalogs] false leaves its book servers out. */
+    fun confirmRestore(backup: BackupFile, withCatalogs: Boolean) = launchWork {
+        restore(if (withCatalogs) backup else backup.withoutCatalogs())
     }
 
     /** Restores the backup the old phone left ([AutoBackup.offer]); asked once, so it is answered either way. */
@@ -104,7 +116,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
             }
         }
         backup.readerSettings?.let { stored ->
-            val values = stored.filterValues { it != null }.mapValues { (_, value) -> value!! }.toMutableMap()
+            val values = ReaderSettingsCheck.valid(stored).toMutableMap()
             // A downloaded font that isn't on this phone (yet) would keep books waiting for it.
             values[FONT_KEY]?.let { family ->
                 val font = FontCatalog.byFamily(family)

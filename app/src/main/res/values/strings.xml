@@ -653,6 +653,25 @@
         <item quantity="one">%d book server added: enter its password again if it has one.</item>
         <item quantity="other">%d book servers added: enter their passwords again if they have one.</item>
     </plurals>
+    <string name="backup_confirm_title">Restore this backup?</string>
+    <string name="backup_confirm_intro">The file contains:</string>
+    <plurals name="backup_confirm_books">
+        <item quantity="one">%d book (progress only, not the book file)</item>
+        <item quantity="other">%d books (progress only, not the book files)</item>
+    </plurals>
+    <plurals name="backup_confirm_words">
+        <item quantity="one">%d saved word</item>
+        <item quantity="other">%d saved words</item>
+    </plurals>
+    <plurals name="backup_confirm_days">
+        <item quantity="one">Reading statistics for %d day</item>
+        <item quantity="other">Reading statistics for %d days</item>
+    </plurals>
+    <string name="backup_confirm_reader_settings">Reader settings (text size, font, theme and so on)</string>
+    <string name="backup_confirm_catalogs">Book servers:</string>
+    <string name="backup_confirm_catalog">%1$s (%2$s)</string>
+    <string name="backup_confirm_with_catalogs">Also restore book servers (%d)</string>
+    <string name="backup_confirm_restore">Restore</string>
     <string name="backup_restored_not_included">Not in a backup: dictionaries and fonts (download them again), the reading progress sync login and the Google Cloud key.</string>
     <string name="auto_backup_offer_title">Restore from your previous phone?</string>
     <string name="auto_backup_offer">Android brought back Honmani\'s backup from %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
