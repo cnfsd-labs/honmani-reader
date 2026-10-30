@@ -186,6 +186,27 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun aPageTurnWithoutAStoredPositionCountsNothingAndStoresIt() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        seconds(60)
+        tracker.onPage(7, 40_000, progress = 0.4f)
+        advanceUntilIdle()
+
+        assertEquals(null, store.characters[7L to DAY])
+        assertEquals(0, store.read.size)
+        assertEquals(40_000L, store.positions[7])
+
+        // The next page is measured from there.
+        seconds(20)
+        tracker.onPage(7, 40_300)
+        advanceUntilIdle()
+        assertEquals(300L, store.characters[7L to DAY])
+    }
+
+    @Test
     fun aNewBookStartsAtTheBeginning() = runTest {
         val tracker = tracker()
         tracker.setForeground(true)

@@ -37,6 +37,7 @@ interface ReadingStore {
  * on screen ([MAX_CHARACTERS_PER_SECOND]): a jump forward through the table of contents is not
  * reading. Going back counts nothing. ttu's reports of all positions (from the library) count
  * what page turns missed, with a little allowance for reading before the app last stopped.
+ * A page turn in a book without a stored position only stores it.
  *
  * **Stretches read**: the part of the book of each page counted is passed on ([ReadingStore.addRead]),
  * for the words read (`WordKnowledge`); ttu's reports of all positions add none.
@@ -102,7 +103,15 @@ class ReadingTracker(
         }
         scope.launch {
             writes.withLock {
-                val before = store.position(ttuId) ?: 0L
+                val known = store.position(ttuId)
+                if (known == null) {
+                    // Nothing to measure the page against (a new or restored book): counting
+                    // from 0 would credit the whole distance to the start. Just remember it.
+                    synchronized(lock) { secondsSinceReport.remove(ttuId) }
+                    safely { store.setPosition(ttuId, characters) }
+                    return@withLock
+                }
+                val before = known
                 // ttu saves the same position again when a page turn stays in one paragraph:
                 // the time keeps adding up until the position moves.
                 if (characters == before) return@withLock
