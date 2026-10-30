@@ -400,6 +400,9 @@ private fun createReaderWebView(
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.allowFileAccess = false
+        // Books and fonts come through the asset loader, and ttu's file picker hands over its
+        // selection itself: the page never loads content:// URLs.
+        settings.allowContentAccess = false
         // The reader is local: everything on its origin comes from the APK (intercepted
         // requests are not network loads), and nothing else may load.
         settings.blockNetworkLoads = true
