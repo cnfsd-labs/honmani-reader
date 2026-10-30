@@ -33,6 +33,14 @@ class OpenedBooksTest {
     }
 
     @Test
+    fun aHugeShareIsCappedWithoutFailing() {
+        val many = (1..OpenedBooks.MAX_FILES_PER_SHARE + 50).map { Uri.parse("content://downloads/public_downloads/$it") }
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).setType("application/epub+zip")
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(many))
+        assertEquals(many.take(OpenedBooks.MAX_FILES_PER_SHARE), OpenedBooks.bookUris(intent))
+    }
+
+    @Test
     fun theLauncherAndPlainFilePathsGiveNothing() {
         assertEquals(emptyList<Uri>(), OpenedBooks.bookUris(Intent(Intent.ACTION_MAIN)))
         assertEquals(emptyList<Uri>(), OpenedBooks.bookUris(null))

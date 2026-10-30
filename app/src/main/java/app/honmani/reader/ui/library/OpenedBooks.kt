@@ -33,6 +33,9 @@ class OpenedBooks {
             Intent.ACTION_SEND_MULTIPLE ->
                 IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
             else -> emptyList()
-        }.filter { it.scheme == "content" }
+        }.filter { it.scheme == "content" }.take(MAX_FILES_PER_SHARE)
+
+        /** More files than this in one share are ignored: nobody shares more, and each one is read. */
+        const val MAX_FILES_PER_SHARE = 200
     }
 }
