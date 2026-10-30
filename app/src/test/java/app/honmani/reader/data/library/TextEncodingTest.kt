@@ -51,4 +51,17 @@ class TextEncodingTest {
         val long = text.repeat(40) // well over the 64 KB sample
         assertEquals(long, roundTrip(long.toByteArray(Charset.forName("windows-31j"))).second)
     }
+
+    @Test
+    fun aFileOverTheLimitIsRefusedAndLeftAlone() {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        val file = File(folder.root, "huge.txt").apply { writeBytes(bytes) }
+        try {
+            TextEncoding.convertToUtf8(file, maxBytes = bytes.size - 1)
+            org.junit.Assert.fail("expected TooLargeException")
+        } catch (_: app.honmani.reader.data.TooLargeException) {
+        }
+        assertEquals(bytes.toList(), file.readBytes().toList())
+        assertEquals(Charsets.UTF_8, TextEncoding.convertToUtf8(file, maxBytes = bytes.size))
+    }
 }

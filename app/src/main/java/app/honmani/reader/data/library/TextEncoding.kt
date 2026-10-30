@@ -1,5 +1,6 @@
 package app.honmani.reader.data.library
 
+import app.honmani.reader.data.TooLargeException
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
@@ -15,8 +16,16 @@ import java.nio.charset.CodingErrorAction
 object TextEncoding {
     private const val SAMPLE_BYTES = 64 * 1024
 
-    /** Rewrites [file] as UTF-8 (without BOM) unless it already is; returns the detected encoding. */
-    fun convertToUtf8(file: File): Charset {
+    /** The longest Japanese novels are about 10 MB of text; the file is held in memory several times over. */
+    internal const val MAX_TEXT_BYTES = 50 * 1024 * 1024
+
+    /**
+     * Rewrites [file] as UTF-8 (without BOM) unless it already is; returns the detected encoding.
+     *
+     * @throws TooLargeException if the file is larger than [maxBytes] (an IOException)
+     */
+    fun convertToUtf8(file: File, maxBytes: Int = MAX_TEXT_BYTES): Charset {
+        if (file.length() > maxBytes) throw TooLargeException(maxBytes.toLong())
         val bytes = file.readBytes()
         val charset = detect(bytes)
         val start = bomLength(bytes)

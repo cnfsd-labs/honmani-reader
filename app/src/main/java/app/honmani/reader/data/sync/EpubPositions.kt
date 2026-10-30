@@ -1,5 +1,6 @@
 package app.honmani.reader.data.sync
 
+import app.honmani.reader.data.readBytesAtMost
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
@@ -96,7 +97,7 @@ class EpubPositions private constructor(
     private fun sizeOf(index: Int): Int = (if (index + 1 < starts.size) starts[index + 1] else total) - starts[index]
 
     private fun document(index: Int): XNode? = try {
-        ZipFile(file).use { zip -> zip.getEntry(spine[index])?.let { zip.getInputStream(it).readBytes() } }
+        ZipFile(file).use { zip -> zip.getEntry(spine[index])?.let { zip.getInputStream(it).use { input -> input.readBytesAtMost(MAX_DOCUMENT_BYTES) } } }
             ?.let { bodyOf(Xhtml.parse(decodeText(it))) }
     } catch (_: IOException) {
         null
@@ -119,6 +120,8 @@ class EpubPositions private constructor(
     }
 
     companion object {
+        /** A chapter is a few hundred KB, a whole novel in one file a few MB; a zip entry can inflate to far more. */
+        internal const val MAX_DOCUMENT_BYTES = 32 * 1024 * 1024
         private val DOC_FRAGMENT = Regex("""^/body/DocFragment\[(\d+)]""")
         private val STEP = Regex("""^([^\[\].]+)(?:\[(\d+)])?(?:\.(\d+))?$""")
         private const val BYTE_ORDER_MARK = '\uFEFF'
@@ -185,7 +188,7 @@ class EpubPositions private constructor(
         /** Elements that end a line; [texts] marks their end with a line break. */
         private val BLOCKS = setOf("p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr", "section", "article")
 
-        private fun ZipFile.text(name: String): String? = getEntry(name)?.let { decodeText(getInputStream(it).readBytes()) }
+        private fun ZipFile.text(name: String): String? = getEntry(name)?.let { decodeText(getInputStream(it).use { input -> input.readBytesAtMost(MAX_DOCUMENT_BYTES) }) }
 
         /** The spine's documents in reading order, as paths in the zip; empty if there is none. */
         private fun spineOf(zip: ZipFile): List<String> {

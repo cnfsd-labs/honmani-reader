@@ -89,4 +89,29 @@ class EpubPositionsTest {
         assertNull(EpubPositions.read(folder.newFile("empty.epub").apply { writeText("not a zip") }))
         assertNull(EpubPositions.texts(folder.root.resolve("empty.epub")))
     }
+
+    private fun epubWithChapter(name: String, chapter: String): java.io.File {
+        val file = folder.newFile(name)
+        java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+            fun put(path: String, text: String) {
+                zip.putNextEntry(java.util.zip.ZipEntry(path))
+                zip.write(text.toByteArray())
+                zip.closeEntry()
+            }
+            put("META-INF/container.xml", """<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>""")
+            put("content.opf", """<package><manifest><item id="c" href="c.xhtml"/></manifest><spine><itemref idref="c"/></spine></package>""")
+            put("c.xhtml", chapter)
+        }
+        return file
+    }
+
+    @Test
+    fun aChapterThatInflatesBeyondTheLimitIsNotRead() {
+        // Compresses to a few KB, inflates past the cap: must not be held in memory.
+        val size = EpubPositions.MAX_DOCUMENT_BYTES + 1
+        val file = epubWithChapter("bomb.epub", "<html><body><p>" + "あ".repeat(size / 3 + 1))
+
+        assertNull(EpubPositions.read(file))
+        assertNull(EpubPositions.texts(file))
+    }
 }

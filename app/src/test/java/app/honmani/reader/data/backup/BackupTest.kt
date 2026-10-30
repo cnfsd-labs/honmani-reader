@@ -299,4 +299,16 @@ class BackupTest {
     fun aBackupFromANewerVersionIsRefused() {
         throughFile(BackupFile(exportedAt = 1, version = BackupFile.VERSION + 1))
     }
+
+    @Test(expected = BackupFormatException::class)
+    fun aBackupWhoseDataInflatesBeyondTheLimitIsRefused() {
+        val bytes = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry(BackupCodec.ENTRY))
+                zip.write(ByteArray(10_000) { ' '.code.toByte() })
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        BackupCodec.read(ByteArrayInputStream(bytes), maxJsonBytes = 5_000)
+    }
 }

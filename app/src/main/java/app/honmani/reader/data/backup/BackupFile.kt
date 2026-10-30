@@ -1,5 +1,7 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.data.TooLargeException
+import app.honmani.reader.data.readBytesAtMost
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -177,13 +179,20 @@ object BackupCodec {
         zip.flush()
     }
 
-    fun read(input: InputStream): BackupFile {
+    /** A backup's JSON is a few MB at most; a zip entry can claim to inflate to far more. */
+    internal const val MAX_JSON_BYTES = 128 * 1024 * 1024
+
+    fun read(input: InputStream, maxJsonBytes: Int = MAX_JSON_BYTES): BackupFile {
         val zip = ZipInputStream(input)
         while (true) {
             val entry = zip.nextEntry ?: throw BackupFormatException("No $ENTRY in the file")
             if (entry.name == ENTRY) break
         }
-        val text = zip.readBytes().toString(Charsets.UTF_8)
+        val text = try {
+            zip.readBytesAtMost(maxJsonBytes).toString(Charsets.UTF_8)
+        } catch (e: TooLargeException) {
+            throw BackupFormatException("Not a Honmani backup: the data is too large", e)
+        }
         val backup = try {
             json.decodeFromString(BackupFile.serializer(), text)
         } catch (e: SerializationException) {
