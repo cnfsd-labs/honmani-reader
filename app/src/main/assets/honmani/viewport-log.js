@@ -23,32 +23,16 @@
 
   const SETTLE_MS = 1500;
 
-  /** The first characters of book text on screen (furigana skipped), or null outside a book. */
+  /**
+   * The first characters of book text on screen (furigana skipped), or null outside a book. In
+   * continuous mode (no paginated container) the search starts at the screen's start edge.
+   */
   function readingPosition() {
     const root = document.querySelector('.book-content');
     if (!root) return null;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) =>
-        node.parentElement && node.parentElement.closest('rt, rp')
-          ? NodeFilter.FILTER_REJECT
-          : NodeFilter.FILTER_ACCEPT,
-    });
-    const onScreen = (rect) =>
-      rect.width > 0 && rect.right > 0 && rect.left < innerWidth && rect.bottom > 0 && rect.top < innerHeight;
-    const range = document.createRange();
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      range.selectNodeContents(node);
-      if (!Array.from(range.getClientRects()).some(onScreen)) continue;
-      for (let index = 0; index < node.data.length; index++) {
-        if (!node.data[index].trim()) continue;
-        range.setStart(node, index);
-        range.setEnd(node, index + 1);
-        if (Array.from(range.getClientRects()).some(onScreen)) {
-          return JSON.stringify(node.data.slice(index, index + 12));
-        }
-      }
-    }
-    return null;
+    const fast = !root.querySelector('.book-content-container');
+    const found = window.honmaniText.firstCharOnScreen(root, 'rt, rp', fast);
+    return found ? JSON.stringify(found.node.data.slice(found.offset, found.offset + 12)) : null;
   }
 
   // Updated once the reader has settled after the user turned a page or scrolled.

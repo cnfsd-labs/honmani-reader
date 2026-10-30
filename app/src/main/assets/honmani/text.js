@@ -61,5 +61,139 @@
       rect.bottom > 0 && rect.top < innerHeight;
   }
 
-  window.honmaniText = { SKIPPED_SELECTOR, isSkipped, isBlock, blockAncestor, bookId, toFraction, onScreen };
+  /** Whether a client rect has a width and is at least partly in the viewport (height may be 0). */
+  function rectVisible(rect) {
+    return rect.width > 0 && rect.right > 0 && rect.left < innerWidth && rect.bottom > 0 && rect.top < innerHeight;
+  }
+
+  function textWalker(root, skipped) {
+    return document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) =>
+        node.parentElement && node.parentElement.closest(skipped) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+  }
+
+  function charVisible(range, node, offset) {
+    range.setStart(node, offset);
+    range.setEnd(node, offset + 1);
+    return Array.from(range.getClientRects()).some(rectVisible);
+  }
+
+  /** The reference: walks every text node from the start of `root` until one has a character on screen. */
+  function firstCharWalk(root, skipped) {
+    const walker = textWalker(root, skipped);
+    const range = document.createRange();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      range.selectNodeContents(node);
+      if (!Array.from(range.getClientRects()).some(rectVisible)) continue;
+      for (let offset = 0; offset < node.data.length; offset++) {
+        if (!node.data[offset].trim()) continue;
+        if (charVisible(range, node, offset)) return { node, offset };
+      }
+    }
+    return null;
+  }
+
+  /** How far the fast path looks around before it gives up and lets the full walk decide. */
+  const FAST_STEPS = 200;
+
+  /**
+   * The same answer as firstCharWalk for a book laid out in one flow (continuous mode: text
+   * nodes follow each other down the page, or from right to left in vertical text), without
+   * walking from the start of the book: the browser names the text at the screen's start edge,
+   * and from there the walk steps back over the text nodes still on screen. Returns undefined
+   * when it cannot tell; the caller then walks.
+   */
+  function firstCharNearStart(root, skipped) {
+    if (typeof document.caretRangeFromPoint !== 'function') return undefined;
+    const vertical = getComputedStyle(root).writingMode.startsWith('vertical');
+    // ttu lays a strip of its own over the first pixels of the page (it opens the reader bar), so
+    // the probe goes deeper until it meets the book; the walk back below makes up the distance.
+    let hit = null;
+    for (const distance of [1, 12, 32, 64, 128]) {
+      const found = vertical
+        ? document.caretRangeFromPoint(innerWidth - distance, innerHeight / 2)
+        : document.caretRangeFromPoint(innerWidth / 2, distance);
+      if (found && root.contains(found.startContainer)) {
+        hit = found;
+        break;
+      }
+    }
+    if (!hit) return undefined;
+
+    const walker = textWalker(root, skipped);
+    const range = document.createRange();
+    const beforeStart = (rect) => (vertical ? rect.left >= innerWidth : rect.bottom <= 0);
+    /** 'on' (a character is on screen), 'before' (all of it lies before the start edge) or 'other'. */
+    const where = (node) => {
+      range.selectNodeContents(node);
+      const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0);
+      if (rects.some(rectVisible)) return 'on';
+      return rects.length > 0 && rects.every(beforeStart) ? 'before' : 'other';
+    };
+
+    // The text node the browser named, or the first one after the position it named.
+    let node = hit.startContainer;
+    if (node.nodeType === Node.TEXT_NODE && !(node.parentElement && node.parentElement.closest(skipped))) {
+      walker.currentNode = node;
+    } else {
+      walker.currentNode = node.childNodes[hit.startOffset] || node;
+      node = walker.nextNode();
+    }
+    // Forward to a node with something on screen.
+    let steps = 0;
+    while (node && where(node) !== 'on') {
+      if (++steps > FAST_STEPS) return undefined;
+      node = walker.nextNode();
+    }
+    if (!node) return undefined;
+
+    // Back over the nodes on screen to the earliest one. A node that lies wholly before the start
+    // edge ends the search; nodes with no box (blank text between blocks) are stepped over.
+    let earliest = node;
+    steps = 0;
+    walker.currentNode = node;
+    for (let previous = walker.previousNode(); previous; previous = walker.previousNode()) {
+      const place = where(previous);
+      if (place === 'before') break;
+      if (place === 'on') {
+        earliest = previous;
+        steps = 0;
+      } else if (++steps > FAST_STEPS) {
+        return undefined;
+      }
+    }
+
+    // Forward from there, as the full walk does.
+    walker.currentNode = earliest;
+    steps = 0;
+    for (let current = earliest; current; current = walker.nextNode()) {
+      if (++steps > FAST_STEPS) return undefined;
+      if (where(current) !== 'on') continue;
+      for (let offset = 0; offset < current.data.length; offset++) {
+        if (!current.data[offset].trim()) continue;
+        if (charVisible(range, current, offset)) return { node: current, offset };
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * The first character of text on screen in `root` ({ node, offset }; blank characters and text
+   * inside `skipped` are not counted), or null. With `fast` (continuous mode only; paginated
+   * columns are not one flow) the walk starts at the screen's start edge instead of the book's.
+   */
+  function firstCharOnScreen(root, skipped, fast = false) {
+    if (fast) {
+      const found = firstCharNearStart(root, skipped);
+      if (found) return found;
+    }
+    return firstCharWalk(root, skipped);
+  }
+
+  window.honmaniText = {
+    SKIPPED_SELECTOR, isSkipped, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
+    // Exposed so tests can compare the fast path with the walk.
+    firstCharWalk, firstCharNearStart,
+  };
 })();

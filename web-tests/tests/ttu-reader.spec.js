@@ -673,6 +673,114 @@ test.describe('rotation keeps the reading position', () => {
   }
 });
 
+// keep-position.js, viewport-log.js and book-end.js look at the text once the scroll settles. In
+// continuous mode they must not walk from the start of the book, and must still find the same
+// character as the walk from the start (the reference below is the earlier implementation).
+test.describe('settle-time walks in continuous mode give the same answers as walking the whole book', () => {
+  test.use({ isMobile: true, hasTouch: true, deviceScaleFactor: 4, viewport: { width: 360, height: 736 } });
+
+  const sentence = '吾輩は<ruby>猫<rt>ねこ</rt></ruby>である。名前はまだ<ruby>無<rt>な</rt></ruby>い。どこで<ruby>生<rt>うま</rt></ruby>れたかとんと<ruby>見当<rt>けんとう</rt></ruby>がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。';
+  const paragraphs = Array.from({ length: 60 }, (_, i) =>
+    `<p>【${i + 1}】${Array.from({ length: 10 }, (_, j) => `<span>（${j + 1}）</span>${sentence}`).join('\n')}</p>`);
+  // Blank text and furigana come last, so the last node in the book is not the last character.
+  paragraphs.push('<p>おわり<ruby>猫<rt>ねこ</rt></ruby> </p>\n');
+  const longEpub = {
+    ...nekoEpub,
+    name: 'settle.epub',
+    buffer: buildEpub({ title: '走査の本', paragraphs, raw: true }),
+  };
+
+  /** Scrolls to `fraction` of the book (plus `extra` pixels, so the lines don't sit on the edge). */
+  const scrollTo = ([fraction, extra]) => {
+    const root = document.querySelector('.book-content');
+    const vertical = getComputedStyle(root).writingMode.startsWith('vertical');
+    let scroller = document.scrollingElement;
+    for (let element = root; element; element = element.parentElement) {
+      const style = getComputedStyle(element);
+      if ((/auto|scroll/.test(style.overflowY) && element.scrollHeight > element.clientHeight) ||
+        (/auto|scroll/.test(style.overflowX) && element.scrollWidth > element.clientWidth)) {
+        scroller = element;
+        break;
+      }
+    }
+    if (vertical) scroller.scrollLeft = -(fraction * (scroller.scrollWidth - scroller.clientWidth) + extra);
+    else scroller.scrollTop = fraction * (scroller.scrollHeight - scroller.clientHeight) + extra;
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  };
+
+  /** The earlier implementation, kept as the reference. */
+  const reference = () => {
+    const onScreen = (r) => r.width > 0 && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight;
+    const root = document.querySelector('.book-content');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (node.parentElement && node.parentElement.closest('rt, rp') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    const range = document.createRange();
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      range.selectNodeContents(node);
+      if (!Array.from(range.getClientRects()).some(onScreen)) continue;
+      for (let offset = 0; offset < node.data.length; offset++) {
+        if (!node.data[offset].trim()) continue;
+        range.setStart(node, offset);
+        range.setEnd(node, offset + 1);
+        if (Array.from(range.getClientRects()).some(onScreen)) return { node, offset };
+      }
+    }
+    return null;
+  };
+
+  const compare = (referenceSource) => {
+    const reference = new Function(`return (${referenceSource})`)();
+    const root = document.querySelector('.book-content');
+    const T = window.honmaniText;
+    const expected = reference();
+    const near = T.firstCharNearStart(root, 'rt, rp');
+    const used = T.firstCharOnScreen(root, 'rt, rp', true);
+    const same = (a) => !!a && !!expected && a.node === expected.node && a.offset === expected.offset;
+    return {
+      expected: expected && expected.node.data.slice(expected.offset, expected.offset + 8),
+      nearSame: same(near),
+      usedSame: same(used),
+      walkSame: same(T.firstCharWalk(root, 'rt, rp')),
+    };
+  };
+
+  for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
+    test(`first character on screen, ${writingMode}`, async ({ page }) => {
+      await setUp(page, { ...userFont, writingMode, viewMode: 'continuous' });
+      await importAndOpen(page, longEpub, '走査の本');
+      const seen = new Set();
+      for (const position of [[0, 0], [0, 7], [0.03, 0], [0.25, 13], [0.5, 0], [0.5, 29], [0.77, 3], [0.97, 41], [1, 0]]) {
+        await page.evaluate(scrollTo, position);
+        const result = await page.evaluate(compare, reference.toString());
+        expect(result, `at ${position}`).toMatchObject({ nearSame: true, usedSame: true, walkSame: true });
+        seen.add(result.expected);
+      }
+      // The positions really were different places.
+      expect(seen.size).toBeGreaterThan(5);
+    });
+  }
+
+  for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
+    test(`the book end is reported at the end only, ${writingMode}`, async ({ page }) => {
+      await setUp(page, { ...userFont, writingMode, viewMode: 'continuous' });
+      await page.addInitScript({ path: path.join(ASSETS, 'book-end.js') });
+      await importAndOpen(page, longEpub, '走査の本');
+      const finished = () => page.evaluate(() => window.__messages.filter((message) => message.type === 'library.finished'));
+      for (const position of [[0, 0], [0.4, 0], [0.9, 0]]) {
+        await page.evaluate(scrollTo, position);
+        await page.mouse.wheel(0, 1);
+        await page.waitForTimeout(1_500);
+        expect(await finished(), `at ${position}`).toEqual([]);
+      }
+      const id = Number(new URL(page.url()).searchParams.get('id'));
+      await page.evaluate(scrollTo, [1, 0]);
+      await page.mouse.wheel(0, 1);
+      await expect.poll(finished, { timeout: 5_000 }).toEqual([{ type: 'library.finished', id }]);
+    });
+  }
+});
+
 test('Aozora books keep their indentation, bottom alignment and upright digits in ttu', async ({ page }) => {
   // Markup and stylesheet as AozoraEpub writes them.
   const css = 'span.upright { -webkit-text-combine: horizontal; text-combine-upright: all; }\np { margin: 0; }\n';

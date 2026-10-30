@@ -27,7 +27,8 @@ test('text.js shares the helpers on one object and loads only once', async ({ pa
     };
   });
   expect(result.names).toEqual(
-    ['SKIPPED_SELECTOR', 'blockAncestor', 'bookId', 'isBlock', 'isSkipped', 'onScreen', 'toFraction'].sort(),
+    ['SKIPPED_SELECTOR', 'blockAncestor', 'bookId', 'firstCharNearStart', 'firstCharOnScreen', 'firstCharWalk', 'isBlock',
+      'isSkipped', 'onScreen', 'toFraction'].sort(),
   );
   expect(result.skipsRt).toBe(true);
   expect(result.skipsText).toBe(false);

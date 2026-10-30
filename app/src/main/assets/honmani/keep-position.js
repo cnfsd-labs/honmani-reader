@@ -55,26 +55,14 @@
     return rangeOnScreen(range);
   }
 
-  /** The first character of book text on screen (furigana skipped), or null. */
+  /**
+   * The first character of book text on screen (furigana skipped), or null. In continuous mode
+   * the search starts at the screen's start edge, not at the book's first character.
+   */
   function firstCharOnScreen() {
     const root = document.querySelector(BOOK_ROOT_SELECTOR);
     if (!root) return null;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode: (node) =>
-        node.parentElement && node.parentElement.closest(SKIPPED_SELECTOR)
-          ? NodeFilter.FILTER_REJECT
-          : NodeFilter.FILTER_ACCEPT,
-    });
-    const range = document.createRange();
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      range.selectNodeContents(node);
-      if (!rangeOnScreen(range)) continue;
-      for (let offset = 0; offset < node.data.length; offset++) {
-        if (!node.data[offset].trim()) continue;
-        if (charOnScreen({ node, offset })) return { node, offset };
-      }
-    }
-    return null;
+    return window.honmaniText.firstCharOnScreen(root, SKIPPED_SELECTOR, !isPaginated());
   }
 
   /** Negative if `a` comes before `b` in the book, 0 if equal, positive after. */
