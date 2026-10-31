@@ -42,6 +42,8 @@
     <string name="sort_easiest">Easiest first</string>
     <string name="sort_hardest">Hardest first</string>
     <string name="sort_title">Title</string>
+    <string name="settings_previous_sentence">Show previous sentence</string>
+    <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
     <string name="settings_cover_difficulty">Difficulty on covers</string>
     <string name="settings_cover_difficulty_details">Each book\'s difficulty (1–100) in a corner of its cover</string>
     <string name="settings_reader">Reader settings</string>

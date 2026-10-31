@@ -130,6 +130,34 @@ test('sentence includes closing quote and stops at the paragraph', async ({ page
   expect(message.sentenceOffset).toBe(0);
 });
 
+test('sends the sentence before the tapped one, within the paragraph', async ({ page }) => {
+  await tapChar(page, '#v1', '名');
+  await tapChar(page, '#h4', '風');
+  await tapChar(page, '#v1', '吾');
+
+  const [second, lineBreak, first] = await messages(page);
+  // The opening quote belongs to the sentence it starts, as in "sentence" itself.
+  expect(second.previousSentence).toBe('「吾輩は猫である。');
+  // A line break ends a sentence.
+  expect(lineBreak.previousSentence).toBe('雨ニモマケズ');
+  // Nothing before the first sentence of a paragraph: the field is left out.
+  expect(first).not.toHaveProperty('previousSentence');
+});
+
+test('the sentence before is cut to its last 200 characters', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector('#h2').textContent = `${'あ'.repeat(300)}。ここです。`;
+    // The long paragraph pushes the tapped sentence below the screen.
+    window.scrollTo(0, 1000);
+  });
+
+  await tapChar(page, '#h2', 'こ');
+
+  const [message] = await messages(page);
+  expect(message.sentence).toBe('ここです。');
+  expect(message.previousSentence).toBe('あ'.repeat(199) + '。');
+});
+
 test('scan text is capped at 20 characters', async ({ page }) => {
   await tapChar(page, '#v2', 'ど');
 

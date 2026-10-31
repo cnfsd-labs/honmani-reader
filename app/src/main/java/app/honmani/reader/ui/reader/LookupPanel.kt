@@ -121,6 +121,8 @@ fun LookupPanel(
     onShorterMatch: () -> Unit = {},
     /** The matched text of a tap made one character longer. */
     onLongerMatch: () -> Unit = {},
+    /** The sentence before the tapped one, shown dimmed above the results; blank to show none. */
+    previousSentence: String = "",
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -208,8 +210,9 @@ fun LookupPanel(
                     is LookupPanelState.Kanji -> state.previous != null
                     else -> false
                 }
-                // The tapped sentence is not repeated here: it is on screen in the book. Back
-                // sits beside close, where the thumb already is.
+                // The tapped sentence is not repeated here: it is on screen in the book (only the
+                // sentence before it, if the reader asked, see [previousSentence]). Back sits
+                // beside close, where the thumb already is.
                 if (state is LookupPanelState.Results && state.previous == null) {
                     MatchControls(
                         matched = state.tap.text.take(state.highlight.length),
@@ -233,6 +236,18 @@ fun LookupPanel(
                 IconButton(onClick = onClose, modifier = Modifier.size(HEADER_BUTTON)) {
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
                 }
+            }
+            if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
+                Text(
+                    text = previousSentence,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                )
             }
             when (state) {
                 is LookupPanelState.Results -> LazyColumn(

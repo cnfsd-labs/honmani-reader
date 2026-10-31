@@ -71,6 +71,11 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
     /** Whether library covers show the book's difficulty in a corner. */
     val showDifficulty: StateFlow<Boolean> = _showDifficulty.asStateFlow()
 
+    private val _showPreviousSentence = MutableStateFlow(preferences.getBoolean(KEY_SHOW_PREVIOUS_SENTENCE, false))
+
+    /** Whether the lookup panel shows the sentence before the tapped one (off until switched on). */
+    val showPreviousSentence: StateFlow<Boolean> = _showPreviousSentence.asStateFlow()
+
     fun setAccent(accent: Accent) {
         _accent.value = accent
         preferences.edit().putString(KEY_ACCENT, accent.name).apply()
@@ -96,17 +101,24 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
         preferences.edit().putBoolean(KEY_SHOW_DIFFICULTY, show).apply()
     }
 
+    fun setShowPreviousSentence(show: Boolean) {
+        _showPreviousSentence.value = show
+        preferences.edit().putBoolean(KEY_SHOW_PREVIOUS_SENTENCE, show).apply()
+    }
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
         _customHue.value = preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE)
         _showDifficulty.value = preferences.getBoolean(KEY_SHOW_DIFFICULTY, true)
         _librarySort.value = preferences.getString(KEY_LIBRARY_SORT, null)
+        _showPreviousSentence.value = preferences.getBoolean(KEY_SHOW_PREVIOUS_SENTENCE, false)
     }
 
     companion object {
         const val KEY_ACCENT = "accent"
         const val KEY_SHOW_DIFFICULTY = "show_difficulty"
+        const val KEY_SHOW_PREVIOUS_SENTENCE = "show_previous_sentence"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"
 

@@ -85,6 +85,30 @@ class TapLookupTest {
     }
 
     @Test
+    fun parse_keepsThePreviousSentence() {
+        val lookup = TapLookup.parse(
+            """{"type":"lookup","text":"猫","sentence":"猫だ。","sentenceOffset":0,"previousSentence":"吾輩は。"}""",
+        )
+
+        assertEquals("吾輩は。", lookup?.previousSentence)
+    }
+
+    @Test
+    fun parse_takesAMessageWithoutThePreviousSentence() {
+        val lookup = TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫だ。","sentenceOffset":0}""")
+
+        assertEquals("", lookup?.previousSentence)
+        assertEquals("猫", lookup?.text)
+    }
+
+    @Test
+    fun parse_dropsAnOversizedPreviousSentence() {
+        val long = "あ".repeat(1_001)
+
+        assertNull(TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"previousSentence":"$long"}"""))
+    }
+
+    @Test
     fun bridgeMessage_parsesLookupsAndDismiss() {
         val lookup = """{"type":"lookup","text":"猫","sentence":"猫だ。","sentenceOffset":0}"""
 

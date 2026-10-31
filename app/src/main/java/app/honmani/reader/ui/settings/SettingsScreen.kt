@@ -92,6 +92,7 @@ fun SettingsScreen(
     val accent by appearance.accent.collectAsStateWithLifecycle()
     val customHue by appearance.customHue.collectAsStateWithLifecycle()
     val showDifficulty by appearance.showDifficulty.collectAsStateWithLifecycle()
+    val showPreviousSentence by appearance.showPreviousSentence.collectAsStateWithLifecycle()
     val catalogs by container.opdsRepository.catalogs.collectAsStateWithLifecycle(emptyList())
     val dictionaries by container.dictionaryRepository.dictionaries.collectAsStateWithLifecycle(emptyList())
     val dictionaryUpdates by remember { container.dictionaryUpdateChecker.updates }.collectAsStateWithLifecycle(emptyList())
@@ -123,6 +124,8 @@ fun SettingsScreen(
         onCustomHueChange = appearance::setCustomHue,
         showDifficulty = showDifficulty,
         onShowDifficultyChange = appearance::setShowDifficulty,
+        showPreviousSentence = showPreviousSentence,
+        onShowPreviousSentenceChange = appearance::setShowPreviousSentence,
         catalogs = catalogs,
         onAutoImportChange = { catalog, enabled ->
             scope.launch {
@@ -153,6 +156,8 @@ private fun SettingsContent(
     onCustomHueChange: (Float) -> Unit,
     showDifficulty: Boolean,
     onShowDifficultyChange: (Boolean) -> Unit,
+    showPreviousSentence: Boolean,
+    onShowPreviousSentenceChange: (Boolean) -> Unit,
     catalogs: List<OpdsCatalog>,
     onAutoImportChange: (OpdsCatalog, Boolean) -> Unit,
     bottomBar: @Composable () -> Unit,
@@ -212,6 +217,18 @@ private fun SettingsContent(
                     },
                     trailingContent = { if (dictionaryUpdates > 0) Badge() },
                     modifier = Modifier.clickable(onClick = onOpenDictionaries),
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_previous_sentence)) },
+                    supportingContent = { Text(stringResource(R.string.settings_previous_sentence_details)) },
+                    trailingContent = { Switch(checked = showPreviousSentence, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        showPreviousSentence,
+                        role = Role.Switch,
+                        onValueChange = onShowPreviousSentenceChange,
+                    ),
                 )
             }
             item {
@@ -447,6 +464,8 @@ private fun SettingsPreview() {
             onCustomHueChange = {},
             showDifficulty = true,
             onShowDifficultyChange = {},
+            showPreviousSentence = false,
+            onShowPreviousSentenceChange = {},
             catalogs = listOf(OpdsCatalog(1, "Calibre-Web", "https://books.example/opds", "me", true)),
             onAutoImportChange = { _, _ -> },
             bottomBar = {},

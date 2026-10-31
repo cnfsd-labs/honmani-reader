@@ -6,6 +6,7 @@
  *
  *   { "type": "lookup", "text": "<up to SCAN_LENGTH chars from the tapped char>",
  *     "sentence": "<sentence around it>", "sentenceOffset": <index of text in sentence>,
+ *     "previousSentence": "<the sentence before it in the paragraph>",
  *     "tap": <number of this tap, counting up from 1>,
  *     "ruby": [{ "start": <n>, "end": <n>, "reading": "<furigana>" }] }
  *
@@ -45,6 +46,7 @@
   const CLICK_AFTER_TAP = 1000;
   const MAX_READING_LENGTH = 32;
   const MAX_SENTENCE_LENGTH = 400;
+  const MAX_PREVIOUS_SENTENCE_LENGTH = 200;
   const BOOK_ROOT_SELECTOR = '.book-content';
   const { isSkipped, blockAncestor } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
@@ -192,6 +194,8 @@
     while (end < text.length && SENTENCE_END.includes(text[end])) end++;
     while (end < text.length && CLOSING_QUOTES.includes(text[end])) end++;
 
+    const previous = sentenceBefore(text, start);
+
     // Keep very long "sentences" (e.g. no punctuation) to a window around the tap.
     if (end - start > MAX_SENTENCE_LENGTH) {
       start = Math.max(start, position - MAX_SENTENCE_LENGTH / 2);
@@ -200,7 +204,26 @@
     let sentence = text.slice(start, end);
     const leading = sentence.length - sentence.trimStart().length;
     sentence = sentence.trim();
-    return { sentence, offset: position - start - leading };
+    return { sentence, offset: position - start - leading, previous };
+  }
+
+  /**
+   * The sentence that ends where the one starting at `boundary` begins, within the same paragraph
+   * (empty at the first sentence), cut to its last MAX_PREVIOUS_SENTENCE_LENGTH characters.
+   */
+  function sentenceBefore(text, boundary) {
+    let end = boundary;
+    while (end > 0 && /\s/.test(text[end - 1])) end--;
+    let begin = end;
+    // Past its own ending and closing quotes, then back to the start of that sentence.
+    while (begin > 0 && (SENTENCE_END.includes(text[begin - 1]) || CLOSING_QUOTES.includes(text[begin - 1]))) begin--;
+    while (begin > 0 && !SENTENCE_END.includes(text[begin - 1])) begin--;
+    if (end - begin > MAX_PREVIOUS_SENTENCE_LENGTH) {
+      begin = end - MAX_PREVIOUS_SENTENCE_LENGTH;
+      // Not in the middle of a surrogate pair.
+      if (/[\uDC00-\uDFFF]/.test(text[begin])) begin++;
+    }
+    return text.slice(begin, end).trim();
   }
 
   /** A tap on book content that is not on a link, button or similar. */
@@ -253,11 +276,12 @@
     const text = takeCodePoints(paragraph.slice(start), SCAN_LENGTH).split('\n')[0];
     if (!text.trim() || /^\s/.test(text)) return null;
 
-    const { sentence, offset } = sentenceAround(paragraph, start);
+    const { sentence, offset, previous } = sentenceAround(paragraph, start);
     lastTap = { block, node, index, skip: start - position };
     const message = { type: 'lookup', text, sentence, sentenceOffset: offset, tap: ++tapNumber };
     const ruby = rubyWithin(paragraphRuby, start, text.length);
     if (ruby.length > 0) message.ruby = ruby;
+    if (previous) message.previousSentence = previous;
     return message;
   }
 

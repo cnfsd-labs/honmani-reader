@@ -37,4 +37,13 @@ class AppearanceSettingsTest {
 
         assertEquals(42f, AppearanceSettings(preferences()).customHue.value, 0f)
     }
+
+    @Test
+    fun theLookupPanelHidesThePreviousSentenceUntilSwitchedOn() {
+        assertEquals(false, AppearanceSettings(preferences()).showPreviousSentence.value)
+
+        AppearanceSettings(preferences()).setShowPreviousSentence(true)
+
+        assertEquals(true, AppearanceSettings(preferences()).showPreviousSentence.value)
+    }
 }

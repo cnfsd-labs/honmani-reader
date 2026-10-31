@@ -111,6 +111,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val dictionaryUpdates by remember { container.dictionaryUpdateChecker.updates }.collectAsStateWithLifecycle(emptyList())
     // Reading time counts while a book is on screen and the app is in front.
     val tracker = remember { container.readingTracker }
+    val showPreviousSentence by container.appearanceSettings.showPreviousSentence.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -241,6 +242,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,
                     onBack = { viewModel.back() },
+                    previousSentence = if (showPreviousSentence) state.tap.previousSentence else "",
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },
                     onOpenDictionaries = {
