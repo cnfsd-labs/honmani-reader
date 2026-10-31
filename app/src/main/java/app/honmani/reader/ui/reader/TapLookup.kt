@@ -30,6 +30,9 @@ sealed interface BridgeMessage {
     /** The reader bar's Settings entry: open Honmani's reader settings (`assets/honmani/reader-settings.js`). */
     data object OpenSettings : BridgeMessage
 
+    /** A tap on the footer along the bottom of the page: open the reader's bottom menu (`assets/honmani/reader-menu.js`). */
+    data object OpenMenu : BridgeMessage
+
     /** ttu's settings are drawn on screen (`assets/honmani/book-shown.js`). */
     data object SettingsShown : BridgeMessage
 
@@ -74,6 +77,7 @@ sealed interface BridgeMessage {
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
+                "reader.menu" -> OpenMenu.takeIf { compact == OPEN_MENU_MESSAGE }
                 else -> if (type.startsWith("library.")) LibraryMessage.parse(message)?.let(::Library) else null
             }
         }
@@ -168,6 +172,7 @@ sealed interface BridgeMessage {
         private const val DISMISS_MESSAGE = """{"type":"dismiss"}"""
         private const val SETTINGS_SHOWN_MESSAGE = """{"type":"pageShown","path":"/settings"}"""
         private const val OPEN_SETTINGS_MESSAGE = """{"type":"reader.settings"}"""
+        private const val OPEN_MENU_MESSAGE = """{"type":"reader.menu"}"""
         private const val ACTIVITY_MESSAGE = """{"type":"reader.activity"}"""
     }
 }

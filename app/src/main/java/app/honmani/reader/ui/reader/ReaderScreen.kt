@@ -50,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.settings.ReaderSettings
+import app.honmani.reader.data.words.SessionWords
 import app.honmani.reader.ui.HomeNavigationBar
 import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.HomeTab
@@ -64,6 +65,7 @@ import app.honmani.reader.ui.progress.ProgressTab
 import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
 import app.honmani.reader.ui.settings.SettingsScreen
+import app.honmani.reader.ui.words.SessionSheet
 import app.honmani.reader.ui.words.WordsScreen
 import app.honmani.reader.ui.words.openInDictionary
 import kotlin.coroutines.cancellation.CancellationException
@@ -149,6 +151,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var addBookOnStart by remember { mutableStateOf<AddBookStart?>(null) }
     // Honmani's reader settings, from the Settings tab or the reader's top bar.
     var readerSettings by rememberSaveable { mutableStateOf(false) }
+    // The words of this reading session, from the reader's bottom menu.
+    var sessionShown by rememberSaveable { mutableStateOf(false) }
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -175,7 +179,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
 
     // Reader settings the app itself acts on (volume buttons, long-press lookup), kept in ttu's
     // storage, read again when a book opens and after the reader settings close.
-    val appSettings by produceState(ReaderSettings(), atLibrary, readerSettings) {
+    var settingsVersion by remember { mutableStateOf(0) }
+    val appSettings by produceState(ReaderSettings(), atLibrary, readerSettings, settingsVersion) {
         if (atLibrary || readerSettings) return@produceState
         value = try {
             ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings())
@@ -214,6 +219,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     viewModel.dismiss()
                     readerSettings = true
                 },
+                onOpenMenu = viewModel::openMenu,
+                closeRequests = viewModel.closeRequests,
                 onAtLibraryChanged = {
                     atLibrary = it
                     if (it) viewModel.dismiss()
@@ -363,6 +370,37 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
             )
+        }
+        val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
+        if (menuOpen && !atLibrary) {
+            ReaderMenuSheet(
+                showProgress = appSettings.showProgress,
+                onContents = {
+                    viewModel.closeMenu()
+                    viewModel.ttuLibrary.openContents()
+                },
+                onSettings = {
+                    viewModel.closeMenu()
+                    readerSettings = true
+                },
+                onSessionWords = {
+                    viewModel.closeMenu()
+                    sessionShown = true
+                },
+                onCloseBook = viewModel::closeBook,
+                onSetShowProgress = {
+                    // ttu reads the setting when the page loads: the page reloads, in place.
+                    viewModel.ttuLibrary.writeSettings(ReaderSettings.progressStorage(it))
+                    settingsVersion++
+                    viewModel.closeMenu()
+                    viewModel.ttuLibrary.reload()
+                },
+                onDismiss = viewModel::closeMenu,
+            )
+        }
+        if (sessionShown) {
+            val session by container.wordRepository.session.collectAsStateWithLifecycle(SessionWords(null, emptyList()))
+            SessionSheet(session, onDismiss = { sessionShown = false })
         }
         if (readerSettings) {
             // On top of everything; closing it reloads the reader if anything changed.

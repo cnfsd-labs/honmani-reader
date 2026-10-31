@@ -18,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -406,6 +407,26 @@ class ReaderViewModelTest {
         assertEquals(results.highlight, viewModel.highlight.value)
         viewModel.dismiss()
         assertNull(viewModel.highlight.value)
+    }
+
+    @Test
+    fun theMenuOpensOverNoPanel_andCloseBookClosesItAndAsksTheReaderToLeave() = runTest {
+        viewModel.onTap(tap("猫"))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+        assertFalse(viewModel.menuOpen.value)
+
+        viewModel.openMenu()
+        assertTrue(viewModel.menuOpen.value)
+        assertNull(viewModel.panel.value)
+        viewModel.closeMenu()
+        assertFalse(viewModel.menuOpen.value)
+
+        val requests = mutableListOf<Unit>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.closeRequests.collect { requests += it } }
+        viewModel.openMenu()
+        viewModel.closeBook()
+        assertFalse(viewModel.menuOpen.value)
+        assertEquals(1, requests.size)
     }
 
     @Test

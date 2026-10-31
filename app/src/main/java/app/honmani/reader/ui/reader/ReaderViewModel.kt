@@ -29,8 +29,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -491,6 +494,32 @@ class ReaderViewModel(
         stopReading()
         lookupJob?.cancel()
         show(null)
+    }
+
+    private val _menuOpen = MutableStateFlow(false)
+
+    /** The reader's bottom menu is open (a tap on the footer of the page, `reader-menu.js`). */
+    val menuOpen: StateFlow<Boolean> = _menuOpen.asStateFlow()
+
+    private val _closeRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** Asks the reader to leave the book, as back does; one item per request. */
+    val closeRequests: SharedFlow<Unit> = _closeRequests.asSharedFlow()
+
+    /** Opens the bottom menu; a lookup panel open at the time closes. */
+    fun openMenu() {
+        dismiss()
+        _menuOpen.value = true
+    }
+
+    fun closeMenu() {
+        _menuOpen.value = false
+    }
+
+    /** The menu's Close book: the menu closes and the reader goes back to the book list. */
+    fun closeBook() {
+        _menuOpen.value = false
+        _closeRequests.tryEmit(Unit)
     }
 
     /** The panel showing [state] has been drawn: logs how long after its tap's message, once per tap. */

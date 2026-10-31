@@ -57,7 +57,9 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -104,6 +106,7 @@ private val DOCUMENT_START_SCRIPTS = listOf(
     "honmani/reading-activity.js",
     "honmani/book-frame.js",
     "honmani/reader-settings.js",
+    "honmani/reader-menu.js",
     "honmani/chapter-end.js",
     "honmani/word-marks.js",
 )
@@ -161,6 +164,10 @@ fun ReaderWebView(
     onPage: (ttuId: Long, characters: Long, progress: Float?) -> Unit = { _, _, _ -> },
     /** The Settings entry in the reader's top bar: Honmani's reader settings, not ttu's page. */
     onOpenSettings: () -> Unit = {},
+    /** A tap on the footer along the bottom of the page: the app shows its reader menu. */
+    onOpenMenu: () -> Unit = {},
+    /** Each item asks to leave the open book, as back does (to the book list). */
+    closeRequests: Flow<Unit> = emptyFlow(),
     /** The book page's background colour (ARGB) changed, for the bars around the reader. */
     onBackground: (Int) -> Unit = {},
     highlightColor: Color = MaterialTheme.colorScheme.primary,
@@ -183,6 +190,7 @@ fun ReaderWebView(
     val currentOnActivity by rememberUpdatedState(onActivity)
     val currentOnPage by rememberUpdatedState(onPage)
     val currentOnOpenSettings by rememberUpdatedState(onOpenSettings)
+    val currentOnOpenMenu by rememberUpdatedState(onOpenMenu)
     val currentOnBackground by rememberUpdatedState(onBackground)
     val currentPanelOpen by rememberUpdatedState(panelOpen)
     val currentHideToolbar by rememberUpdatedState(hideSelectionToolbar)
@@ -216,6 +224,9 @@ fun ReaderWebView(
     }
 
     BackHandler(enabled = !atLibrary) { webViewRef.view?.let(::goBack) }
+    LaunchedEffect(closeRequests) {
+        closeRequests.collect { if (!atLibrary) webViewRef.view?.let(::goBack) }
+    }
 
     // ttu turns pages on PageDown and PageUp in every reading mode and direction.
     val activity = LocalActivity.current as? MainActivity
@@ -293,6 +304,7 @@ fun ReaderWebView(
                             BridgeMessage.Activity -> currentOnActivity()
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()
+                            BridgeMessage.OpenMenu -> currentOnOpenMenu()
                             is BridgeMessage.Background -> currentOnBackground(message.color)
                             is BridgeMessage.Marks -> {
                                 val generation = marksGeneration.get()

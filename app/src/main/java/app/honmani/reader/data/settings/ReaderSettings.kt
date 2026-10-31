@@ -102,6 +102,10 @@ data class ReaderSettings(
 
         private fun flag(value: Boolean) = if (value) "1" else "0"
 
+        /** Only the progress counter's values, for the reader's menu (the rest stays as it is). */
+        fun progressStorage(show: Boolean): Map<String, String> =
+            mapOf(CHARACTER_COUNTER to flag(show), PERCENTAGE to flag(show))
+
         /** The settings from ttu's stored values ([key] to value, null for unset). */
         fun fromStorage(values: Map<String, String?>): ReaderSettings {
             fun flag(key: String, default: Boolean) = values[key]?.let { it == "1" } ?: default

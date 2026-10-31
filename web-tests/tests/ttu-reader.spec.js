@@ -168,6 +168,38 @@ test('the reader bar keeps the table of contents; its Settings entry opens the a
   expect(new URL(page.url()).pathname).toBe('/b');
 });
 
+// Honmani's reader menu opens from ttu's footer strip (reader-menu.js).
+test('a tap on the footer posts the reader menu message, a tap on the text still looks a word up', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb' });
+  await page.addInitScript({ path: path.join(ASSETS, 'reader-menu.js') });
+  await importAndOpen(page);
+  const messageTypes = () => page.evaluate(() => window.__messages.map((m) => m.type));
+
+  const footer = await page.locator('#ttu-page-footer').boundingBox();
+  expect(footer.height).toBeGreaterThan(0);
+  expect(footer.y + footer.height).toBeGreaterThan(page.viewportSize().height - 1);
+  // Bottom edge, middle of the page: ttu's page-turn strips sit at the sides.
+  await page.mouse.click(page.viewportSize().width / 2, page.viewportSize().height - 5);
+  await expect.poll(messageTypes).toContain('reader.menu');
+  expect((await messageTypes()).filter((type) => type === 'reader.menu')).toHaveLength(1);
+  expect(await messageTypes()).not.toContain('lookup');
+
+  await tapChar(page, '猫');
+  await expect.poll(messageTypes).toContain('lookup');
+  expect((await messageTypes()).filter((type) => type === 'reader.menu')).toHaveLength(1);
+});
+
+test('the menu\'s Contents opens ttu\'s table of contents', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb' });
+  await page.addInitScript({ path: path.join(ASSETS, 'reader-menu.js') });
+  await importAndOpen(page);
+  expect(await page.evaluate(() => typeof window.honmaniReaderMenu.openContents)).toBe('function');
+
+  await page.evaluate(() => window.honmaniReaderMenu.openContents());
+  await expect(page.locator('[title="Open Table of Contents"]')).toBeHidden();
+  await expect(page.locator('[title="Close Table of Contents"]')).toBeVisible();
+});
+
 test('a page turn saves the reading position right away, without a bookmark button', async ({ page }) => {
   await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
   const paragraphs = Array.from({ length: 40 }, (_, i) => `第${i + 1}段落。吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。`);

@@ -248,6 +248,11 @@
     <string name="network_purpose_book_server">Book server</string>
     <string name="network_purpose_sync">Progress sync</string>
     <string name="network_purpose_voice">Google voice</string>
+    <string name="reader_menu_contents">Contents</string>
+    <string name="reader_menu_settings">Reader settings</string>
+    <string name="reader_menu_close_book">Close book</string>
+    <string name="reader_menu_progress">Show progress</string>
+    <string name="reader_menu_progress_details">The character count and percentage at the bottom of the page. The page reloads.</string>
     <string name="session_title">Words from this session</string>
     <string name="session_summary">%1$s since %2$s</string>
     <plurals name="session_words">

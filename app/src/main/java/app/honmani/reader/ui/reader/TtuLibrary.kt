@@ -152,6 +152,11 @@ class TtuLibrary(
         )
     }
 
+    /** Opens ttu's table of contents, as its button in the reader bar does (`reader-menu.js`). */
+    fun openContents() {
+        page.value?.evaluate("window.honmaniReaderMenu && honmaniReaderMenu.openContents();")
+    }
+
     /** The app's accent colours (`#rrggbb`), for ttu's settings; kept for later pages. */
     fun setAccent(accent: String, onAccent: String) {
         accentScript = "window.honmaniSetAccent && honmaniSetAccent(${JsonPrimitive(accent)}, ${JsonPrimitive(onAccent)});"

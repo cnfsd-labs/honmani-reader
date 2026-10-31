@@ -125,6 +125,15 @@ is opened again; a lookup brings it back), and tint sentences with exactly one u
 Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
 to you", higher for easy books; "Words to learn before reading" lists them, most used first.
 
+## Reader bottom menu
+
+In a book, tap the bottom edge of the page (the thin strip under the text). A sheet opens with
+Contents (ttu's table of contents opens), Reader settings, Words from this session, Show progress
+(a switch; the page reloads and the counter appears or disappears) and Close book (back to the
+book list). A tap on the text still looks a word up. The tap on the bottom edge no longer hides the
+progress counter. Check that the strip is easy to hit with the gesture bar and that page turns at
+the left and right edges still work.
+
 ## Known limitations (no need to report)
 
 - Diagnostics show "Failed to register a ServiceWorker": ttu tries to install its offline cache,

@@ -143,6 +143,17 @@ class TtuLibraryTest {
     }
 
     @Test
+    fun openContents_asksThePageToOpenTtusTableOfContents_andNeedsAPage() {
+        library.openContents()
+        assertEquals(emptyList<String>(), page.scripts)
+
+        library.attach(page)
+        library.openContents()
+
+        assertEquals("window.honmaniReaderMenu && honmaniReaderMenu.openContents();", page.scripts.last())
+    }
+
+    @Test
     fun show_navigatesInsideTheRunningPage_andTheAccentFollowsEveryPage() = runTest {
         library.setAccent("#d0bcff", "#381e72")
         library.attach(page)
