@@ -19,6 +19,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -43,6 +44,7 @@ class StatisticsViewModelTest {
     private fun viewModel(
         days: List<ReadingDayEntity> = emptyList(),
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
+        goalMinutes: Int? = null,
     ) = StatisticsViewModel(
         days = flowOf(days),
         bookDays = { flowOf(emptyList()) },
@@ -50,12 +52,26 @@ class StatisticsViewModelTest {
         lookups = { from -> lookupTimes.map { times -> times.count { from == null || it >= from } } },
         bookLookups = { flowOf(0) },
         words = flowOf(WordCounts()),
+        goalMinutes = flowOf(goalMinutes),
         today = { today },
         zone = { zone },
         writeDocument = writeDocument,
     )
 
     private fun millis(date: LocalDate, hour: Int) = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
+
+    @Test
+    fun theGoalShowsOnlyWhileItIsOn() = runTest {
+        val rows = listOf(ReadingDayEntity(1, today.toString(), seconds = 600))
+        val off = viewModel(rows)
+        val on = viewModel(rows, goalMinutes = 20)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { off.uiState.collect {} }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { on.uiState.collect {} }
+
+        assertNull(off.uiState.filterNotNull().first().goal)
+        assertEquals(600L, on.uiState.filterNotNull().first().goal?.secondsToday)
+        assertEquals(20, on.uiState.filterNotNull().first().goal?.goalMinutes)
+    }
 
     @Test
     fun lookupsAreCountedFromTheStartOfThePeriod() = runTest {

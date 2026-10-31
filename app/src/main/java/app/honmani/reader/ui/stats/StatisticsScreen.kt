@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.stats.DayTotal
+import app.honmani.reader.data.stats.GoalProgress
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.stats.WeekSpeed
@@ -103,6 +105,7 @@ fun StatisticsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            current.goal?.let { GoalCard(it) }
             Headline(summary)
             Tiles(current)
             when (summary.period) {
@@ -161,6 +164,41 @@ private fun periodName(period: StatsPeriod) = stringResource(
         StatsPeriod.ALL -> R.string.stats_total
     },
 )
+
+/** Today's reading against the daily goal, with the days in a row that reached it. */
+@Composable
+private fun GoalCard(goal: GoalProgress) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                stringResource(R.string.stats_goal_title),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                if (goal.met) {
+                    stringResource(R.string.stats_goal_met)
+                } else {
+                    stringResource(R.string.stats_goal_progress, (goal.secondsToday / 60).toInt(), goal.goalMinutes)
+                },
+                style = MaterialTheme.typography.titleLarge,
+            )
+            LinearProgressIndicator(progress = { goal.fraction }, modifier = Modifier.fillMaxWidth())
+            if (goal.streak > 0) {
+                Text(
+                    pluralStringResource(R.plurals.stats_goal_streak, goal.streak, goal.streak),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 /** The period's reading time, large, with the characters read. */
 @Composable

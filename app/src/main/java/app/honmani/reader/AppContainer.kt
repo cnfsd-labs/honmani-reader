@@ -41,6 +41,7 @@ import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
+import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -131,6 +132,9 @@ class AppContainer(context: Context) {
     private val devicePreferences by lazy { appContext.getSharedPreferences(DEVICE_SETTINGS, Context.MODE_PRIVATE) }
 
     val appearanceSettings: AppearanceSettings by lazy { AppearanceSettings(settingsPreferences) }
+
+    /** The daily reading goal (Settings; shown in the statistics). */
+    val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
 

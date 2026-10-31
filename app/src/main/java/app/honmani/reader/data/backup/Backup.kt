@@ -10,6 +10,7 @@ import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.settings.AppearanceSettings
+import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
@@ -26,6 +27,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.longOrNull
 
 /** What a restore brought back. */
@@ -319,6 +321,7 @@ class Backup(
                 BackupValue.STRING -> value.contentOrNull?.let { editor.putString(key, it) }
                 BackupValue.BOOLEAN -> value.booleanOrNull?.let { editor.putBoolean(key, it) }
                 BackupValue.FLOAT -> value.doubleOrNull?.let { editor.putFloat(key, it.toFloat()) }
+                BackupValue.INT -> value.intOrNull?.let { editor.putInt(key, it) }
             }
         }
         editor.apply()
@@ -333,6 +336,8 @@ class Backup(
             AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
             AppearanceSettings.KEY_SHOW_PREVIOUS_SENTENCE to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_SHOW_WORD_FREQUENCY to BackupValue.BOOLEAN,
+            ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
+            ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
             AnkiSettings.KEY_AUDIO to BackupValue.STRING,
             AnkiSettings.KEY_SENTENCE_SPEED to BackupValue.STRING,
             AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,

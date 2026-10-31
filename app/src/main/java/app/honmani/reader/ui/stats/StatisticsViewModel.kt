@@ -12,6 +12,8 @@ import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.stats.BookReading
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.stats.GoalProgress
+import app.honmani.reader.data.stats.ReadingGoal
 import app.honmani.reader.data.stats.ReadingStats
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
@@ -52,6 +54,8 @@ data class StatisticsUiState(
     val words: WordCounts = WordCounts(),
     /** Titles of the books in [PeriodSummary.books], by book id. */
     val titles: Map<Long, String> = emptyMap(),
+    /** Today against the daily reading goal; null while the goal is off. */
+    val goal: GoalProgress? = null,
 )
 
 /** One book's statistics, for its sheet in the library. */
@@ -87,6 +91,8 @@ class StatisticsViewModel(
     private val grading: Flow<GradingState> = flowOf(GradingState.IDLE),
     /** How much of a book (by content hash) the reader knows. */
     private val coverage: (contentHash: String) -> Flow<BookCoverage?> = { flowOf(null) },
+    /** The daily reading goal in minutes; null while it is off. */
+    private val goalMinutes: Flow<Int?> = flowOf(null),
     private val today: () -> LocalDate = LocalDate::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     /** Writes text to a document the reader picked (a content URI). */
@@ -107,7 +113,7 @@ class StatisticsViewModel(
     }
 
     val uiState: StateFlow<StatisticsUiState?> =
-        combine(days, books, periodLookups, words) { days, books, (period, lookups), words ->
+        combine(days, books, periodLookups, words, goalMinutes) { days, books, (period, lookups), words, goalMinutes ->
             val today = today()
             val zone = zone()
             val from = firstDay(period, today)
@@ -121,6 +127,7 @@ class StatisticsViewModel(
                 lookups = lookups,
                 words = words,
                 titles = books.associate { it.id to it.title },
+                goal = goalMinutes?.let { ReadingGoal.progress(days, today, it) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -202,6 +209,7 @@ class StatisticsViewModel(
                     grades = container.difficultyStore.grades,
                     grading = container.bookGrader.state,
                     coverage = container::bookCoverage,
+                    goalMinutes = container.readingGoalSettings.goalMinutes,
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                 )
             }

@@ -43,6 +43,16 @@
     <string name="sort_hardest">Hardest first</string>
     <string name="sort_title">Title</string>
     <string name="settings_previous_sentence">Show previous sentence</string>
+    <string name="settings_daily_goal">Daily reading goal</string>
+    <string name="settings_daily_goal_details">Shows today\'s reading time against a goal, and the days in a row you reached it, in Progress</string>
+    <string name="settings_daily_goal_minutes">%1$d min</string>
+    <string name="stats_goal_title">Daily goal</string>
+    <string name="stats_goal_progress">%1$d of %2$d min</string>
+    <string name="stats_goal_met">Goal reached</string>
+    <plurals name="stats_goal_streak">
+        <item quantity="one">%1$d day in a row</item>
+        <item quantity="other">%1$d days in a row</item>
+    </plurals>
     <string name="settings_word_frequency">Show frequency in Words</string>
     <string name="settings_word_frequency_details">Shows how common each saved word is (#727), from your frequency dictionary; nothing shows without one</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>

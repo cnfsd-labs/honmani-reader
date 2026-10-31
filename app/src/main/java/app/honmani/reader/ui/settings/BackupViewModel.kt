@@ -101,6 +101,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
     private suspend fun restore(backup: BackupFile): BackupState {
         val summary = container.backup.restore(backup)
         container.appearanceSettings.reload()
+        container.readingGoalSettings.reload()
         container.ankiSettings.reload()
         val ttu = container.ttuLibrary
         // Books in the library whose position moved forward: ttu opens them there, unless progress

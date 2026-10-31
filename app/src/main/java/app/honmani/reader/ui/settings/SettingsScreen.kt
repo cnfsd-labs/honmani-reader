@@ -153,6 +153,7 @@ fun SettingsScreen(
         anki = { AnkiSettingsRow(onClick = { showingAnki = true }) },
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
+        goal = { ReadingGoalSection() },
     )
 }
 
@@ -183,6 +184,7 @@ private fun SettingsContent(
     anki: @Composable () -> Unit = {},
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
+    goal: @Composable () -> Unit = {},
 ) {
     var showingSamples by rememberSaveable { mutableStateOf(false) }
     if (showingSamples) {
@@ -255,6 +257,7 @@ private fun SettingsContent(
                     ),
                 )
             }
+            item { goal() }
             item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_sample_books)) },
