@@ -40,7 +40,16 @@ class AutoBackup(
     /** Called once when the app starts: offers a backup another phone left, if there is one. */
     suspend fun checkOffer() {
         if (device.getBoolean(KEY_ANSWERED, false)) return
-        val made = withContext(Dispatchers.IO) { file.takeIf { it.isFile }?.lastModified() }
+        val made = withContext(Dispatchers.IO) {
+            file.takeIf { it.isFile }?.let { stored ->
+                // Not the file's date: Android's restore has been seen to give it a wrong one (1970).
+                try {
+                    stored.inputStream().buffered().use(BackupCodec::read).exportedAt
+                } catch (e: IOException) {
+                    stored.lastModified()
+                }
+            }
+        }
         if (made == null) answered() else _offer.value = made
     }
 

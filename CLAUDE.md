@@ -137,6 +137,9 @@ repository is public: never copy those notes, personal details or discussions in
   (`AtomicBoolean`). Catch exceptions from other apps' content providers.
 - Android 13+ shows no notifications without `POST_NOTIFICATIONS`, even a foreground service's;
   an Android 12 phone proves nothing. Ask when the work starts (`rememberWithNotifications`).
+- Android's restore gives restored files a wrong modified date (1970): read dates from the file's
+  contents (`AutoBackup` offers the backup's own `exportedAt`). Try Android's backup with
+  `bmgr` and the local transport (`docs/device-testing.md`).
 - ttu reserves some font families (`reservedFontNames`) without their files: downloaded fonts use
   their own family ("Honmani Klee One"), or books wait for ttu's 30 s font timeout.
 

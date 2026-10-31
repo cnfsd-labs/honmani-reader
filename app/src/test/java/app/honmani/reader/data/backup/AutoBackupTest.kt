@@ -85,6 +85,18 @@ class AutoBackupTest {
     }
 
     @Test
+    fun theOfferNamesTheBackupsOwnDateNotTheRestoredFilesDate() = runBlocking {
+        dir.mkdirs()
+        auto.file.outputStream().use { BackupCodec.write(backup(at = 1_793_440_249_218), it) }
+        // Android's restore gave the file seconds as milliseconds: January 1970.
+        auto.file.setLastModified(1_793_440_249)
+
+        auto.checkOffer()
+
+        assertEquals(1_793_440_249_218, auto.offer.first())
+    }
+
+    @Test
     fun aBackupThatCouldNotBeMadeLeavesTheLastOne() = runBlocking {
         auto.checkOffer()
         assertTrue(auto.saveIfDue { backup() })

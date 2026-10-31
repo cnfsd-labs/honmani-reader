@@ -65,7 +65,29 @@ book: it opens at KOReader's page ("Continued at …"), not at the backup's.
 Without a backup file: Honmani keeps one of its own (rewritten when it goes to the background,
 at most every 6 hours), which Android's backup to the Google account or a phone-to-phone
 transfer takes along. On the new phone, the first start asks "Restore from your previous
-phone?"; Restore brings back the same as a restore from a file.
+phone?" (with the date the backup was made); Restore brings back the same as a restore from a
+file, and Android has already put the settings back.
+
+Android's backup can be tried without a Google account over USB, through the debug-only local
+transport (the phone's own backup setting is switched off by default; undo it afterwards):
+
+```sh
+adb shell bmgr enable true
+adb shell bmgr transport com.android.localtransport/.LocalTransport
+# open the app once and send it to the background, then:
+adb shell bmgr backupnow app.honmani.reader.debug      # "Success"
+adb uninstall app.honmani.reader.debug && adb install app-debug.apk   # restores at install
+# the first start offers the restore; check the words and settings
+adb shell bmgr transport com.google.android.gms/.backup.BackupTransportService
+adb shell bmgr enable false
+```
+
+## Anki
+
+Words → Learning: "Check against Anki" (beside "Add all N to Anki") forgets the "in Anki" mark of
+cards deleted in AnkiDroid and marks words whose card exists there. It only looks at Honmani's
+own note type and at words already saved. "Choose a deck" (also in Settings → Anki) marks saved
+words found in a deck's word field as learned; decks of whole sentences match almost nothing.
 
 ## Reading progress sync (KOReader)
 
@@ -90,13 +112,18 @@ offers it next time, "Go to …" jumps back.
 Reader settings → Mark words. "Learning" (the default): look up a word, turn a page or two and
 come back: the word and its other forms (食べた, 食べない) have a light accent tint; after
 "Learned" in Words it loses it. Other spellings of it count as the same word: after looking up
-当たり前, 当り前 has the tint too (with or without furigana, one unbroken mark). "+ New" adds a grey tint on words never met in your reading
-(at first nearly everything, particles too); words read once lose it the next time they come up.
-"Off" shows none. On a dark page (black, grey or dark system theme) both tints are stronger,
-so they still show at low screen brightness. The first marks after a new install or a dictionary change take a few seconds
-(the word list is built once); after that they fade in within about a second of opening a book,
-and a turned page shows its marks at once. Book sheet, after some reading in graded books: "You
-know about N% of its words; about M are new to you", higher for easy books.
+当たり前, 当り前 has the tint too (with or without furigana, one unbroken mark). "+ New" adds a grey
+tint on words never met in your reading (at first nearly everything, particles too); words read
+once lose it the next time they come up. "Off" shows none. On a dark page (black, grey or dark
+system theme) both tints are stronger, so they still show at low screen brightness. The first
+marks after a new install or a dictionary change take a few seconds (the word list is built
+once); after that they fade in within about a second of opening a book, and a turned page shows
+its marks at once.
+
+Optional, in the same settings: hide the furigana over words you know (takes effect when the book
+is opened again; a lookup brings it back), and tint sentences with exactly one unknown word.
+Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
+to you", higher for easy books; "Words to learn before reading" lists them, most used first.
 
 ## Known limitations (no need to report)
 

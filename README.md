@@ -9,6 +9,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts;
   pages turn with a tap, a swipe or the volume buttons
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap
+- Marks in the book on the words you are learning or have not met yet, and a list of the words
+  a book holds that you do not know
 - Every word you look up is saved with its sentence; send words to Anki (AnkiDroid or an
   `.apkg` for Anki on a computer)
 - Reading statistics (time, characters, speed), a reading level and milestones
