@@ -20,6 +20,15 @@ class LoginGateTest {
     }
 
     @Test
+    fun dockerStyleHostNamesAreRemembered() {
+        val gate = LoginGate()
+        assertFalse(gate.maySend("http://calibre_web:8083/opds"))
+        gate.asked("http://calibre_web:8083/opds")
+        assertTrue(gate.maySend("http://calibre_web:8083/kosync/users/auth"))
+        assertFalse(gate.maySend("http://calibre_web:8084/opds"))
+    }
+
+    @Test
     fun onAnotherNetworkTheServerHasToAskAgain() {
         var network: Any? = "home Wi-Fi"
         val gate = LoginGate(network = { network })

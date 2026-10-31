@@ -13,6 +13,12 @@ class OriginTest {
     }
 
     @Test
+    fun hostNamesWithAnUnderscoreHaveAnOrigin() {
+        assertEquals("http://calibre_web:8083", originOf("http://Calibre_Web:8083/opds"))
+        assertEquals("https://my_nas:443", originOf("https://my_nas/opds"))
+    }
+
+    @Test
     fun relativeOrBrokenUrlsHaveNoOrigin() {
         assertNull(originOf("/opds"))
         assertNull(originOf("http://bad host/"))

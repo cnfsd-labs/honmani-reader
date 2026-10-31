@@ -49,6 +49,13 @@ class OpdsClientTest {
     }
 
     @Test
+    fun dockerStyleHostNamesGetTheLogin() {
+        val opds = OpdsServer("http://calibre_web:8083/opds", "reader", "secret")
+        assertTrue(OpdsClient.authorization(opds, "http://calibre_web:8083/opds/new")!!.startsWith("Basic "))
+        assertNull(OpdsClient.authorization(opds, "http://other_host:8083/opds"))
+    }
+
+    @Test
     fun overHttpTheLoginWaitsForTheServerToAsk_onEveryNetwork() = runTest {
         var network = "home"
         val client = OpdsClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000, logins = LoginGate(network = { network }))

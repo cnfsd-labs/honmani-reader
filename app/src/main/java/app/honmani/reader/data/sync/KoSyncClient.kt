@@ -1,6 +1,7 @@
 package app.honmani.reader.data.sync
 
 import app.honmani.reader.data.net.LoginGate
+import app.honmani.reader.data.net.originOf
 import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.IOException
@@ -169,6 +170,8 @@ class KoSyncClient(
             send(account, url, method, body, login = false)
         } catch (e: KoSyncException) {
             if (e.reason != KoSyncException.Reason.UNAUTHORIZED) throw e
+            // An address without a known origin can't be remembered as having asked: no login.
+            if (originOf(url.toString()) == null) throw e
             // Over http the login waited for the server to ask: send it now (not on a hotspot).
             if (logins.blocked(url.toString())) {
                 throw KoSyncException(KoSyncException.Reason.HOTSPOT, "No login over http on a hotspot")
