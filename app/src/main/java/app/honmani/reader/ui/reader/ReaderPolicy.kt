@@ -36,6 +36,8 @@ object ReaderPolicy {
             .map { "'sha256-${sha256(it.groupValues[2])}'" }
         return listOf(
             "script-src 'self' ${hashes.joinToString(" ")}".trim(),
+            // ttu parses an EPUB in a worker it starts from a blob it builds itself: no book can supply one.
+            "worker-src 'self' blob:",
             "object-src 'none'",
             "frame-src 'none'",
             "base-uri 'self'",

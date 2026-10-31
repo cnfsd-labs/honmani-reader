@@ -23,7 +23,7 @@ class ReaderPolicyTest {
     fun framesPluginsAndForms_areBlocked() {
         val policy = ReaderPolicy.contentSecurityPolicy("<p>no scripts</p>")
         assertEquals(
-            "script-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'",
+            "script-src 'self'; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'self'; form-action 'none'",
             policy,
         )
         assertFalse(policy.contains("unsafe"))

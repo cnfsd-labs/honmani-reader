@@ -41,6 +41,7 @@ function contentSecurityPolicy(html) {
     .map((match) => `'sha256-${crypto.createHash('sha256').update(match[2], 'utf8').digest('base64')}'`);
   return [
     `script-src 'self' ${hashes.join(' ')}`.trim(),
+    "worker-src 'self' blob:",
     "object-src 'none'",
     "frame-src 'none'",
     "base-uri 'self'",
