@@ -151,6 +151,19 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun allListsEveryWordOnceLearningFirst() = runTest {
+        listOf("猫", "犬", "鳥").forEach { repository.record(lookup(it)) }
+        val bird = learning().first { it.expression == "鳥" }
+        repository.markLearned(bird.id)
+
+        // One query: two flows could be caught mid-change with a word in both, which crashed the list.
+        val all = repository.all.first()
+        assertEquals(3, all.map { it.id }.distinct().size)
+        assertEquals(listOf("鳥"), all.filter { it.status == WordStatus.LEARNED }.map { it.expression })
+        assertEquals(WordStatus.LEARNED, all.last().status)
+    }
+
+    @Test
     fun aLearnedWordLookedUpAgainIsBeingLearned() = runTest {
         repository.record(lookup("猫", sentence = "一。"))
         repository.markLearned(learning().single().id)

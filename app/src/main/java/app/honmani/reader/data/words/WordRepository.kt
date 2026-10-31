@@ -47,7 +47,7 @@ class WordRepository(
     val learned = dao.observeLearned()
 
     /** Every saved word, being learned or learned. */
-    val all: Flow<List<WordEntity>> = combine(learning, learned) { learning, learned -> learning + learned }
+    val all: Flow<List<WordEntity>> = dao.observeAll()
 
     /** The words of the latest reading session, see [ReadingSession]. */
     @OptIn(ExperimentalCoroutinesApi::class)

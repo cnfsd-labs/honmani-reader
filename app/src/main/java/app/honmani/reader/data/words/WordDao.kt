@@ -18,6 +18,10 @@ interface WordDao {
     @Query("SELECT * FROM word WHERE status = 'LEARNED' ORDER BY expression, reading")
     fun observeLearned(): Flow<List<WordEntity>>
 
+    /** Every word, learning ones first: one query, so a word moving between the two lists is never in both. */
+    @Query("SELECT * FROM word ORDER BY status = 'LEARNED', CASE WHEN status = 'LEARNED' THEN expression END, CASE WHEN status = 'LEARNED' THEN reading END, rank_key DESC, id DESC")
+    fun observeAll(): Flow<List<WordEntity>>
+
     /**
      * Words suggested for Anki: being learned, not in Anki yet, and looked up more than once
      * (a repeat in the same sentence within the hour doesn't count, see [WordRepository.record]).
