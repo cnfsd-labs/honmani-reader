@@ -77,4 +77,12 @@ class BackupContentsTest {
         val values = mapOf("fontSize" to "28", "lineHeight" to "1.65", "fontFamilyGroupOne" to "Honmani Klee One", "writingMode" to "vertical-rl")
         assertEquals(values, ReaderSettingsCheck.valid(values))
     }
+
+    @Test
+    fun honmaniSwitchesPassOnlyAsZeroOrOne() {
+        val valid = ReaderSettingsCheck.valid(
+            mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniHideKnownFurigana" to "maybe"),
+        )
+        assertEquals(mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1"), valid)
+    }
 }

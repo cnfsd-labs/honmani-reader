@@ -45,6 +45,8 @@ data class ReaderSettings(
     val keepScreenOn: Boolean = false,
     /** The phone's volume buttons turn pages in a book (down: next, up: previous). */
     val volumeKeys: Boolean = true,
+    /** Selected book text (a long press and its handles) is looked up as a tap is (`tap-bridge.js`). */
+    val selectionLookup: Boolean = true,
 ) {
     /** The values to store, as ttu writes them. */
     fun toStorage(): Map<String, String> = buildMap {
@@ -61,6 +63,7 @@ data class ReaderSettings(
         put(WORD_MARKS, wordMarks.storage)
         put(WAKE_LOCK, flag(keepScreenOn))
         put(VOLUME_KEYS, flag(volumeKeys))
+        put(SELECTION_LOOKUP, flag(selectionLookup))
     }
 
     companion object {
@@ -83,6 +86,7 @@ data class ReaderSettings(
         private const val PROGRESS_BAR = "honmaniProgressBar"
         private const val WORD_MARKS = "honmaniWordMarks"
         private const val VOLUME_KEYS = "honmaniVolumeKeys"
+        private const val SELECTION_LOOKUP = "honmaniSelectionLookup"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -108,6 +112,7 @@ data class ReaderSettings(
                 wordMarks = WordMarksMode.fromStorage(values[WORD_MARKS]),
                 keepScreenOn = flag(WAKE_LOCK, defaults.keepScreenOn),
                 volumeKeys = flag(VOLUME_KEYS, defaults.volumeKeys),
+                selectionLookup = flag(SELECTION_LOOKUP, defaults.selectionLookup),
             )
         }
     }

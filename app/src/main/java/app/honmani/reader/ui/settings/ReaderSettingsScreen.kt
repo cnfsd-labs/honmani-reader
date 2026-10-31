@@ -207,6 +207,9 @@ private fun ReaderSettingsContent(
         SwitchRow(R.string.reader_settings_volume_keys, R.string.reader_settings_volume_keys_details, settings.volumeKeys) {
             onChange(settings.copy(volumeKeys = it))
         }
+        SwitchRow(R.string.reader_settings_selection_lookup, R.string.reader_settings_selection_lookup_details, settings.selectionLookup) {
+            onChange(settings.copy(selectionLookup = it))
+        }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         ListItem(
             headlineContent = { Text(stringResource(R.string.reader_settings_all)) },

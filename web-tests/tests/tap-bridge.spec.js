@@ -460,6 +460,7 @@ test('the fallback mark follows the text when the page scrolls', async ({ page }
 
 test('no lookup while text is selected', async ({ page }) => {
   await page.evaluate(() => {
+    window.localStorage.setItem('honmaniSelectionLookup', '0');
     const range = document.createRange();
     range.selectNodeContents(document.querySelector('#v2'));
     window.getSelection().addRange(range);
@@ -488,4 +489,110 @@ test('elements in the book with the script\'s ids are not taken over', async ({ 
   expect(book.style).toBe('p { color: red }');
   expect(book.overlayChildren).toBe(0);
   expect(book.styles).toBe(1);
+});
+
+/** Selects from (selector's text node `from`, offset) to (node `to`, offset), as a long press and its handles do. */
+async function select(page, selector, from, to) {
+  await page.evaluate(
+    ({ selector, from, to }) => {
+      const texts = [];
+      const walker = document.createTreeWalker(document.querySelector(selector), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.parentElement.closest('rt, rp')) texts.push(node);
+      }
+      const range = document.createRange();
+      range.setStart(texts[from[0]], from[1]);
+      range.setEnd(texts[to[0]], to[1]);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    },
+    { selector, from, to },
+  );
+}
+
+const settle = (page) => page.waitForTimeout(700);
+
+test('a selection is looked up once it has settled, with the selected text as the query', async ({ page }) => {
+  // 猫である: the ruby base, then the text after it.
+  await select(page, '#v1', [1, 0], [2, 3]);
+  expect(await messages(page)).toEqual([]);
+  await settle(page);
+
+  expect(await messages(page)).toEqual([
+    {
+      type: 'lookup',
+      text: '猫である',
+      sentence: '「吾輩は猫である。',
+      sentenceOffset: 4,
+      tap: 1,
+      ruby: [{ start: 0, end: 1, reading: 'ねこ' }],
+    },
+  ]);
+});
+
+test('a selection that keeps changing is looked up once, at its final extent', async ({ page }) => {
+  await select(page, '#v2', [0, 0], [0, 2]);
+  await page.waitForTimeout(150);
+  await select(page, '#v2', [0, 0], [0, 4]);
+  await settle(page);
+
+  const lookups = await messages(page);
+  expect(lookups.map((message) => message.text)).toEqual(['どこで生']);
+});
+
+test('the same selection is not looked up twice, a new one after it is', async ({ page }) => {
+  await select(page, '#v2', [0, 0], [0, 3]);
+  await settle(page);
+  await page.evaluate(() => document.dispatchEvent(new Event('selectionchange')));
+  await settle(page);
+  expect((await messages(page)).length).toBe(1);
+
+  await select(page, '#v2', [0, 3], [0, 5]);
+  await settle(page);
+  expect((await messages(page)).map((message) => message.text)).toEqual(['どこで', '生れ']);
+});
+
+test('a long selection is capped at the 20 characters of a tap', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector('#h2').textContent = 'あ'.repeat(40);
+  });
+  await select(page, '#h2', [0, 0], [0, 40]);
+  await settle(page);
+
+  const lookups = await messages(page);
+  expect(lookups.at(-1).text).toBe('あ'.repeat(20));
+});
+
+test('a selection stops at a line break and skips furigana', async ({ page }) => {
+  // From 雨ニモ... through the <br> into the next line.
+  await select(page, '#h4', [0, 0], [1, 3]);
+  await settle(page);
+
+  const [message] = await messages(page);
+  expect(message.text).toBe('雨ニモマケズ');
+});
+
+test('the switch honmaniSelectionLookup = 0 turns selection lookups off, and the selection stays', async ({ page }) => {
+  await page.evaluate(() => window.localStorage.setItem('honmaniSelectionLookup', '0'));
+  await select(page, '#v2', [0, 0], [0, 3]);
+  await settle(page);
+
+  expect(await messages(page)).toEqual([]);
+  expect(await page.evaluate(() => window.getSelection().toString())).toBe('どこで');
+});
+
+test('a selection outside the book is not looked up', async ({ page }) => {
+  await select(page, '#outside', [0, 0], [0, 3]);
+  await settle(page);
+
+  expect(await messages(page)).toEqual([]);
+});
+
+test('the app can highlight a selection lookup like a tap', async ({ page }) => {
+  await select(page, '#v2', [0, 0], [0, 3]);
+  await settle(page);
+  await page.evaluate(() => window.honmani.onmessage({ data: JSON.stringify({ type: 'highlight', length: 3, tap: 1 }) }));
+
+  expect(await page.evaluate(() => CSS.highlights.has('honmani-lookup'))).toBe(true);
 });

@@ -14,6 +14,10 @@
  * left out when there are none.
  *   { "type": "dismiss" }   (a tap on book content that is not on text)
  *
+ * Selected book text (a long press, then the handles) is looked up in the same message once the
+ * selection has settled: "text" is the selection, up to SCAN_LENGTH characters. localStorage
+ * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns it off.
+ *
  * Furigana (<rt>, <rp>) is not part of the scanned text; a tap on furigana scans from the start
  * of the base text it reads. Scanning stops at the end of the
  * tapped paragraph and at a line break (<br>). A tap on an opening bracket or quote scans from
@@ -265,15 +269,22 @@
 
     const hit = rubyBaseOf(target) || charAt(x, y);
     if (!hit || !root.contains(hit.node)) return null;
-    const { node, index } = hit;
+    return lookupFrom(root, hit.node, hit.index, Infinity);
+  }
 
+  /**
+   * The lookup message for the text from (node, index), at most `limit` characters of it (a
+   * selection's length; a tap scans SCAN_LENGTH code points whatever follows), or null.
+   */
+  function lookupFrom(root, node, index, limit) {
     const block = blockAncestor(node, root);
     const { text: paragraph, position, ruby: paragraphRuby } = blockText(block, node, index);
     if (position < 0) return null;
 
     let start = position;
     while (start < paragraph.length && OPENING_BRACKETS.includes(paragraph[start])) start++;
-    const text = takeCodePoints(paragraph.slice(start), SCAN_LENGTH).split('\n')[0];
+    const end = limit === Infinity ? paragraph.length : Math.max(start, position + limit);
+    const text = takeCodePoints(paragraph.slice(start, end), SCAN_LENGTH).split('\n')[0].trimEnd();
     if (!text.trim() || /^\s/.test(text)) return null;
 
     const { sentence, offset, previous } = sentenceAround(paragraph, start);
@@ -442,6 +453,81 @@
       }),
     );
   }
+
+  /**
+   * Looks up a selection once it has settled (a long press selects a word; the handles then
+   * change it), when localStorage "honmaniSelectionLookup" is not "0". The selected text, up to
+   * SCAN_LENGTH characters, is the query, found by the same dictionary scan as for a tap. The
+   * selection itself is left alone, so copying works as before.
+   */
+  const SELECTION_SETTLE = 450;
+  let selectionTimer = 0;
+  let lastSelected = '';
+
+  function selectionLookupOn() {
+    try {
+      return window.localStorage.getItem('honmaniSelectionLookup') !== '0';
+    } catch (error) {
+      return true;
+    }
+  }
+
+  /** The first text node of the book (furigana skipped) a range reaches, and where it starts. */
+  function selectionStart(range, root) {
+    if (range.startContainer.nodeType === Node.TEXT_NODE && !isSkipped(range.startContainer)) {
+      return { node: range.startContainer, index: range.startOffset };
+    }
+    const walker = textWalker(root);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (range.comparePoint(node, 0) > 0) return null;
+      if (range.intersectsNode(node)) return { node, index: node === range.startContainer ? range.startOffset : 0 };
+    }
+    return null;
+  }
+
+  /** How many characters of book text (no furigana) the range holds from (node, index). */
+  function selectedLength(range, root, node, index) {
+    const walker = textWalker(root);
+    walker.currentNode = node;
+    let length = 0;
+    for (let current = node; current && range.intersectsNode(current); current = walker.nextNode()) {
+      const from = current === node ? index : 0;
+      const to = current === range.endContainer ? range.endOffset : current.data.length;
+      length += Math.max(0, to - from);
+    }
+    return length;
+  }
+
+  function lookupSelection() {
+    selectionTimer = 0;
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0 || !selectionLookupOn()) return;
+    const range = selection.getRangeAt(0);
+    const inside = range.commonAncestorContainer;
+    const root = (inside.nodeType === Node.ELEMENT_NODE ? inside : inside.parentElement)?.closest(BOOK_ROOT_SELECTOR);
+    if (!root) return;
+    const selected = selection.toString().trim();
+    if (!selected || selected === lastSelected) return;
+    const from = selectionStart(range, root);
+    if (!from) return;
+    const length = selectedLength(range, root, from.node, from.index);
+    const message = lookupFrom(root, from.node, from.index, length);
+    if (!message) return;
+    lastSelected = selected;
+    clearHighlight();
+    post(message);
+  }
+
+  document.addEventListener('selectionchange', () => {
+    clearTimeout(selectionTimer);
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) {
+      lastSelected = '';
+      selectionTimer = 0;
+      return;
+    }
+    selectionTimer = setTimeout(lookupSelection, SELECTION_SETTLE);
+  });
 
   function onTap(x, y, target, arrived, via) {
     if (!(target instanceof Element)) return;
