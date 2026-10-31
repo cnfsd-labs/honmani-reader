@@ -349,6 +349,8 @@
     <string name="lookup_frequency_explained">Frequency rank in %1$s: number %2$s among the most common Japanese words. The lower the number, the more often you will meet the word.</string>
     <string name="lookup_expand">Show this word</string>
     <string name="catalog_kind_pitch">Pitch accent</string>
+    <string name="catalog_kind_names">Names</string>
+    <string name="catalog_jmnedict">Names of people, places and companies, so tapping 田中 or 渋谷 finds something. Shown after ordinary words.</string>
     <string name="action_download">Download</string>
     <string name="catalog_installed">Installed</string>
     <string name="catalog_in_progress">Installing…</string>

@@ -1,5 +1,6 @@
 package app.honmani.reader.lookup
 
+import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.dictionary.DictionaryDao
 import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
@@ -199,6 +200,9 @@ class DictionaryLookup(
             .thenBy { it.term.id in kanaOnlyNamed }
             .thenBy { it.inflections.size }
             .thenByDescending { it.matchedExpression }
+            // A name (JMnedict) after the ordinary words of the same match, however the dictionaries
+            // are ordered: a surname is rarely what the reader wants from a common word.
+            .thenBy { DictionaryCatalog.isNames(it.dictionary.title) }
             // The more common word first (by the frequency dictionaries, if any are installed).
             .thenBy { meta[metaKey(it.term.expression, it.term.reading)]?.rank ?: Double.MAX_VALUE }
             .then(entryOrder)

@@ -107,6 +107,25 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun namesRankBelowOrdinaryWordsOfTheSameMatch_evenWhenInstalledFirst() = runTest {
+        // Installed first, so it is the first dictionary on the Dictionaries screen.
+        install(
+            "JMnedict [2026-10-30]",
+            listOf("猫", "ねこ", "surname", 0, "Neko (surname)"),
+            listOf("猫田", "ねこた", "surname", 0, "Nekota (surname)"),
+        )
+        jmdict()
+
+        val same = lookup.lookup("猫です")
+        assertEquals(listOf("猫", "猫"), same.headwords())
+        assertEquals(listOf("JMdict", "JMnedict [2026-10-30]"), same.entries.take(2).map { it.dictionary.title })
+
+        // A longer match is still the longer match, and a word that is only a name is found.
+        assertEquals("猫田", lookup.lookup("猫田です").entries.first().term.expression)
+        assertEquals("猫田", lookup.lookup("猫田").entries.first().term.expression)
+    }
+
+    @Test
     fun deinflectsTheLongestMatch() = runTest {
         jmdict()
 

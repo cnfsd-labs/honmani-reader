@@ -24,6 +24,9 @@ data class CatalogDictionary(
         KANJI,
         FREQUENCY,
         PITCH,
+
+        /** Names of people, places and companies (JMnedict): looked up after ordinary words. */
+        NAMES,
     }
 }
 
@@ -33,6 +36,13 @@ data class CatalogDictionary(
  * file still works.
  */
 object DictionaryCatalog {
+    /** Title prefix of JMnedict, whose entries rank below ordinary words of the same match. */
+    const val NAMES_TITLE = "JMnedict"
+
+    /** Whether a dictionary of this title holds names (JMnedict). */
+    fun isNames(title: String): Boolean =
+        title.startsWith(NAMES_TITLE) && title.getOrNull(NAMES_TITLE.length)?.isLetter() != true
+
     val dictionaries = listOf(
         CatalogDictionary(
             id = "jitendex",
@@ -50,6 +60,16 @@ object DictionaryCatalog {
             url = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.zip",
             sizeMb = 16,
             license = "CC BY-SA 4.0 (EDRDG)",
+        ),
+        CatalogDictionary(
+            id = "jmnedict",
+            name = "JMnedict (names)",
+            titlePrefix = NAMES_TITLE,
+            // Same publisher and release as JMdict; its index.json title is "JMnedict [date]".
+            url = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.zip",
+            sizeMb = 11,
+            license = "CC BY-SA 4.0 (EDRDG)",
+            kind = CatalogDictionary.Kind.NAMES,
         ),
         CatalogDictionary(
             id = "wiktionary-japanese",

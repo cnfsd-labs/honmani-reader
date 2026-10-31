@@ -262,6 +262,7 @@ private fun CatalogRow(item: CatalogItem, onDownload: () -> Unit) {
             CatalogDictionary.Kind.KANJI -> stringResource(R.string.catalog_kind_kanji)
             CatalogDictionary.Kind.FREQUENCY -> stringResource(R.string.catalog_kind_frequency)
             CatalogDictionary.Kind.PITCH -> stringResource(R.string.catalog_kind_pitch)
+            CatalogDictionary.Kind.NAMES -> stringResource(R.string.catalog_kind_names)
         },
         stringResource(R.string.catalog_recommended).takeIf { dictionary.recommended },
     ).joinToString(" · ")
@@ -296,6 +297,7 @@ private fun CatalogRow(item: CatalogItem, onDownload: () -> Unit) {
 private fun catalogDescription(dictionary: CatalogDictionary): Int? = when (dictionary.id) {
     "jitendex" -> R.string.catalog_jitendex
     "jmdict-english" -> R.string.catalog_jmdict_english
+    "jmnedict" -> R.string.catalog_jmnedict
     "kanjidic-english" -> R.string.catalog_kanjidic
     "wiktionary-japanese" -> R.string.catalog_wiktionary_japanese
     "jiten-frequency" -> R.string.catalog_jiten_frequency
