@@ -598,6 +598,17 @@
     <string name="book_time_whole">About %1$s to read</string>
     <string name="book_time_left">About %1$s left</string>
     <string name="book_coverage_all">You know all its words.</string>
+    <string name="unknown_words_button">Words to learn before reading</string>
+    <string name="unknown_words_title">Words you don\'t know yet</string>
+    <plurals name="unknown_words_all">
+        <item quantity="one">The one word of this book that is new to you.</item>
+        <item quantity="other">All %1$s words of this book that are new to you, the most used first.</item>
+    </plurals>
+    <string name="unknown_words_capped">The %1$s most used of the %2$s words of this book that are new to you. Tap one to look it up.</string>
+    <plurals name="unknown_words_uses">
+        <item quantity="one">%1$s time</item>
+        <item quantity="other">%1$s times</item>
+    </plurals>
     <plurals name="book_coverage">
         <item quantity="one">You know about %1$d%% of its words; one is new to you.</item>
         <item quantity="other">You know about %1$d%% of its words; about %2$s are new to you.</item>

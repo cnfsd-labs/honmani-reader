@@ -98,7 +98,7 @@ private fun SessionRow(word: WordEntity, onClick: () -> Unit) {
     )
 }
 
-private fun openInDictionary(context: Context, text: String) {
+internal fun openInDictionary(context: Context, text: String) {
     context.startActivity(
         Intent(context, LookupActivity::class.java)
             .setAction(Intent.ACTION_SEND)

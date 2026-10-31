@@ -18,6 +18,7 @@ import app.honmani.reader.data.stats.ReadingStats
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.BookCoverage
+import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.WordCounts
 import app.honmani.reader.data.export.CsvExports
 import app.honmani.reader.data.export.writeTextDocument
@@ -91,6 +92,8 @@ class StatisticsViewModel(
     private val grading: Flow<GradingState> = flowOf(GradingState.IDLE),
     /** How much of a book (by content hash) the reader knows. */
     private val coverage: (contentHash: String) -> Flow<BookCoverage?> = { flowOf(null) },
+    /** The words of a book (by content hash) the reader does not know yet. */
+    private val unknownWords: (contentHash: String) -> Flow<UnknownWords?> = { flowOf(null) },
     /** The daily reading goal in minutes; null while it is off. */
     private val goalMinutes: Flow<Int?> = flowOf(null),
     private val today: () -> LocalDate = LocalDate::now,
@@ -194,6 +197,9 @@ class StatisticsViewModel(
                 .flatMapLatest { hash -> hash?.let(coverage) ?: flowOf(null) },
         ) { statistics, coverage -> statistics?.copy(coverage = coverage) }
 
+    /** The words of the book with [contentHash] the reader does not know yet; null before they can be told. */
+    fun unknownWords(contentHash: String): Flow<UnknownWords?> = unknownWords.invoke(contentHash)
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
@@ -209,6 +215,7 @@ class StatisticsViewModel(
                     grades = container.difficultyStore.grades,
                     grading = container.bookGrader.state,
                     coverage = container::bookCoverage,
+                    unknownWords = container::unknownWords,
                     goalMinutes = container.readingGoalSettings.goalMinutes,
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                 )

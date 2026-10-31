@@ -106,6 +106,7 @@ fun BookSheet(
     val stats by flow.collectAsStateWithLifecycle(null)
     val progressState by progress.uiState.collectAsStateWithLifecycle()
     val skill = progressState?.skill?.current
+    var showUnknown by rememberSaveable(book.id) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -185,6 +186,11 @@ fun BookSheet(
                     )
                 }
                 stats?.let { DifficultyCard(it, book, skill) }
+                if ((stats?.coverage?.newWords ?: 0) > 0 && book.contentHash.isNotEmpty()) {
+                    TextButton(onClick = { showUnknown = true }, modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Text(stringResource(R.string.unknown_words_button))
+                    }
+                }
                 stats?.let { Statistics(it) }
                 Actions(
                     book = book,
@@ -200,6 +206,8 @@ fun BookSheet(
             }
         }
     }
+    // After the book's sheet, so it opens above it.
+    if (showUnknown) UnknownWordsSheet(book.contentHash, viewModel, onDismiss = { showUnknown = false })
 }
 
 private const val MAX_HEIGHT_FRACTION = 0.92f

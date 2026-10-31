@@ -57,6 +57,7 @@ import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.words.BookCoverage
+import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.ReadStretchStore
 import app.honmani.reader.data.words.SpellingVariants
 import app.honmani.reader.data.words.WordKnowledge
@@ -425,7 +426,17 @@ class AppContainer(context: Context) {
      * How much of a graded book's words the reader knows, once their vocabulary is estimated
      * (the skill's vocabulary part); null before.
      */
-    fun bookCoverage(contentHash: String): Flow<BookCoverage?> {
+    fun bookCoverage(contentHash: String): Flow<BookCoverage?> =
+        bookWordsFlow(contentHash) { words, knowledge, vocabulary -> BookCoverage.of(words, knowledge, vocabulary) }
+
+    /** The graded book's words the reader does not know yet, most used first (see [UnknownWords]). */
+    fun unknownWords(contentHash: String): Flow<UnknownWords?> =
+        bookWordsFlow(contentHash) { words, knowledge, vocabulary -> UnknownWords.of(words, knowledge, vocabulary) }
+
+    private fun <T : Any> bookWordsFlow(
+        contentHash: String,
+        compute: (BookWords, WordKnowledge, Int) -> T?,
+    ): Flow<T?> {
         var words: Pair<StoredDifficulty, BookWords?>? = null
         return combine(
             wordKnowledge,
@@ -436,7 +447,7 @@ class AppContainer(context: Context) {
             // The book's words only change when it is graded again.
             val bookWords = words?.takeIf { it.first == grade }?.second
                 ?: difficultyStore.words(contentHash).also { words = grade to it }
-            bookWords?.let { BookCoverage.of(it, knowledge, vocabulary) }
+            bookWords?.let { compute(it, knowledge, vocabulary) }
         }.flowOn(Dispatchers.Default)
     }
 
