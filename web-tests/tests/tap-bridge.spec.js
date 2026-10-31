@@ -356,6 +356,18 @@ test('a tap on book content that is not text asks the app to close the panel', a
   expect(await messages(page)).toEqual([{ type: 'dismiss' }]);
 });
 
+test('a tap on punctuation or a symbol that starts no word looks nothing up; a word still does', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector('#h2').textContent = '、私が小さいとき。・★猫…';
+  });
+  for (const char of ['、', '。', '・', '★', '…']) await tapChar(page, '#h2', char);
+  expect((await messages(page)).map((message) => message.type)).toEqual(['dismiss', 'dismiss', 'dismiss', 'dismiss', 'dismiss']);
+
+  await tapChar(page, '#h2', '私');
+  const lookups = (await messages(page)).filter((message) => message.type === 'lookup');
+  expect(lookups.map((message) => message.text)).toEqual(['私が小さいとき。・★猫…']);
+});
+
 /** Sends a reply as the app would, through the handler the bridge installed. */
 async function reply(page, message) {
   await page.evaluate((message) => window.honmani.onmessage({ data: JSON.stringify(message) }), message);

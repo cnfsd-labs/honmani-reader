@@ -200,6 +200,29 @@ test('the menu\'s Contents opens ttu\'s table of contents', async ({ page }) => 
   await expect(page.locator('[title="Close Table of Contents"]')).toBeVisible();
 });
 
+test('closeContents closes ttu\'s table of contents, however it was opened, and reports whether it did', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb' });
+  await page.addInitScript({ path: path.join(ASSETS, 'reader-menu.js') });
+  await importAndOpen(page);
+  const close = () => page.evaluate(() => window.honmaniReaderMenu.closeContents());
+  expect(await close()).toBe(false);
+
+  // Opened with ttu's own button in its bar.
+  await page.mouse.click(page.viewportSize().width / 2, 10);
+  await page.locator('[title="Open Table of Contents"]').click();
+  await expect(page.locator('[title="Close Table of Contents"]')).toBeVisible();
+  expect(await close()).toBe(true);
+  await expect(page.locator('[title="Close Table of Contents"]')).toBeHidden();
+  expect(new URL(page.url()).pathname).toBe('/b');
+  expect(await close()).toBe(false);
+
+  // Opened by the app's menu.
+  await page.evaluate(() => window.honmaniReaderMenu.openContents());
+  await expect(page.locator('[title="Close Table of Contents"]')).toBeVisible();
+  expect(await close()).toBe(true);
+  await expect(page.locator('[title="Close Table of Contents"]')).toBeHidden();
+});
+
 test('a page turn saves the reading position right away, without a bookmark button', async ({ page }) => {
   await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
   const paragraphs = Array.from({ length: 40 }, (_, i) => `第${i + 1}段落。吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。`);

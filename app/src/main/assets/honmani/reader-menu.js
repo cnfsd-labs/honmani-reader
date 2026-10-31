@@ -10,6 +10,9 @@
  *     Opens ttu's table of contents, as its button in the reader bar does: the bar is shown (a
  *     tap on the strip at the top of the page), the button clicked, and the bar closed again if
  *     the book has no contents.
+ *   honmaniReaderMenu.closeContents()
+ *     Closes ttu's table of contents if it is open (however it was opened) and returns true,
+ *     else false: the app's Back button asks this before it leaves the book.
  */
 (() => {
   'use strict';
@@ -19,6 +22,7 @@
   const FOOTER = '#ttu-page-footer';
   const BAR_STRIP = 'button.fixed.inset-x-0.top-0';
   const CONTENTS_BUTTON = '[title="Open Table of Contents"]';
+  const CLOSE_CONTENTS_BUTTON = '[title="Close Table of Contents"]';
   /** ttu draws its bar in the next tick; the button is looked for this many frames. */
   const MAX_FRAMES = 20;
 
@@ -57,5 +61,12 @@
     requestAnimationFrame(look);
   }
 
-  window.honmaniReaderMenu = Object.freeze({ openContents });
+  function closeContents() {
+    const button = document.querySelector(CLOSE_CONTENTS_BUTTON);
+    if (!button) return false;
+    button.click();
+    return true;
+  }
+
+  window.honmaniReaderMenu = Object.freeze({ openContents, closeContents });
 })();

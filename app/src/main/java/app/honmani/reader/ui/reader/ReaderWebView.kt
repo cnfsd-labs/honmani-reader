@@ -223,7 +223,7 @@ fun ReaderWebView(
         pendingFileCallback = null
     }
 
-    BackHandler(enabled = !atLibrary) { webViewRef.view?.let(::goBack) }
+    BackHandler(enabled = !atLibrary) { webViewRef.view?.let(::backOrCloseContents) }
     LaunchedEffect(closeRequests) {
         closeRequests.collect { if (!atLibrary) webViewRef.view?.let(::goBack) }
     }
@@ -534,6 +534,13 @@ private fun turnPage(view: WebView, next: Boolean) {
     view.requestFocus()
     view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
     view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+}
+
+/** Back closes ttu's table of contents when it is open (`reader-menu.js`), else see [goBack]. */
+private fun backOrCloseContents(view: WebView) {
+    view.evaluateJavascript("window.honmaniReaderMenu ? honmaniReaderMenu.closeContents() : false;") { closed ->
+        if (closed != "true" && view.isAttachedToWindow) goBack(view)
+    }
 }
 
 /** Handles back anywhere but on ttu's book list; see [ReaderBack.from]. */

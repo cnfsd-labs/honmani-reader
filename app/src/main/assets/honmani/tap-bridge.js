@@ -22,7 +22,8 @@
  * Furigana (<rt>, <rp>) is not part of the scanned text; a tap on furigana scans from the start
  * of the base text it reads. Scanning stops at the end of the
  * tapped paragraph and at a line break (<br>). A tap on an opening bracket or quote scans from
- * the character after it.
+ * the character after it;
+ * a tap on other punctuation or a symbol (、。！ ・ …) looks nothing up.
  *
  * Messages from the app (replies on the same object):
  *
@@ -57,6 +58,7 @@
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   /** Stands for a gaiji picture in the text (isGaiji): no word runs across it. */
   const GAIJI = '\uFFFC';
+  const NOT_WORD_START = /^[\p{P}\p{S}]/u;
   const SENTENCE_END = '。！？!?…\n';
   const CLOSING_QUOTES = '」』）〉》】"\'';
   const OPENING_BRACKETS = '「『（(〈《【〔［｛“‘〝"\'';
@@ -290,6 +292,8 @@
 
     let start = position;
     while (start < paragraph.length && OPENING_BRACKETS.includes(paragraph[start])) start++;
+    // Punctuation and symbols start no word: a tap on 、 or 。 looks nothing up.
+    if (NOT_WORD_START.test(paragraph.slice(start, start + 2))) return null;
     const end = limit === Infinity ? paragraph.length : Math.max(start, position + limit);
     const text = takeCodePoints(paragraph.slice(start, end), SCAN_LENGTH).split(/[\n\uFFFC]/)[0].trimEnd();
     if (!text.trim() || /^\s/.test(text)) return null;
