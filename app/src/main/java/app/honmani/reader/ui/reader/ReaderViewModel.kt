@@ -177,7 +177,16 @@ class ReaderViewModel(
             tapStarted = tap to start
             // Deinflection and matching take up to ~20 ms on older phones: not on the main thread,
             // where the reader draws.
-            val result = withContext(compute) { lookup(tap.text, tap.ruby) }
+            val result = try {
+                withContext(compute) { lookup(tap.text, tap.ruby) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A damaged dictionary row must not take the app down on a tap.
+                log("Lookup failed: $e")
+                show(LookupPanelState.NothingFound(tap))
+                return@launch
+            }
             log("Lookup of ${tap.text.length} chars: ${result.entries.size} entries in ${start.elapsedNow()}")
             if (result.entries.isNotEmpty()) {
                 _highlight.value = Highlight(lookupId, result.matchedLength, tap.tapNumber)
@@ -195,7 +204,15 @@ class ReaderViewModel(
                         ?: LookupPanelState.NothingFound(tap)
                 }
                 else -> {
-                    val groups = withContext(compute) { LookupGroups.from(result) }
+                    val groups = try {
+                        withContext(compute) { LookupGroups.from(result) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        log("Grouping the lookup failed: $e")
+                        show(LookupPanelState.NothingFound(tap))
+                        return@launch
+                    }
                     record(tap, groups.first())
                     LookupPanelState.Results(
                         tap = tap,
@@ -248,7 +265,7 @@ class ReaderViewModel(
             }
             if (found == null) {
                 // Nothing there: hide the button instead of leaving one that does nothing.
-                _panel.value = if (longer) current.copy(longestMatch = length) else current.copy(shortestMatch = length)
+                updateResults(tap) { if (longer) it.copy(longestMatch = length) else it.copy(shortestMatch = length) }
                 return@launch
             }
             val groups = withContext(compute) { LookupGroups.from(found) }
@@ -361,14 +378,26 @@ class ReaderViewModel(
                 AnkiResult.Failed(e.message ?: e.javaClass.simpleName)
             }
             val added = result is AnkiResult.Added || result == AnkiResult.AlreadyInAnki
-            updateResults(tap) {
-                it.copy(
-                    inAnki = if (added) it.inAnki + key else it.inAnki,
-                    addingToAnki = it.addingToAnki - key,
-                )
+            _panel.update { panel ->
+                when (panel) {
+                    is LookupPanelState.Results -> panel.settled(tap, key, added)
+                    // Back from a kanji or a referenced word returns to the panel that was waiting.
+                    is LookupPanelState.Kanji -> panel.copy(previous = panel.previous?.settled(tap, key, added))
+                    else -> panel
+                }
             }
             _ankiResults.send(group.expression to result)
         }
+    }
+
+    /** The add of [key] for [tap] is over, here and in the results back would return to. */
+    private fun LookupPanelState.Results.settled(tap: TapLookup, key: String, added: Boolean): LookupPanelState.Results {
+        val here = if (this.tap == tap) {
+            copy(inAnki = if (added) inAnki + key else inAnki, addingToAnki = addingToAnki - key)
+        } else {
+            this
+        }
+        return here.copy(previous = here.previous?.settled(tap, key, added))
     }
 
     /** Changes the panel's results if they are still those of [tap]. */

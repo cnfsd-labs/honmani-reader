@@ -31,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -475,7 +477,11 @@ private fun LookupGroupItem(
             IconButton(onClick = onAddToAnki, enabled = !adding) {
                 if (adding) {
                     // Making the card (with audio) takes a few seconds.
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    val addingText = stringResource(R.string.anki_adding)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp).semantics { contentDescription = addingText },
+                        strokeWidth = 2.dp,
+                    )
                 } else {
                     Icon(
                         painter = painterResource(if (inAnki) R.drawable.ic_in_anki else R.drawable.ic_add_card),

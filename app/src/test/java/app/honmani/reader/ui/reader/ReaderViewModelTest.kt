@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.TermEntity
@@ -233,6 +234,39 @@ class ReaderViewModelTest {
         assertEquals(results.highlight, panel.highlight)
         assertTrue(viewModel.back())
         assertEquals(results, viewModel.panel.value)
+    }
+
+    @Test
+    fun anAnkiAddThatEndsBehindAKanjiIsDoneWhenBackReturns() {
+        val card = CompletableDeferred<AnkiResult>()
+        val viewModel = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            addCard = { card.await() },
+            lookupKanji = { text -> kanji.filterKeys { it in text } },
+        )
+        viewModel.onTap(tap("食べました。"))
+        viewModel.addToAnki((viewModel.panel.value as LookupPanelState.Results).groups.single())
+        viewModel.showKanji("食")
+
+        card.complete(AnkiResult.Added(1))
+        assertTrue(viewModel.back())
+
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertTrue(panel.addingToAnki.isEmpty())
+        assertEquals(1, panel.inAnki.size)
+    }
+
+    @Test
+    fun aLookupThatThrowsShowsNothingFoundInsteadOfCrashing() {
+        val viewModel = ReaderViewModel(
+            lookup = { _, _ -> error("damaged glossary") },
+            compute = Dispatchers.Unconfined,
+        )
+
+        viewModel.onTap(tap("猫"))
+
+        assertEquals(LookupPanelState.NothingFound(tap("猫")), viewModel.panel.value)
     }
 
     @Test

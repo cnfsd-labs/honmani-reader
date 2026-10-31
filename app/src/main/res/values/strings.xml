@@ -208,6 +208,7 @@
     <string name="action_add_to_anki">Add to Anki</string>
     <string name="action_add_to_anki_with_sentence">Add to Anki with this sentence</string>
     <string name="word_in_anki">In Anki</string>
+    <string name="anki_adding">Adding to Anki…</string>
     <string name="action_add_all_to_anki">Add all %1$d to Anki</string>
     <string name="anki_add_all_title" tools:ignore="PluralsCandidate">Add %1$d words to Anki?</string>
     <string name="anki_add_all_text">Each becomes a card in Anki. Particles and other grammar words (の, です) are left out; their own Anki button still adds them.</string>
