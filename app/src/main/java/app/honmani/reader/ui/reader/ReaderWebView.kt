@@ -280,7 +280,8 @@ fun ReaderWebView(
                 createReaderWebView(
                     context = context,
                     onRenderProcessGone = { renderer++ },
-                    hideSelectionToolbar = { currentHideToolbar },
+                    // Only over a book: ttu's own pages keep their text fields' Paste and Select all.
+                    hideSelectionToolbar = { currentHideToolbar && inBook },
                     onMessage = { message, replyProxy ->
                         webViewRef.replyProxy = replyProxy
                         when (message) {

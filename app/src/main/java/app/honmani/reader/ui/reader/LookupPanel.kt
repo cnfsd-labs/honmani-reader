@@ -254,8 +254,13 @@ fun LookupPanel(
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
                 }
             }
-            if (state.tap.bySelection && state is LookupPanelState.Results && state.previous == null) {
-                CopyActions(word = state.tap.text.take(state.highlight.length), sentence = state.tap.sentence)
+            // The selection is gone after a long press: its text can be copied here, found or not.
+            val results = state as? LookupPanelState.Results
+            if (state.tap.bySelection && results?.previous == null) {
+                CopyActions(
+                    word = results?.let { state.tap.text.take(it.highlight.length) } ?: state.tap.text,
+                    sentence = state.tap.sentence,
+                )
             }
             if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
                 Text(
@@ -330,10 +335,6 @@ fun LookupPanel(
 
 private const val MAX_SHOWN_TEXT = 8
 
-/**
- * The matched text of a tap with buttons to make it one character shorter or longer; a button
- * that can't do anything is left out (its place stays, so the text doesn't jump).
- */
 /** Copy buttons for a long-press lookup, which has no Android selection toolbar. */
 @Composable
 private fun CopyActions(word: String, sentence: String) {
@@ -357,6 +358,10 @@ private fun CopyActions(word: String, sentence: String) {
     }
 }
 
+/**
+ * The matched text of a tap with buttons to make it one character shorter or longer; a button
+ * that can't do anything is left out (its place stays, so the text doesn't jump).
+ */
 @Composable
 private fun MatchControls(
     matched: String,

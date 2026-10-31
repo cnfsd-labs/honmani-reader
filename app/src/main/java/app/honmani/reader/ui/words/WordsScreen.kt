@@ -382,6 +382,7 @@ private fun WordsContent(
 }
 
 /** One of the two lists: [words] saved, then (known list) [knownByReading]. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordList(
     filter: WordFilter,
@@ -417,17 +418,14 @@ private fun WordList(
         else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.fillMaxSize()) {
             if (filter == WordFilter.LEARNING) {
                 item(key = "ankiActions") {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    // Wraps below the first button on a narrow screen or with large text.
+                    FlowRow(
+                        verticalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
                         if (uiState.ankiProgress == null && uiState.notInAnki > 0) {
+                            // No icon: with it the two buttons don't fit on one row of a phone.
                             FilledTonalButton(onClick = onAddAllToAnki) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_add_card),
-                                    contentDescription = null,
-                                    modifier = Modifier.padding(end = 8.dp),
-                                )
                                 Text(stringResource(R.string.action_add_all_to_anki, uiState.notInAnki))
                             }
                         }

@@ -604,8 +604,8 @@
     <string name="unknown_words_button">Words to learn before reading</string>
     <string name="unknown_words_title">Words you don\'t know yet</string>
     <plurals name="unknown_words_all">
-        <item quantity="one">The one word of this book that is new to you.</item>
-        <item quantity="other">All %1$s words of this book that are new to you, the most used first.</item>
+        <item quantity="one">The one word of this book that is new to you. Tap it to look it up.</item>
+        <item quantity="other">All %1$s words of this book that are new to you, the most used first. Tap one to look it up.</item>
     </plurals>
     <string name="unknown_words_capped">The %1$s most used of the %2$s words of this book that are new to you. Tap one to look it up.</string>
     <plurals name="unknown_words_uses">
