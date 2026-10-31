@@ -81,7 +81,8 @@ private fun SignInDialog(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var server by rememberSaveable { mutableStateOf("") }
     var username by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
+    // Not saveable: that would write it, readable, into the saved state.
+    var password by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<Int?>(null) }
 

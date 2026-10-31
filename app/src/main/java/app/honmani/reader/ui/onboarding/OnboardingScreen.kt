@@ -139,9 +139,13 @@ fun OnboardingScreen(
     val pack = DictionaryCatalog.starterPack(japanese)
     val withNotifications = rememberWithNotifications()
     val download = {
-        started = true
         dictionaries.dismissFailures()
-        withNotifications { pack.forEach(dictionaries::download) }
+        // Marked started only when the downloads are queued: the permission question can outlive
+        // the activity, and "started" without a queue would show a download that never runs.
+        withNotifications {
+            started = true
+            pack.forEach(dictionaries::download)
+        }
     }
     BackHandler(enabled = page.back() != null) { page.back()?.let { page = it } }
     OnboardingContent(

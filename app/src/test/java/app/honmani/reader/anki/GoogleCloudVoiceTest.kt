@@ -109,6 +109,17 @@ class GoogleCloudVoiceTest {
     }
 
     @Test
+    fun aReplyOfAnotherShapeIsAFailureNotACrash() = runBlocking {
+        body = """{"voices":"none"}"""
+        try {
+            GoogleCloudVoice.voices("key", baseUrl)
+            fail("expected an exception")
+        } catch (e: VoiceException) {
+            assertEquals(VoiceProblem.FAILED, e.problem)
+        }
+    }
+
+    @Test
     fun problemsByStatus() {
         assertEquals(VoiceProblem.KEY_REJECTED, GoogleCloudVoice.problemFor(403, "SERVICE_DISABLED"))
         assertEquals(VoiceProblem.QUOTA, GoogleCloudVoice.problemFor(429, ""))

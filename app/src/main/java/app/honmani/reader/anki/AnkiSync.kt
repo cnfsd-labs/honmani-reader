@@ -6,6 +6,7 @@ import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.logWarning
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -102,7 +103,8 @@ class AnkiSync(
     }
 
     /** Marks [found] as known (learned), and records that the import was done. */
-    suspend fun markKnown(found: List<WordEntity>) {
+    suspend fun markKnown(found: List<WordEntity>) = withContext(NonCancellable) {
+        // Not cancelled with the screen: a half-marked deck would offer itself again.
         found.forEach { words.markLearned(it.id) }
         settings.setKnownFromAnkiOffered(true)
     }

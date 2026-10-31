@@ -127,8 +127,14 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
                 }
             }
             if (values.isNotEmpty()) {
-                ttu.writeSettings(values)
-                ttu.reload()
+                // The data is merged by now: a reader page that doesn't answer must not turn this
+                // into a failed restore.
+                try {
+                    ttu.writeSettings(values)
+                    ttu.reload()
+                } catch (e: TtuLibraryException) {
+                    logWarning("Honmani.backup", "Reader settings could not be restored", e)
+                }
             }
         }
         if (summary.catalogsAdded > 0) container.opdsAutoImport.start(force = true)

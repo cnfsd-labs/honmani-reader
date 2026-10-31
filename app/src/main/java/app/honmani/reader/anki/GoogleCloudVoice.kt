@@ -70,10 +70,15 @@ class GoogleCloudVoice(
         /** Japanese voices for [apiKey], best first; also checks that the key works. */
         suspend fun voices(apiKey: String, baseUrl: String = BASE_URL): List<CloudVoiceInfo> {
             val response = request(apiKey, "$baseUrl/v1/voices?languageCode=$LANGUAGE", null)
-            val voices = response["voices"]?.jsonArray.orEmpty().mapNotNull { element ->
-                val voice = element.jsonObject
-                val name = voice["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                CloudVoiceInfo(name, voice["ssmlGender"]?.jsonPrimitive?.contentOrNull)
+            val voices = try {
+                response["voices"]?.jsonArray.orEmpty().mapNotNull { element ->
+                    val voice = element.jsonObject
+                    val name = voice["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                    CloudVoiceInfo(name, voice["ssmlGender"]?.jsonPrimitive?.contentOrNull)
+                }
+            } catch (e: IllegalArgumentException) {
+                // A reply of another shape than the API documents.
+                throw VoiceException(VoiceProblem.FAILED, e)
             }
             return voices.filter { it.name.startsWith("$LANGUAGE-") }
                 .sortedWith(compareBy({ modelRank(it.model) }, { it.name }))
