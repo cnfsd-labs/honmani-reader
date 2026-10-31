@@ -323,13 +323,15 @@ class WordsViewModel(
      */
     fun addAllToAnki() {
         if (ankiProgress.value != null) return
+        // Set now, not after the list is read, so a second tap can't start a second run.
+        ankiProgress.value = 0 to 1
         viewModelScope.launch {
-            val suggested = lists.first().learning.filter { it.ankiNoteId == null && it.id !in grammarWords.value }
             var added = 0
             var leftOut = 0
             var stopped: AnkiResult? = null
             var audioProblem: VoiceProblem? = null
             try {
+                val suggested = lists.first().learning.filter { it.ankiNoteId == null && it.id !in grammarWords.value }
                 for ((i, word) in suggested.withIndex()) {
                     ankiProgress.value = i to suggested.size
                     if (isGrammarWord(word)) {
@@ -417,10 +419,11 @@ class WordsViewModel(
     /** Writes the words of the current list to [uri] as an Anki package with audio. */
     fun exportPackage(uri: String) {
         if (ankiProgress.value != null) return
+        savingPackage.value = true
+        ankiProgress.value = 0 to 1
         viewModelScope.launch {
             val outcome = try {
                 val list = words.first()
-                savingPackage.value = true
                 ankiProgress.value = 0 to list.size
                 val problem = writePackage(uri, list) { done ->
                     ankiProgress.value = done.coerceAtMost(list.size - 1) to list.size

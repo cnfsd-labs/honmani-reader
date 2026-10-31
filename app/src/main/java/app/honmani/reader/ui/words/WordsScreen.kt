@@ -467,7 +467,7 @@ private fun WordList(
                     steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
                     frequency = uiState.frequencies[word.id],
                     expanded = expanded,
-                    lookups = if (expanded) uiState.lookups else emptyList(),
+                    lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
                     onToggleExpanded = { onToggleExpanded(word.id) },
                     onSetStarred = { onSetStarred(word.id, it) },
                     onMarkLearned = { onMarkLearned(word) },

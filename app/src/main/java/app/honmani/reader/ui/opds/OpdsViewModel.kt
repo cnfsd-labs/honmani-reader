@@ -179,8 +179,8 @@ class OpdsViewModel(
         viewModelScope.launch {
             try {
                 val feed = client.feed(server, next)
-                replaceTop { top ->
-                    if (top.url != page.url) return@replaceTop top
+                // The page may no longer be on top (an entry was opened meanwhile): it still gets its entries.
+                replacePage(page.url) { top ->
                     val known = top.entries.mapTo(HashSet()) { it.id }
                     top.copy(
                         entries = top.entries + feed.entries.filter { it.id !in known },
@@ -190,7 +190,7 @@ class OpdsViewModel(
                 }
             } catch (_: OpdsException) {
                 // Scrolling to the end again retries.
-                replaceTop { it.copy(loadingMore = false) }
+                replacePage(page.url) { it.copy(loadingMore = false) }
             }
         }
     }
@@ -250,6 +250,15 @@ class OpdsViewModel(
             search = feed.search,
         )
         browsing.update { state -> state?.copy(pages = state.pages + page, loading = false, error = null) }
+    }
+
+    /** Changes the page loaded from [url], wherever it is on the stack; nothing if it was left. */
+    private fun replacePage(url: String, transform: (CatalogPage) -> CatalogPage) {
+        browsing.update { state ->
+            val index = state?.pages?.indexOfLast { it.url == url } ?: -1
+            if (state == null || index < 0) return@update state
+            state.copy(pages = state.pages.toMutableList().also { it[index] = transform(it[index]) })
+        }
     }
 
     private fun replaceTop(transform: (CatalogPage) -> CatalogPage) {
