@@ -246,9 +246,16 @@ object Deinflector {
         rule("じよう", "ずる", FINAL, VZ, Inflection.VOLITIONAL)
         rule("じろ", "ずる", FINAL, VZ, Inflection.IMPERATIVE)
         rule("ぜよ", "ずる", FINAL, VZ, Inflection.IMPERATIVE)
+        // Literary negatives: 信ぜず, 信ぜぬ (also 信じず, 信じぬ).
+        for (stem in listOf("ぜ", "じ")) {
+            rule(stem + "ず", "ずる", FINAL, VZ, Inflection.WITHOUT)
+            literaryNegatives(stem, "ずる", VZ)
+        }
 
         // i-adjectives, including ない and たい forms produced above.
         rule("くない", "い", ADJ, ADJ, Inflection.NEGATIVE)
+        // 忘れないで (do not forget): ない with で, so 忘れない continues to 忘れる.
+        rule("ないで", "ない", TE, ADJ, Inflection.TE)
         rule("かった", "い", PAST, ADJ, Inflection.PAST)
         rule("くて", "い", TE, ADJ, Inflection.TE)
         rule("ければ", "い", FINAL, ADJ, Inflection.CONDITIONAL_BA)
