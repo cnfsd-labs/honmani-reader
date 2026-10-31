@@ -1,5 +1,7 @@
 package app.honmani.reader.data.dictionary
 
+import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.File
 import java.io.OutputStream
 import java.net.InetAddress
@@ -27,7 +29,7 @@ class DictionaryDownloaderTest {
     @Before
     fun setUp() {
         server = TestHttpServer { path, out ->
-            when (path) {
+            when (path.substringBefore('?')) {
                 // Like a GitHub "latest release" link: a redirect to the actual file.
                 "/releases/latest/download/dict.zip" ->
                     out.head("302 Found", "Location: $base/assets/dict-2026.zip", "Content-Length: 0")
@@ -54,6 +56,19 @@ class DictionaryDownloaderTest {
     @After
     fun tearDown() {
         server.stop()
+    }
+
+    @Test
+    fun theRequestIsNoted_withItsHostOnly() = runTest {
+        NetworkLog.shared.clear()
+
+        DictionaryDownloader().fetchText("$base/index.json?token=secret")
+
+        val entry = NetworkLog.shared.entries().single()
+        assertEquals(NetworkPurpose.DICTIONARY, entry.purpose)
+        assertEquals("127.0.0.1", entry.host)
+        assertEquals("HTTP 200", entry.result)
+        assertTrue(!entry.line().contains("secret") && !entry.line().contains("index.json"))
     }
 
     @Test

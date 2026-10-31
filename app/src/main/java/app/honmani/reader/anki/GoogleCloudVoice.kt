@@ -1,5 +1,7 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -108,6 +110,7 @@ class GoogleCloudVoice(
                         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                     }
                     val status = connection.responseCode
+                    NetworkLog.shared.answered(NetworkPurpose.GOOGLE_VOICE, url, status, connection.contentLengthLong)
                     if (status !in 200..299) {
                         val error = connection.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
                         throw VoiceException(problemFor(status, error))
@@ -117,6 +120,7 @@ class GoogleCloudVoice(
                 } catch (e: VoiceException) {
                     throw e
                 } catch (e: IOException) {
+                    NetworkLog.shared.failed(NetworkPurpose.GOOGLE_VOICE, url, e)
                     throw VoiceException(VoiceProblem.NETWORK, e)
                 } catch (e: IllegalArgumentException) {
                     // Not JSON, or not an object.

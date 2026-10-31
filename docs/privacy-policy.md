@@ -59,6 +59,11 @@ Honmani only connects to the internet for these things, and only to these places
 
 The book reader itself never loads anything from the internet.
 
+Settings → Network activity lists the latest requests Honmani made (when, what for, the server's
+name and how it went). The list is kept in memory on your phone only: it holds no addresses,
+logins or keys, is not sent anywhere unless you share the diagnostics yourself, and is gone when
+the app stops.
+
 ## Other apps
 
 - **AnkiDroid:** if you add words to Anki, Honmani hands them to the AnkiDroid app on your phone,

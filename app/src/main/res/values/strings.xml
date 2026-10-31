@@ -228,6 +228,15 @@
     <string name="anki_package_file_name">Honmani words.apkg</string>
     <string name="anki_package_progress">Saving for Anki: %1$d of %2$d…</string>
     <string name="anki_export_file_name">Honmani words.txt</string>
+    <string name="network_activity_title">Network activity</string>
+    <string name="network_activity_summary">What Honmani has contacted since it started</string>
+    <string name="network_activity_details">The latest requests Honmani made: dictionary downloads, book servers, progress sync and Google voices. Only the server name is listed, never addresses, logins or keys. The list stays on this phone and is cleared when the app stops.</string>
+    <string name="network_activity_empty">Nothing yet. Honmani only uses the network when you ask it to.</string>
+    <string name="network_activity_clear">Clear</string>
+    <string name="network_purpose_dictionary">Dictionary download</string>
+    <string name="network_purpose_book_server">Book server</string>
+    <string name="network_purpose_sync">Progress sync</string>
+    <string name="network_purpose_voice">Google voice</string>
     <string name="session_title">Words from this session</string>
     <string name="session_summary">%1$s since %2$s</string>
     <plurals name="session_words">

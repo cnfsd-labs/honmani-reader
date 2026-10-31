@@ -1,6 +1,8 @@
 package app.honmani.reader.data.sync
 
 import app.honmani.reader.data.net.LoginGate
+import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -202,6 +204,7 @@ class KoSyncClient(
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             }
             val status = connection.responseCode
+            NetworkLog.shared.answered(NetworkPurpose.PROGRESS_SYNC, url.toString(), status, connection.contentLengthLong)
             if (status == 401) throw KoSyncException(KoSyncException.Reason.UNAUTHORIZED, "Wrong login")
             val stream = if (status >= 400) connection.errorStream else connection.inputStream
             val text = stream?.use { input ->
@@ -220,6 +223,7 @@ class KoSyncClient(
         } catch (e: KoSyncException) {
             throw e
         } catch (e: IOException) {
+            NetworkLog.shared.failed(NetworkPurpose.PROGRESS_SYNC, url.toString(), e)
             throw KoSyncException(KoSyncException.Reason.NETWORK, e.message ?: "No connection", e)
         } finally {
             connection.disconnect()

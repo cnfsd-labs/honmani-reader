@@ -1,5 +1,7 @@
 package app.honmani.reader.data.dictionary
 
+import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -110,9 +112,11 @@ class DictionaryDownloader(
         val status = try {
             connection.responseCode
         } catch (e: IOException) {
+            NetworkLog.shared.failed(NetworkPurpose.DICTIONARY, url, e)
             connection.disconnect()
             throw DownloadException("Could not connect: ${e.message}", e)
         }
+        NetworkLog.shared.answered(NetworkPurpose.DICTIONARY, url, status, connection.contentLengthLong)
         if (status != HttpURLConnection.HTTP_OK) {
             connection.disconnect()
             throw DownloadException("The server answered $status for $url")

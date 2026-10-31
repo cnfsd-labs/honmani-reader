@@ -2,6 +2,8 @@ package app.honmani.reader.data.opds
 
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.originOf
+import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
@@ -161,8 +163,10 @@ class OpdsClient(
                 val status = try {
                     connection.responseCode
                 } catch (e: IOException) {
+                    NetworkLog.shared.failed(NetworkPurpose.BOOK_SERVER, current, e)
                     throw networkError(e)
                 }
+                NetworkLog.shared.answered(NetworkPurpose.BOOK_SERVER, current, status, connection.contentLengthLong)
                 when (status) {
                     in 200..299 -> return@withContext try {
                         read(connection)

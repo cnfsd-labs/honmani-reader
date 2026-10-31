@@ -39,6 +39,9 @@ class ReaderDiagnostics {
         appendLine("== Last opened book")
         appendLine(bookSnapshot ?: "(no book opened since the app started)")
         appendLine()
+        appendLine("== Network activity (last ${NetworkLog.shared.entries().size} requests, hosts only)")
+        NetworkLog.shared.entries().forEach { appendLine(it.line()) }
+        appendLine()
         appendLine("== Reader console (last ${lines.size} lines)")
         lines.forEach { appendLine(it) }
     }

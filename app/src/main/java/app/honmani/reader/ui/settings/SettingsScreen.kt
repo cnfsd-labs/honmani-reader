@@ -108,6 +108,11 @@ fun SettingsScreen(
         AboutScreen(version, onBack = { showingAbout = false })
         return
     }
+    var showingNetwork by rememberSaveable { mutableStateOf(false) }
+    if (showingNetwork) {
+        NetworkActivityScreen(onBack = { showingNetwork = false })
+        return
+    }
     var showingAnki by rememberSaveable { mutableStateOf(false) }
     if (showingAnki) {
         AnkiSettingsScreen(onBack = { showingAnki = false })
@@ -143,6 +148,7 @@ fun SettingsScreen(
         onOpenReaderSettings = onOpenReaderSettings,
         onShareDiagnostics = onShareDiagnostics,
         onOpenAbout = { showingAbout = true },
+        onOpenNetworkActivity = { showingNetwork = true },
         onOpenSample = onOpenSample,
         anki = { AnkiSettingsRow(onClick = { showingAnki = true }) },
         sync = { ProgressSyncSection() },
@@ -172,6 +178,7 @@ private fun SettingsContent(
     onOpenReaderSettings: () -> Unit,
     onShareDiagnostics: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenNetworkActivity: () -> Unit = {},
     onOpenSample: (SampleBook) -> Unit = {},
     anki: @Composable () -> Unit = {},
     sync: @Composable () -> Unit = {},
@@ -292,6 +299,13 @@ private fun SettingsContent(
                     headlineContent = { Text(stringResource(R.string.action_share_diagnostics)) },
                     supportingContent = { Text(stringResource(R.string.settings_diagnostics_details)) },
                     modifier = Modifier.clickable(onClick = onShareDiagnostics),
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.network_activity_title)) },
+                    supportingContent = { Text(stringResource(R.string.network_activity_summary)) },
+                    modifier = Modifier.clickable(onClick = onOpenNetworkActivity),
                 )
             }
             item {
