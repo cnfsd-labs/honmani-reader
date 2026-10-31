@@ -200,6 +200,9 @@ private fun ReaderSettingsContent(
         SwitchRow(R.string.reader_settings_hide_known_furigana, R.string.reader_settings_hide_known_furigana_details, settings.hideKnownFurigana) {
             onChange(settings.copy(hideKnownFurigana = it))
         }
+        SwitchRow(R.string.reader_settings_tint_one_unknown, R.string.reader_settings_tint_one_unknown_details, settings.tintOneUnknown) {
+            onChange(settings.copy(tintOneUnknown = it))
+        }
         SwitchRow(R.string.reader_settings_progress, R.string.reader_settings_progress_details, settings.showProgress) {
             onChange(settings.copy(showProgress = it))
         }

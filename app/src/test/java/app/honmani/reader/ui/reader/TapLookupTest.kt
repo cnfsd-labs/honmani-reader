@@ -164,6 +164,11 @@ class TapLookupTest {
             BridgeMessage.Marks(6, WordMarksMode.OFF, emptyList(), knownFurigana = true),
             BridgeMessage.parse("""{"type":"marks.request","requestId":6,"mode":"off","knownFurigana":true,"blocks":[]}"""),
         )
+        // So does whether to mark the sentences with one unknown word.
+        assertEquals(
+            BridgeMessage.Marks(7, WordMarksMode.OFF, emptyList(), unknownSentences = true),
+            BridgeMessage.parse("""{"type":"marks.request","requestId":7,"mode":"off","unknownSentences":true,"blocks":[]}"""),
+        )
         assertNull(BridgeMessage.parse("""{"type":"marks.request","blocks":"x"}"""))
     }
 

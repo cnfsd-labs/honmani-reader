@@ -149,4 +149,39 @@ class WordMarksTest {
         assertEquals(true, knowledge.isKnown("当り前"))
         assertEquals(false, knowledge.isKnown("猫"))
     }
+
+    @Test
+    fun aSentenceWithExactlyOneUnknownWordIsMarkedWhole_grammarAndNamesDoNotCount() {
+        // 猫 was read; 鼬 and 当たり前 were not. は and を are grammar, メロス is a name no dictionary has.
+        val text = "私は猫を食べた。メロスは鼬を見た。猫は当たり前の鼬だ。「私は鼬を。」猫は猫を"
+        fun sentences(mode: WordMarksMode = WordMarksMode.OFF) =
+            WordMarks.of(text, segmenter, knowledge, mode, sentences = true)
+                .filter { it.kind == WordMark.Kind.SENTENCE }
+                .map { text.substring(it.start, it.start + it.length) }
+
+        // 食べる is being learned: one unknown word. The second sentence has 鼬 only (見る is not in
+        // the test lexicon). The third has two (当たり前, 鼬). The fourth has 鼬 inside quotes.
+        assertEquals(listOf("私は猫を食べた。", "メロスは鼬を見た。", "「私は鼬を。」"), sentences())
+        // The tint's own mode makes no difference to the sentences.
+        assertEquals(sentences(), sentences(WordMarksMode.NEW))
+        assertEquals(
+            emptyList<WordMark>(),
+            WordMarks.of(text, segmenter, knowledge, WordMarksMode.OFF),
+        )
+    }
+
+    @Test
+    fun aWordLookedUpAsWrittenCountsAsTheUnknownWordOfItsSentence() {
+        val learning = WordKnowledge(
+            read = mapOf("猫" to ReadWord(900, 3)),
+            progress = emptyMap(),
+            learning = setOf("猫"),
+            learningForms = setOf("猫"),
+        )
+        val text = "私は猫を。"
+        assertEquals(
+            listOf(WordMark(0, 5, WordMark.Kind.SENTENCE)),
+            WordMarks.of(text, segmenter, learning, WordMarksMode.OFF, sentences = true),
+        )
+    }
 }

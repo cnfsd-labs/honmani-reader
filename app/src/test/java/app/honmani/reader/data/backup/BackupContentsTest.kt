@@ -81,8 +81,8 @@ class BackupContentsTest {
     @Test
     fun honmaniSwitchesPassOnlyAsZeroOrOne() {
         val valid = ReaderSettingsCheck.valid(
-            mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniHideKnownFurigana" to "maybe", "honmaniWordMarks" to "off"),
+            mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniHideKnownFurigana" to "maybe", "honmaniTintOneUnknown" to "1", "honmaniWordMarks" to "off"),
         )
-        assertEquals(mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniWordMarks" to "off"), valid)
+        assertEquals(mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniTintOneUnknown" to "1", "honmaniWordMarks" to "off"), valid)
     }
 }

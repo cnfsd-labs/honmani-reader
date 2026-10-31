@@ -48,6 +48,7 @@
     'honmaniVolumeKeys',
     'honmaniSelectionLookup',
     'honmaniHideKnownFurigana',
+    'honmaniTintOneUnknown',
   ];
   const USER_FONTS = 'userfonts';
   const FONT_PATH = '/honmani-fonts/';

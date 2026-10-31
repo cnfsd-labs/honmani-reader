@@ -9,10 +9,15 @@
  * made transparent through a highlight over its <rt> text (`color: transparent`), so the page's
  * layout and the DOM stay as they are. The marks run for it even with the tint turned off.
  *
+ * localStorage "honmaniTintOneUnknown" = "1" (off by default) also tints the sentences with exactly
+ * one word the reader does not know yet (kind 3: the app cuts the sentences as the tap bridge
+ * does and sends each as one mark), with a green background through a highlight. Like the other
+ * marks it changes neither the DOM nor the layout; the furigana over the sentence is tinted too.
+ *
  * The app splits the text into words (the splitter that grades books) and knows the reader's
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
  *
- *   { type: 'marks.request', requestId, mode, knownFurigana, blocks: [{ id, text }] }
+ *   { type: 'marks.request', requestId, mode, knownFurigana, unknownSentences, blocks: [{ id, text }] }
  *     text: the paragraph without furigana (<rt>, <rp>), a <br> as "\n", as the tap bridge
  *     reads it; a long paragraph comes in pieces of up to 4,000 characters, each a block of its
  *     own (id: the piece's, unique on the page)
@@ -20,7 +25,7 @@
  * and the app answers on the same object:
  *
  *   { type: 'marks', requestId, color: '#rrggbb', blocks: [{ id, marks: [[start, length, kind]] }] }
- *     kind 0: learning, 1: new, 2: known (only when asked for); start and length in UTF-16 units of the block's text; color:
+ *     kind 0: learning, 1: new, 2: known and 3: a sentence with one unknown word (only when asked for); start and length in UTF-16 units of the block's text; color:
  *     the app's accent, for the learning words' tint
  *   { type: 'marks.reset' }   the reader's words changed: paragraphs are asked about again
  *
@@ -42,12 +47,14 @@
 
   const MODE_KEY = 'honmaniWordMarks';
   const KNOWN_FURIGANA_KEY = 'honmaniHideKnownFurigana';
+  const SENTENCE_KEY = 'honmaniTintOneUnknown';
   const KNOWN = 2;
+  const SENTENCE = 3;
   const BOOK_ROOT_SELECTOR = '.book-content';
   const { isSkipped } = window.honmaniText;
-  const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana'];
+  const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana', 'honmani-one-unknown'];
   /** New marks, while they fade in; then they move to NAMES (the known words' furigana does not fade). */
-  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh'];
+  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh', 'honmani-one-unknown-fresh'];
   /** Paragraphs this far from the page (in pages) are asked about before they show. */
   const AHEAD = '100%';
   const FADE_MS = 250;
@@ -76,9 +83,17 @@
     }
   }
 
-  /** Whether the app has anything to mark: the tint, or the known words' furigana. */
+  function tintSentences() {
+    try {
+      return window.localStorage.getItem(SENTENCE_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /** Whether the app has anything to mark: the tint, the known words' furigana or the sentences. */
   function wanted() {
-    return mode() !== 'off' || hideKnownFurigana();
+    return mode() !== 'off' || hideKnownFurigana() || tintSentences();
   }
 
   function isBookPage() {
@@ -110,6 +125,9 @@
   const fresh = FRESH_NAMES.map(() => new Highlight());
   // Below the lookup mark.
   for (const highlight of [...highlights, ...fresh]) highlight.priority = -1;
+  // A sentence's tint lies under the tints of its words.
+  highlights[SENTENCE].priority = -2;
+  fresh[SENTENCE].priority = -2;
   let rgb = null;
   /** The fade of the fresh marks: when it started, and its animation frame. */
   let fadeStart = 0;
@@ -146,8 +164,17 @@
     const tints = (names, share) =>
       `::highlight(${names[0]}) { background-color: rgba(${rgb}, ${(learning * share).toFixed(3)}); }\n` +
       `::highlight(${names[1]}) { background-color: rgba(128, 128, 128, ${(fresh * share).toFixed(3)}); }\n`;
+    // Green, as no word tint is (the accent varies, the new words are grey); dark pages get more
+    // for the same reason as above.
+    const sentence = dark ? 0.3 : 0.16;
+    const sentences = (name, share) =>
+      `::highlight(${name}) { background-color: rgba(46, 160, 110, ${(sentence * share).toFixed(3)}); }\n`;
     style.textContent =
-      tints(NAMES, 1) + tints(FRESH_NAMES, alpha) + `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n`;
+      tints(NAMES, 1) +
+      tints(FRESH_NAMES, alpha) +
+      sentences(NAMES[SENTENCE], 1) +
+      sentences(FRESH_NAMES[SENTENCE], alpha) +
+      `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n`;
   }
 
   /** Whether the page behind the text is dark (ttu's dark themes set it on <body>). */
@@ -356,7 +383,7 @@
       const requestId = nextRequest++;
       pending.set(requestId, { generation, parts });
       app.postMessage(
-        JSON.stringify({ type: 'marks.request', requestId, mode: mode(), knownFurigana: hideKnownFurigana(), blocks: batch }),
+        JSON.stringify({ type: 'marks.request', requestId, mode: mode(), knownFurigana: hideKnownFurigana(), unknownSentences: tintSentences(), blocks: batch }),
       );
     }
     if (queue.size > 0 || pieces.length > 0) timer = setTimeout(send, BATCH_DELAY_MS);
@@ -464,7 +491,11 @@
           continue;
         }
         let ranges = rangesOf(id, start, length);
-        if (kind === KNOWN) {
+        if (kind === SENTENCE) {
+          // The furigana over the sentence is tinted with it, or the tint would have holes.
+          ranges = ranges.concat(furiganaRanges(ranges));
+          for (const range of ranges) fresh[kind].add(range);
+        } else if (kind === KNOWN) {
           // The furigana goes at once: a reading that fades out would show for a moment.
           ranges = furiganaRanges(ranges);
           for (const range of ranges) highlights[kind].add(range);

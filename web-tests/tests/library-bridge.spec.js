@@ -725,6 +725,49 @@ test('without the furigana switch the page never hides a reading or asks while t
   expect(await hiddenFurigana(page)).toEqual([]);
 });
 
+/** The text each range of the one-unknown-word sentence tint covers. */
+const tintedSentences = (page) =>
+  page.evaluate(() => [...(CSS.highlights.get('honmani-one-unknown') ?? [])].map((range) => range.toString()));
+
+test('a sentence with one unknown word is tinted, furigana included, without the DOM changing', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('honmaniTintOneUnknown', '1'));
+  await openWithMarks(page, 'ruby.epub', 'off');
+
+  // The tint is off, but the switch makes the page ask, and say why.
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(0);
+  const request = (await markRequests(page))[0];
+  expect(request.unknownSentences).toBe(true);
+  expect(request.knownFurigana).toBe(false);
+  const block = request.blocks.find((b) => b.text.startsWith('第1段落。'));
+  const html = await page.evaluate(() => document.querySelector('ruby').parentElement.innerHTML);
+
+  // The second sentence, 吾輩は猫である。, comes from the app as one mark of kind 3.
+  const at = block.text.indexOf('吾輩は猫である。');
+  await page.evaluate(
+    ([requestId, id, at]) => window.__reply({ type: 'marks', requestId, color: '#e91e63', blocks: [{ id, marks: [[at, 8, 3]] }] }),
+    [request.requestId, block.id, at],
+  );
+  await expect.poll(() => tintedSentences(page)).toEqual(expect.arrayContaining(['吾輩', 'は', '猫', 'である。']));
+  // The readings over the bases are tinted with them.
+  const tinted = await tintedSentences(page);
+  expect(tinted).toEqual(expect.arrayContaining(['わがはい', 'ねこ']));
+  const css = await page.evaluate(() => document.getElementById('honmani-marks-style').textContent);
+  expect(css).toMatch(/::highlight\(honmani-one-unknown\) \{ background-color: rgba\(46, 160, 110, 0\.\d+\); \}/);
+  // A word tint stays above the sentence's.
+  expect(await page.evaluate(() => CSS.highlights.get('honmani-one-unknown').priority)).toBeLessThan(
+    await page.evaluate(() => CSS.highlights.get('honmani-learning')?.priority ?? 0),
+  );
+  expect(await marked(page)).toEqual({ 'honmani-learning': [], 'honmani-new': [] });
+  expect(await page.evaluate(() => document.querySelector('ruby').parentElement.innerHTML)).toBe(html);
+});
+
+test('without the sentence switch no sentence is tinted or asked for', async ({ page }) => {
+  await openWithMarks(page, 'ruby.epub', 'new');
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(0);
+  expect((await markRequests(page))[0].unknownSentences).toBe(false);
+  expect(await tintedSentences(page)).toEqual([]);
+});
+
 test('word marks ask about a paragraph longer than a request in pieces, and mark all of it', async ({ page }) => {
   await openWithMarks(page, 'one-paragraph.epub', null);
   const paragraph = Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('');

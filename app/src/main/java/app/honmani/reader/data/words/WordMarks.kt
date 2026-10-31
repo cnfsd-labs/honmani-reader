@@ -32,6 +32,9 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
 
         /** A word the reader knows ([WordKnowledge.isKnown]): the reader hides its furigana. */
         KNOWN,
+
+        /** A sentence with exactly one word the reader does not know yet ("i+1"): tinted whole. */
+        SENTENCE,
     }
 }
 
@@ -49,9 +52,11 @@ object WordMarks {
         mode: WordMarksMode,
         /** Also mark the words the reader knows ([WordMark.Kind.KNOWN]), whatever [mode]. */
         knownWords: Boolean = false,
+        /** Also mark the sentences with exactly one unknown word ([WordMark.Kind.SENTENCE]). */
+        sentences: Boolean = false,
     ): List<WordMark> {
         val tint = mode != WordMarksMode.OFF
-        if (!tint && !knownWords) return emptyList()
+        if (!tint && !knownWords && !sentences) return emptyList()
         val marks = ArrayList<WordMark>()
         val tokens = ArrayList<Token>()
         segmenter.segment(text) { tokens += it }
@@ -78,6 +83,48 @@ object WordMarks {
             }
             marks += WordMark(token.start, token.length, kind)
         }
+        if (sentences) marks += oneUnknownSentences(text, tokens, knowledge)
         return marks
+    }
+
+    /** Words this common (a rank up to here: は, です, ない) are grammar, not vocabulary. */
+    private const val GRAMMAR_RANK_LIMIT = 100
+
+    /** A longer "sentence" has no punctuation to speak of; the reader's tap window cuts it at this too. */
+    private const val MAX_SENTENCE = 400
+
+    /**
+     * The sentences of [text] that hold exactly one word the reader does not know: one never met in
+     * reading or being learned (a form looked up counts as written). Grammar words and text no
+     * dictionary knows (names) are not counted.
+     */
+    private fun oneUnknownSentences(text: String, tokens: List<Token>, knowledge: WordKnowledge): List<WordMark> {
+        val ends = tokens.mapTo(HashSet()) { it.start + it.length }
+        val unknown = ArrayList<Int>()
+        var formEnd = 0
+        for (token in tokens) {
+            if (token.start < formEnd) continue
+            val form = knowledge.learningFormAt(text, token.start) { token.start + it.length in ends }
+            if (form != null) {
+                unknown += token.start
+                formEnd = token.start + form.length
+            } else if (token.rank != Token.UNKNOWN && token.rank > GRAMMAR_RANK_LIMIT &&
+                (knowledge.isLearning(token.key) || !knowledge.hasRead(token.key))
+            ) {
+                unknown += token.start
+            }
+        }
+        val found = ArrayList<WordMark>()
+        var next = 0
+        for (sentence in Sentences.of(text)) {
+            while (next < unknown.size && unknown[next] < sentence.first) next++
+            var count = 0
+            while (next + count < unknown.size && unknown[next + count] < sentence.last + 1) count++
+            if (count == 1 && sentence.last + 1 - sentence.first <= MAX_SENTENCE) {
+                found += WordMark(sentence.first, sentence.last + 1 - sentence.first, WordMark.Kind.SENTENCE)
+            }
+            next += count
+        }
+        return found
     }
 }
