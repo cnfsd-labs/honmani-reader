@@ -15,6 +15,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,6 +36,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.backup.BackupCodec
+import app.honmani.reader.data.backup.FolderBackupState
 import app.honmani.reader.data.backup.RestoreSummary
 import java.text.DateFormat
 import java.util.Date
@@ -80,6 +82,48 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
         )
     }
     BackupStateDialog(state, onDismiss = viewModel::dismiss, onConfirm = { confirm, withCatalogs -> viewModel.confirmRestore(confirm.backup, withCatalogs) })
+    FolderBackupRow()
+}
+
+/** Settings → Back up and restore → Back up to a folder: a copy of the automatic backup in a folder the reader picks. */
+@Composable
+private fun FolderBackupRow() {
+    val context = LocalContext.current
+    val container = remember { (context.applicationContext as HonmaniApplication).container }
+    val folderBackup = container.folderBackup
+    val state by folderBackup.state.collectAsStateWithLifecycle()
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        // Right away, so the folder has a copy before the next automatic backup is due.
+        if (uri != null && folderBackup.choose(uri.toString())) container.saveAutoBackup(force = true)
+    }
+    val on = state != FolderBackupState.Off
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.backup_folder_title)) },
+        supportingContent = {
+            Column {
+                Text(
+                    when (val current = state) {
+                        FolderBackupState.Off -> stringResource(R.string.backup_folder_details)
+                        FolderBackupState.Unavailable -> stringResource(R.string.backup_folder_unavailable)
+                        is FolderBackupState.On -> current.lastAt?.let {
+                            stringResource(
+                                R.string.backup_folder_last,
+                                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)),
+                            )
+                        } ?: stringResource(R.string.backup_folder_waiting)
+                    },
+                )
+                if (state == FolderBackupState.Unavailable) {
+                    TextButton(onClick = folderBackup::disable) { Text(stringResource(R.string.backup_folder_switch_off)) }
+                }
+            }
+        },
+        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        modifier = Modifier.clickable {
+            // Off, or no longer reachable: pick the folder (again); otherwise switch off.
+            if (state is FolderBackupState.On) folderBackup.disable() else pick.launch(null)
+        },
+    )
 }
 
 /** While a backup is made or restored, and how it went. */

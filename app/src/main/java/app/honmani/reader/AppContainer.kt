@@ -13,6 +13,8 @@ import app.honmani.reader.anki.WordAudio
 import app.honmani.reader.anki.WordDetails
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.backup.AutoBackup
+import app.honmani.reader.data.backup.ContentFolderTarget
+import app.honmani.reader.data.backup.FolderBackup
 import app.honmani.reader.data.backup.Backup
 import app.honmani.reader.data.backup.RestoredBooks
 import app.honmani.reader.data.dictionary.DictionaryDownloader
@@ -456,13 +458,16 @@ class AppContainer(context: Context) {
     /** Honmani's own backup of itself, taken along by Android's backup; see [AutoBackup]. */
     val autoBackup: AutoBackup by lazy { AutoBackup(File(appContext.filesDir, AutoBackup.DIRECTORY), devicePreferences) }
 
+    /** The copy of [autoBackup] in a folder the reader chose (Settings → Back up and restore). */
+    val folderBackup: FolderBackup by lazy { FolderBackup(devicePreferences, ContentFolderTarget(appContext.contentResolver)) }
+
     /**
      * Brings [autoBackup] up to date when it is due, as the app goes to the background. ttu's
      * reader settings come from the reader page, so this starts on the main thread.
      */
-    fun saveAutoBackup() {
+    fun saveAutoBackup(force: Boolean = false) {
         applicationScope.launch(Dispatchers.Main) {
-            autoBackup.saveIfDue {
+            val wrote = autoBackup.saveIfDue(force) {
                 val readerSettings = try {
                     ttuLibrary.readSettings()
                 } catch (_: TtuLibraryException) {
@@ -470,6 +475,8 @@ class AppContainer(context: Context) {
                 }
                 backup.export(readerSettings)
             }
+            // The same file, also into the folder the reader chose (if any).
+            if (wrote) folderBackup.copy(autoBackup.file)
         }
     }
 

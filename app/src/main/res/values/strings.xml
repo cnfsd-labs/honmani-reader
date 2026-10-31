@@ -756,6 +756,12 @@
     <string name="auto_backup_offer">Android brought back Honmani\'s backup from %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
     <string name="auto_backup_restore">Restore</string>
     <string name="auto_backup_start_fresh">Start fresh</string>
+    <string name="backup_folder_title">Back up to a folder</string>
+    <string name="backup_folder_details">Also copies the automatic backup into a folder you choose, such as one on an SD card or in a cloud app. One file, replaced each time</string>
+    <string name="backup_folder_waiting">Folder chosen. The next automatic backup is copied there.</string>
+    <string name="backup_folder_last">Last folder backup: %1$s</string>
+    <string name="backup_folder_unavailable">Folder not available, choose it again</string>
+    <string name="backup_folder_switch_off">Switch off</string>
     <string name="backup_failed_title">Not restored</string>
     <string name="backup_not_a_backup">This file is not a Honmani backup, or it comes from a newer version of Honmani. Update Honmani and try again.</string>
     <string name="backup_failed">The file could not be read or written. Try again, or pick another place for it.</string>
