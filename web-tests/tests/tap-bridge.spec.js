@@ -204,6 +204,26 @@ test('a line break ends the scanned text and the sentence', async ({ page }) => 
   expect(next.ruby).toEqual([{ start: 0, end: 1, reading: 'ゆき' }]);
 });
 
+test('a line break in the source is a space, not the end of the text or the sentence', async ({ page }) => {
+  await page.evaluate(() => {
+    document.querySelector('#horizontal').insertAdjacentHTML(
+      'afterbegin',
+      '<p id="nl">彼は東京\nに住む。</p><p id="tabs">猫が\t\r\n鳴く。</p>' +
+        '<p id="keep" style="white-space: pre-line">雨が\n降る。</p>',
+    );
+  });
+  await tapChar(page, '#nl', '彼');
+  await tapChar(page, '#tabs', '猫');
+  // A source that keeps its line breaks (white-space: pre-line) still breaks there.
+  await tapChar(page, '#keep', '雨');
+
+  const [source, tabs, kept] = await messages(page);
+  expect(source.text).toBe('彼は東京 に住む。');
+  expect(source.sentence).toBe('彼は東京 に住む。');
+  expect(tabs.text).toBe('猫が  鳴く。');
+  expect(kept.text).toBe('雨が');
+});
+
 test('a tap is looked up when the finger goes up, also when its click never comes (it stopped a fling)', async ({ page }) => {
   const { x, y } = await charCenter(page, '#v2', 'ど');
   // Pointer events only, as Chromium sends for a tap right after a page swipe.

@@ -53,7 +53,7 @@
   const MAX_SENTENCE_LENGTH = 400;
   const MAX_PREVIOUS_SENTENCE_LENGTH = 200;
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const { isSkipped, blockAncestor } = window.honmaniText;
+  const { isSkipped, blockAncestor, textData } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   const SENTENCE_END = '。！？!?…\n';
   const CLOSING_QUOTES = '」』）〉》】"\'';
@@ -160,15 +160,16 @@
         continue;
       }
       if (current === node) position = text.length + index;
+      const data = textData(current);
       const rt = rubyTextFor(current, block);
       if (rt && rt === lastRt) {
-        ruby[ruby.length - 1].end += current.data.length;
+        ruby[ruby.length - 1].end += data.length;
       } else if (rt) {
         const reading = rt.textContent.trim();
-        ruby.push({ start: text.length, end: text.length + current.data.length, reading });
+        ruby.push({ start: text.length, end: text.length + data.length, reading });
       }
       lastRt = rt;
-      text += current.data;
+      text += data;
     }
     return { text, position, ruby };
   }

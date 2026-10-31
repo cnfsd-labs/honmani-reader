@@ -51,7 +51,7 @@
   const KNOWN = 2;
   const SENTENCE = 3;
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const { isSkipped } = window.honmaniText;
+  const { isSkipped, textData } = window.honmaniText;
   const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana', 'honmani-one-unknown'];
   /** New marks, while they fade in; then they move to NAMES (the known words' furigana does not fade). */
   const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh', 'honmani-one-unknown-fresh'];
@@ -273,7 +273,7 @@
    * spaces included, and a <br> as a line break, so no word runs across one.
    */
   function dataOf(node) {
-    return node.nodeType === Node.TEXT_NODE ? node.data : '\n';
+    return node.nodeType === Node.TEXT_NODE ? textData(node) : '\n';
   }
 
   /** Groups the book's text into paragraphs and watches which come near the screen. */

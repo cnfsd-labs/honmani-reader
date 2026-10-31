@@ -25,6 +25,19 @@
     return !parent || parent.closest(SKIPPED_SELECTOR) !== null;
   }
 
+  /**
+   * A text node's text as the browser shows it: a line break, tab or carriage return in the book's
+   * source is a space (the same length, so offsets stay valid), unless the text keeps its
+   * whitespace (white-space: pre, pre-wrap, pre-line, break-spaces).
+   */
+  function textData(node) {
+    const data = node.data;
+    if (!/[\t\n\r]/.test(data)) return data;
+    const parent = node.parentElement;
+    if (parent && getComputedStyle(parent).whiteSpace.startsWith('pre')) return data;
+    return data.replace(/[\t\n\r]/g, ' ');
+  }
+
   /** Whether the element starts a new line: anything that is not inline, ruby or display: contents. */
   function isBlock(element) {
     const display = getComputedStyle(element).display;
@@ -192,7 +205,7 @@
   }
 
   window.honmaniText = {
-    SKIPPED_SELECTOR, isSkipped, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
+    SKIPPED_SELECTOR, isSkipped, textData, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
     // Exposed so tests can compare the fast path with the walk.
     firstCharWalk, firstCharNearStart,
   };
