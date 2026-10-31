@@ -222,6 +222,22 @@ class BackupTest {
     }
 
     @Test
+    fun anEditedBackupWithABadDayOrTheSameWordTwiceStillRestores() = runTest {
+        val good = throughFile(oldPhone().backup.export(readerSettings = null))
+        val edited = good.copy(
+            readingDays = good.readingDays + good.readingDays.first().copy(day = "2026-1-5"),
+            words = good.words + good.words.first(),
+        )
+        val new = Phone("new")
+
+        val result = new.backup.restore(edited)
+
+        assertEquals(good.words.size, result.wordsAdded)
+        assertTrue(new.days().none { it.day == "2026-1-5" })
+        assertEquals(good.readingDays.size, new.days().size)
+    }
+
+    @Test
     fun restoringTheSameBackupTwiceChangesNothing() = runTest {
         val backup = throughFile(oldPhone().backup.export(readerSettings = null))
         val new = Phone("new")

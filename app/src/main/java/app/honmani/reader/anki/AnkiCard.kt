@@ -140,6 +140,8 @@ object AnkiCard {
                 '<' -> append("&lt;")
                 '>' -> append("&gt;")
                 '"' -> append("&quot;")
+                // Anki's field separator: inside a field it would split the note into more fields.
+                '\u001f' -> Unit
                 else -> append(c)
             }
         }

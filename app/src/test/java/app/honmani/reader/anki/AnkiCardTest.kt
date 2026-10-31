@@ -38,6 +38,16 @@ class AnkiCardTest {
     }
 
     @Test
+    fun ankisFieldSeparatorNeverReachesAField() {
+        val odd = content.copy(sentence = "荷物を\u001f丁寧に取り扱った。", senses = listOf(listOf("to\u001f handle")), bookTitle = "a\u001fb")
+
+        val fields = AnkiCard.fields(odd, wordAudio = "", sentenceAudio = "")
+
+        assertEquals(AnkiCard.FIELDS.size, fields.size)
+        assertEquals(emptyList<String>(), fields.filter { '\u001f' in it })
+    }
+
+    @Test
     fun oneSenseIsPlainText_andHtmlInTextIsEscaped() {
         assertEquals("a &lt;b&gt; c", AnkiCard.meaning(listOf(listOf("a <b> c"))))
         assertEquals("", AnkiCard.meaning(emptyList()))

@@ -196,7 +196,8 @@ class Backup(
             }
 
             val days = dao.readingDays().associateBy { it.bookId to it.day }
-            val changedDays = backup.readingDays.mapNotNull { day ->
+            // A day that isn't a date would crash every screen that reads the days back.
+            val changedDays = backup.readingDays.filter { runCatching { LocalDate.parse(it.day) }.isSuccess }.mapNotNull { day ->
                 val id = idOf(day.book)
                 val before = days[id to day.day]
                 val after = ReadingDayEntity(
@@ -218,7 +219,10 @@ class Backup(
 
             val words = dao.words().associateBy { WordRepository.key(it.expression, it.reading) }
             val lookups = dao.wordLookups().groupBy { it.wordId }
+            val seen = HashSet<String>()
             for (word in backup.words) {
+                // The same word twice (an edited or merged file) would hit the unique index and fail the restore.
+                if (!seen.add(WordRepository.key(word.expression, word.reading))) continue
                 val current = words[WordRepository.key(word.expression, word.reading)]
                 val id = if (current == null) {
                     wordsAdded++
