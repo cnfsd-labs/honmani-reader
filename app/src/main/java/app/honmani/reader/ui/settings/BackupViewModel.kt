@@ -149,6 +149,9 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
                 throw e
             } catch (_: BackupFormatException) {
                 BackupState.NotABackup
+            } catch (e: OutOfMemoryError) {
+                logWarning("Honmani.backup", "Backup was too large to restore", e)
+                BackupState.Failed
             } catch (e: Exception) {
                 logWarning("Honmani.backup", "Backup could not be read or restored", e)
                 // IOException, SecurityException, or whatever the picked file's app throws.

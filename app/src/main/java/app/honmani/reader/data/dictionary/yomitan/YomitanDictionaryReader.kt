@@ -1,5 +1,7 @@
 package app.honmani.reader.data.dictionary.yomitan
 
+import app.honmani.reader.data.TooLargeException
+import app.honmani.reader.data.readBytesAtMost
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
@@ -245,7 +247,11 @@ class YomitanDictionaryReader private constructor(
 
     private fun readJson(name: String): JsonElement {
         val entry = entry(name) ?: throw InvalidDictionaryException("$name is missing")
-        val text = zip.getInputStream(entry).bufferedReader().use { it.readText() }
+        val text = try {
+            zip.getInputStream(entry).use { it.readBytesAtMost(MAX_JSON_BYTES) }.toString(Charsets.UTF_8)
+        } catch (e: TooLargeException) {
+            throw InvalidDictionaryException("$name is too large", e)
+        }
         return decoding(name) { json.parseToJsonElement(text) }
     }
 
@@ -419,6 +425,9 @@ class YomitanDictionaryReader private constructor(
         }
 
         /** Runs [block], reporting malformed JSON in [name] as an invalid dictionary. */
+        /** index.json and tag banks are small; a zip entry can claim to inflate to gigabytes. */
+        private const val MAX_JSON_BYTES = 32 * 1024 * 1024
+
         private inline fun <T> decoding(name: String, block: () -> T): T = try {
             block()
         } catch (e: SerializationException) {

@@ -184,7 +184,7 @@ object BackupCodec {
     }
 
     /** A backup's JSON is a few MB at most; a zip entry can claim to inflate to far more. */
-    internal const val MAX_JSON_BYTES = 128 * 1024 * 1024
+    internal const val MAX_JSON_BYTES = 32 * 1024 * 1024
 
     fun read(input: InputStream, maxJsonBytes: Int = MAX_JSON_BYTES): BackupFile {
         val zip = ZipInputStream(input)

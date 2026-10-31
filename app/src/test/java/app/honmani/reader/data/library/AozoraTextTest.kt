@@ -186,6 +186,16 @@ class AozoraTextTest {
     }
 
     @Test
+    fun keepsTheMarkForCodePointsThatDoNotExist() {
+        for (code in listOf("U+FFFFFF", "U+110000", "U+D800")) {
+            assertEquals(
+                Paragraph(listOf(Text("※を食う"))),
+                paragraphs(aozora("※［＃「魚＋花」、$code、1-2-3］を食う")).first(),
+            )
+        }
+    }
+
+    @Test
     fun restoresCharactersGivenAsUnicode() {
         assertEquals(
             Paragraph(listOf(Text("𩸽を食う"))),

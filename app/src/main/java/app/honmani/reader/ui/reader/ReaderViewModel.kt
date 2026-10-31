@@ -254,8 +254,10 @@ class ReaderViewModel(
             val groups = withContext(compute) { LookupGroups.from(found) }
             record(tap, groups.first())
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
-            val updated = current.copy(groups = groups, highlight = highlight, inAnki = emptySet(), addingToAnki = emptySet(), kanji = emptyMap())
-            show(updated)
+            // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
+            // keeps its spinner.
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), kanji = emptyMap()) }
+            _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, kanji = kanji) }

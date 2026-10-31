@@ -167,7 +167,10 @@ object AozoraText {
     private fun parseLine(raw: String, range: AozoraLayout): AozoraBlock? {
         if (raw.isBlank()) return AozoraBlock.Blank
         var line = raw.replace(GAIJI) { match ->
-            UNICODE.find(match.value)?.let { String(Character.toChars(it.groupValues[1].toInt(16))) } ?: "※"
+            // Up to six hex digits can name a code point past U+10FFFF, or a lone surrogate.
+            UNICODE.find(match.value)?.groupValues?.get(1)?.toInt(16)
+                ?.takeIf { Character.isValidCodePoint(it) && it !in 0xD800..0xDFFF }
+                ?.let { String(Character.toChars(it)) } ?: "※"
         }
 
         var level = 0
