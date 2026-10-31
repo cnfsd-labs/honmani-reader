@@ -125,6 +125,76 @@ class AnkiSyncTest {
         assertEquals(99L, word("名前").ankiNoteId)
     }
 
+    /** A note in [deck] of a note type with [names] as fields. */
+    private fun deckNote(deck: String, type: String, names: List<String>, fields: List<String>) {
+        val typeId = anki.noteType(type)
+        anki.fieldNamesByType[typeId] = names
+        anki.decks += deck
+        anki.deckContents.getOrPut(deck) { mutableListOf() } += anki.addNote(typeId, fields)
+    }
+
+    @Test
+    fun findsSavedWordsAmongTheNotesOfADeck_usingTheExpressionField() = runBlocking {
+        save("名前", "なまえ")
+        save("見当", "けんとう")
+        save("猫", "ねこ")
+        deckNote("Core", "Basic", listOf("Reading", "Expression"), listOf("なまえ", "名前"))
+        deckNote("Core", "Basic", listOf("Reading", "Expression"), listOf("ねこ", "<b>猫</b>[ねこ]"))
+        deckNote("Core", "Other", listOf("Back", "Front"), listOf("x", "大きい"))
+        words.markLearned(word("猫").id)
+
+        val result = sync.deckWords("Core")
+
+        val found = result as DeckWords.Found
+        assertEquals(3, found.notes)
+        // 猫 is known already; 見当 is not in the deck.
+        assertEquals(listOf("名前"), found.matching.map { it.expression })
+    }
+
+    @Test
+    fun markingMarksWordsAsKnown_andNoLongerOffers() = runBlocking {
+        save("名前", "なまえ")
+        deckNote("Core", "Basic", listOf("Front", "Back"), listOf("名前", "name"))
+        val found = sync.deckWords("Core") as DeckWords.Found
+        assertEquals(false, settings.knownFromAnkiOffered.value)
+
+        sync.markKnown(found.matching)
+
+        assertEquals(app.honmani.reader.data.words.WordStatus.LEARNED, word("名前").status)
+        assertEquals(true, settings.knownFromAnkiOffered.value)
+    }
+
+    @Test
+    fun aDeckThatCannotBeReadIsReportedNotFaked() = runBlocking {
+        anki.installed = false
+        assertEquals(DeckWords.NotInstalled, sync.deckWords("Core"))
+        anki.installed = true
+        anki.permission = false
+        assertEquals(DeckWords.NoPermission, sync.deckWords("Core"))
+        anki.permission = true
+        assertTrue(sync.deckWords("Missing") is DeckWords.Failed)
+        anki.failure = IllegalStateException("denied")
+        assertEquals(DeckWords.Failed("denied"), sync.deckWords("Core"))
+    }
+
+    @Test
+    fun theWordIsTakenFromAFieldNamedLikeExpression_elseTheFirst() {
+        assertEquals(1, AnkiWords.fieldIndex(listOf("Reading", "Expression", "Meaning")))
+        assertEquals(2, AnkiWords.fieldIndex(listOf("Id", "Meaning", "単語")))
+        assertEquals(0, AnkiWords.fieldIndex(listOf("A", "B")))
+    }
+
+    @Test
+    fun extractsTheWordFromHtmlAndFurigana() {
+        assertEquals("食べる", AnkiWords.extract("食[た]べる"))
+        assertEquals("日本語", AnkiWords.extract(" 日本語[にほんご]"))
+        assertEquals("取り扱う", AnkiWords.extract("<ruby>取<rt>と</rt></ruby>り<ruby>扱<rt>あつか</rt></ruby>う"))
+        assertEquals("猫", AnkiWords.extract("<div><b>猫</b></div><div>ねこ</div>[sound:neko.mp3]"))
+        assertEquals("猫", AnkiWords.extract("&nbsp;猫&nbsp;"))
+        assertNull(AnkiWords.extract("[sound:a.mp3]"))
+        assertNull(AnkiWords.extract("hello"))
+    }
+
     private class FakeAnki : AnkiApi {
         var installed = true
         var permission = true
@@ -176,5 +246,15 @@ class AnkiSyncTest {
         }
 
         override fun notes(noteType: Long) = notes.values.filter { it.noteType == noteType }
+
+        val deckContents = mutableMapOf<String, MutableList<Long>>()
+        val fieldNamesByType = mutableMapOf<Long, List<String>>()
+
+        override fun deckNotes(deck: String): List<AnkiNote>? {
+            failure?.let { throw it }
+            return deckContents[deck]?.mapNotNull { notes[it] }
+        }
+
+        override fun fieldNames(noteType: Long) = fieldNamesByType[noteType].orEmpty()
     }
 }

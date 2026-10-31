@@ -83,6 +83,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
@@ -93,6 +94,8 @@ import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
+import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.lookup.LookupActivity
@@ -183,6 +186,12 @@ fun WordsScreen(
             }
         }
     }
+    val knownFromAnki = rememberKnownFromAnki()
+    KnownFromAnkiDialogs(knownFromAnki)
+    val ankiSettings = remember { (context.applicationContext as HonmaniApplication).container.ankiSettings }
+    val offered by ankiSettings.knownFromAnkiOffered.collectAsStateWithLifecycle()
+    // Only for readers who have AnkiDroid at all.
+    val offerKnown = !offered && remember { (context.applicationContext as HonmaniApplication).container.ankiDroid.packageName() != null }
     var confirmAddAll by remember { mutableStateOf(false) }
     if (confirmAddAll) {
         AlertDialog(
@@ -227,6 +236,9 @@ fun WordsScreen(
         onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
         onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
         onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
+        offerKnown = offerKnown,
+        onOfferKnown = knownFromAnki::start,
+        onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
     )
 }
 
@@ -248,6 +260,9 @@ private fun WordsContent(
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
     onCheckAnki: () -> Unit = {},
+    offerKnown: Boolean = false,
+    onOfferKnown: () -> Unit = {},
+    onDismissOffer: () -> Unit = {},
 ) {
     val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
     val scope = rememberCoroutineScope()
@@ -334,6 +349,9 @@ private fun WordsContent(
                     onAddToAnki = onAddToAnki,
                     onAddAllToAnki = onAddAllToAnki,
                     onCheckAnki = onCheckAnki,
+                    offerKnown = offerKnown,
+                    onOfferKnown = onOfferKnown,
+                    onDismissOffer = onDismissOffer,
                 )
             }
         }
@@ -357,6 +375,9 @@ private fun WordList(
     onAddToAnki: (WordEntity, WordLookupEntity?) -> Unit,
     onAddAllToAnki: () -> Unit,
     onCheckAnki: () -> Unit = {},
+    offerKnown: Boolean = false,
+    onOfferKnown: () -> Unit = {},
+    onDismissOffer: () -> Unit = {},
 ) {
     when {
         words == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -383,6 +404,17 @@ private fun WordList(
                             modifier = Modifier.padding(end = 8.dp),
                         )
                         Text(stringResource(R.string.action_add_all_to_anki, uiState.notInAnki))
+                    }
+                }
+            }
+            if (filter == WordFilter.LEARNING && offerKnown) {
+                item(key = "offerKnown") {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Text(stringResource(R.string.anki_known_offer), style = MaterialTheme.typography.bodyMedium)
+                        Row {
+                            TextButton(onClick = onOfferKnown) { Text(stringResource(R.string.anki_known_choose)) }
+                            TextButton(onClick = onDismissOffer) { Text(stringResource(R.string.anki_known_not_now)) }
+                        }
                     }
                 }
             }

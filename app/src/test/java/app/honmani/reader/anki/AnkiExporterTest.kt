@@ -372,6 +372,10 @@ class AnkiExporterTest {
         override fun notes(noteType: Long) =
             notes.mapIndexed { i, note -> AnkiNote(i + 1L, note.noteType, note.fields) }.filter { it.noteType == noteType }
 
+        override fun deckNotes(deck: String): List<AnkiNote>? = null
+
+        override fun fieldNames(noteType: Long): List<String> = emptyList()
+
         override fun addSound(file: File, preferredName: String): String {
             check(file.isFile)
             return "[sound:$preferredName.${file.extension}]"

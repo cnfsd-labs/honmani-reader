@@ -57,7 +57,9 @@ import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
 import app.honmani.reader.anki.VoiceException
 import app.honmani.reader.ui.HonmaniTopAppBar
+import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.label
+import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -119,6 +121,7 @@ private fun AnkiSettingsContent() {
     val deck by settings.deck.collectAsStateWithLifecycle()
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
     val anki = rememberAnkiAccess()
+    val knownFromAnki = rememberKnownFromAnki()
     val scope = rememberCoroutineScope()
     var keyInput by remember { mutableStateOf("") }
     var check by remember { mutableStateOf<KeyCheck?>(null) }
@@ -203,6 +206,12 @@ private fun AnkiSettingsContent() {
             },
             onSelect = settings::setDeck,
         )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
+            supportingContent = { Text(stringResource(R.string.anki_known_summary)) },
+            modifier = Modifier.clickable(onClick = knownFromAnki::start),
+        )
+        KnownFromAnkiDialogs(knownFromAnki)
         Text(
             text = stringResource(R.string.settings_card_audio),
             style = MaterialTheme.typography.bodyLarge,

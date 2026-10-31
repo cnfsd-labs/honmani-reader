@@ -55,6 +55,12 @@ interface AnkiApi {
 
     /** Every note of [noteType]; null if AnkiDroid gave no answer. */
     fun notes(noteType: Long): List<AnkiNote>?
+
+    /** The notes in the deck called [deck] (and its subdecks); null if AnkiDroid gave no answer. */
+    fun deckNotes(deck: String): List<AnkiNote>?
+
+    /** The field names of [noteType], in order. */
+    fun fieldNames(noteType: Long): List<String>
 }
 
 /**
@@ -211,6 +217,11 @@ class AnkiDroid(context: Context) : AnkiApi {
 
     override fun notes(noteType: Long): List<AnkiNote>? = readNotes(NOTES_V2, "$NOTE_TYPE=$noteType")
 
+    override fun deckNotes(deck: String): List<AnkiNote>? {
+        val quoted = deck.replace("\\", "\\\\").replace("\"", "\\\"").replace("*", "\\*").replace("_", "\\_")
+        return readNotes(NOTES, "deck:\"$quoted\"")
+    }
+
     private fun readNotes(uri: Uri, selection: String): List<AnkiNote>? =
         resolver.query(uri, null, selection, null, null)?.use { cursor ->
             buildList {
@@ -221,6 +232,11 @@ class AnkiDroid(context: Context) : AnkiApi {
                 }
             }
         }
+
+    override fun fieldNames(noteType: Long): List<String> =
+        resolver.query(Uri.withAppendedPath(MODELS, noteType.toString()), null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.string(MODEL_FIELD_NAMES)?.split(SEPARATOR) else null
+        }.orEmpty()
 
     private fun Cursor.string(column: String): String? =
         getColumnIndex(column).takeIf { it >= 0 }?.let { getString(it) }

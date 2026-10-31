@@ -74,6 +74,19 @@ class AnkiSettings(
     private val _hasGoogleKey = MutableStateFlow(devicePreferences.contains(KEY_GOOGLE_KEY))
     val hasGoogleKey: StateFlow<Boolean> = _hasGoogleKey.asStateFlow()
 
+    private val _knownFromAnkiOffered = MutableStateFlow(devicePreferences.getBoolean(KEY_KNOWN_OFFERED, false))
+
+    /**
+     * Whether "mark words from an Anki deck as known" needs no further offer in the Words list:
+     * it was done once or the reader said no. The button in the settings stays.
+     */
+    val knownFromAnkiOffered: StateFlow<Boolean> = _knownFromAnkiOffered.asStateFlow()
+
+    fun setKnownFromAnkiOffered(done: Boolean) {
+        devicePreferences.edit().putBoolean(KEY_KNOWN_OFFERED, done).apply()
+        _knownFromAnkiOffered.value = done
+    }
+
     fun setAudio(audio: CardAudio) {
         _audio.value = audio
         preferences.edit().putString(KEY_AUDIO, audio.name).apply()
@@ -148,6 +161,8 @@ class AnkiSettings(
         const val KEY_GOOGLE_KEY = "anki_google_key"
         const val KEY_GOOGLE_VOICE = "anki_google_voice"
         const val KEY_SENTENCE_SPEED = "anki_sentence_speed"
+        // On this phone only: it is about this phone's AnkiDroid.
+        const val KEY_KNOWN_OFFERED = "anki_known_offered"
         const val KEY_DECK = "anki_deck"
         // "v2": the note type got Pitch and Frequency fields; an id kept from before is not it.
         const val KEY_NOTE_TYPE = "anki_note_type_v2"

@@ -251,6 +251,28 @@
         <item quantity="other">%1$d words found in AnkiDroid</item>
     </plurals>
     <string name="anki_check_failed">Could not read AnkiDroid: %1$s</string>
+    <string name="action_mark_known_from_anki">Mark words from an Anki deck as known</string>
+    <string name="anki_known_summary">Words you already learned in AnkiDroid stop showing as being learned here. Only words you have looked up are changed.</string>
+    <string name="anki_known_offer">Already learn with Anki? Words from one of your decks can be marked as known.</string>
+    <string name="anki_known_choose">Choose a deck</string>
+    <string name="anki_known_not_now">Not now</string>
+    <string name="anki_known_pick_deck">Which deck?</string>
+    <string name="anki_known_no_decks">AnkiDroid has no decks to read. Open AnkiDroid once, then try again.</string>
+    <string name="anki_known_failed">Could not read the deck: %1$s</string>
+    <plurals name="anki_known_none">
+        <item quantity="one">%2$s has %1$d note, but none is a saved word that is still being learned.</item>
+        <item quantity="other">%2$s has %1$d notes, but none is a saved word that is still being learned.</item>
+    </plurals>
+    <plurals name="anki_known_title">
+        <item quantity="one">Mark %1$d word as known?</item>
+        <item quantity="other">Mark %1$d words as known?</item>
+    </plurals>
+    <string name="anki_known_text" tools:ignore="PluralsCandidate">Saved words that are still being learned and appear in the %1$s deck (%2$d notes). They move to Known; you can move any back.</string>
+    <string name="anki_known_mark">Mark as known</string>
+    <plurals name="anki_known_done">
+        <item quantity="one">%1$d word marked as known</item>
+        <item quantity="other">%1$d words marked as known</item>
+    </plurals>
     <string name="anki_failed">Adding to Anki failed: %1$s</string>
     <string name="anki_added_without_audio">%1$s added to Anki, without audio: %2$s</string>
     <string name="voice_problem_no_engine">this phone has no text-to-speech voice</string>
