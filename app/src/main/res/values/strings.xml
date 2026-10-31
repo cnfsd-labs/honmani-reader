@@ -394,6 +394,8 @@
     <string name="inflection_classical">classical form</string>
 
     <string name="lookup_close">Close</string>
+    <string name="lookup_match_shorter">Match one character less</string>
+    <string name="lookup_match_longer">Match one character more</string>
     <string name="lookup_activity_label">Honmani</string>
     <string name="lookup_search_hint">Japanese word or sentence</string>
     <string name="lookup_from_here">look up from here</string>

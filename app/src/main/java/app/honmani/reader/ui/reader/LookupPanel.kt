@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -116,6 +117,10 @@ fun LookupPanel(
     onShowKanji: (String) -> Unit = {},
     /** Back to the results before [onLookupWord] or [onShowKanji]; shown when there are some. */
     onBack: () -> Unit = {},
+    /** The matched text of a tap made one character shorter. */
+    onShorterMatch: () -> Unit = {},
+    /** The matched text of a tap made one character longer. */
+    onLongerMatch: () -> Unit = {},
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -205,7 +210,18 @@ fun LookupPanel(
                 }
                 // The tapped sentence is not repeated here: it is on screen in the book. Back
                 // sits beside close, where the thumb already is.
-                Spacer(modifier = Modifier.weight(1f))
+                if (state is LookupPanelState.Results && state.previous == null) {
+                    MatchControls(
+                        matched = state.tap.text.take(state.highlight.length),
+                        canShorten = state.canShorten,
+                        canLengthen = state.canLengthen,
+                        onShorter = onShorterMatch,
+                        onLonger = onLongerMatch,
+                        modifier = Modifier.weight(1f),
+                    )
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
                 if (canGoBack) {
                     IconButton(onClick = onBack, modifier = Modifier.size(HEADER_BUTTON)) {
                         Icon(
@@ -278,6 +294,51 @@ fun LookupPanel(
 }
 
 private const val MAX_SHOWN_TEXT = 8
+
+/**
+ * The matched text of a tap with buttons to make it one character shorter or longer; a button
+ * that can't do anything is left out (its place stays, so the text doesn't jump).
+ */
+@Composable
+private fun MatchControls(
+    matched: String,
+    canShorten: Boolean,
+    canLengthen: Boolean,
+    onShorter: () -> Unit,
+    onLonger: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (canShorten) {
+            IconButton(onClick = onShorter, modifier = Modifier.size(HEADER_BUTTON)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = stringResource(R.string.lookup_match_shorter),
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.size(HEADER_BUTTON))
+        }
+        Text(
+            text = matched,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+        )
+        if (canLengthen) {
+            IconButton(onClick = onLonger, modifier = Modifier.size(HEADER_BUTTON)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.lookup_match_longer),
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.size(HEADER_BUTTON))
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
 
 /** The header's buttons, a little smaller than the usual 48 dp so the header stays slim. */
 private val HEADER_BUTTON = 40.dp

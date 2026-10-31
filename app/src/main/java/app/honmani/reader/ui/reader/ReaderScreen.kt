@@ -241,6 +241,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,
                     onBack = { viewModel.back() },
+                    onShorterMatch = { viewModel.changeMatch(longer = false) },
+                    onLongerMatch = { viewModel.changeMatch(longer = true) },
                     onOpenDictionaries = {
                         // Leave the book for the Dictionaries screen.
                         tab = HomeTab.SETTINGS

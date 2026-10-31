@@ -87,6 +87,75 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun aShorterMatchLooksTheSameStartUpAgain_andMarksAndSavesIt() {
+        val sentence = "食べました。"
+        viewModel.onTap(TapLookup(text = sentence, sentence = sentence, sentenceOffset = 0, tapNumber = 7))
+        pending.getValue(sentence).complete(LookupResult(listOf(entry("食べる", "食べました"), entry("食", "食"))))
+        val first = viewModel.panel.value as LookupPanelState.Results
+        assertTrue(first.canShorten)
+        assertFalse(first.canLengthen)
+
+        viewModel.changeMatch(longer = false)
+        pending.getValue("食べまし").complete(LookupResult(listOf(entry("食べる", "食べまし"))))
+
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertEquals(4, panel.highlight.length)
+        // The mark answers the same tap, as a new lookup.
+        assertEquals(7, panel.highlight.tapNumber)
+        assertNotEquals(first.highlight.lookupId, panel.highlight.lookupId)
+        assertEquals(panel.highlight, viewModel.highlight.value)
+        assertTrue(panel.canLengthen)
+        assertEquals(listOf("食べる", "食べる"), recorded.map { it.expression })
+        assertEquals("食べまし", recorded.last().surface)
+    }
+
+    @Test
+    fun aLongerMatchSkipsLengthsThatMatchNothingNew() {
+        val sentence = "食べました。"
+        viewModel.onTap(tap(sentence))
+        pending.getValue(sentence).complete(LookupResult(listOf(entry("食", "食"), entry("食べる", "食べました"))))
+        assertEquals(1, (viewModel.panel.value as LookupPanelState.Results).highlight.length)
+
+        viewModel.changeMatch(longer = true)
+        for (text in listOf("食べ", "食べま", "食べまし")) {
+            pending.getValue(text).complete(LookupResult(listOf(entry("食", "食"))))
+        }
+        pending.getValue("食べました").complete(LookupResult(listOf(entry("食べる", "食べました"))))
+
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertEquals(5, panel.highlight.length)
+        assertEquals("食べる", panel.groups.first().expression)
+        assertFalse(panel.canLengthen)
+        assertTrue(panel.canShorten)
+    }
+
+    @Test
+    fun aMatchThatFindsNothingHidesItsButton() {
+        viewModel.onTap(tap("食べました。"))
+        pending.getValue("食べました。").complete(LookupResult(listOf(entry("食べる", "食べました"))))
+
+        viewModel.changeMatch(longer = false)
+        pending.getValue("食べまし").complete(LookupResult(emptyList()))
+
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertFalse(panel.canShorten)
+        assertEquals(5, panel.highlight.length)
+        assertEquals(listOf("食べる"), recorded.map { it.expression })
+    }
+
+    @Test
+    fun aReferencedWordHasNoMatchButtons() {
+        viewModel.onTap(tap("猫が"))
+        pending.getValue("猫が").complete(LookupResult(listOf(entry("猫が", "猫が"))))
+        viewModel.lookupWord("犬")
+        pending.getValue("犬").complete(LookupResult(listOf(entry("犬", "犬"))))
+
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertFalse(panel.canShorten)
+        assertFalse(panel.canLengthen)
+    }
+
+    @Test
     fun aReferencedWordOpensInThePanel_andBackReturns() {
         viewModel.onTap(tap("猫"))
         pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))

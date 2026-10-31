@@ -54,7 +54,18 @@ sealed interface LookupPanelState {
         val previous: Results? = null,
         /** What the kanji dictionaries say about the kanji in these words, by character. */
         val kanji: Map<String, KanjiInfo> = emptyMap(),
-    ) : LookupPanelState
+        /** The longest match the tap found, in characters of the tapped text: the most the match can grow to. */
+        val longestMatch: Int = highlight.length,
+        /** No match is shorter than this many characters (1 until a shorter lookup found nothing). */
+        val shortestMatch: Int = 1,
+    ) : LookupPanelState {
+        /** The match can be made one character shorter (only for a tap in the book, not a referenced word). */
+        val canShorten: Boolean
+            get() = previous == null && highlight.length > shortestMatch && MatchLength.shorter(tap.text, highlight.length) != null
+
+        /** The match can be made one character longer. */
+        val canLengthen: Boolean get() = previous == null && highlight.length < longestMatch
+    }
 
     /** One kanji, opened from a word's results ([previous]) or tapped in the book alone. */
     data class Kanji(
@@ -161,13 +172,65 @@ class ReaderViewModel(
                 else -> {
                     val groups = withContext(compute) { LookupGroups.from(result) }
                     record(tap, groups.first())
-                    LookupPanelState.Results(tap = tap, groups = groups, highlight = Highlight(lookupId, result.matchedLength, tap.tapNumber))
+                    LookupPanelState.Results(
+                        tap = tap,
+                        groups = groups,
+                        highlight = Highlight(lookupId, result.matchedLength, tap.tapNumber),
+                        longestMatch = result.entries.maxOf { it.source.length },
+                    )
                 }
             })
             log("Panel shown ${start.elapsedNow()} after the tap's message")
             // Which words are in Anki (another app's content provider) and the kanji come a moment
             // later, while the panel slides in: waiting for them made every lookup slower.
             val groups = (_panel.value as? LookupPanelState.Results)?.takeIf { it.tap == tap }?.groups ?: return@launch
+            val inAnki = wordsInAnki(groups)
+            val kanji = kanjiOf(groups)
+            updateResults(tap) { it.copy(inAnki = inAnki, kanji = kanji) }
+        }
+    }
+
+    /**
+     * Makes the matched text one character shorter or longer ([longer]) and looks it up again from
+     * the same start, within the tap's text; the mark in the book follows. The word the final
+     * match finds is saved like a tap's (a word looked up again in the same sentence soon after
+     * counts once).
+     */
+    fun changeMatch(longer: Boolean) {
+        val current = _panel.value as? LookupPanelState.Results ?: return
+        if (current.previous != null) return
+        val tap = current.tap
+        val length = current.highlight.length
+        val candidates = if (longer) {
+            MatchLength.longer(tap.text, length, current.longestMatch)
+        } else {
+            listOfNotNull(MatchLength.shorter(tap.text, length))
+        }
+        if (candidates.isEmpty()) return
+        lookupJob?.cancel()
+        val lookupId = ++lookupCount
+        lookupJob = viewModelScope.launch {
+            var found: LookupResult? = null
+            for (candidate in candidates) {
+                val result = withContext(compute) {
+                    lookup(tap.text.substring(0, candidate), tap.ruby.filter { it.end <= candidate })
+                }
+                // Longer: a prefix that matches nothing new is passed over for the next.
+                if (result.entries.isNotEmpty() && (!longer || result.matchedLength > length)) {
+                    found = result
+                    break
+                }
+            }
+            if (found == null) {
+                // Nothing there: hide the button instead of leaving one that does nothing.
+                _panel.value = if (longer) current.copy(longestMatch = length) else current.copy(shortestMatch = length)
+                return@launch
+            }
+            val groups = withContext(compute) { LookupGroups.from(found) }
+            record(tap, groups.first())
+            val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
+            val updated = current.copy(groups = groups, highlight = highlight, inAnki = emptySet(), addingToAnki = emptySet(), kanji = emptyMap())
+            show(updated)
             val inAnki = wordsInAnki(groups)
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, kanji = kanji) }
