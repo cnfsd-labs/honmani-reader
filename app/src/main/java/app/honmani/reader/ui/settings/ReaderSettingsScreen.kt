@@ -197,6 +197,9 @@ private fun ReaderSettingsContent(
         }
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         SwitchRow(R.string.reader_settings_furigana, null, settings.furigana) { onChange(settings.copy(furigana = it)) }
+        SwitchRow(R.string.reader_settings_hide_known_furigana, R.string.reader_settings_hide_known_furigana_details, settings.hideKnownFurigana) {
+            onChange(settings.copy(hideKnownFurigana = it))
+        }
         SwitchRow(R.string.reader_settings_progress, R.string.reader_settings_progress_details, settings.showProgress) {
             onChange(settings.copy(showProgress = it))
         }

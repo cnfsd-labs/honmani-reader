@@ -28,6 +28,7 @@ class WordMarker(
     suspend fun mark(
         texts: List<String>,
         mode: WordMarksMode,
+        knownWords: Boolean = false,
         isStale: () -> Boolean = { false },
     ): List<List<WordMark>>? = withContext(Dispatchers.Default) {
         lock.withLock {
@@ -36,7 +37,7 @@ class WordMarker(
             val split = segmenter?.takeIf { it.first == wanted.signature }?.second
                 ?: Segmenter(lexicon(wanted)).also { segmenter = wanted.signature to it }
             val known = knowledge()
-            texts.map { WordMarks.of(it, split, known, mode) }
+            texts.map { WordMarks.of(it, split, known, mode, knownWords) }
         }
     }
 }

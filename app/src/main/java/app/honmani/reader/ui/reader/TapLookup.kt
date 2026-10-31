@@ -40,7 +40,13 @@ sealed interface BridgeMessage {
     data class Background(val color: Int) : BridgeMessage
 
     /** Paragraphs near the screen whose words to mark (`assets/honmani/word-marks.js`). */
-    data class Marks(val requestId: Long, val mode: WordMarksMode, val blocks: List<MarksBlock>) : BridgeMessage
+    data class Marks(
+        val requestId: Long,
+        val mode: WordMarksMode,
+        val blocks: List<MarksBlock>,
+        /** Also mark the words the reader knows, to hide their furigana. */
+        val knownFurigana: Boolean = false,
+    ) : BridgeMessage
 
     /** A paragraph's text without furigana, and the page's id for it. */
     @Serializable
@@ -134,6 +140,7 @@ sealed interface BridgeMessage {
             val type: String = "",
             val requestId: Long = 0,
             val mode: String = "",
+            val knownFurigana: Boolean = false,
             val blocks: List<MarksBlock> = emptyList(),
         )
 
@@ -142,7 +149,7 @@ sealed interface BridgeMessage {
             val envelope = decode<MarksEnvelope>(obj) ?: return null
             if (envelope.blocks.size > MAX_MARKS_BLOCKS) return null
             val blocks = envelope.blocks.filter { it.text.length <= MAX_MARKS_TEXT }
-            return Marks(envelope.requestId, WordMarksMode.fromStorage(envelope.mode), blocks)
+            return Marks(envelope.requestId, WordMarksMode.fromStorage(envelope.mode), blocks, envelope.knownFurigana)
         }
 
         /** Largest of the per-kind caps (library messages); anything longer is dropped unread. */

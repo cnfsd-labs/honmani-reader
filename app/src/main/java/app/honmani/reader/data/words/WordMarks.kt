@@ -29,6 +29,9 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
 
         /** Never met in reading. */
         NEW,
+
+        /** A word the reader knows ([WordKnowledge.isKnown]): the reader hides its furigana. */
+        KNOWN,
     }
 }
 
@@ -39,8 +42,16 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
  * mostly marked; the particles and other common words lose their marks within a few pages.
  */
 object WordMarks {
-    fun of(text: String, segmenter: Segmenter, knowledge: WordKnowledge, mode: WordMarksMode): List<WordMark> {
-        if (mode == WordMarksMode.OFF) return emptyList()
+    fun of(
+        text: String,
+        segmenter: Segmenter,
+        knowledge: WordKnowledge,
+        mode: WordMarksMode,
+        /** Also mark the words the reader knows ([WordMark.Kind.KNOWN]), whatever [mode]. */
+        knownWords: Boolean = false,
+    ): List<WordMark> {
+        val tint = mode != WordMarksMode.OFF
+        if (!tint && !knownWords) return emptyList()
         val marks = ArrayList<WordMark>()
         val tokens = ArrayList<Token>()
         segmenter.segment(text) { tokens += it }
@@ -51,7 +62,7 @@ object WordMarks {
             if (token.start < formEnd) continue
             // Only a form that ends where a word of the book ends: た looked up inside だった
             // marks no た at the start of ただ.
-            val form = knowledge.learningFormAt(text, token.start) { token.start + it.length in tokenEnds }
+            val form = if (tint) knowledge.learningFormAt(text, token.start) { token.start + it.length in tokenEnds } else null
             if (form != null) {
                 marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
                 formEnd = token.start + form.length
@@ -60,8 +71,9 @@ object WordMarks {
             // Names and other text no dictionary knows stay unmarked.
             if (token.rank == Token.UNKNOWN) continue
             val kind = when {
-                knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
-                mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
+                tint && knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
+                tint && mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
+                knownWords && knowledge.isKnown(token.key) -> WordMark.Kind.KNOWN
                 else -> continue
             }
             marks += WordMark(token.start, token.length, kind)

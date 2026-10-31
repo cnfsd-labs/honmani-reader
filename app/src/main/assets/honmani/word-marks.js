@@ -4,10 +4,15 @@
  * new to them get a tint. localStorage "honmaniWordMarks" (Honmani's reader settings) is "off",
  * "learning" (the default) or "new" (learning and new words).
  *
+ * localStorage "honmaniHideKnownFurigana" = "1" (off by default) hides the furigana over words the
+ * reader knows: the app then also answers with those words (kind 2) and the reading above each is
+ * made transparent through a highlight over its <rt> text (`color: transparent`), so the page's
+ * layout and the DOM stay as they are. The marks run for it even with the tint turned off.
+ *
  * The app splits the text into words (the splitter that grades books) and knows the reader's
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
  *
- *   { type: 'marks.request', requestId, mode, blocks: [{ id, text }] }
+ *   { type: 'marks.request', requestId, mode, knownFurigana, blocks: [{ id, text }] }
  *     text: the paragraph without furigana (<rt>, <rp>), a <br> as "\n", as the tap bridge
  *     reads it; a long paragraph comes in pieces of up to 4,000 characters, each a block of its
  *     own (id: the piece's, unique on the page)
@@ -15,7 +20,7 @@
  * and the app answers on the same object:
  *
  *   { type: 'marks', requestId, color: '#rrggbb', blocks: [{ id, marks: [[start, length, kind]] }] }
- *     kind 0: learning, 1: new; start and length in UTF-16 units of the block's text; color:
+ *     kind 0: learning, 1: new, 2: known (only when asked for); start and length in UTF-16 units of the block's text; color:
  *     the app's accent, for the learning words' tint
  *   { type: 'marks.reset' }   the reader's words changed: paragraphs are asked about again
  *
@@ -36,11 +41,13 @@
   window.__honmaniWordMarks = true;
 
   const MODE_KEY = 'honmaniWordMarks';
+  const KNOWN_FURIGANA_KEY = 'honmaniHideKnownFurigana';
+  const KNOWN = 2;
   const BOOK_ROOT_SELECTOR = '.book-content';
   const { isSkipped } = window.honmaniText;
-  const NAMES = ['honmani-learning', 'honmani-new'];
-  /** New marks, while they fade in; then they move to NAMES. */
-  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh'];
+  const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana'];
+  /** New marks, while they fade in; then they move to NAMES (the known words' furigana does not fade). */
+  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh'];
   /** Paragraphs this far from the page (in pages) are asked about before they show. */
   const AHEAD = '100%';
   const FADE_MS = 250;
@@ -59,6 +66,19 @@
     } catch (error) {
       return 'learning';
     }
+  }
+
+  function hideKnownFurigana() {
+    try {
+      return window.localStorage.getItem(KNOWN_FURIGANA_KEY) === '1';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /** Whether the app has anything to mark: the tint, or the known words' furigana. */
+  function wanted() {
+    return mode() !== 'off' || hideKnownFurigana();
   }
 
   function isBookPage() {
@@ -126,7 +146,8 @@
     const tints = (names, share) =>
       `::highlight(${names[0]}) { background-color: rgba(${rgb}, ${(learning * share).toFixed(3)}); }\n` +
       `::highlight(${names[1]}) { background-color: rgba(128, 128, 128, ${(fresh * share).toFixed(3)}); }\n`;
-    style.textContent = tints(NAMES, 1) + tints(FRESH_NAMES, alpha);
+    style.textContent =
+      tints(NAMES, 1) + tints(FRESH_NAMES, alpha) + `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n`;
   }
 
   /** Whether the page behind the text is dark (ttu's dark themes set it on <body>). */
@@ -306,8 +327,7 @@
     timer = 0;
     const app = window.honmani;
     if (!app || (queue.size === 0 && pieces.length === 0)) return;
-    const wanted = mode();
-    if (wanted === 'off') {
+    if (!wanted()) {
       queue.clear();
       pieces = [];
       return;
@@ -335,7 +355,9 @@
     if (batch.length > 0) {
       const requestId = nextRequest++;
       pending.set(requestId, { generation, parts });
-      app.postMessage(JSON.stringify({ type: 'marks.request', requestId, mode: wanted, blocks: batch }));
+      app.postMessage(
+        JSON.stringify({ type: 'marks.request', requestId, mode: mode(), knownFurigana: hideKnownFurigana(), blocks: batch }),
+      );
     }
     if (queue.size > 0 || pieces.length > 0) timer = setTimeout(send, BATCH_DELAY_MS);
   }
@@ -363,6 +385,50 @@
       if (offset >= start + length) break;
     }
     return ranges;
+  }
+
+  /**
+   * For a known word's `ranges` (its base text), the ranges of the furigana (<rt> text) over it:
+   * one for each reading whose whole base lies inside the word, so a reading is never half hidden
+   * (the ruby 日本語 holds one reading, however the words in it are split).
+   */
+  function furiganaRanges(ranges) {
+    const covered = new Set();
+    for (const range of ranges) {
+      const node = range.startContainer;
+      if (range.startOffset === 0 && range.endOffset === node.data.length) covered.add(node);
+    }
+    const rubies = new Set();
+    for (const node of covered) {
+      const ruby = node.parentElement && node.parentElement.closest('ruby');
+      if (ruby) rubies.add(ruby);
+    }
+    const found = [];
+    for (const ruby of rubies) {
+      // The base text each <rt> reads: the text before it since the previous <rt>.
+      const walker = document.createTreeWalker(ruby, NodeFilter.SHOW_TEXT);
+      const bases = new Map();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.parentElement.closest('rt, rp')) continue;
+        let rt = null;
+        for (const candidate of ruby.querySelectorAll('rt')) {
+          if (node.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) {
+            rt = candidate;
+            break;
+          }
+        }
+        if (!rt) continue;
+        if (!bases.has(rt)) bases.set(rt, []);
+        bases.get(rt).push(node);
+      }
+      for (const [rt, nodes] of bases) {
+        if (!nodes.every((node) => covered.has(node))) continue;
+        const range = document.createRange();
+        range.selectNodeContents(rt);
+        found.push(range);
+      }
+    }
+    return found;
   }
 
   function apply(message) {
@@ -397,8 +463,14 @@
           now.set(key, kept);
           continue;
         }
-        const ranges = rangesOf(id, start, length);
-        for (const range of ranges) fresh[kind].add(range);
+        let ranges = rangesOf(id, start, length);
+        if (kind === KNOWN) {
+          // The furigana goes at once: a reading that fades out would show for a moment.
+          ranges = furiganaRanges(ranges);
+          for (const range of ranges) highlights[kind].add(range);
+        } else {
+          for (const range of ranges) fresh[kind].add(range);
+        }
         now.set(key, { kind, start, ranges });
       }
       for (const [key, mark] of before) {
@@ -465,7 +537,7 @@
 
   function start() {
     const content = document.querySelector(BOOK_ROOT_SELECTOR);
-    if (!isBookPage() || !content || mode() === 'off') {
+    if (!isBookPage() || !content || !wanted()) {
       if (!isBookPage() && root) stop();
       return;
     }

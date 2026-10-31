@@ -677,6 +677,54 @@ test('word marks leave furigana out of the text and the marks', async ({ page })
   await expect.poll(() => marked(page)).toEqual({ 'honmani-learning': ['吾輩', 'は', '猫'], 'honmani-new': [] });
 });
 
+/** The furigana text the known-words highlight covers. */
+const hiddenFurigana = (page) =>
+  page.evaluate(() => [...(CSS.highlights.get('honmani-known-furigana') ?? [])].map((range) => range.toString()));
+
+test('known words lose their furigana without the DOM changing, and it works with the tint off', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('honmaniHideKnownFurigana', '1'));
+  await openWithMarks(page, 'ruby.epub', 'off');
+
+  // The tint is off, but the switch makes the page ask, and say why.
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(0);
+  const request = (await markRequests(page))[0];
+  expect(request.knownFurigana).toBe(true);
+  expect(request.mode).toBe('off');
+  const block = request.blocks.find((b) => b.text.startsWith('第1段落。'));
+  const html = await page.evaluate(() => document.querySelector('ruby').parentElement.innerHTML);
+
+  // 吾輩 (a ruby base), は (plain text) and 猫 (another base) are known: only the two readings go.
+  await page.evaluate(
+    ([requestId, id]) => window.__reply({ type: 'marks', requestId, color: '#e91e63', blocks: [{ id, marks: [[5, 4, 2]] }] }),
+    [request.requestId, block.id],
+  );
+  await expect.poll(() => hiddenFurigana(page)).toEqual(['わがはい', 'ねこ']);
+  expect(await page.evaluate(() => document.getElementById('honmani-marks-style').textContent)).toContain(
+    '::highlight(honmani-known-furigana) { color: transparent; }',
+  );
+  // No tint, nothing moved: the page's own markup is as it was.
+  expect(await marked(page)).toEqual({ 'honmani-learning': [], 'honmani-new': [] });
+  expect(await page.evaluate(() => document.querySelector('ruby').parentElement.innerHTML)).toBe(html);
+
+  // A known word that covers only part of a ruby base keeps its reading.
+  const before = (await markRequests(page)).length;
+  await page.evaluate(() => window.__reply({ type: 'marks.reset' }));
+  await expect.poll(async () => (await markRequests(page)).length).toBeGreaterThan(before);
+  const again = (await markRequests(page)).slice(before).find((m) => m.blocks.some((b) => b.id === block.id));
+  await page.evaluate(
+    ([requestId, id]) => window.__reply({ type: 'marks', requestId, color: '#e91e63', blocks: [{ id, marks: [[5, 1, 2], [7, 1, 2]] }] }),
+    [again.requestId, block.id],
+  );
+  await expect.poll(() => hiddenFurigana(page)).toEqual([]);
+});
+
+test('without the furigana switch the page never hides a reading or asks while the tint is off', async ({ page }) => {
+  await openWithMarks(page, 'ruby.epub', 'off');
+  await page.waitForTimeout(1_000);
+  expect(await markRequests(page)).toEqual([]);
+  expect(await hiddenFurigana(page)).toEqual([]);
+});
+
 test('word marks ask about a paragraph longer than a request in pieces, and mark all of it', async ({ page }) => {
   await openWithMarks(page, 'one-paragraph.epub', null);
   const paragraph = Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('');

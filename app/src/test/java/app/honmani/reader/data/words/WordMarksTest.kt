@@ -113,4 +113,40 @@ class WordMarksTest {
         assertEquals(false, learning.knows("当り前", 40_708, vocabulary = 50_000))
         assertEquals(true, read.knows("当り前", 40_708, vocabulary = 0))
     }
+
+    @Test
+    fun knownWordsAreMarkedOnlyWhenAsked_andNeverWhileBeingLearned() {
+        // 猫 was looked up and learned; 食べる was read nine times but is being learned again.
+        val known = WordKnowledge(
+            read = mapOf("猫" to ReadWord(900, 3), "食べる" to ReadWord(187, 9)),
+            progress = emptyMap(),
+            learning = setOf("食べる"),
+            known = setOf("猫"),
+        )
+        val text = "私は猫を食べた"
+        fun marks(mode: WordMarksMode, knownWords: Boolean) =
+            WordMarks.of(text, segmenter, known, mode, knownWords).map { text.substring(it.start, it.start + it.length) to it.kind }
+
+        assertEquals(listOf("食べた" to WordMark.Kind.LEARNING), marks(WordMarksMode.LEARNING, false))
+        assertEquals(
+            listOf("猫" to WordMark.Kind.KNOWN, "食べた" to WordMark.Kind.LEARNING),
+            marks(WordMarksMode.LEARNING, true),
+        )
+        // Word marks off: the known words are still found, nothing else is.
+        assertEquals(listOf("猫" to WordMark.Kind.KNOWN), marks(WordMarksMode.OFF, true))
+        assertEquals(emptyList<Pair<String, WordMark.Kind>>(), marks(WordMarksMode.OFF, false))
+    }
+
+    @Test
+    fun aWordReadOftenEnoughIsKnownInAnySpelling() {
+        val variants = SpellingVariants.Builder().add(1, 1448800, "当たり前").add(1, 1448800, "当り前").build()
+        val knowledge = WordKnowledge(
+            read = mapOf("当たり前" to ReadWord(698, WordProgress.KNOWN), "猫" to ReadWord(900, WordProgress.KNOWN - 1)),
+            progress = emptyMap(),
+            learning = emptySet(),
+            variants = variants,
+        )
+        assertEquals(true, knowledge.isKnown("当り前"))
+        assertEquals(false, knowledge.isKnown("猫"))
+    }
 }

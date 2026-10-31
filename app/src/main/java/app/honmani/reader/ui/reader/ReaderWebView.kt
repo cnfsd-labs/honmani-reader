@@ -160,8 +160,8 @@ fun ReaderWebView(
     onBackground: (Int) -> Unit = {},
     highlightColor: Color = MaterialTheme.colorScheme.primary,
     /** The words to mark in each paragraph (`word-marks.js`); null: none can be found. */
-    marks: suspend (texts: List<String>, mode: WordMarksMode, isStale: () -> Boolean) -> List<List<WordMark>>? =
-        { _, _, _ -> null },
+    marks: suspend (texts: List<String>, mode: WordMarksMode, knownWords: Boolean, isStale: () -> Boolean) -> List<List<WordMark>>? =
+        { _, _, _, _ -> null },
     /** Changes when the reader's words change, so the page asks for its marks again. */
     marksKey: Any? = null,
     /** The volume buttons turn pages while a book is open (they close the lookup panel first). */
@@ -287,7 +287,7 @@ fun ReaderWebView(
                                     // A stale request needs no answer: the reset made the page forget it.
                                     // Otherwise null (no dictionary) still answers, with no marks, so the
                                     // page drops its pending entry.
-                                    val found = currentMarks(message.blocks.map { it.text }, message.mode, stale)
+                                    val found = currentMarks(message.blocks.map { it.text }, message.mode, message.knownFurigana, stale)
                                     if (stale()) return@launch
                                     val reply = marksReply(message, found.orEmpty(), currentHighlightColor.toHex())
                                     if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {

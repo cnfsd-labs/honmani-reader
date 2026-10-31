@@ -75,6 +75,9 @@ class WordKnowledgeTrackerTest {
         val words = listOf(word("よくわかった。", 2, 5))
         val inKana = tracker(words, store()).knowledge.first()
         assertEquals(WordStep(steps = 9, reads = 12, lookups = 1, learned = false, kana = true), inKana.progress[1])
+        // 分かる is known now: its furigana can go; not so while it is still being learned.
+        assertEquals(true, inKana.isKnown("分かる"))
+        assertEquals(false, tracker(listOf(word("よく分かった。", 2, 5)), store()).knowledge.first().isKnown("分かる"))
         // Known now, and わかる is not a word known from reading of its own.
         val lists = WordLists.of(words, inKana)
         assertEquals(listOf("分かる"), lists.known.map { it.expression })

@@ -37,12 +37,24 @@ class WordKnowledge(
     val learningForms: Set<String> = emptySet(),
     /** Other spellings of a word, which count as the word ([hasRead], [isLearning]). */
     val variants: SpellingVariants = SpellingVariants.EMPTY,
+    /** Dictionary forms of looked-up words that are known now ([WordProgress.KNOWN] steps). */
+    val known: Set<String> = emptySet(),
 ) {
     /** Whether [key], or another spelling of it, was read. */
     fun hasRead(key: String): Boolean = key in read || variants.of(key).any { it in read }
 
     /** Whether [key], or another spelling of it, was looked up and is not known yet. */
     fun isLearning(key: String): Boolean = key in learning || variants.of(key).any { it in learning }
+
+    /**
+     * Whether the reader knows the word [key], in any spelling: looked up and learned, or met in
+     * reading [WordProgress.KNOWN] times, and not being learned now.
+     */
+    fun isKnown(key: String): Boolean {
+        if (isLearning(key)) return false
+        val spellings = variants.of(key) + key
+        return spellings.any { it in known || (read[it]?.reads ?: 0) >= WordProgress.KNOWN }
+    }
 
     /** [learningForms] by first character, longest first. */
     private val formsByFirst: Map<Char, List<String>> by lazy {
@@ -188,7 +200,8 @@ class WordKnowledgeTracker(
                 ?.substring(word.lastSurfaceStart, word.lastSurfaceEnd)
                 ?.takeIf { it.isNotBlank() }
         }
-        WordKnowledge(read, updated, learning, shares, forms, spellings)
+        val known = words.filter { (updated[it.id]?.steps ?: 0) >= WordProgress.KNOWN }.mapTo(HashSet()) { it.expression }
+        WordKnowledge(read, updated, learning, shares, forms, spellings, known)
     }.flowOn(context)
 
     /**

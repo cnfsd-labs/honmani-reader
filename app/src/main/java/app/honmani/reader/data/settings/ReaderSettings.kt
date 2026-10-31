@@ -47,6 +47,8 @@ data class ReaderSettings(
     val volumeKeys: Boolean = true,
     /** Selected book text (a long press and its handles) is looked up as a tap is (`tap-bridge.js`). */
     val selectionLookup: Boolean = true,
+    /** Furigana is hidden over words the reader knows (`word-marks.js`); off by default. */
+    val hideKnownFurigana: Boolean = false,
 ) {
     /** The values to store, as ttu writes them. */
     fun toStorage(): Map<String, String> = buildMap {
@@ -64,6 +66,7 @@ data class ReaderSettings(
         put(WAKE_LOCK, flag(keepScreenOn))
         put(VOLUME_KEYS, flag(volumeKeys))
         put(SELECTION_LOOKUP, flag(selectionLookup))
+        put(HIDE_KNOWN_FURIGANA, flag(hideKnownFurigana))
     }
 
     companion object {
@@ -87,6 +90,7 @@ data class ReaderSettings(
         private const val WORD_MARKS = "honmaniWordMarks"
         private const val VOLUME_KEYS = "honmaniVolumeKeys"
         private const val SELECTION_LOOKUP = "honmaniSelectionLookup"
+        private const val HIDE_KNOWN_FURIGANA = "honmaniHideKnownFurigana"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -113,6 +117,7 @@ data class ReaderSettings(
                 keepScreenOn = flag(WAKE_LOCK, defaults.keepScreenOn),
                 volumeKeys = flag(VOLUME_KEYS, defaults.volumeKeys),
                 selectionLookup = flag(SELECTION_LOOKUP, defaults.selectionLookup),
+                hideKnownFurigana = flag(HIDE_KNOWN_FURIGANA, defaults.hideKnownFurigana),
             )
         }
     }

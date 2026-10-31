@@ -159,6 +159,11 @@ class TapLookupTest {
             BridgeMessage.Marks(5, WordMarksMode.LEARNING, emptyList()),
             BridgeMessage.parse("""{"type":"marks.request","requestId":5,"mode":"x","blocks":[]}"""),
         )
+        // Whether to mark known words (to hide their furigana) comes along.
+        assertEquals(
+            BridgeMessage.Marks(6, WordMarksMode.OFF, emptyList(), knownFurigana = true),
+            BridgeMessage.parse("""{"type":"marks.request","requestId":6,"mode":"off","knownFurigana":true,"blocks":[]}"""),
+        )
         assertNull(BridgeMessage.parse("""{"type":"marks.request","blocks":"x"}"""))
     }
 
