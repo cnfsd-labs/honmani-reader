@@ -31,12 +31,15 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,6 +66,7 @@ import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.rememberWithNotifications
 import app.honmani.reader.ui.theme.HonmaniTheme
 import java.text.NumberFormat
+import kotlinx.coroutines.launch
 
 /** MIME types file managers use for Yomitan's .zip files. */
 private val DICTIONARY_MIME_TYPES =
@@ -107,8 +111,12 @@ private fun DictionariesContent(
     onCheckUpdates: () -> Unit,
 ) {
     var pendingDelete by remember { mutableStateOf<DictionaryEntity?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deletedMessage = pendingDelete?.let { stringResource(R.string.dictionary_deleted, it.title) }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             HonmaniTopAppBar(title = stringResource(R.string.dictionaries_title), onBack = onBack)
         },
@@ -213,6 +221,8 @@ private fun DictionariesContent(
                     onClick = {
                         onDelete(dictionary.id)
                         pendingDelete = null
+                        // Deleting can't be undone cheaply (the entries go): a confirmation only.
+                        if (deletedMessage != null) scope.launch { snackbarHostState.showSnackbar(deletedMessage) }
                     },
                 ) { Text(stringResource(R.string.action_delete)) }
             },

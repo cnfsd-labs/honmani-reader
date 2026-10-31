@@ -138,6 +138,9 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.FilledTonalButton
+import kotlinx.coroutines.launch
 
 /** File managers report EPUBs and Aozora text files under many types; the importer checks. */
 private val BOOK_MIME_TYPES = arrayOf("*/*")
@@ -158,6 +161,7 @@ fun LibraryScreen(
     onAddBookStarted: () -> Unit = {},
     /** Opens the Progress tab, from a milestone's notice. */
     onShowProgress: () -> Unit = {},
+    scrollToTop: Int = 0,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val autoImport by viewModel.autoImport.collectAsStateWithLifecycle()
@@ -266,6 +270,7 @@ fun LibraryScreen(
             onSearch = viewModel::search,
             onSort = viewModel::setSort,
             onDismissContinue = viewModel::dismissContinue,
+            scrollToTop = scrollToTop,
             bottomBar = bottomBar,
             modifier = modifier,
         )
@@ -338,8 +343,12 @@ private fun LibraryContent(
     difficulty: (LibraryBook) -> Int? = { null },
     onSort: (LibrarySort) -> Unit = {},
     onDismissContinue: () -> Unit = {},
+    /** Counts taps on the Library tab while it is open: each one scrolls to the top. */
+    scrollToTop: Int = 0,
 ) {
     var pendingRemove by remember { mutableStateOf<LibraryBook?>(null) }
+    val scope = rememberCoroutineScope()
+    val removedMessage = pendingRemove?.let { stringResource(R.string.book_removed, it.title) }
     var pendingReset by remember { mutableStateOf<LibraryBook?>(null) }
     var detailsFor by rememberSaveable { mutableStateOf<Long?>(null) }
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -347,6 +356,10 @@ private fun LibraryContent(
     val gridState = rememberLazyGridState()
     // A new order or filter starts at the top; coming back from a book keeps the place.
     var shownOrder by rememberSaveable { mutableStateOf(uiState.sort to uiState.filter) }
+    val firstScrollToTop = remember { scrollToTop }
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop != firstScrollToTop) gridState.animateScrollToItem(0)
+    }
     LaunchedEffect(uiState.sort, uiState.filter) {
         val order = uiState.sort to uiState.filter
         if (order != shownOrder) {
@@ -442,10 +455,15 @@ private fun LibraryContent(
                 uiState.totalBooks == 0 -> if (uiState.adding == null) {
                     Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd) }
                 }
-                books.isEmpty() -> Column {
+                books.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val statusFilter = uiState.filter
                     Text(
                         text = stringResource(
-                            if (uiState.query.isBlank()) R.string.library_filter_empty else R.string.library_search_empty,
+                            when {
+                                uiState.query.isNotBlank() -> R.string.library_search_empty
+                                statusFilter != null -> statusEmptyText(statusFilter)
+                                else -> R.string.library_filter_empty
+                            },
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -454,6 +472,11 @@ private fun LibraryContent(
                             .fillMaxWidth()
                             .padding(32.dp),
                     )
+                    if (statusFilter != null) {
+                        FilledTonalButton(onClick = { onFilter(null) }) {
+                            Text(stringResource(R.string.library_show_all))
+                        }
+                    }
                     // E.g. every book hidden: the way to them must not disappear with the covers.
                     if (showHiddenLink) HiddenBooksLink(uiState.hiddenCount) { onShowHidden(true) }
                 }
@@ -536,6 +559,8 @@ private fun LibraryContent(
                     onClick = {
                         onRemove(book.id)
                         pendingRemove = null
+                        // Removing deletes the book's files: no undo, a confirmation only.
+                        if (removedMessage != null) scope.launch { snackbarHostState.showSnackbar(removedMessage) }
                         detailsFor = null
                     },
                 ) { Text(stringResource(R.string.action_remove)) }
@@ -888,6 +913,12 @@ internal fun statusIcon(status: ReadingStatus): Painter = when (status) {
     ReadingStatus.NOT_STARTED -> painterResource(R.drawable.ic_not_started)
     ReadingStatus.READING -> painterResource(R.drawable.ic_reading)
     ReadingStatus.FINISHED -> rememberVectorPainter(Icons.Filled.CheckCircle)
+}
+
+private fun statusEmptyText(status: ReadingStatus): Int = when (status) {
+    ReadingStatus.NOT_STARTED -> R.string.library_empty_not_started
+    ReadingStatus.READING -> R.string.library_empty_reading
+    ReadingStatus.FINISHED -> R.string.library_empty_finished
 }
 
 internal fun statusLabel(status: ReadingStatus): Int = when (status) {

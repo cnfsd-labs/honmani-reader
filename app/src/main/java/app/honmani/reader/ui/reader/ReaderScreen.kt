@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -297,7 +298,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         } else if (atLibrary) {
             // Opaque, and on top: the tabs take all touches while ttu's list stays loaded below.
             BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
+            // Tapping the open tab again scrolls its list to the top.
+            var libraryTaps by remember { mutableIntStateOf(0) }
+            var wordsTaps by remember { mutableIntStateOf(0) }
             val onSelectTab = { selected: HomeTab ->
+                if (selected == tab) {
+                    when (selected) {
+                        HomeTab.LIBRARY -> libraryTaps++
+                        HomeTab.WORDS -> wordsTaps++
+                        else -> Unit
+                    }
+                }
                 tab = selected
                 // A tab opens at its top level.
                 dictionariesShown = false
@@ -324,8 +335,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 addBookOnStart = addBookOnStart,
                                 onAddBookStarted = { addBookOnStart = null },
                                 onShowProgress = { tab = HomeTab.PROGRESS },
+                                scrollToTop = libraryTaps,
                             )
-                            HomeTab.WORDS -> WordsScreen(bottomBar = bottomBar)
+                            HomeTab.WORDS -> WordsScreen(bottomBar = bottomBar, scrollToTop = wordsTaps)
                             HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
                             HomeTab.SETTINGS -> SettingsScreen(
                                 bottomBar = bottomBar,

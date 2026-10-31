@@ -164,6 +164,11 @@
     <string name="library_search_hint">Title or author</string>
     <string name="library_search_empty">No books match.</string>
     <string name="library_filter_empty">No books here yet.</string>
+    <string name="library_empty_not_started">No books not started.</string>
+    <string name="library_empty_reading">No books being read.</string>
+    <string name="library_empty_finished">No finished books.</string>
+    <string name="library_show_all">Show all books</string>
+    <string name="book_removed">Removed “%1$s”</string>
     <string name="library_filter_not_started">Not started</string>
     <string name="library_filter_reading">Reading</string>
     <string name="library_filter_finished">Finished</string>
@@ -383,6 +388,7 @@
     <string name="action_dismiss">Dismiss</string>
     <string name="action_cancel">Cancel</string>
     <string name="dictionary_deleting">Deleting…</string>
+    <string name="dictionary_deleted">Deleted “%1$s”</string>
     <string name="delete_dictionary_title">Delete “%1$s”?</string>
     <string name="delete_dictionary_message">Its entries are removed from lookups. You can import it again later.</string>
 
@@ -487,7 +493,11 @@
     <string name="lookup_search_hint">Japanese word or sentence</string>
     <string name="lookup_from_here">look up from here</string>
     <string name="action_clear">Clear</string>
-    <string name="action_lookup_word">Look up a word</string>
+    <string name="action_lookup_word">Look up</string>
+    <string name="action_more_options">More options</string>
+    <string name="words_search_hint">Search saved words</string>
+    <string name="words_search_clear">Clear search</string>
+    <string name="words_search_empty">No saved words match \"%1$s\".</string>
     <string name="listen_failed">Can\'t say it: %1$s.</string>
     <string name="lookup_nothing_found">No entry for “%1$s”.</string>
     <string name="lookup_no_dictionaries">No dictionary is installed yet. Get one in Settings → Dictionaries – it takes a minute.</string>

@@ -86,6 +86,8 @@ data class WordsUiState(
     val frequencies: Map<Long, Frequency> = emptyMap(),
     /** The words of the latest reading session, for the sheet "Words from this session". */
     val session: SessionWords = SessionWords(null, emptyList()),
+    /** The search text for the lists ([filterWords]); empty shows all. */
+    val query: String = "",
 )
 
 /** How adding to Anki went: one word, or several from "Add all". */
@@ -163,6 +165,7 @@ class WordsViewModel(
 ) : ViewModel() {
     private val filter = MutableStateFlow(WordFilter.LEARNING)
     private val expanded = MutableStateFlow<Long?>(null)
+    private val query = MutableStateFlow("")
     private val _changes = Channel<WordChange>(Channel.BUFFERED)
     private val _ankiOutcomes = Channel<AnkiOutcome>(Channel.BUFFERED)
     private val ankiProgress = MutableStateFlow<Pair<Int, Int>?>(null)
@@ -236,10 +239,15 @@ class WordsViewModel(
             .combine(readWord) { state, word -> state.copy(readWord = word) }
             .combine(frequencies.onStart { emit(emptyMap()) }) { state, found -> state.copy(frequencies = found) }
             .combine(session) { state, session -> state.copy(session = session) }
+            .combine(query) { state, query -> state.copy(query = query) }
             .combine(grammarWords) { state, grammar ->
                 state.copy(notInAnki = state.learning.orEmpty().count { it.ankiNoteId == null && it.id !in grammar })
             }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), WordsUiState())
+
+    fun setQuery(value: String) {
+        query.value = value
+    }
 
     fun setFilter(value: WordFilter) {
         if (filter.value == value) return

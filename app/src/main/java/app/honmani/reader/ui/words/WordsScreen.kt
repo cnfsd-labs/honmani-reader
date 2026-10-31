@@ -22,19 +22,25 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -113,6 +119,8 @@ private const val ADD_ALL_WITHOUT_ASKING = 10
 @Composable
 fun WordsScreen(
     bottomBar: @Composable () -> Unit,
+    /** Counts taps on the Words tab while it is open: each one scrolls the list to the top. */
+    scrollToTop: Int = 0,
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -234,6 +242,8 @@ fun WordsScreen(
         snackbarHostState = snackbarHostState,
         bottomBar = bottomBar,
         onFilter = viewModel::setFilter,
+        onQuery = viewModel::setQuery,
+        scrollToTop = scrollToTop,
         onToggleExpanded = viewModel::toggleExpanded,
         onToggleReadWord = viewModel::toggleReadWord,
         onSetStarred = viewModel::setStarred,
@@ -272,6 +282,8 @@ private fun WordsContent(
     onAddAllToAnki: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
+    onQuery: (String) -> Unit = {},
+    scrollToTop: Int = 0,
     onExportCsv: () -> Unit = {},
     onShowSession: () -> Unit = {},
     onCheckAnki: () -> Unit = {},
@@ -311,25 +323,25 @@ private fun WordsContent(
                             )
                         }
                     }
-                    val context = LocalContext.current
-                    IconButton(onClick = onShowSession) {
-                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.session_open))
-                    }
-                    IconButton(onClick = { context.startActivity(Intent(context, LookupActivity::class.java)) }) {
-                        Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
-                    }
                     val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
-                    ExportMenu(
-                        onExport,
-                        onExportPackage,
-                        onExportCsv,
-                        enabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
+                    WordsMenu(
+                        onShowSession = onShowSession,
+                        onExport = onExport,
+                        onExportPackage = onExportPackage,
+                        onExportCsv = onExportCsv,
+                        exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
                     )
                 }
             }
         },
         bottomBar = bottomBar,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            val context = LocalContext.current
+            FloatingActionButton(onClick = { context.startActivity(Intent(context, LookupActivity::class.java)) }) {
+                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
+            }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -355,12 +367,38 @@ private fun WordsContent(
                     )
                 }
             }
+            if (uiState.learning?.isNotEmpty() == true || uiState.known?.isNotEmpty() == true || uiState.knownByReading.isNotEmpty()) {
+                OutlinedTextField(
+                    value = uiState.query,
+                    onValueChange = onQuery,
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.words_search_hint)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (uiState.query.isNotEmpty()) {
+                            IconButton(onClick = { onQuery("") }) {
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+            val listStates = WordFilter.entries.map { rememberLazyListState() }
+            val firstScrollToTop = remember { scrollToTop }
+            LaunchedEffect(scrollToTop) {
+                if (scrollToTop != firstScrollToTop) listStates[pager.currentPage].animateScrollToItem(0)
+            }
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 val filter = WordFilter.entries[page]
                 WordList(
                     filter = filter,
-                    words = if (filter == WordFilter.LEARNING) uiState.learning else uiState.known,
-                    knownByReading = if (filter == WordFilter.KNOWN) uiState.knownByReading else emptyList(),
+                    listState = listStates[page],
+                    words = (if (filter == WordFilter.LEARNING) uiState.learning else uiState.known)
+                        ?.let { filterWords(it, uiState.query) },
+                    knownByReading = if (filter == WordFilter.KNOWN) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
                     uiState = uiState,
                     now = now,
                     onToggleExpanded = onToggleExpanded,
@@ -386,6 +424,7 @@ private fun WordsContent(
 @Composable
 private fun WordList(
     filter: WordFilter,
+    listState: LazyListState,
     words: List<WordEntity>?,
     knownByReading: List<Pair<String, Int>>,
     uiState: WordsUiState,
@@ -408,14 +447,15 @@ private fun WordList(
             CircularProgressIndicator()
         }
         words.isEmpty() && knownByReading.isEmpty() -> Text(
-            text = stringResource(emptyText(filter)),
+            text = if (uiState.query.isBlank()) stringResource(emptyText(filter)) else stringResource(R.string.words_search_empty, uiState.query.trim()),
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(32.dp),
         )
-        else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.fillMaxSize()) {
+        // Room at the end for the look-up button.
+        else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp), modifier = Modifier.fillMaxSize()) {
             if (filter == WordFilter.LEARNING) {
                 item(key = "ankiActions") {
                     // Wraps below the first button on a narrow screen or with large text.
@@ -569,12 +609,19 @@ private fun StepsBar(steps: Int) {
  * Exports the list shown as a file for Anki on a computer, from a small rounded menu like the
  * library's order: a package with audio, or text.
  */
+/** The top bar's overflow menu (three dots): this session's words and the exports. */
 @Composable
-private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExportCsv: () -> Unit, enabled: Boolean) {
+private fun WordsMenu(
+    onShowSession: () -> Unit,
+    onExport: () -> Unit,
+    onExportPackage: () -> Unit,
+    onExportCsv: () -> Unit,
+    exportEnabled: Boolean,
+) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }, enabled = enabled) {
-            Icon(painterResource(R.drawable.ic_export), contentDescription = stringResource(R.string.words_export))
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
         }
         DropdownMenu(
             expanded = open,
@@ -582,16 +629,30 @@ private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExpo
             shape = RoundedCornerShape(24.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.session_open), style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                colors = MenuDefaults.itemColors(leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                onClick = {
+                    open = false
+                    onShowSession()
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            HorizontalDivider()
             Text(
                 text = stringResource(R.string.words_export),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
             )
             ExportItem(
                 title = R.string.export_package,
                 detail = R.string.export_package_detail,
                 icon = R.drawable.ic_add_card,
+                enabled = exportEnabled,
                 onClick = {
                     open = false
                     onExportPackage()
@@ -601,6 +662,7 @@ private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExpo
                 title = R.string.export_text,
                 detail = R.string.export_text_detail,
                 icon = R.drawable.ic_export,
+                enabled = exportEnabled,
                 onClick = {
                     open = false
                     onExport()
@@ -611,6 +673,7 @@ private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExpo
                 title = R.string.export_csv,
                 detail = R.string.export_csv_detail,
                 icon = R.drawable.ic_export,
+                enabled = exportEnabled,
                 onClick = {
                     open = false
                     onExportCsv()
@@ -621,8 +684,9 @@ private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExpo
 }
 
 @Composable
-private fun ExportItem(title: Int, detail: Int, icon: Int, onClick: () -> Unit) {
+private fun ExportItem(title: Int, detail: Int, icon: Int, enabled: Boolean, onClick: () -> Unit) {
     DropdownMenuItem(
+        enabled = enabled,
         text = {
             Column {
                 Text(stringResource(title), style = MaterialTheme.typography.bodyLarge)

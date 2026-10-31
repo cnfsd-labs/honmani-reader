@@ -62,3 +62,23 @@ data class ReadWordDetails(val expression: String, val loading: Boolean = true, 
         }
     }
 }
+
+/**
+ * Search in the Words tab: [words] whose word, reading or meaning contains [query], ignoring case
+ * (and surrounding spaces); an empty query keeps all.
+ */
+fun filterWords(words: List<WordEntity>, query: String): List<WordEntity> {
+    val wanted = query.trim().lowercase()
+    if (wanted.isEmpty()) return words
+    return words.filter {
+        it.expression.lowercase().contains(wanted) || it.reading.lowercase().contains(wanted) ||
+            it.gloss.lowercase().contains(wanted)
+    }
+}
+
+/** The same for words known from reading alone, which have only the word itself. */
+fun filterReadWords(words: List<Pair<String, Int>>, query: String): List<Pair<String, Int>> {
+    val wanted = query.trim().lowercase()
+    if (wanted.isEmpty()) return words
+    return words.filter { it.first.lowercase().contains(wanted) }
+}
