@@ -41,12 +41,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Honmani">
 
-        <!-- Handles rotation and similar changes itself so the reader WebView (and the open book)
+        <!-- Handles rotation, dark mode and similar changes itself so the reader WebView (and the open book)
              survives them; Compose re-lays out on its own. One task (singleTask): a book opened
              from another app goes to the running reader instead of a second one inside that app. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
             android:launchMode="singleTask"
             android:exported="true">
             <intent-filter>

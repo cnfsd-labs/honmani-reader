@@ -1,6 +1,7 @@
 package app.honmani.reader
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
@@ -41,6 +42,16 @@ class MainActivity : ComponentActivity() {
                 HonmaniApp()
             }
         }
+    }
+
+    /**
+     * Dark mode switches (by hand or at sunset) without recreating the activity: that would drop
+     * the open book and its lookup panel. Compose follows the system theme by itself; the system
+     * bars' icon colours are chosen when edge-to-edge is set up, so set it up again.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enableEdgeToEdge()
     }
 
     // Volume keys reach the activity: neither the WebView nor Compose uses them.
