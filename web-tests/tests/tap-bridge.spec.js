@@ -224,6 +224,28 @@ test('a line break in the source is a space, not the end of the text or the sent
   expect(kept.text).toBe('雨が');
 });
 
+test('a gaiji picture ends the scanned text, and the text after it still lines up', async ({ page }) => {
+  await page.evaluate(() => {
+    const gif = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    document.querySelector('#horizontal').insertAdjacentHTML(
+      'afterbegin',
+      `<p id="gj">東<img class="gaiji" src="${gif}" width="24" height="24">京都に行く。</p>`,
+    );
+  });
+  await tapChar(page, '#gj', '東');
+  await tapChar(page, '#gj', '京');
+
+  const [before, after] = await messages(page);
+  expect(before.text).toBe('東');
+  expect(before.sentence).toBe('東\u3013京都に行く。');
+  expect(before.sentenceOffset).toBe(0);
+  expect(after.text).toBe('京都に行く。');
+  expect(after.sentenceOffset).toBe(2);
+
+  await reply(page, { type: 'highlight', length: 2 });
+  expect(await highlighted(page)).toEqual(['京都']);
+});
+
 test('a tap is looked up when the finger goes up, also when its click never comes (it stopped a fling)', async ({ page }) => {
   const { x, y } = await charCenter(page, '#v2', 'ど');
   // Pointer events only, as Chromium sends for a tap right after a page swipe.

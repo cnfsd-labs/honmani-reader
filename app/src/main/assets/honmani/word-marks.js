@@ -51,7 +51,7 @@
   const KNOWN = 2;
   const SENTENCE = 3;
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const { isSkipped, textData } = window.honmaniText;
+  const { isSkipped, isGaiji, textData } = window.honmaniText;
   const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana', 'honmani-one-unknown'];
   /** New marks, while they fade in; then they move to NAMES (the known words' furigana does not fade). */
   const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh', 'honmani-one-unknown-fresh'];
@@ -270,10 +270,12 @@
 
   /**
    * A block's text as the tap bridge reads it (blockText in tap-bridge.js): its text nodes,
-   * spaces included, and a <br> as a line break, so no word runs across one.
+   * spaces included, a <br> as a line break and a gaiji picture as U+FFFC, so no word runs across
+   * one.
    */
   function dataOf(node) {
-    return node.nodeType === Node.TEXT_NODE ? textData(node) : '\n';
+    if (node.nodeType === Node.TEXT_NODE) return textData(node);
+    return node.tagName === 'BR' ? '\n' : '\uFFFC';
   }
 
   /** Groups the book's text into paragraphs and watches which come near the screen. */
@@ -282,6 +284,7 @@
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode: (node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
+          if (isGaiji(node)) return NodeFilter.FILTER_ACCEPT;
           return node.tagName === 'BR' && !isSkipped(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }
         return isSkipped(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;

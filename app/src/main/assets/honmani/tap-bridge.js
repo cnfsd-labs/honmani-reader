@@ -53,8 +53,10 @@
   const MAX_SENTENCE_LENGTH = 400;
   const MAX_PREVIOUS_SENTENCE_LENGTH = 200;
   const BOOK_ROOT_SELECTOR = '.book-content';
-  const { isSkipped, blockAncestor, textData } = window.honmaniText;
+  const { isSkipped, blockAncestor, isGaiji, textData } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
+  /** Stands for a gaiji picture in the text (isGaiji): no word runs across it. */
+  const GAIJI = '\uFFFC';
   const SENTENCE_END = '。！？!?…\n';
   const CLOSING_QUOTES = '」』）〉》】"\'';
   const OPENING_BRACKETS = '「『（(〈《【〔［｛“‘〝"\'';
@@ -131,12 +133,12 @@
     return null;
   }
 
-  /** Like textWalker, but also stops at <br> elements. */
+  /** Like textWalker, but also stops at <br> elements and gaiji pictures. */
   function lineWalker(block) {
     return document.createTreeWalker(block, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode: (node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          return node.tagName === 'BR' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          return node.tagName === 'BR' || isGaiji(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }
         return isSkipped(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
       },
@@ -144,8 +146,8 @@
   }
 
   /**
-   * Text of `block` without furigana (a <br> as "\n"), the index of (node, index) within it, and
-   * the ruby bases in it as { start, end, reading } (indexes into the text).
+   * Text of `block` without furigana (a <br> as "\n", a gaiji picture as U+FFFC), the index of
+   * (node, index) within it, and the ruby bases in it as { start, end, reading } (indexes into the text).
    */
   function blockText(block, node, index) {
     const walker = lineWalker(block);
@@ -155,7 +157,7 @@
     let lastRt = null;
     for (let current = walker.nextNode(); current; current = walker.nextNode()) {
       if (current.nodeType === Node.ELEMENT_NODE) {
-        text += '\n';
+        text += current.tagName === 'BR' ? '\n' : GAIJI;
         lastRt = null;
         continue;
       }
@@ -286,10 +288,14 @@
     let start = position;
     while (start < paragraph.length && OPENING_BRACKETS.includes(paragraph[start])) start++;
     const end = limit === Infinity ? paragraph.length : Math.max(start, position + limit);
-    const text = takeCodePoints(paragraph.slice(start, end), SCAN_LENGTH).split('\n')[0].trimEnd();
+    const text = takeCodePoints(paragraph.slice(start, end), SCAN_LENGTH).split(/[\n\uFFFC]/)[0].trimEnd();
     if (!text.trim() || /^\s/.test(text)) return null;
 
-    const { sentence, offset, previous } = sentenceAround(paragraph, start);
+    const around = sentenceAround(paragraph, start);
+    // The geta mark, the usual stand-in for a missing character, rather than U+FFFC in a card.
+    const sentence = around.sentence.replaceAll(GAIJI, '\u3013');
+    const { offset } = around;
+    const previous = around.previous.replaceAll(GAIJI, '\u3013');
     lastTap = { block, node, index, skip: start - position };
     const message = { type: 'lookup', text, sentence, sentenceOffset: offset, tap: ++tapNumber };
     const ruby = rubyWithin(paragraphRuby, start, text.length);

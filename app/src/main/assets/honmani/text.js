@@ -26,6 +26,19 @@
   }
 
   /**
+   * Whether `element` is an inline picture of a character the font lacks (ttu's gaiji: an <img>
+   * with a class containing "gaiji"). The scripts read it as one U+FFFC in the book's text, so no
+   * word runs across it.
+   */
+  function isGaiji(element) {
+    return (
+      element.tagName === 'IMG' &&
+      Array.from(element.classList).some((name) => name.includes('gaiji')) &&
+      element.closest(SKIPPED_SELECTOR) === null
+    );
+  }
+
+  /**
    * A text node's text as the browser shows it: a line break, tab or carriage return in the book's
    * source is a space (the same length, so offsets stay valid), unless the text keeps its
    * whitespace (white-space: pre, pre-wrap, pre-line, break-spaces).
@@ -205,7 +218,7 @@
   }
 
   window.honmaniText = {
-    SKIPPED_SELECTOR, isSkipped, textData, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
+    SKIPPED_SELECTOR, isSkipped, isGaiji, textData, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
     // Exposed so tests can compare the fast path with the walk.
     firstCharWalk, firstCharNearStart,
   };
