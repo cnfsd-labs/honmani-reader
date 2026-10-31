@@ -158,6 +158,28 @@ test('the sentence before is cut to its last 200 characters', async ({ page }) =
   expect(message.previousSentence).toBe('あ'.repeat(199) + '。');
 });
 
+test('a long sentence is cut to a window without splitting a surrogate pair', async ({ page }) => {
+  await page.evaluate(() => {
+    // Pairs from index 0: the window starts (601 - 200) on the low half of a pair and would end
+    // (after the shift) between the halves of the pair at 801.
+    document.querySelector('#h2').textContent = `${'\u{20B9F}'.repeat(300)}あこ${'ん'.repeat(199)}\u{20B9F}${'ん'.repeat(50)}`;
+    const node = document.querySelector('#h2').firstChild;
+    const range = document.createRange();
+    range.setStart(node, 601);
+    range.setEnd(node, 602);
+    window.scrollTo(0, window.scrollY + range.getBoundingClientRect().top - 300);
+  });
+
+  await tapChar(page, '#h2', 'こ');
+
+  const [message] = await messages(page);
+  const lone = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+  expect(message.sentence).not.toMatch(lone);
+  expect(message.sentence.startsWith('\u{20B9F}')).toBe(true);
+  expect(message.sentence.length).toBeLessThanOrEqual(400);
+  expect(message.sentence[message.sentenceOffset]).toBe('こ');
+});
+
 test('scan text is capped at 20 characters', async ({ page }) => {
   await tapChar(page, '#v2', 'ど');
 

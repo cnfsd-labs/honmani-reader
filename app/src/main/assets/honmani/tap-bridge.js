@@ -207,7 +207,10 @@
     // Keep very long "sentences" (e.g. no punctuation) to a window around the tap.
     if (end - start > MAX_SENTENCE_LENGTH) {
       start = Math.max(start, position - MAX_SENTENCE_LENGTH / 2);
+      // Not in the middle of a surrogate pair, at either end.
+      if (/[\uDC00-\uDFFF]/.test(text[start])) start++;
       end = Math.min(end, start + MAX_SENTENCE_LENGTH);
+      if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1])) end--;
     }
     let sentence = text.slice(start, end);
     const leading = sentence.length - sentence.trimStart().length;
