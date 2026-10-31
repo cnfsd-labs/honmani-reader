@@ -42,6 +42,15 @@ add a card to AnkiDroid; Words → export (arrow up) → "Anki package" and impo
 computer (cards with audio in the chosen deck); force-stop and reopen (books, dictionaries,
 position kept).
 
+Do the first-start part on a **fresh install** (uninstall first, or clear the app's data): open
+the sample book from the empty library and check that the text shows within a few seconds. Policies
+and storage that only break with nothing cached (a blocked import worker, say) don't show on a
+phone that has opened a book before.
+
+Long-press a word: the lookup panel opens, no blue selection handles or Copy toolbar stay, and the
+panel offers "Copy word" and "Copy sentence". With the panel open a volume press only closes it;
+the next one turns the page.
+
 ## Back up and restore
 
 Settings → Back up and restore → Back up…, save the file (to Downloads, say). Uninstall Honmani,

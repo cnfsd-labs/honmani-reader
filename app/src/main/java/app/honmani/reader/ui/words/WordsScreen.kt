@@ -415,18 +415,26 @@ private fun WordList(
                 .padding(32.dp),
         )
         else -> LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.fillMaxSize()) {
-            if (filter == WordFilter.LEARNING && uiState.ankiProgress == null && uiState.notInAnki > 0) {
-                item(key = "addAll") {
-                    FilledTonalButton(
-                        onClick = onAddAllToAnki,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            if (filter == WordFilter.LEARNING) {
+                item(key = "ankiActions") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_add_card),
-                            contentDescription = null,
-                            modifier = Modifier.padding(end = 8.dp),
-                        )
-                        Text(stringResource(R.string.action_add_all_to_anki, uiState.notInAnki))
+                        if (uiState.ankiProgress == null && uiState.notInAnki > 0) {
+                            FilledTonalButton(onClick = onAddAllToAnki) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_add_card),
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 8.dp),
+                                )
+                                Text(stringResource(R.string.action_add_all_to_anki, uiState.notInAnki))
+                            }
+                        }
+                        TextButton(
+                            onClick = onCheckAnki,
+                            enabled = !uiState.checkingAnki && uiState.ankiProgress == null,
+                        ) { Text(stringResource(R.string.action_check_against_anki)) }
                     }
                 }
             }
@@ -439,15 +447,6 @@ private fun WordList(
                             TextButton(onClick = onDismissOffer) { Text(stringResource(R.string.anki_known_not_now)) }
                         }
                     }
-                }
-            }
-            if (filter == WordFilter.LEARNING) {
-                item(key = "checkAnki") {
-                    TextButton(
-                        onClick = onCheckAnki,
-                        enabled = !uiState.checkingAnki && uiState.ankiProgress == null,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                    ) { Text(stringResource(R.string.action_check_against_anki)) }
                 }
             }
             item(key = "hint") {

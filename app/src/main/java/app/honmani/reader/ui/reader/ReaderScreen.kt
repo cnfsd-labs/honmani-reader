@@ -172,16 +172,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (!atLibrary) container.wordKnowledge.map { it.learning to it.learningForms }.distinctUntilChanged().collect { value = it }
     }
 
-    // Whether the volume buttons turn pages: a reader setting, kept in ttu's storage, read again
-    // when a book opens and after the reader settings close.
-    val volumeKeys by produceState(ReaderSettings().volumeKeys, atLibrary, readerSettings) {
+    // Reader settings the app itself acts on (volume buttons, long-press lookup), kept in ttu's
+    // storage, read again when a book opens and after the reader settings close.
+    val appSettings by produceState(ReaderSettings(), atLibrary, readerSettings) {
         if (atLibrary || readerSettings) return@produceState
         value = try {
-            ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings()).volumeKeys
+            ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            logWarning("Honmani.reader", "Reading the volume key setting failed", e)
+            logWarning("Honmani.reader", "Reading the reader settings failed", e)
             value
         }
     }
@@ -220,7 +220,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onBackground = { bookBackground = Color(it) },
                 marks = { texts, mode, knownWords, sentences, isStale -> container.wordMarker.mark(texts, mode, knownWords, sentences, isStale) },
                 marksKey = learning,
-                volumeKeysTurnPages = volumeKeys,
+                volumeKeysTurnPages = appSettings.volumeKeys,
+                hideSelectionToolbar = appSettings.selectionLookup,
+                panelOpen = panel != null,
                 modifier = Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing),

@@ -54,6 +54,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import android.content.ClipData
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -248,6 +254,9 @@ fun LookupPanel(
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
                 }
             }
+            if (state.tap.bySelection && state is LookupPanelState.Results && state.previous == null) {
+                CopyActions(word = state.tap.text.take(state.highlight.length), sentence = state.tap.sentence)
+            }
             if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
                 Text(
                     text = previousSentence,
@@ -325,6 +334,29 @@ private const val MAX_SHOWN_TEXT = 8
  * The matched text of a tap with buttons to make it one character shorter or longer; a button
  * that can't do anything is left out (its place stays, so the text doesn't jump).
  */
+/** Copy buttons for a long-press lookup, which has no Android selection toolbar. */
+@Composable
+private fun CopyActions(word: String, sentence: String) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    fun copy(text: String) {
+        scope.launch {
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
+            // Android 13 and later confirm a copy themselves.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                Toast.makeText(context, R.string.lookup_copied, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    Row(modifier = Modifier.padding(start = 12.dp, end = 12.dp)) {
+        TextButton(onClick = { copy(word) }) { Text(stringResource(R.string.lookup_copy_word)) }
+        if (sentence.isNotBlank()) {
+            TextButton(onClick = { copy(sentence) }) { Text(stringResource(R.string.lookup_copy_sentence)) }
+        }
+    }
+}
+
 @Composable
 private fun MatchControls(
     matched: String,

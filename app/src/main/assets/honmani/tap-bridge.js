@@ -14,8 +14,9 @@
  * left out when there are none.
  *   { "type": "dismiss" }   (a tap on book content that is not on text)
  *
- * Selected book text (a long press, then the handles) is looked up in the same message once the
- * selection has settled: "text" is the selection, up to SCAN_LENGTH characters. localStorage
+ * Selected book text (a long press) is looked up in the same message, with "selection": true,
+ * once the selection has settled, and then deselected: "text" is the selection, up to
+ * SCAN_LENGTH characters. localStorage
  * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns it off.
  *
  * Furigana (<rt>, <rp>) is not part of the scanned text; a tap on furigana scans from the start
@@ -455,12 +456,13 @@
   }
 
   /**
-   * Looks up a selection once it has settled (a long press selects a word; the handles then
-   * change it), when localStorage "honmaniSelectionLookup" is not "0". The selected text, up to
-   * SCAN_LENGTH characters, is the query, found by the same dictionary scan as for a tap. The
-   * selection itself is left alone, so copying works as before.
+   * Looks up a selection once it has settled (a long press selects a word), when localStorage
+   * "honmaniSelectionLookup" is not "0". The selected text, up to SCAN_LENGTH characters, is the
+   * query, found by the same dictionary scan as for a tap. The message says "selection": true
+   * and the selection is cleared, so Android's handles and Copy toolbar go away (the lookup
+   * panel offers the copying); with the switch off the selection is left alone.
    */
-  const SELECTION_SETTLE = 450;
+  const SELECTION_SETTLE = 250;
   let selectionTimer = 0;
   let lastSelected = '';
 
@@ -515,7 +517,9 @@
     if (!message) return;
     lastSelected = selected;
     clearHighlight();
+    message.selection = true;
     post(message);
+    selection.removeAllRanges();
   }
 
   document.addEventListener('selectionchange', () => {

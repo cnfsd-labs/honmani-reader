@@ -527,8 +527,18 @@ test('a selection is looked up once it has settled, with the selected text as th
       sentenceOffset: 4,
       tap: 1,
       ruby: [{ start: 0, end: 1, reading: 'ねこ' }],
+      selection: true,
     },
   ]);
+});
+
+test('a looked-up selection is cleared, so Android shows no handles or toolbar', async ({ page }) => {
+  await select(page, '#v2', [0, 0], [0, 3]);
+  expect(await page.evaluate(() => window.getSelection().toString())).toBe('どこで');
+  await settle(page);
+
+  expect((await messages(page)).length).toBe(1);
+  expect(await page.evaluate(() => window.getSelection().isCollapsed)).toBe(true);
 });
 
 test('a selection that keeps changing is looked up once, at its final extent', async ({ page }) => {

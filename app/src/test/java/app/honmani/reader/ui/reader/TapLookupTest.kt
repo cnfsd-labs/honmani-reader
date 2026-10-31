@@ -18,6 +18,14 @@ class TapLookupTest {
     }
 
     @Test
+    fun parse_marksALongPressLookup() {
+        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true}"""
+
+        assertEquals(true, TapLookup.parse(message)?.bySelection)
+        assertEquals(false, TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0}""")?.bySelection)
+    }
+
+    @Test
     fun parse_ignoresUnknownFields() {
         val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"rect":{}}"""
 

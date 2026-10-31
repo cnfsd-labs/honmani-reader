@@ -470,6 +470,9 @@
     <string name="inflection_classical">classical form</string>
 
     <string name="lookup_close">Close</string>
+    <string name="lookup_copy_word">Copy word</string>
+    <string name="lookup_copy_sentence">Copy sentence</string>
+    <string name="lookup_copied">Copied</string>
     <string name="lookup_read_sentence">Read the sentence aloud</string>
     <string name="lookup_match_shorter">Match one character less</string>
     <string name="lookup_match_longer">Match one character more</string>

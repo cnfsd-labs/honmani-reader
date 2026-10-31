@@ -17,6 +17,11 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
+import android.graphics.Rect
+import android.view.ActionMode
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -164,8 +169,12 @@ fun ReaderWebView(
         { _, _, _, _, _ -> null },
     /** Changes when the reader's words change, so the page asks for its marks again. */
     marksKey: Any? = null,
-    /** The volume buttons turn pages while a book is open (they close the lookup panel first). */
+    /** The volume buttons turn pages while a book is open. */
     volumeKeysTurnPages: Boolean = false,
+    /** The lookup panel is open: a volume button then only closes it, the next one turns the page. */
+    panelOpen: Boolean = false,
+    /** A long press looks the text up and deselects it, so Android's Copy toolbar is not shown. */
+    hideSelectionToolbar: Boolean = false,
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -175,6 +184,8 @@ fun ReaderWebView(
     val currentOnPage by rememberUpdatedState(onPage)
     val currentOnOpenSettings by rememberUpdatedState(onOpenSettings)
     val currentOnBackground by rememberUpdatedState(onBackground)
+    val currentPanelOpen by rememberUpdatedState(panelOpen)
+    val currentHideToolbar by rememberUpdatedState(hideSelectionToolbar)
     val currentMarks by rememberUpdatedState(marks)
     val currentHighlightColor by rememberUpdatedState(highlightColor)
     val webViewRef = remember { WebViewRef() }
@@ -211,9 +222,10 @@ fun ReaderWebView(
     DisposableEffect(activity, volumeKeysTurnPages && inBook) {
         if (activity != null && volumeKeysTurnPages && inBook) {
             activity.volumePageTurn = { next ->
-                webViewRef.view?.let { view ->
+                if (currentPanelOpen) {
                     currentOnDismiss()
-                    turnPage(view, next)
+                } else {
+                    webViewRef.view?.let { view -> turnPage(view, next) }
                 }
             }
         }
@@ -268,6 +280,7 @@ fun ReaderWebView(
                 createReaderWebView(
                     context = context,
                     onRenderProcessGone = { renderer++ },
+                    hideSelectionToolbar = { currentHideToolbar },
                     onMessage = { message, replyProxy ->
                         webViewRef.replyProxy = replyProxy
                         when (message) {
@@ -375,6 +388,38 @@ private fun Color.toHex(): String = "#%06X".format(toArgb() and 0xFFFFFF)
 /** Marks [length] characters from the tap of lookup [lookupId], which makes each mark distinct. */
 data class Highlight(val lookupId: Long, val length: Int, val tapNumber: Int = 0)
 
+/**
+ * A WebView whose text selection toolbar (Translate, Copy, Select all) can be emptied, which
+ * hides it: a long press is looked up and deselected by `tap-bridge.js` and the panel copies.
+ */
+private class ReaderWebViewWithoutToolbar(
+    context: Context,
+    private val hideToolbar: () -> Boolean,
+) : WebView(context) {
+    override fun startActionMode(callback: ActionMode.Callback, type: Int): ActionMode? {
+        if (!hideToolbar()) return super.startActionMode(callback, type)
+        val inner = callback
+        val emptied = object : ActionMode.Callback2() {
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean =
+                inner.onCreateActionMode(mode, menu).also { menu.clear() }
+
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean =
+                inner.onPrepareActionMode(mode, menu).also { menu.clear() }
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean =
+                inner.onActionItemClicked(mode, item)
+
+            override fun onDestroyActionMode(mode: ActionMode) = inner.onDestroyActionMode(mode)
+
+            override fun onGetContentRect(mode: ActionMode, view: View, outRect: Rect) {
+                (inner as? ActionMode.Callback2)?.onGetContentRect(mode, view, outRect)
+                    ?: super.onGetContentRect(mode, view, outRect)
+            }
+        }
+        return super.startActionMode(emptied, type)
+    }
+}
+
 private class WebViewRef {
     var view: WebView? = null
 
@@ -392,6 +437,7 @@ private fun createReaderWebView(
     onPathChanged: (path: String, ttuBookId: Long?) -> Unit,
     onShowFileChooser: (ValueCallback<Array<Uri>>, allowsMultiple: Boolean) -> Unit,
     onRenderProcessGone: () -> Unit,
+    hideSelectionToolbar: () -> Boolean,
 ): WebView {
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     WebView.setWebContentsDebuggingEnabled(debuggable)
@@ -406,7 +452,7 @@ private fun createReaderWebView(
         .addPathHandler("/", TtuPathHandler(context.assets))
         .build()
 
-    return WebView(context).apply {
+    return ReaderWebViewWithoutToolbar(context, hideSelectionToolbar).apply {
         // Behind the page before ttu paints it: black in dark mode (ttu's black theme), not white.
         val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES

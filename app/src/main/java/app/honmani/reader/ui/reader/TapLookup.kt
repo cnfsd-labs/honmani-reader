@@ -186,6 +186,8 @@ data class TapLookup(
     val tapNumber: Int = 0,
     /** The sentence before [sentence] in the same paragraph (the bridge cuts it to 200 characters); empty if none or not sent. */
     val previousSentence: String = "",
+    /** The text was chosen by a long press (Android's own selection tools are hidden), not a tap. */
+    val bySelection: Boolean = false,
 ) {
     companion object {
         // Generous bounds; the bridge sends at most 20 code points and 400 sentence chars.
@@ -214,6 +216,7 @@ data class TapLookup(
                 envelope.text, envelope.sentence, envelope.sentenceOffset,
                 tapNumber = envelope.tap.coerceAtLeast(0),
                 previousSentence = envelope.previousSentence,
+                bySelection = envelope.selection,
             )
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
@@ -244,6 +247,7 @@ data class TapLookup(
         val ruby: List<RubyEnvelope> = emptyList(),
         val tap: Int = 0,
         val previousSentence: String = "",
+        val selection: Boolean = false,
     )
 
     @Serializable
