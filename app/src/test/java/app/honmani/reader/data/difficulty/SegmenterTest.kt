@@ -42,6 +42,18 @@ class SegmenterTest {
     }
 
     @Test
+    fun aGaijiPlaceholderStopsEveryWord() {
+        // The reader text has U+FFFC where a gaiji picture is: 家 and 裏 around it are not 家の裏,
+        // and the placeholder itself is no token.
+        val tokens = buildList {
+            Segmenter(lexicon).segment("猫\uFFFC家の\uFFFC裏") { add(Triple(it.key, it.start, it.length)) }
+        }
+        assertEquals(listOf("猫", "家", "の", "裏"), tokens.map { it.first })
+        assertEquals(listOf(0, 2, 3, 5), tokens.map { it.second })
+        assertEquals(listOf(1, 1, 1, 1), tokens.map { it.third })
+    }
+
+    @Test
     fun inflectedWordsComeBackInTheirDictionaryForm() {
         assertEquals(listOf("私", "は", "ケーキ", "を", "食べる"), split("私はケーキを食べさせられなかった"))
     }

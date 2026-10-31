@@ -53,6 +53,18 @@ class RomajiTest {
     }
 
     @Test
+    fun readsKanjiOutsideTheBasicPlane() = runBlocking {
+        // 𠮟 (U+20B9F) is a surrogate pair; the segment is cut on whole code points.
+        val segments = mutableListOf<String>()
+        val reading = TextReading.of("𠮟る") { text ->
+            segments += text
+            if (text.startsWith("𠮟")) 2 to "しか" else null
+        }
+        assertEquals("しかる", reading)
+        assertEquals(listOf("𠮟る"), segments)
+    }
+
+    @Test
     fun readingOfAnInflectedSource() {
         assertEquals("たべた", TextReading.readingOf("食べた", "食べる", "たべる", matchedExpression = true))
         assertEquals("ねこ", TextReading.readingOf("猫", "猫", "ねこ", matchedExpression = true))

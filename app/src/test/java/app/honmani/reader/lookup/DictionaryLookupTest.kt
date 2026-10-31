@@ -491,6 +491,18 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun aKanjiOutsideTheBasicPlaneIsNoOkurigana() = runTest {
+        // U+23041 is a kanji whose low 16 bits (U+3041) are a hiragana.
+        install(
+            "JMdict",
+            listOf("私", "わたし", "", 10, "I"),
+            listOf("私\uD84C\uDC41", "わたし", "", 10, "not a word"),
+        )
+
+        assertEquals(listOf("私"), lookup.lookup("私あ\uD84C\uDC41").headwords())
+    }
+
+    @Test
     fun furiganaThatIsNoReadingOfTheWordLooksUpTheWordItNames() = runTest {
         install(
             "JMdict",

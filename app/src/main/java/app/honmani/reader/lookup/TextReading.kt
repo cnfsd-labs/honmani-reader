@@ -13,11 +13,16 @@ object TextReading {
         val out = StringBuilder()
         var i = 0
         while (i < text.length) {
-            val c = text[i]
-            val match = if (isKanji(c)) segment(text.substring(i, minOf(text.length, i + MAX_SEGMENT))) else null
+            val codePoint = text.codePointAt(i)
+            val match = if (isKanji(codePoint)) {
+                val end = text.offsetByCodePoints(i, minOf(MAX_SEGMENT, text.codePointCount(i, text.length)))
+                segment(text.substring(i, end))
+            } else {
+                null
+            }
             if (match == null || match.first <= 0) {
-                out.append(c)
-                i++
+                out.appendCodePoint(codePoint)
+                i += Character.charCount(codePoint)
             } else {
                 out.append(match.second)
                 i += match.first
@@ -40,7 +45,9 @@ object TextReading {
         return stem + source.substring(common.length)
     }
 
-    private fun isKanji(c: Char) = c in '㐀'..'鿿' || c in '豈'..'﫿' || c in "々〆ヶ"
+    private fun isKanji(c: Int) =
+        c in 0x3400..0x9FFF || c in 0xF900..0xFAFF || c in 0x20000..0x323AF ||
+            c == '々'.code || c == '〆'.code || c == 'ヶ'.code
 
     private const val MAX_SEGMENT = 12
 }

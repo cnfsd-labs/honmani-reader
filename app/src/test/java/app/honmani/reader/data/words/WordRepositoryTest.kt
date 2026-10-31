@@ -123,6 +123,14 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun aLongSentenceIsNotCutInsideASurrogatePair() = runTest {
+        repository.record(lookup("猫", sentence = "あ".repeat(399) + "𠮟" + "い"))
+
+        val sentence = repository.lookups(learning().single().id).first().single().sentence
+        assertEquals("あ".repeat(399), sentence)
+    }
+
+    @Test
     fun aSurfaceOutsideTheSentenceIsClamped() = runTest {
         repository.record(lookup("猫", sentence = "猫。", surface = "猫猫猫", surfaceStart = 1))
 

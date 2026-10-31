@@ -93,7 +93,10 @@ class WordRepository(
      */
     suspend fun record(word: LookedUpWord) {
         val time = now()
-        val sentence = word.sentence.take(MAX_SENTENCE_LENGTH)
+        val sentence = word.sentence.take(MAX_SENTENCE_LENGTH).let {
+            // Not half a surrogate pair at the cut.
+            if (it.length < word.sentence.length && it.isNotEmpty() && it.last().isHighSurrogate()) it.dropLast(1) else it
+        }
         val start = word.surfaceStart.coerceIn(0, sentence.length)
         val end = (start + word.surface.length).coerceAtMost(sentence.length)
         val gloss = word.gloss.take(MAX_GLOSS_LENGTH)

@@ -397,7 +397,9 @@ class DictionaryLookup(
             // At least one more kana after the dropped one (困ま alone is no 困), and only kana.
             .filter { end ->
                 drop == null ||
-                    end > drop + 1 && (drop + 1 until end).all { JapaneseText.isHiragana(codePoints[it].toChar()) }
+                    end > drop + 1 && (drop + 1 until end).all {
+                        Character.isBmpCodePoint(codePoints[it]) && JapaneseText.isHiragana(codePoints[it].toChar())
+                    }
             }
         return ends.flatMap { end ->
             val written = String(codePoints, 0, end)
