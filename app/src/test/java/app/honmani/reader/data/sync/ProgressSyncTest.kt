@@ -64,9 +64,14 @@ class ProgressSyncTest {
     }
 
     /** A ProgressSync as the app makes one when it starts. */
-    private fun newSync(books: File = File(folder.root, "books")) = ProgressSync(
+    private fun newSync(
+        books: File = File(folder.root, "books"),
+        client: KoSyncClient = KoSyncClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000),
+        pullTimeoutMs: Long = 4_000,
+    ) = ProgressSync(
         settings = settings,
-        client = KoSyncClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000),
+        client = client,
+        pullTimeoutMs = pullTimeoutMs,
         books = database.bookDao(),
         bookFile = { File(books, it.fileName) },
         scope = scope,
@@ -112,6 +117,26 @@ class ProgressSyncTest {
         server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Honmani (Test)", settings.deviceId, timestamp = 9_000)
         assertNull(pull(local = 7, savedAtMs = 1_000))
         assertNull(written)
+    }
+
+    @Test
+    fun aServerThatNeverAnswersDoesNotHoldBackTheBook() {
+        java.net.ServerSocket(0).use { silent ->
+            val held = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+            val acceptor = Thread { try { while (true) held += silent.accept() } catch (_: java.io.IOException) {} }
+            acceptor.start()
+            settings.signIn(KoSyncAccount("http://127.0.0.1:${silent.localPort}", "reader", KoSyncAccount.userKey("secret")))
+            // The client itself would wait 30 s; the book must not.
+            sync = newSync(client = KoSyncClient(connectTimeoutMs = 30_000, readTimeoutMs = 30_000), pullTimeoutMs = 300)
+
+            val started = System.nanoTime()
+            val pulled = runBlocking { pull(local = 7, savedAtMs = 0) }
+            val tookMs = (System.nanoTime() - started) / 1_000_000
+
+            assertNull(pulled)
+            assertTrue("Waited $tookMs ms", tookMs < 3_000)
+            held.forEach { it.close() }
+        }
     }
 
     @Test

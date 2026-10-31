@@ -13,6 +13,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -58,6 +60,7 @@ class ProgressSync(
     private val device: String,
     private val unsent: UnsentPositions,
     private val pushDelayMs: Long = PUSH_DELAY_MS,
+    private val pullTimeoutMs: Long = PULL_TIMEOUT_MS,
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private class Document(val id: String, val positions: EpubPositions) {
@@ -122,11 +125,16 @@ class ProgressSync(
     ): PulledPosition? {
         val account = settings.account.value ?: return null
         if (book.format != BookFormat.EPUB) return null
+        // The request blocks in HttpURLConnection, which a timeout cannot interrupt: it runs on
+        // its own and is left behind when the deadline passes (its answer is dropped).
+        val lookup = CoroutineScope(currentCoroutineContext().minusKey(Job)).async { find(account, book, ttuId, bookmark) }
         val found = try {
-            withTimeoutOrNull(PULL_TIMEOUT_MS) { find(account, book, ttuId, bookmark) }
+            withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
         } catch (e: IOException) {
             Log.i(TAG, "No progress sync for this book: ${e.message}")
             null
+        } finally {
+            lookup.cancel()
         } ?: return null
         return when (found) {
             Found.None -> {
