@@ -114,4 +114,10 @@ class ReadingStatsTest {
         assertEquals(today.minusDays(1), reading.lastDay)
         assertEquals(12_000L, reading.charactersPerHour)
     }
+
+    @Test
+    fun aSpeedBelowOneCharacterAnHourIsNoSpeed() {
+        assertNull(ReadingStats.speed(seconds = 7_200, characters = 1))
+        assertEquals(3_600L, ReadingStats.speed(seconds = 3_600, characters = 3_600))
+    }
 }

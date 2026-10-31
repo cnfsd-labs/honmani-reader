@@ -150,5 +150,10 @@ object ReadingStats {
     }
 
     internal fun speed(seconds: Long, characters: Long): Long? =
-        if (seconds >= MIN_SPEED_SECONDS && characters > 0) characters * 3_600 / seconds else null
+        if (seconds >= MIN_SPEED_SECONDS && characters > 0) {
+            // Under one character an hour rounds to 0, which is no speed.
+            (characters * 3_600 / seconds).takeIf { it > 0 }
+        } else {
+            null
+        }
 }

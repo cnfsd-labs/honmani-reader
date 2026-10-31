@@ -56,7 +56,9 @@ import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.stats.WeekSpeed
 import java.text.NumberFormat
+import android.text.format.DateFormat
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.time.format.FormatStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -110,11 +112,17 @@ fun StatisticsContent(
             Tiles(current)
             when (summary.period) {
                 StatsPeriod.TODAY -> BooksToday(summary.books, current.titles)
-                StatsPeriod.WEEK -> BarChart(
-                    title = stringResource(R.string.stats_day_chart),
-                    bars = summary.chart,
-                    label = { it.day.format(DateTimeFormatter.ofPattern("EEE, d MMM")) },
-                )
+                StatsPeriod.WEEK -> {
+                    // The order of day and month is the language's, not a fixed European one.
+                    val dayFormat = remember {
+                        DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(Locale.getDefault(), "EEEMMMd"))
+                    }
+                    BarChart(
+                        title = stringResource(R.string.stats_day_chart),
+                        bars = summary.chart,
+                        label = { it.day.format(dayFormat) },
+                    )
+                }
                 StatsPeriod.ALL -> {
                     SpeedTrend(summary.speedTrend)
                     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }

@@ -71,7 +71,8 @@ class BookImporter(
         try {
             val (hash, head) = try {
                 copyAndHash(input, temp)
-            } catch (_: IOException) {
+            } catch (_: Exception) {
+                // IOException, or whatever another app's content provider throws while reading.
                 return Result.Unreadable
             }
             var format = formatOf(displayName, head) ?: return Result.Unsupported
