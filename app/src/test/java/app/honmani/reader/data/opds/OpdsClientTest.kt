@@ -56,6 +56,28 @@ class OpdsClientTest {
     }
 
     @Test
+    fun relativeLinksFollowTheAddressAfterRedirects() = runTest {
+        val catalogue = server { path, out ->
+            when (path) {
+                "/opds" -> out.respond("301 Moved Permanently", "", "Location: /opds/")
+                else -> out.respond(
+                    "200 OK",
+                    """<feed xmlns="http://www.w3.org/2005/Atom"><title>Test</title>
+                    <link rel="next" href="feed?page=2" type="application/atom+xml"/>
+                    <entry><id>1</id><title>Book</title>
+                    <link rel="http://opds-spec.org/acquisition" href="get/1.epub" type="application/epub+zip"/>
+                    </entry></feed>""",
+                )
+            }
+        }
+        val base = "http://127.0.0.1:${catalogue.port}"
+        val feed = client.feed(OpdsServer("$base/opds"), "$base/opds")
+
+        assertEquals("$base/opds/feed?page=2", feed.nextUrl)
+        assertEquals("$base/opds/get/1.epub", feed.entries.single().acquisitions.single().url)
+    }
+
+    @Test
     fun overHttpTheLoginWaitsForTheServerToAsk_onEveryNetwork() = runTest {
         var network = "home"
         val client = OpdsClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000, logins = LoginGate(network = { network }))

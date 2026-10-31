@@ -67,11 +67,12 @@ class OpdsClient(
     private val digests = ConcurrentHashMap<String, DigestChallenge>()
 
     suspend fun feed(server: OpdsServer, url: String): OpdsFeed {
-        val bytes = bytes(server, url, MAX_FEED_BYTES)
+        // Relative links are relative to where the feed was found, after redirects.
+        val (bytes, base) = bytesAt(server, url, MAX_FEED_BYTES)
         // Off the main thread: a feed can be megabytes of XML.
         return withContext(Dispatchers.Default) {
             try {
-                OpdsParser.parseFeed(bytes, url)
+                OpdsParser.parseFeed(bytes, base)
             } catch (e: NotAFeedException) {
                 throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "$url is not an OPDS feed", e)
             }
@@ -83,8 +84,8 @@ class OpdsClient(
         val template = when (search) {
             is OpdsSearch.Template -> search
             is OpdsSearch.Description -> try {
-                val bytes = bytes(server, search.url, MAX_FEED_BYTES)
-                withContext(Dispatchers.Default) { OpdsParser.parseSearchDescription(bytes, search.url) }
+                val (bytes, base) = bytesAt(server, search.url, MAX_FEED_BYTES)
+                withContext(Dispatchers.Default) { OpdsParser.parseSearchDescription(bytes, base) }
             } catch (e: NotAFeedException) {
                 throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "Bad search description", e)
             } ?: throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "No search template")
@@ -92,10 +93,14 @@ class OpdsClient(
         return template.urlFor(terms)
     }
 
-    suspend fun bytes(server: OpdsServer, url: String, limit: Int): ByteArray = request(server, url) { connection ->
-        if (connection.contentLengthLong > limit) tooLarge(url)
-        connection.inputStream.use { it.readUpTo(limit) ?: tooLarge(url) }
-    }
+    suspend fun bytes(server: OpdsServer, url: String, limit: Int): ByteArray = bytesAt(server, url, limit).first
+
+    /** The bytes of [url] and the address they came from after redirects. */
+    private suspend fun bytesAt(server: OpdsServer, url: String, limit: Int): Pair<ByteArray, String> =
+        request(server, url) { connection, finalUrl ->
+            if (connection.contentLengthLong > limit) tooLarge(url)
+            (connection.inputStream.use { it.readUpTo(limit) ?: tooLarge(url) }) to finalUrl
+        }
 
     /**
      * Downloads [url] into [destination], reporting bytes received and the total (-1 if unknown).
@@ -106,7 +111,7 @@ class OpdsClient(
         url: String,
         destination: File,
         onProgress: (bytesDone: Long, bytesTotal: Long) -> Unit,
-    ): String? = request(server, url) { connection ->
+    ): String? = request(server, url) { connection, _ ->
         val total = connection.contentLengthLong
         var done = 0L
         connection.inputStream.use { input ->
@@ -129,11 +134,14 @@ class OpdsClient(
         connection.getHeaderField("Content-Disposition")?.let(::fileNameFromDisposition)
     }
 
-    /** Opens [url] (following redirects itself, so the login never leaves the server) and reads it. */
+    /**
+     * Opens [url] (following redirects itself, so the login never leaves the server) and reads it;
+     * [read] also gets the final address.
+     */
     private suspend fun <T> request(
         server: OpdsServer,
         url: String,
-        read: suspend (HttpURLConnection) -> T,
+        read: suspend (HttpURLConnection, String) -> T,
     ): T = withContext(Dispatchers.IO) {
         var current = url
         var redirects = 0
@@ -169,7 +177,7 @@ class OpdsClient(
                 NetworkLog.shared.answered(NetworkPurpose.BOOK_SERVER, current, status, connection.contentLengthLong)
                 when (status) {
                     in 200..299 -> return@withContext try {
-                        read(connection)
+                        read(connection, current)
                     } catch (e: OpdsException) {
                         throw e
                     } catch (e: IOException) {
