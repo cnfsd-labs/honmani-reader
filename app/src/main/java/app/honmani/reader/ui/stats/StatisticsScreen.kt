@@ -1,5 +1,8 @@
 package app.honmani.reader.ui.stats
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +24,9 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +71,20 @@ fun StatisticsContent(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val csvFileName = stringResource(R.string.csv_stats_file_name)
+    val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) viewModel.exportCsv(uri.toString())
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.exported.collect { worked ->
+            Toast.makeText(
+                context,
+                if (worked) R.string.csv_stats_exported else R.string.anki_export_failed,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
     Column(modifier = modifier.fillMaxSize()) {
         PeriodPicker(period, viewModel::setPeriod)
         val current = state ?: return@Column
@@ -107,6 +127,9 @@ fun StatisticsContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(onClick = { exportCsv.launch(csvFileName) }) {
+                Text(stringResource(R.string.csv_stats_export))
+            }
         }
     }
 }

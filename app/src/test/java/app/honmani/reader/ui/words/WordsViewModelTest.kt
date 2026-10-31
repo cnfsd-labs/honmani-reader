@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.time.ZoneId
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -64,7 +65,7 @@ class WordsViewModelTest {
         bookTitle = null,
     )
 
-    private fun viewModel(): WordsViewModel {
+    private fun viewModel(writeDocument: suspend (String, String) -> Unit = { _, _ -> }): WordsViewModel {
         val lookup = DictionaryLookup(
             database.dictionaryDao(),
             database.termDao(),
@@ -73,6 +74,8 @@ class WordsViewModelTest {
         )
         return WordsViewModel(
             repository = repository,
+            writeDocument = writeDocument,
+            zone = { ZoneId.of("UTC") },
             showFrequency = showFrequency,
             frequencyOf = { words -> lookup.frequencies(words) },
         )
@@ -98,5 +101,21 @@ class WordsViewModelTest {
 
         showFrequency.value = false
         viewModel.uiState.first { it.frequencies.isEmpty() }
+    }
+
+    @Test
+    fun theCsvExportHoldsEverySavedWordNotJustTheListShown() = runTest {
+        repository.record(lookedUp("猫"))
+        repository.record(lookedUp("犬"))
+        repository.markLearned(repository.learning.first().first { it.expression == "犬" }.id)
+        var written = ""
+        val viewModel = viewModel { _, text -> written = text }
+
+        viewModel.exportCsv("content://x/y")
+
+        assertEquals(AnkiOutcome.CsvExported(2), viewModel.ankiOutcomes.first())
+        val rows = written.trimEnd().split("\r\n")
+        assertEquals(3, rows.size)
+        assertEquals(setOf("猫", "犬"), rows.drop(1).map { it.substringBefore(',') }.toSet())
     }
 }

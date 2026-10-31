@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.stats
 
+import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.WordCounts
 import java.time.LocalDate
@@ -39,8 +40,11 @@ class StatisticsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = StatisticsViewModel(
-        days = flowOf(emptyList()),
+    private fun viewModel(
+        days: List<ReadingDayEntity> = emptyList(),
+        writeDocument: suspend (String, String) -> Unit = { _, _ -> },
+    ) = StatisticsViewModel(
+        days = flowOf(days),
         bookDays = { flowOf(emptyList()) },
         books = flowOf(emptyList()),
         lookups = { from -> lookupTimes.map { times -> times.count { from == null || it >= from } } },
@@ -48,6 +52,7 @@ class StatisticsViewModelTest {
         words = flowOf(WordCounts()),
         today = { today },
         zone = { zone },
+        writeDocument = writeDocument,
     )
 
     private fun millis(date: LocalDate, hour: Int) = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
@@ -76,5 +81,36 @@ class StatisticsViewModelTest {
         // A new lookup shows at once.
         lookupTimes.value += millis(today, 10)
         assertEquals(6, viewModel.uiState.filterNotNull().first { it.lookups != 5 }.lookups)
+    }
+
+    @Test
+    fun theCsvHasOneRowPerDayWithAllBooksAdded() = runTest {
+        var written = "" to ""
+        val viewModel = viewModel(
+            days = listOf(
+                ReadingDayEntity(bookId = 1, day = "2026-10-18", seconds = 600, characters = 1000),
+                ReadingDayEntity(bookId = 2, day = "2026-10-18", seconds = 600, characters = 2000),
+                ReadingDayEntity(bookId = 1, day = "2026-10-19", seconds = 60, characters = 10),
+            ),
+            writeDocument = { uri, text -> written = uri to text },
+        )
+
+        viewModel.exportCsv("content://x/y")
+
+        assertEquals(true, viewModel.exported.first())
+        assertEquals("content://x/y", written.first)
+        assertEquals(
+            "date,seconds,characters,characters_per_hour\r\n2026-10-18,1200,3000,9000\r\n2026-10-19,60,10,600\r\n",
+            written.second,
+        )
+    }
+
+    @Test
+    fun aFailedCsvExportIsReported() = runTest {
+        val viewModel = viewModel(writeDocument = { _, _ -> throw java.io.IOException("full") })
+
+        viewModel.exportCsv("content://x/y")
+
+        assertEquals(false, viewModel.exported.first())
     }
 }

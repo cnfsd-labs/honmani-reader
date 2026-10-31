@@ -21,7 +21,9 @@ import app.honmani.reader.lookup.Frequency
 import app.honmani.reader.lookup.LookupGroup
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.lookup.metaKey
+import app.honmani.reader.data.export.CsvExports
 import java.io.IOException
+import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -109,6 +111,9 @@ sealed interface AnkiOutcome {
     data class Exported(val count: Int, val packaged: Boolean = false, val audioProblem: VoiceProblem? = null) :
         AnkiOutcome
 
+    /** [count] words were written to a CSV file. */
+    data class CsvExported(val count: Int) : AnkiOutcome
+
     data object ExportFailed : AnkiOutcome
 
     /** "Check against Anki" finished. */
@@ -153,6 +158,8 @@ class WordsViewModel(
     private val frequencyOf: suspend (List<Pair<String, String>>) -> Map<String, Frequency> = { emptyMap() },
     /** The words of the latest reading session. */
     private val session: Flow<SessionWords> = flowOf(SessionWords(null, emptyList())),
+    /** The time zone the CSV export writes times in. */
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
 ) : ViewModel() {
     private val filter = MutableStateFlow(WordFilter.LEARNING)
     private val expanded = MutableStateFlow<Long?>(null)
@@ -384,6 +391,23 @@ class WordsViewModel(
                 throw e
             } catch (e: Exception) {
                 logWarning("Honmani.words", "Anki text export failed", e)
+                AnkiOutcome.ExportFailed
+            }
+            _ankiOutcomes.send(outcome)
+        }
+    }
+
+    /** Writes every saved word, with its lookup history, to [uri] as a CSV file. */
+    fun exportCsv(uri: String) {
+        viewModelScope.launch {
+            val outcome = try {
+                val list = repository.all.first()
+                writeDocument(uri, CsvExports.words(list, zone()))
+                AnkiOutcome.CsvExported(list.size)
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logWarning("Honmani.words", "CSV export failed", e)
                 AnkiOutcome.ExportFailed
             }
             _ankiOutcomes.send(outcome)

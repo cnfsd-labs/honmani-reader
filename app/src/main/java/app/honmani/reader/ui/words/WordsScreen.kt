@@ -145,6 +145,9 @@ fun WordsScreen(
     ) { uri ->
         if (uri != null) viewModel.exportPackage(uri.toString())
     }
+    val exportCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) viewModel.exportCsv(uri.toString())
+    }
     LaunchedEffect(viewModel) {
         viewModel.ankiOutcomes.collect { outcome ->
             when (outcome) {
@@ -181,6 +184,11 @@ fun WordsScreen(
                     val audio = outcome.audioProblem?.let { " – " + resources.getString(it.label()) }.orEmpty()
                     Toast.makeText(context, saved + audio, Toast.LENGTH_LONG).show()
                 }
+                is AnkiOutcome.CsvExported -> Toast.makeText(
+                    context,
+                    resources.getQuantityString(R.plurals.csv_words_exported, outcome.count, outcome.count),
+                    Toast.LENGTH_LONG,
+                ).show()
                 is AnkiOutcome.Checked -> showAnkiCheck(context, outcome.result)
                 AnkiOutcome.ExportFailed ->
                     Toast.makeText(context, R.string.anki_export_failed, Toast.LENGTH_LONG).show()
@@ -238,6 +246,7 @@ fun WordsScreen(
         },
         onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
         onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
+        onExportCsv = { exportCsv.launch(resources.getString(R.string.csv_words_file_name)) },
         onShowSession = { showSession = true },
         onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
         offerKnown = offerKnown,
@@ -263,6 +272,7 @@ private fun WordsContent(
     onAddAllToAnki: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
+    onExportCsv: () -> Unit = {},
     onShowSession: () -> Unit = {},
     onCheckAnki: () -> Unit = {},
     offerKnown: Boolean = false,
@@ -309,7 +319,12 @@ private fun WordsContent(
                         Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
                     }
                     val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
-                    ExportMenu(onExport, onExportPackage, enabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null)
+                    ExportMenu(
+                        onExport,
+                        onExportPackage,
+                        onExportCsv,
+                        enabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
+                    )
                 }
             }
         },
@@ -558,7 +573,7 @@ private fun StepsBar(steps: Int) {
  * library's order: a package with audio, or text.
  */
 @Composable
-private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, enabled: Boolean) {
+private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, onExportCsv: () -> Unit, enabled: Boolean) {
     var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }, enabled = enabled) {
@@ -592,6 +607,16 @@ private fun ExportMenu(onExport: () -> Unit, onExportPackage: () -> Unit, enable
                 onClick = {
                     open = false
                     onExport()
+                },
+            )
+            HorizontalDivider()
+            ExportItem(
+                title = R.string.export_csv,
+                detail = R.string.export_csv_detail,
+                icon = R.drawable.ic_export,
+                onClick = {
+                    open = false
+                    onExportCsv()
                 },
             )
         }

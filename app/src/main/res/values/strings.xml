@@ -236,7 +236,17 @@
     </plurals>
     <string name="session_empty">No words looked up yet. Tap a word while reading and it shows up here. A new session starts after a pause of half an hour.</string>
     <string name="session_open">Words from this session</string>
-    <string name="words_export">Export for Anki</string>
+    <string name="words_export">Export</string>
+    <string name="export_csv">CSV file</string>
+    <string name="export_csv_detail">All saved words with their lookup history, for a spreadsheet</string>
+    <string name="csv_words_file_name">Honmani words.csv</string>
+    <string name="csv_stats_file_name">Honmani reading.csv</string>
+    <plurals name="csv_words_exported">
+        <item quantity="one">%d word saved to a CSV file.</item>
+        <item quantity="other">%d words saved to a CSV file.</item>
+    </plurals>
+    <string name="csv_stats_exported">Reading statistics saved to a CSV file.</string>
+    <string name="csv_stats_export">Export reading per day (CSV)</string>
     <string name="export_package">Anki package</string>
     <string name="export_package_detail">Cards with audio, for Anki on a computer (.apkg)</string>
     <string name="export_text">Text file</string>

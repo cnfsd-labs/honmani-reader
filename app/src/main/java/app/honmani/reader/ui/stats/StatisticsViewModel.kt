@@ -17,10 +17,19 @@ import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.WordCounts
+import app.honmani.reader.data.export.CsvExports
+import app.honmani.reader.data.export.writeTextDocument
+import app.honmani.reader.data.stats.DayTotal
+import app.honmani.reader.diagnostics.logWarning
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -80,7 +89,14 @@ class StatisticsViewModel(
     private val coverage: (contentHash: String) -> Flow<BookCoverage?> = { flowOf(null) },
     private val today: () -> LocalDate = LocalDate::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** Writes text to a document the reader picked (a content URI). */
+    private val writeDocument: suspend (uri: String, text: String) -> Unit = { _, _ -> },
 ) : ViewModel() {
+    private val _exported = Channel<Boolean>(Channel.BUFFERED)
+
+    /** Whether each CSV export worked. */
+    val exported: Flow<Boolean> = _exported.receiveAsFlow()
+
     private val _period = MutableStateFlow(StatsPeriod.TODAY)
     val period: StateFlow<StatsPeriod> = _period.asStateFlow()
 
@@ -112,6 +128,25 @@ class StatisticsViewModel(
         StatsPeriod.TODAY -> today
         StatsPeriod.WEEK -> today.minusDays(6)
         StatsPeriod.ALL -> null
+    }
+
+    /** Writes the reading of every day, all books together, to [uri] as a CSV file. */
+    fun exportCsv(uri: String) {
+        viewModelScope.launch {
+            val worked = try {
+                val totals = days.first().groupBy { LocalDate.parse(it.day) }.map { (day, rows) ->
+                    DayTotal(day, rows.sumOf { it.seconds }, rows.sumOf { it.characters })
+                }
+                writeDocument(uri, CsvExports.reading(totals))
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logWarning("Honmani.stats", "CSV export failed", e)
+                false
+            }
+            _exported.send(worked)
+        }
     }
 
     fun setPeriod(period: StatsPeriod) {
@@ -155,7 +190,8 @@ class StatisticsViewModel(
     companion object {
         val Factory = viewModelFactory {
             initializer {
-                val container = (this[APPLICATION_KEY] as HonmaniApplication).container
+                val application = this[APPLICATION_KEY] as HonmaniApplication
+                val container = application.container
                 StatisticsViewModel(
                     days = container.readingDao.observeAll(),
                     bookDays = container.readingDao::observeBook,
@@ -166,6 +202,7 @@ class StatisticsViewModel(
                     grades = container.difficultyStore.grades,
                     grading = container.bookGrader.state,
                     coverage = container::bookCoverage,
+                    writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                 )
             }
         }
