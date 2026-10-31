@@ -12,6 +12,7 @@ import app.honmani.reader.anki.AnkiCheck
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.DeletedWord
+import app.honmani.reader.data.words.SessionWords
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordLookupEntity
@@ -81,6 +82,8 @@ data class WordsUiState(
     val addingToAnki: Set<Long> = emptySet(),
     /** How common each word of the shown list is (first frequency dictionary), by id; empty if switched off. */
     val frequencies: Map<Long, Frequency> = emptyMap(),
+    /** The words of the latest reading session, for the sheet "Words from this session". */
+    val session: SessionWords = SessionWords(null, emptyList()),
 )
 
 /** How adding to Anki went: one word, or several from "Add all". */
@@ -148,6 +151,8 @@ class WordsViewModel(
     private val showFrequency: Flow<Boolean> = flowOf(false),
     /** How common each word is, by [app.honmani.reader.lookup.metaKey] of its form and reading; one batch for all. */
     private val frequencyOf: suspend (List<Pair<String, String>>) -> Map<String, Frequency> = { emptyMap() },
+    /** The words of the latest reading session. */
+    private val session: Flow<SessionWords> = flowOf(SessionWords(null, emptyList())),
 ) : ViewModel() {
     private val filter = MutableStateFlow(WordFilter.LEARNING)
     private val expanded = MutableStateFlow<Long?>(null)
@@ -223,6 +228,7 @@ class WordsViewModel(
             .combine(checkingAnki) { state, checking -> state.copy(checkingAnki = checking) }
             .combine(readWord) { state, word -> state.copy(readWord = word) }
             .combine(frequencies.onStart { emit(emptyMap()) }) { state, found -> state.copy(frequencies = found) }
+            .combine(session) { state, session -> state.copy(session = session) }
             .combine(grammarWords) { state, grammar ->
                 state.copy(notInAnki = state.learning.orEmpty().count { it.ankiNoteId == null && it.id !in grammar })
             }
@@ -445,6 +451,7 @@ class WordsViewModel(
                     lookUp = { word -> LookupGroups.from(container.dictionaryLookup.lookup(word, emptyList())) },
                     showFrequency = container.appearanceSettings.showWordFrequency,
                     frequencyOf = { words -> container.dictionaryLookup.frequencies(words) },
+                    session = container.wordRepository.session,
                 )
             }
         }

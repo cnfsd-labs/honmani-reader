@@ -2,9 +2,14 @@ package app.honmani.reader.data.words
 
 import androidx.room.withTransaction
 import app.honmani.reader.data.HonmaniDatabase
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 /** A lookup in the reader, to be recorded as a saved word. */
 data class LookedUpWord(
@@ -43,6 +48,15 @@ class WordRepository(
 
     /** Every saved word, being learned or learned. */
     val all: Flow<List<WordEntity>> = combine(learning, learned) { learning, learned -> learning + learned }
+
+    /** The words of the latest reading session, see [ReadingSession]. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val session: Flow<SessionWords> = dao.observeLookupTimes(ReadingSession.MAX_LOOKUPS)
+        .map { ReadingSession.start(it) }
+        .distinctUntilChanged()
+        .flatMapLatest { start ->
+            if (start == null) flowOf(SessionWords(null, emptyList())) else dao.observeLookedUpSince(start).map { SessionWords(start, it) }
+        }
 
     /** Words to suggest for Anki; see [WordDao.observeSuggested]. */
     val forAnki = dao.observeSuggested()

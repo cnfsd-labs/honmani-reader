@@ -216,4 +216,29 @@ class WordRepositoryTest {
         assertEquals(1, repository.lookupCount(now).first())
         assertEquals(6, repository.lookupCount(start + 11_000).first())
     }
+
+    @Test
+    fun theSessionHoldsTheWordsOfTheLatestRunOfLookups() = runTest {
+        repository.record(lookup("古い"))
+        now += ReadingSession.GAP_MS
+        repository.record(lookup("犬"))
+        now += 5 * 60_000L
+        repository.record(lookup("猫"))
+        now += 60_000L
+        // Looked up again: still one word, and the earlier session's word is not in this one.
+        repository.record(lookup("犬", sentence = "別の文。"))
+
+        val session = repository.session.first()
+
+        assertEquals(listOf("犬", "猫"), session.words.map { it.expression })
+        assertEquals(1_800_000_000_000L + ReadingSession.GAP_MS, session.start)
+    }
+
+    @Test
+    fun theSessionIsEmptyWithoutLookups() = runTest {
+        val session = repository.session.first()
+
+        assertEquals(null, session.start)
+        assertTrue(session.words.isEmpty())
+    }
 }

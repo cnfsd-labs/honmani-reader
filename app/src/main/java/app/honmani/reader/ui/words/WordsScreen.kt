@@ -27,6 +27,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
@@ -217,6 +218,8 @@ fun WordsScreen(
         }
     }
 
+    var showSession by remember { mutableStateOf(false) }
+    if (showSession) SessionSheet(uiState.session, onDismiss = { showSession = false })
     WordsContent(
         uiState = uiState,
         now = remember(uiState.learning, uiState.known) { System.currentTimeMillis() },
@@ -235,6 +238,7 @@ fun WordsScreen(
         },
         onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
         onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
+        onShowSession = { showSession = true },
         onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
         offerKnown = offerKnown,
         onOfferKnown = knownFromAnki::start,
@@ -259,6 +263,7 @@ private fun WordsContent(
     onAddAllToAnki: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
+    onShowSession: () -> Unit = {},
     onCheckAnki: () -> Unit = {},
     offerKnown: Boolean = false,
     onOfferKnown: () -> Unit = {},
@@ -297,6 +302,9 @@ private fun WordsContent(
                         }
                     }
                     val context = LocalContext.current
+                    IconButton(onClick = onShowSession) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.session_open))
+                    }
                     IconButton(onClick = { context.startActivity(Intent(context, LookupActivity::class.java)) }) {
                         Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
                     }

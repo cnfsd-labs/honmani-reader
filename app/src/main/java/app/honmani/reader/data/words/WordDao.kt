@@ -44,6 +44,14 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM lookup_event")
     fun countLookups(): Flow<Int>
 
+    /** When the latest lookups happened, newest first (to find where the latest session began). */
+    @Query("SELECT looked_up_at FROM lookup_event ORDER BY looked_up_at DESC LIMIT :limit")
+    fun observeLookupTimes(limit: Int): Flow<List<Long>>
+
+    /** Words looked up at [from] or later, the latest first. */
+    @Query("SELECT * FROM word WHERE last_looked_up_at >= :from ORDER BY last_looked_up_at DESC, id DESC")
+    fun observeLookedUpSince(from: Long): Flow<List<WordEntity>>
+
     /** Lookups since [from] (epoch milliseconds). */
     @Query("SELECT COUNT(*) FROM lookup_event WHERE looked_up_at >= :from")
     fun countLookupsSince(from: Long): Flow<Int>

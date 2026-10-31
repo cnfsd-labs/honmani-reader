@@ -228,6 +228,14 @@
     <string name="anki_package_file_name">Honmani words.apkg</string>
     <string name="anki_package_progress">Saving for Anki: %1$d of %2$d…</string>
     <string name="anki_export_file_name">Honmani words.txt</string>
+    <string name="session_title">Words from this session</string>
+    <string name="session_summary">%1$s since %2$s</string>
+    <plurals name="session_words">
+        <item quantity="one">%d word</item>
+        <item quantity="other">%d words</item>
+    </plurals>
+    <string name="session_empty">No words looked up yet. Tap a word while reading and it shows up here. A new session starts after a pause of half an hour.</string>
+    <string name="session_open">Words from this session</string>
     <string name="words_export">Export for Anki</string>
     <string name="export_package">Anki package</string>
     <string name="export_package_detail">Cards with audio, for Anki on a computer (.apkg)</string>
