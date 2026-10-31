@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
+import app.honmani.reader.anki.AnkiCheck
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.DeletedWord
@@ -74,6 +75,8 @@ data class WordsUiState(
     val ankiProgress: Pair<Int, Int>? = null,
     /** The progress is that of an Anki package being saved, not of "Add all". */
     val savingPackage: Boolean = false,
+    /** "Check against Anki" is running. */
+    val checkingAnki: Boolean = false,
     /** Words whose card is being made right now. */
     val addingToAnki: Set<Long> = emptySet(),
     /** How common each word of the shown list is (first frequency dictionary), by id; empty if switched off. */
@@ -104,6 +107,9 @@ sealed interface AnkiOutcome {
         AnkiOutcome
 
     data object ExportFailed : AnkiOutcome
+
+    /** "Check against Anki" finished. */
+    data class Checked(val result: AnkiCheck) : AnkiOutcome
 }
 
 /** A change the user can undo from a snackbar. */
@@ -132,6 +138,8 @@ class WordsViewModel(
      */
     private val writePackage: suspend (uri: String, List<WordEntity>, onProgress: (Int) -> Unit) -> VoiceProblem? =
         { _, _, _ -> null },
+    /** Compares the "in Anki" marks with AnkiDroid's notes. */
+    private val checkAnki: suspend () -> AnkiCheck = { AnkiCheck.NotInstalled },
     /** What was read and how well each word is known; null while it is worked out. */
     private val knowledge: Flow<WordKnowledge?> = flowOf(null),
     /** Looks a word up in the dictionaries, as a tap in a book would. */
@@ -148,6 +156,7 @@ class WordsViewModel(
     private val ankiProgress = MutableStateFlow<Pair<Int, Int>?>(null)
     private val savingPackage = MutableStateFlow(false)
     private val addingToAnki = MutableStateFlow<Set<Long>>(emptySet())
+    private val checkingAnki = MutableStateFlow(false)
 
     /** Grammar words "Add all" passed over, so it neither counts nor checks them again. */
     private val grammarWords = MutableStateFlow<Set<Long>>(emptySet())
@@ -211,6 +220,7 @@ class WordsViewModel(
         }.combine(ankiProgress) { state, progress -> state.copy(ankiProgress = progress) }
             .combine(addingToAnki) { state, adding -> state.copy(addingToAnki = adding) }
             .combine(savingPackage) { state, saving -> state.copy(savingPackage = saving) }
+            .combine(checkingAnki) { state, checking -> state.copy(checkingAnki = checking) }
             .combine(readWord) { state, word -> state.copy(readWord = word) }
             .combine(frequencies.onStart { emit(emptyMap()) }) { state, found -> state.copy(frequencies = found) }
             .combine(grammarWords) { state, grammar ->
@@ -344,6 +354,19 @@ class WordsViewModel(
         false
     }
 
+    /** Compares the "in Anki" marks with AnkiDroid: forgets cards deleted there, marks cards found. */
+    fun checkAgainstAnki() {
+        if (checkingAnki.value) return
+        checkingAnki.value = true
+        viewModelScope.launch {
+            try {
+                _ankiOutcomes.send(AnkiOutcome.Checked(checkAnki()))
+            } finally {
+                checkingAnki.value = false
+            }
+        }
+    }
+
     /** Writes the words of the current list to [uri] as a file for Anki's import. */
     fun exportToFile(uri: String) {
         viewModelScope.launch {
@@ -404,6 +427,7 @@ class WordsViewModel(
                     repository = container.wordRepository,
                     addCard = { word, lookup -> container.ankiExporter.add(word, lookup) },
                     ankiText = { list -> container.ankiExporter.textFile(list) },
+                    checkAnki = { container.ankiSync.check() },
                     writeDocument = { uri, text ->
                         withContext(Dispatchers.IO) {
                             val out = application.contentResolver.openOutputStream(Uri.parse(uri), "wt")

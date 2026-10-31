@@ -93,6 +93,7 @@ import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.lookup.LookupActivity
 import app.honmani.reader.ui.reader.FrequencyBadge
@@ -176,6 +177,7 @@ fun WordsScreen(
                     val audio = outcome.audioProblem?.let { " – " + resources.getString(it.label()) }.orEmpty()
                     Toast.makeText(context, saved + audio, Toast.LENGTH_LONG).show()
                 }
+                is AnkiOutcome.Checked -> showAnkiCheck(context, outcome.result)
                 AnkiOutcome.ExportFailed ->
                     Toast.makeText(context, R.string.anki_export_failed, Toast.LENGTH_LONG).show()
             }
@@ -224,6 +226,7 @@ fun WordsScreen(
         },
         onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
         onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
+        onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
     )
 }
 
@@ -244,6 +247,7 @@ private fun WordsContent(
     onAddAllToAnki: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
+    onCheckAnki: () -> Unit = {},
 ) {
     val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
     val scope = rememberCoroutineScope()
@@ -329,6 +333,7 @@ private fun WordsContent(
                     onDelete = onDelete,
                     onAddToAnki = onAddToAnki,
                     onAddAllToAnki = onAddAllToAnki,
+                    onCheckAnki = onCheckAnki,
                 )
             }
         }
@@ -351,6 +356,7 @@ private fun WordList(
     onDelete: (id: Long) -> Unit,
     onAddToAnki: (WordEntity, WordLookupEntity?) -> Unit,
     onAddAllToAnki: () -> Unit,
+    onCheckAnki: () -> Unit = {},
 ) {
     when {
         words == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -378,6 +384,15 @@ private fun WordList(
                         )
                         Text(stringResource(R.string.action_add_all_to_anki, uiState.notInAnki))
                     }
+                }
+            }
+            if (filter == WordFilter.LEARNING) {
+                item(key = "checkAnki") {
+                    TextButton(
+                        onClick = onCheckAnki,
+                        enabled = !uiState.checkingAnki && uiState.ankiProgress == null,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                    ) { Text(stringResource(R.string.action_check_against_anki)) }
                 }
             }
             item(key = "hint") {

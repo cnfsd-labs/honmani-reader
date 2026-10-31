@@ -240,6 +240,17 @@
     <string name="anki_not_installed">Adding cards needs AnkiDroid. Install it from Google Play, open it once, then try again.</string>
     <string name="anki_no_permission">Honmani needs permission to add cards to AnkiDroid.</string>
     <string name="anki_refused">AnkiDroid didn\'t take the card. Open AnkiDroid once (so it has a collection), then try again.</string>
+    <string name="action_check_against_anki">Check against Anki</string>
+    <string name="anki_check_nothing">The Anki marks match AnkiDroid.</string>
+    <plurals name="anki_check_cleared">
+        <item quantity="one">%1$d word is no longer in AnkiDroid</item>
+        <item quantity="other">%1$d words are no longer in AnkiDroid</item>
+    </plurals>
+    <plurals name="anki_check_marked">
+        <item quantity="one">%1$d word found in AnkiDroid</item>
+        <item quantity="other">%1$d words found in AnkiDroid</item>
+    </plurals>
+    <string name="anki_check_failed">Could not read AnkiDroid: %1$s</string>
     <string name="anki_failed">Adding to Anki failed: %1$s</string>
     <string name="anki_added_without_audio">%1$s added to Anki, without audio: %2$s</string>
     <string name="voice_problem_no_engine">this phone has no text-to-speech voice</string>

@@ -11,6 +11,9 @@ import android.os.Process
 import androidx.core.content.FileProvider
 import java.io.File
 
+/** A note as AnkiDroid stores it: its [fields] are in the note type's order, as raw HTML or text. */
+data class AnkiNote(val id: Long, val noteType: Long, val fields: List<String>)
+
 /** What Honmani needs from AnkiDroid; see [AnkiDroid]. */
 interface AnkiApi {
     fun packageName(): String?
@@ -46,6 +49,12 @@ interface AnkiApi {
     fun addNote(noteType: Long, deck: Long, fields: List<String>, tags: Set<String>): Long?
 
     fun addSound(file: File, preferredName: String): String?
+
+    /** The ids among [ids] that are still notes in AnkiDroid; null if it gave no answer. */
+    fun existingNotes(ids: Collection<Long>): Set<Long>?
+
+    /** Every note of [noteType]; null if AnkiDroid gave no answer. */
+    fun notes(noteType: Long): List<AnkiNote>?
 }
 
 /**
@@ -190,6 +199,29 @@ class AnkiDroid(context: Context) : AnkiApi {
         return "[sound:$stored]"
     }
 
+    override fun existingNotes(ids: Collection<Long>): Set<Long>? {
+        val found = mutableSetOf<Long>()
+        for (chunk in ids.distinct().chunked(NOTE_CHUNK)) {
+            // Anki's own search syntax ("nid:1,2,3"), which the notes URI takes as its selection.
+            val notes = readNotes(NOTES, "nid:" + chunk.joinToString(",")) ?: return null
+            notes.forEach { found += it.id }
+        }
+        return found
+    }
+
+    override fun notes(noteType: Long): List<AnkiNote>? = readNotes(NOTES_V2, "$NOTE_TYPE=$noteType")
+
+    private fun readNotes(uri: Uri, selection: String): List<AnkiNote>? =
+        resolver.query(uri, null, selection, null, null)?.use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    val id = cursor.long(ID) ?: continue
+                    val fields = cursor.string(FIELDS)?.split(SEPARATOR).orEmpty()
+                    add(AnkiNote(id, cursor.long(NOTE_TYPE) ?: 0L, fields))
+                }
+            }
+        }
+
     private fun Cursor.string(column: String): String? =
         getColumnIndex(column).takeIf { it >= 0 }?.let { getString(it) }
 
@@ -210,6 +242,7 @@ class AnkiDroid(context: Context) : AnkiApi {
         private val DECKS: Uri = Uri.withAppendedPath(ROOT, "decks")
         private val MEDIA: Uri = Uri.withAppendedPath(ROOT, "media")
 
+        private const val NOTE_CHUNK = 100
         private const val SEPARATOR = "\u001f"
         private const val ID = "_id"
         private const val NOTE_TYPE = "mid"

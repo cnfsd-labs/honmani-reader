@@ -13,6 +13,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.anki.AnkiCheck
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.VoiceProblem
@@ -69,6 +70,24 @@ fun showAnkiResult(context: Context, expression: String, result: AnkiResult) {
         AnkiResult.NoPermission -> context.getString(R.string.anki_no_permission)
         AnkiResult.Refused -> context.getString(R.string.anki_refused)
         is AnkiResult.Failed -> context.getString(R.string.anki_failed, result.reason)
+    }
+    toast(context, message)
+}
+
+/** Tells what "Check against Anki" changed. */
+fun showAnkiCheck(context: Context, result: AnkiCheck) {
+    val resources = context.resources
+    val message = when (result) {
+        is AnkiCheck.Done -> when {
+            result.cleared == 0 && result.marked == 0 -> resources.getString(R.string.anki_check_nothing)
+            else -> listOfNotNull(
+                result.cleared.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.anki_check_cleared, it, it) },
+                result.marked.takeIf { it > 0 }?.let { resources.getQuantityString(R.plurals.anki_check_marked, it, it) },
+            ).joinToString(" – ")
+        }
+        AnkiCheck.NotInstalled -> context.getString(R.string.anki_not_installed)
+        AnkiCheck.NoPermission -> context.getString(R.string.anki_no_permission)
+        is AnkiCheck.Failed -> context.getString(R.string.anki_check_failed, result.reason)
     }
     toast(context, message)
 }

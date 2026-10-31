@@ -7,6 +7,7 @@ import androidx.room.withTransaction
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiExporter
 import app.honmani.reader.anki.AnkiSettings
+import app.honmani.reader.anki.AnkiSync
 import app.honmani.reader.anki.PhoneVoice
 import app.honmani.reader.anki.WordAudio
 import app.honmani.reader.anki.WordDetails
@@ -203,6 +204,8 @@ class AppContainer(context: Context) {
             sentenceVoice = { phoneVoice },
         )
     }
+
+    val ankiSync: AnkiSync by lazy { AnkiSync(ankiDroid, ankiSettings, wordRepository) }
 
     val ankiExporter: AnkiExporter by lazy {
         AnkiExporter(
