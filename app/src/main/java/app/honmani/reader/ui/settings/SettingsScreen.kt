@@ -93,6 +93,7 @@ fun SettingsScreen(
     val customHue by appearance.customHue.collectAsStateWithLifecycle()
     val showDifficulty by appearance.showDifficulty.collectAsStateWithLifecycle()
     val showPreviousSentence by appearance.showPreviousSentence.collectAsStateWithLifecycle()
+    val showWordFrequency by appearance.showWordFrequency.collectAsStateWithLifecycle()
     val catalogs by container.opdsRepository.catalogs.collectAsStateWithLifecycle(emptyList())
     val dictionaries by container.dictionaryRepository.dictionaries.collectAsStateWithLifecycle(emptyList())
     val dictionaryUpdates by remember { container.dictionaryUpdateChecker.updates }.collectAsStateWithLifecycle(emptyList())
@@ -126,6 +127,8 @@ fun SettingsScreen(
         onShowDifficultyChange = appearance::setShowDifficulty,
         showPreviousSentence = showPreviousSentence,
         onShowPreviousSentenceChange = appearance::setShowPreviousSentence,
+        showWordFrequency = showWordFrequency,
+        onShowWordFrequencyChange = appearance::setShowWordFrequency,
         catalogs = catalogs,
         onAutoImportChange = { catalog, enabled ->
             scope.launch {
@@ -158,6 +161,8 @@ private fun SettingsContent(
     onShowDifficultyChange: (Boolean) -> Unit,
     showPreviousSentence: Boolean,
     onShowPreviousSentenceChange: (Boolean) -> Unit,
+    showWordFrequency: Boolean,
+    onShowWordFrequencyChange: (Boolean) -> Unit,
     catalogs: List<OpdsCatalog>,
     onAutoImportChange: (OpdsCatalog, Boolean) -> Unit,
     bottomBar: @Composable () -> Unit,
@@ -228,6 +233,18 @@ private fun SettingsContent(
                         showPreviousSentence,
                         role = Role.Switch,
                         onValueChange = onShowPreviousSentenceChange,
+                    ),
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text(stringResource(R.string.settings_word_frequency)) },
+                    supportingContent = { Text(stringResource(R.string.settings_word_frequency_details)) },
+                    trailingContent = { Switch(checked = showWordFrequency, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        showWordFrequency,
+                        role = Role.Switch,
+                        onValueChange = onShowWordFrequencyChange,
                     ),
                 )
             }
@@ -466,6 +483,8 @@ private fun SettingsPreview() {
             onShowDifficultyChange = {},
             showPreviousSentence = false,
             onShowPreviousSentenceChange = {},
+            showWordFrequency = true,
+            onShowWordFrequencyChange = {},
             catalogs = listOf(OpdsCatalog(1, "Calibre-Web", "https://books.example/opds", "me", true)),
             onAutoImportChange = { _, _ -> },
             bottomBar = {},

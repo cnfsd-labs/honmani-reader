@@ -275,14 +275,32 @@ class DictionaryLookup(
             }
     }
 
+    /**
+     * How common each of [words] (written form and reading) is according to the first enabled
+     * frequency dictionary, by [metaKey]; words it has no entry for are left out, and so is
+     * everything while no frequency dictionary is installed. One batch of queries for all words.
+     */
+    suspend fun frequencies(words: List<Pair<String, String>>): Map<String, Frequency> {
+        if (words.isEmpty()) return emptyMap()
+        val dictionaries = dictionaryDao.enabledReady().associateBy { it.id }
+        return metaOfWords(words.distinct(), dictionaries).mapNotNull { (key, meta) ->
+            meta.frequencies.firstOrNull()?.let { key to it }
+        }.toMap()
+    }
+
     /** Frequency and pitch of each word among [entries], from the enabled meta dictionaries. */
     private suspend fun meta(
         entries: List<LookupEntry>,
         dictionaries: Map<Long, DictionaryEntity>,
+    ): Map<String, WordMeta> =
+        metaOfWords(entries.map { it.term.expression to it.term.reading }.distinct(), dictionaries)
+
+    private suspend fun metaOfWords(
+        words: List<Pair<String, String>>,
+        dictionaries: Map<Long, DictionaryEntity>,
     ): Map<String, WordMeta> {
         val dao = termMetaDao ?: return emptyMap()
-        if (entries.isEmpty() || dictionaries.values.none { it.metaCount > 0 }) return emptyMap()
-        val words = entries.map { it.term.expression to it.term.reading }.distinct()
+        if (words.isEmpty() || dictionaries.values.none { it.metaCount > 0 }) return emptyMap()
         val rows = words.map { it.first }.distinct().chunked(MAX_LOOKUP_TEXTS)
             .flatMap { dao.find(it) }
             .filter { it.dictionaryId in dictionaries }

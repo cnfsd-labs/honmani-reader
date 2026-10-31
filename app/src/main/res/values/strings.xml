@@ -43,6 +43,8 @@
     <string name="sort_hardest">Hardest first</string>
     <string name="sort_title">Title</string>
     <string name="settings_previous_sentence">Show previous sentence</string>
+    <string name="settings_word_frequency">Show frequency in Words</string>
+    <string name="settings_word_frequency_details">Shows how common each saved word is (#727), from your frequency dictionary; nothing shows without one</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
     <string name="settings_cover_difficulty">Difficulty on covers</string>
     <string name="settings_cover_difficulty_details">Each book\'s difficulty (1–100) in a corner of its cover</string>

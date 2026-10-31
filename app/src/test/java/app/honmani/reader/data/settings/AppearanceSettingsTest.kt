@@ -39,6 +39,15 @@ class AppearanceSettingsTest {
     }
 
     @Test
+    fun theWordsListShowsFrequencyUnlessSwitchedOff() {
+        assertEquals(true, AppearanceSettings(preferences()).showWordFrequency.value)
+
+        AppearanceSettings(preferences()).setShowWordFrequency(false)
+
+        assertEquals(false, AppearanceSettings(preferences()).showWordFrequency.value)
+    }
+
+    @Test
     fun theLookupPanelHidesThePreviousSentenceUntilSwitchedOn() {
         assertEquals(false, AppearanceSettings(preferences()).showPreviousSentence.value)
 

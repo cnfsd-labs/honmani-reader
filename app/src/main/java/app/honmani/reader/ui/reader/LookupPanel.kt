@@ -724,7 +724,7 @@ private fun FoldedMeaning(group: LookupGroup) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FrequencyBadge(frequency: Frequency) {
+internal fun FrequencyBadge(frequency: Frequency) {
     val tooltip = rememberTooltipState(isPersistent = true)
     val scope = rememberCoroutineScope()
     TooltipBox(

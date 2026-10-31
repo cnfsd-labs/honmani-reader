@@ -332,6 +332,7 @@ class Backup(
             AppearanceSettings.KEY_SHOW_DIFFICULTY to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
             AppearanceSettings.KEY_SHOW_PREVIOUS_SENTENCE to BackupValue.BOOLEAN,
+            AppearanceSettings.KEY_SHOW_WORD_FREQUENCY to BackupValue.BOOLEAN,
             AnkiSettings.KEY_AUDIO to BackupValue.STRING,
             AnkiSettings.KEY_SENTENCE_SPEED to BackupValue.STRING,
             AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,

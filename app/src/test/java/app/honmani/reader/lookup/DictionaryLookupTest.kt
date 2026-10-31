@@ -126,6 +126,31 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun frequenciesOfSavedWordsComeFromTheFirstFrequencyDictionaryInOneBatch() = runTest {
+        // Nothing installed, or only definitions: nothing to show.
+        assertEquals(emptyMap<String, Frequency>(), lookup.frequencies(listOf("猫" to "ねこ")))
+        jmdict()
+        assertEquals(emptyMap<String, Frequency>(), lookup.frequencies(listOf("猫" to "ねこ")))
+
+        val files = mapOf(
+            "index.json" to index("Jiten", extra = ",\"frequencyMode\":\"rank-based\""),
+            "term_meta_bank_1.json" to """[
+                ["猫","freq",{"reading":"ねこ","frequency":{"value":727,"displayValue":"727"}}],
+                ["帰る","freq",{"reading":"かえる","frequency":{"value":300,"displayValue":"300"}}]
+            ]""",
+        )
+        DictionaryImporter(database).import(writeZip(temp.root, files, "jiten.zip"))
+
+        val found = lookup.frequencies(listOf("猫" to "ねこ", "猫" to "ねこ", "犬" to "いぬ", "帰る" to "かえる"))
+
+        assertEquals(setOf(metaKey("猫", "ねこ"), metaKey("帰る", "かえる")), found.keys)
+        assertEquals("727", found.getValue(metaKey("猫", "ねこ")).display)
+        assertEquals("#300", "#" + found.getValue(metaKey("帰る", "かえる")).display)
+        // A reading the dictionary gives for another reading says nothing.
+        assertEquals(emptyMap<String, Frequency>(), lookup.frequencies(listOf("猫" to "びょう")))
+    }
+
+    @Test
     fun deinflectsTheLongestMatch() = runTest {
         jmdict()
 

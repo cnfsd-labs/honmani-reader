@@ -88,12 +88,14 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
 import app.honmani.reader.data.words.WordProgress
 import app.honmani.reader.data.words.WordStatus
+import app.honmani.reader.lookup.Frequency
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.lookup.LookupActivity
+import app.honmani.reader.ui.reader.FrequencyBadge
 import app.honmani.reader.ui.reader.GlossLines
 import app.honmani.reader.ui.theme.HonmaniTheme
 import kotlinx.coroutines.flow.first
@@ -396,6 +398,7 @@ private fun WordList(
                     // Known words are listed by name only; details on a tap.
                     compact = filter == WordFilter.KNOWN && !expanded,
                     steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
+                    frequency = uiState.frequencies[word.id],
                     expanded = expanded,
                     lookups = if (expanded) uiState.lookups else emptyList(),
                     onToggleExpanded = { onToggleExpanded(word.id) },
@@ -582,6 +585,8 @@ private fun WordRow(
     lookups: List<WordLookupEntity>,
     /** Progress towards known, shown in the learning list. */
     steps: Int?,
+    /** How common the word is, if the setting is on and a frequency dictionary knows it. */
+    frequency: Frequency? = null,
     onToggleExpanded: () -> Unit,
     onSetStarred: (Boolean) -> Unit,
     onMarkLearned: () -> Unit,
@@ -615,6 +620,7 @@ private fun WordRow(
                             .padding(bottom = 3.dp),
                     )
                 }
+                frequency?.let { FrequencyBadge(it) }
             }
             AnkiButton(inAnki = word.ankiNoteId != null, adding = adding, onClick = { onAddToAnki(null) })
             IconToggleButton(
