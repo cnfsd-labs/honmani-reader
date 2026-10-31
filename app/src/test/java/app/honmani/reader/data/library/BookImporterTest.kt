@@ -127,6 +127,22 @@ class BookImporterTest {
     }
 
     @Test
+    fun aFailedInsertLeavesNoFilesBehind() = runTest {
+        val failing = object : BookDao by dao {
+            override suspend fun insert(book: BookEntity): Long = throw IllegalStateException("disk")
+        }
+        val failingImporter = BookImporter(failing, booksDir, coversDir, now = { 1_000L })
+
+        try {
+            failingImporter.import(TestBooks.epub().inputStream(), "neko.epub")
+            org.junit.Assert.fail("expected the insert error")
+        } catch (_: IllegalStateException) {
+        }
+        assertEquals(emptyList<String>(), booksDir.list()!!.toList())
+        assertEquals(emptyList<String>(), coversDir.list()!!.toList())
+    }
+
+    @Test
     fun anEpubWithoutTitleTakesTheFileName() = runTest {
         val book = (import(TestBooks.epub(title = null), "kokoro.epub") as BookImporter.Result.Added).book
 

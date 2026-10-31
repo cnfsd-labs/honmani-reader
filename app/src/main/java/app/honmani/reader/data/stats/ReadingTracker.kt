@@ -65,6 +65,9 @@ class ReadingTracker(
     /** Time counted since the book's reading position last changed: what its characters may use. */
     private val secondsSinceReport = HashMap<Long, Long>()
 
+    /** Time of page turns that kept the position, waiting for the turn that moves it. */
+    private val carriedSeconds = HashMap<Long, Long>()
+
     /** Milliseconds counted but not written yet, by book and day. */
     private val pending = HashMap<Pair<Long, String>, Long>()
 
@@ -101,21 +104,26 @@ class ReadingTracker(
                 mark = now
             }
         }
+        // The time up to this page turn is taken now, before a later page adds to it.
+        val onThisPage = synchronized(lock) { secondsSinceReport.remove(ttuId) ?: 0L }
         scope.launch {
             writes.withLock {
                 val known = store.position(ttuId)
                 if (known == null) {
                     // Nothing to measure the page against (a new or restored book): counting
                     // from 0 would credit the whole distance to the start. Just remember it.
-                    synchronized(lock) { secondsSinceReport.remove(ttuId) }
+                    synchronized(lock) { carriedSeconds.remove(ttuId) }
                     safely { store.setPosition(ttuId, characters) }
                     return@withLock
                 }
                 val before = known
                 // ttu saves the same position again when a page turn stays in one paragraph:
                 // the time keeps adding up until the position moves.
-                if (characters == before) return@withLock
-                val seconds = synchronized(lock) { secondsSinceReport.remove(ttuId) ?: 0L }
+                if (characters == before) {
+                    synchronized(lock) { carriedSeconds.merge(ttuId, onThisPage, Long::plus) }
+                    return@withLock
+                }
+                val seconds = onThisPage + synchronized(lock) { carriedSeconds.remove(ttuId) ?: 0L }
                 val read = if (seconds >= MIN_PAGE_SECONDS) {
                     (characters - before).coerceIn(0L, seconds * MAX_CHARACTERS_PER_SECOND)
                 } else {
@@ -142,7 +150,9 @@ class ReadingTracker(
                 for ((ttuId, characters) in positions) {
                     val before = store.position(ttuId) ?: 0L
                     if (characters == before) continue
-                    val seconds = synchronized(lock) { secondsSinceReport.remove(ttuId) ?: 0L }
+                    val seconds = synchronized(lock) {
+                        (secondsSinceReport.remove(ttuId) ?: 0L) + (carriedSeconds.remove(ttuId) ?: 0L)
+                    }
                     val allowed = seconds * MAX_CHARACTERS_PER_SECOND + SLACK_CHARACTERS
                     val read = (characters - before).coerceIn(0L, allowed)
                     if (read > 0) safely { store.add(ttuId, day(clock()), 0, read) }

@@ -128,6 +128,11 @@ class BookImporter(
             } catch (_: SQLiteConstraintException) {
                 // Imports are serialized, so this only happens if the row appeared meanwhile.
                 return dao.findByHash(hash)?.let { Result.AlreadyInLibrary(it) } ?: Result.Unreadable
+            } catch (e: Exception) {
+                // No row, so no owner for the files: don't leave them behind.
+                bookFile.delete()
+                coverFileName?.let { File(coversDir, it).delete() }
+                throw e
             }
             return Result.Added(
                 try {

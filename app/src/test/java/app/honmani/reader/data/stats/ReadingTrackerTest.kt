@@ -145,6 +145,24 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun timeGoesToThePageItWasSpentOnWhenTurnsCome_beforeTheWritesRun() = runTest {
+        val tracker = tracker()
+        store.positions[7] = 1_000
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        // Flicked past after a second, then a page read for forty: no advance in between.
+        seconds(1)
+        tracker.onPage(7, 1_400)
+        seconds(40)
+        tracker.onPage(7, 1_700)
+        advanceUntilIdle()
+
+        assertEquals(300L, store.characters[7L to DAY])
+        assertEquals(1_700L, store.positions[7])
+    }
+
+    @Test
     fun pagesCountWhenTheyWereOnScreenLongEnough() = runTest {
         val tracker = tracker()
         store.positions[7] = 1_000
