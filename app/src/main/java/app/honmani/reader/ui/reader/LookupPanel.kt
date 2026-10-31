@@ -123,6 +123,8 @@ fun LookupPanel(
     onLongerMatch: () -> Unit = {},
     /** The sentence before the tapped one, shown dimmed above the results; blank to show none. */
     previousSentence: String = "",
+    /** The read-aloud button: say the tapped sentence. */
+    onReadSentence: () -> Unit = {},
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -224,6 +226,15 @@ fun LookupPanel(
                     )
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
+                }
+                if (state.tap.sentence.isNotBlank()) {
+                    IconButton(onClick = onReadSentence, modifier = Modifier.size(HEADER_BUTTON)) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_listen),
+                            contentDescription = stringResource(R.string.lookup_read_sentence),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 if (canGoBack) {
                     IconButton(onClick = onBack, modifier = Modifier.size(HEADER_BUTTON)) {

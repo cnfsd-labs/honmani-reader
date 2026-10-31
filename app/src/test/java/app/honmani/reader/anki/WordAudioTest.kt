@@ -42,6 +42,35 @@ class WordAudioTest {
     }
 
     @Test
+    fun aSentenceIsReadByThePhoneVoice_andOnlyTheLastOneIsKept() = runBlocking {
+        val card = CountingVoice()
+        val phone = CountingVoice()
+        val audio = WordAudio(voice = { card }, dir = dir, main = Dispatchers.Unconfined, sentenceVoice = { phone })
+
+        assertEquals(null, audio.playSentence("吾輩は猫である。"))
+        assertEquals(null, audio.playSentence("吾輩は猫である。"))
+        assertEquals(null, audio.playSentence("名前はまだ無い。"))
+
+        assertEquals(emptyList<String>(), card.spoken)
+        // Not remembered: the same sentence is made again, and one file is left.
+        assertEquals(listOf("吾輩は猫である。", "吾輩は猫である。", "名前はまだ無い。"), phone.spoken)
+        assertEquals(listOf("sentence.wav"), dir.listFiles()!!.map { it.name })
+        audio.stop()
+    }
+
+    @Test
+    fun aSentenceVoiceProblemIsReported_notThrown() = runBlocking {
+        val audio = WordAudio(
+            voice = { CountingVoice() },
+            dir = dir,
+            main = Dispatchers.Unconfined,
+            sentenceVoice = { CountingVoice(VoiceProblem.NO_ENGINE) },
+        )
+
+        assertEquals(VoiceProblem.NO_ENGINE, audio.playSentence("吾輩は猫である。"))
+    }
+
+    @Test
     fun aVoiceProblemIsReported() = runBlocking {
         val audio = WordAudio(voice = { CountingVoice(VoiceProblem.NO_JAPANESE) }, dir = dir, main = Dispatchers.Unconfined)
 

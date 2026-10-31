@@ -165,6 +165,7 @@ fun LookupScreen(
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,
                     onBack = { viewModel.back() },
+                    onReadSentence = viewModel::readSentence,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },
                     onOpenDictionaries = onDone,

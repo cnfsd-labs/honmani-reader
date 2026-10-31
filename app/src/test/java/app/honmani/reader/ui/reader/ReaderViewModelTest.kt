@@ -14,6 +14,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -153,6 +154,49 @@ class ReaderViewModelTest {
         val panel = viewModel.panel.value as LookupPanelState.Results
         assertFalse(panel.canShorten)
         assertFalse(panel.canLengthen)
+    }
+
+    @Test
+    fun theTappedSentenceCanBeReadAloud_andClosingThePanelStopsIt() {
+        val read = mutableListOf<String>()
+        var stopped = 0
+        val gate = CompletableDeferred<Unit>()
+        val model = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            readAloud = { read += it; gate.await(); null },
+            stopSpeaking = { stopped++ },
+        )
+        model.onTap(TapLookup(text = "猫だ。", sentence = "吾輩は猫だ。", sentenceOffset = 3))
+        pending.getValue("猫だ。").complete(LookupResult(listOf(entry("猫", "猫"))))
+
+        model.readSentence()
+        assertEquals(listOf("吾輩は猫だ。"), read)
+
+        model.dismiss()
+        assertEquals(1, stopped)
+        // The reading that was still preparing is cancelled.
+        assertTrue(gate.isActive)
+    }
+
+    @Test
+    fun aSentenceThatCannotBeReadIsReported() {
+        val problems = mutableListOf<app.honmani.reader.anki.VoiceProblem>()
+        val model = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            readAloud = { app.honmani.reader.anki.VoiceProblem.NO_JAPANESE },
+        )
+        model.onTap(TapLookup(text = "猫", sentence = "猫", sentenceOffset = 0))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+
+        val collected = kotlinx.coroutines.CoroutineScope(Dispatchers.Unconfined).launch {
+            model.voiceProblems.collect { problems += it }
+        }
+        model.readSentence()
+        collected.cancel()
+
+        assertEquals(listOf(app.honmani.reader.anki.VoiceProblem.NO_JAPANESE), problems)
     }
 
     @Test

@@ -396,6 +396,7 @@
     <string name="inflection_classical">classical form</string>
 
     <string name="lookup_close">Close</string>
+    <string name="lookup_read_sentence">Read the sentence aloud</string>
     <string name="lookup_match_shorter">Match one character less</string>
     <string name="lookup_match_longer">Match one character more</string>
     <string name="lookup_activity_label">Honmani</string>
@@ -403,7 +404,7 @@
     <string name="lookup_from_here">look up from here</string>
     <string name="action_clear">Clear</string>
     <string name="action_lookup_word">Look up a word</string>
-    <string name="listen_failed">Can\'t say the word: %1$s.</string>
+    <string name="listen_failed">Can\'t say it: %1$s.</string>
     <string name="lookup_nothing_found">No entry for “%1$s”.</string>
     <string name="lookup_no_dictionaries">No dictionary is installed yet. Get one in Settings → Dictionaries – it takes a minute.</string>
     <string name="lookup_open_dictionaries">Dictionaries</string>

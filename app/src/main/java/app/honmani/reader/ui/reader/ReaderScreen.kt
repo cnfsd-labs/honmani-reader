@@ -243,6 +243,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onShowKanji = viewModel::showKanji,
                     onBack = { viewModel.back() },
                     previousSentence = if (showPreviousSentence) state.tap.previousSentence else "",
+                    onReadSentence = viewModel::readSentence,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },
                     onOpenDictionaries = {

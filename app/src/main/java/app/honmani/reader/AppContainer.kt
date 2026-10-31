@@ -192,9 +192,16 @@ class AppContainer(context: Context) {
     /** Audio for cards waits here until AnkiDroid has copied it; see `res/xml/file_paths.xml`. */
     val ankiAudioDir = File(appContext.cacheDir, "anki-audio")
 
-    /** The lookup panel's listen button: the card voice, or the phone's when card audio is off. */
+    /**
+     * The lookup panel's listen button: the card voice, or the phone's when card audio is off;
+     * its read-aloud button for the sentence always uses the phone's voice.
+     */
     val wordAudio: WordAudio by lazy {
-        WordAudio(voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice }, dir = File(appContext.cacheDir, "listen"))
+        WordAudio(
+            voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice },
+            dir = File(appContext.cacheDir, "listen"),
+            sentenceVoice = { phoneVoice },
+        )
     }
 
     val ankiExporter: AnkiExporter by lazy {

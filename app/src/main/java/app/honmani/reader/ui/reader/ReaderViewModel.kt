@@ -104,6 +104,10 @@ class ReaderViewModel(
     private val lookupKanji: suspend (String) -> Map<String, KanjiInfo> = { emptyMap() },
     /** Says a word (its reading); returns why it couldn't. See [app.honmani.reader.anki.WordAudio]. */
     private val say: suspend (String) -> VoiceProblem? = { null },
+    /** Reads a sentence aloud with the phone's voice; returns why it couldn't. See [app.honmani.reader.anki.WordAudio.playSentence]. */
+    private val readAloud: suspend (String) -> VoiceProblem? = { null },
+    /** Stops what [readAloud] or [say] is playing. */
+    private val stopSpeaking: () -> Unit = {},
     /** Where lookups run and results become what the panel shows (parsing definitions), off the main thread. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
@@ -142,6 +146,27 @@ class ReaderViewModel(
         viewModelScope.launch {
             say(group.reading.ifEmpty { group.expression })?.let { _voiceProblems.send(it) }
         }
+    }
+
+    private var readJob: Job? = null
+
+    /** Reads the tapped sentence aloud; a second press starts it again. */
+    fun readSentence() {
+        val sentence = _panel.value?.tap?.sentence?.takeIf { it.isNotBlank() } ?: return
+        readJob?.cancel()
+        readJob = viewModelScope.launch {
+            readAloud(sentence)?.let { _voiceProblems.send(it) }
+        }
+    }
+
+    private fun stopReading() {
+        readJob?.cancel()
+        readJob = null
+        stopSpeaking()
+    }
+
+    override fun onCleared() {
+        stopReading()
     }
 
     fun onTap(tap: TapLookup) {
@@ -392,6 +417,7 @@ class ReaderViewModel(
     }
 
     fun dismiss() {
+        stopReading()
         lookupJob?.cancel()
         show(null)
     }
@@ -436,6 +462,8 @@ class ReaderViewModel(
                     inAnki = { container.wordRepository.inAnki(it) },
                     lookupKanji = { lookup.kanji(it) },
                     say = { container.wordAudio.play(it) },
+                    readAloud = { container.wordAudio.playSentence(it) },
+                    stopSpeaking = { container.wordAudio.stop() },
                 )
             }
         }
