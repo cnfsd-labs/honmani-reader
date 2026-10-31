@@ -78,10 +78,11 @@ object WordMarks {
             val kind = when {
                 tint && knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
                 tint && mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
-                knownWords && knowledge.isKnown(token.key) -> WordMark.Kind.KNOWN
-                else -> continue
+                else -> null
             }
-            marks += WordMark(token.start, token.length, kind)
+            if (kind != null) marks += WordMark(token.start, token.length, kind)
+            // Also for a word marked learned in Words and never read: it is new and known at once.
+            if (knownWords && knowledge.isKnown(token.key)) marks += WordMark(token.start, token.length, WordMark.Kind.KNOWN)
         }
         if (sentences) marks += oneUnknownSentences(text, tokens, knowledge)
         return marks
