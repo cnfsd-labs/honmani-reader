@@ -65,6 +65,7 @@ import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
 import app.honmani.reader.ui.settings.SettingsScreen
 import app.honmani.reader.ui.words.WordsScreen
+import app.honmani.reader.ui.words.openInDictionary
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -240,6 +241,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     state = state,
                     onClose = viewModel::dismiss,
                     onAddToAnki = { group -> anki.whenReady { viewModel.addToAnki(group) } },
+                    onSetStarred = viewModel::setStarred,
+                    onEditLookup = { openInDictionary(context, it) },
                     onListen = viewModel::listen,
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,

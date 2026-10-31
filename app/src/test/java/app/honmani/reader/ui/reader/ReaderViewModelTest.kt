@@ -294,6 +294,31 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun starringAWordShowsAtOnceAndSavesTheWordFirst() {
+        val stars = mutableListOf<Triple<String, String, Boolean>>()
+        val saved = mutableSetOf<String>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { saved += it.expression },
+            starredAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.toSet() },
+            saveStar = { e, r, starred -> stars += Triple(e, r, starred && e in saved) },
+        )
+        model.onTap(tap("食べました。"))
+        val group = (model.panel.value as LookupPanelState.Results).groups.single()
+        // The word list says it is starred already.
+        assertEquals(setOf(WordRepository.key("食べる", "食べる")), (model.panel.value as LookupPanelState.Results).starred)
+
+        model.setStarred(group, false)
+
+        assertEquals(emptySet<String>(), (model.panel.value as LookupPanelState.Results).starred)
+        assertEquals(listOf(Triple("食べる", "食べる", false)), stars)
+        model.setStarred(group, true)
+        assertEquals(setOf(WordRepository.key("食べる", "食べる")), (model.panel.value as LookupPanelState.Results).starred)
+        assertEquals(Triple("食べる", "食べる", true), stars.last())
+    }
+
+    @Test
     fun aKanjiNoWordStartsWithShowsTheKanji() {
         viewModel.onTap(tap("嘉兵衛"))
         pending.getValue("嘉兵衛").complete(LookupResult(emptyList()))

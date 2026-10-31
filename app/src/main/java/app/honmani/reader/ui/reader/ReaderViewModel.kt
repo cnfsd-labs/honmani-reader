@@ -48,6 +48,8 @@ sealed interface LookupPanelState {
         val highlight: Highlight,
         /** Words already in Anki, as [WordRepository.key]s. */
         val inAnki: Set<String> = emptySet(),
+        /** Words starred in the word list, as [WordRepository.key]s. */
+        val starred: Set<String> = emptySet(),
         /** Words whose card is being made right now, as [WordRepository.key]s. */
         val addingToAnki: Set<String> = emptySet(),
         /** The results this word was reached from by tapping a reference; null for a tap in the book. */
@@ -100,6 +102,10 @@ class ReaderViewModel(
     private val addCard: suspend (CardContent) -> AnkiResult = { AnkiResult.Refused },
     /** Which of these written forms are in Anki, as [WordRepository.key]s. */
     private val inAnki: suspend (Collection<String>) -> Set<String> = { emptySet() },
+    /** Which of these words (expression, reading) are starred, as [WordRepository.key]s. */
+    private val starredAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
+    /** Stars or unstars the saved word (expression, reading). */
+    private val saveStar: suspend (expression: String, reading: String, starred: Boolean) -> Unit = { _, _, _ -> },
     /** The kanji dictionaries' entries for the kanji in a text; see [app.honmani.reader.lookup.DictionaryLookup.kanji]. */
     private val lookupKanji: suspend (String) -> Map<String, KanjiInfo> = { emptyMap() },
     /** Says a word (its reading); returns why it couldn't. See [app.honmani.reader.anki.WordAudio]. */
@@ -227,8 +233,9 @@ class ReaderViewModel(
             // later, while the panel slides in: waiting for them made every lookup slower.
             val groups = (_panel.value as? LookupPanelState.Results)?.takeIf { it.tap == tap }?.groups ?: return@launch
             val inAnki = wordsInAnki(groups)
+            val starred = starredWords(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, kanji = kanji) }
         }
     }
 
@@ -273,11 +280,12 @@ class ReaderViewModel(
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
-            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), kanji = emptyMap()) }
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), kanji = emptyMap()) }
             _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
+            val starred = starredWords(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, kanji = kanji) }
         }
     }
 
@@ -296,6 +304,7 @@ class ReaderViewModel(
                 current.copy(
                     groups = groups,
                     inAnki = wordsInAnki(groups),
+                    starred = emptySet(),
                     addingToAnki = emptySet(),
                     previous = current,
                     kanji = kanjiOf(groups),
@@ -344,6 +353,37 @@ class ReaderViewModel(
     } catch (e: Exception) {
         log("Checking Anki words failed: $e")
         emptySet()
+    }
+
+    private suspend fun starredWords(groups: List<LookupGroup>): Set<String> = try {
+        starredAmong(groups.map { it.expression to it.reading })
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log("Checking starred words failed: $e")
+        emptySet()
+    }
+
+    /**
+     * Stars or unstars [group] of the tapped text. The word is saved first if this lookup hasn't
+     * (only the best match of a tap is), as when adding it to Anki.
+     */
+    fun setStarred(group: LookupGroup, starred: Boolean) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        updateResults(tap) { it.copy(starred = if (starred) it.starred + key else it.starred - key) }
+        viewModelScope.launch {
+            try {
+                if (state.previous == null) record(tap, group).join()
+                saveStar(group.expression, group.reading, starred)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Starring a word failed: $e")
+                updateResults(tap) { it.copy(starred = if (starred) it.starred - key else it.starred + key) }
+            }
+        }
     }
 
     /** Adds [group] from the panel to Anki, with the tapped sentence, and saves the word. */
@@ -491,6 +531,10 @@ class ReaderViewModel(
                     },
                     addCard = { container.ankiExporter.add(it) },
                     inAnki = { container.wordRepository.inAnki(it) },
+                    starredAmong = { container.wordRepository.starredAmong(it) },
+                    saveStar = { expression, reading, starred ->
+                        container.wordRepository.setStarred(expression, reading, starred)
+                    },
                     lookupKanji = { lookup.kanji(it) },
                     say = { container.wordAudio.play(it) },
                     readAloud = { container.wordAudio.playSentence(it) },

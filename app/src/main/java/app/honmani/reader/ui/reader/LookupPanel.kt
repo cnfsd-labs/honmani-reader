@@ -40,6 +40,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.CircularProgressIndicator
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -88,6 +91,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.words.WordRepository
@@ -117,6 +121,10 @@ fun LookupPanel(
     onOpenDictionaries: () -> Unit,
     modifier: Modifier = Modifier,
     onAddToAnki: (LookupGroup) -> Unit = {},
+    /** The star of a word: star it (true) or remove the star. Words reached from a reference have no star. */
+    onSetStarred: (LookupGroup, Boolean) -> Unit = { _, _ -> },
+    /** Opens the search screen with a text filled in, when nothing was found; null shows no such button. */
+    onEditLookup: ((String) -> Unit)? = null,
     /** The listen button of a word: say it. */
     onListen: (LookupGroup) -> Unit = {},
     /** A word referenced in a definition was tapped. */
@@ -307,6 +315,12 @@ fun LookupPanel(
                             inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
                             adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
                             onAddToAnki = { onAddToAnki(group) },
+                            starred = WordRepository.key(group.expression, group.reading) in state.starred,
+                            onSetStarred = if (state.previous == null) {
+                                { onSetStarred(group, it) }
+                            } else {
+                                null
+                            },
                             onListen = { onListen(group) },
                             onLookupWord = onLookupWord,
                             kanji = state.kanji,
@@ -321,9 +335,19 @@ fun LookupPanel(
                         .verticalScroll(rememberScrollState())
                         .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
                 )
-                is LookupPanelState.NothingFound -> Message(
-                    stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
-                )
+                is LookupPanelState.NothingFound -> Column {
+                    Message(
+                        stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
+                        bottomPadding = 0.dp,
+                    )
+                    // After a long press the copy buttons are already above.
+                    CopyActions(
+                        word = state.tap.text.take(MAX_SHOWN_TEXT),
+                        sentence = state.tap.sentence,
+                        showCopy = !state.tap.bySelection,
+                        onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
+                    )
+                }
                 is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.padding(bottom = 8.dp)) {
                     Message(stringResource(R.string.lookup_no_dictionaries))
                     TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
@@ -338,8 +362,15 @@ fun LookupPanel(
 private const val MAX_SHOWN_TEXT = 8
 
 /** Copy buttons for a long-press lookup, which has no Android selection toolbar. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CopyActions(word: String, sentence: String) {
+private fun CopyActions(
+    word: String,
+    sentence: String,
+    showCopy: Boolean = true,
+    /** Opens the search screen with the text; the button is left out when null. */
+    onEdit: (() -> Unit)? = null,
+) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -352,10 +383,15 @@ private fun CopyActions(word: String, sentence: String) {
             }
         }
     }
-    Row(modifier = Modifier.padding(start = 12.dp, end = 12.dp)) {
-        TextButton(onClick = { copy(word) }) { Text(stringResource(R.string.lookup_copy_word)) }
-        if (sentence.isNotBlank()) {
-            TextButton(onClick = { copy(sentence) }) { Text(stringResource(R.string.lookup_copy_sentence)) }
+    FlowRow(modifier = Modifier.padding(start = 12.dp, end = 12.dp)) {
+        if (showCopy) {
+            TextButton(onClick = { copy(word) }) { Text(stringResource(R.string.lookup_copy_word)) }
+            if (sentence.isNotBlank()) {
+                TextButton(onClick = { copy(sentence) }) { Text(stringResource(R.string.lookup_copy_sentence)) }
+            }
+        }
+        if (onEdit != null) {
+            TextButton(onClick = onEdit) { Text(stringResource(R.string.lookup_edit)) }
         }
     }
 }
@@ -401,12 +437,11 @@ private fun MatchControls(
         } else {
             Spacer(modifier = Modifier.size(HEADER_BUTTON))
         }
-        Spacer(modifier = Modifier.weight(1f))
     }
 }
 
-/** The header's buttons, a little smaller than the usual 48 dp so the header stays slim. */
-private val HEADER_BUTTON = 40.dp
+/** The header's buttons: the usual 48 dp touch size, for the thumb at the bottom of a tall phone. */
+private val HEADER_BUTTON = 48.dp
 private val CLOSE_DISTANCE = 56.dp
 private val CLOSE_VELOCITY = 600.dp
 
@@ -419,11 +454,11 @@ private class SwipeState {
 }
 
 @Composable
-private fun Message(text: String) {
+private fun Message(text: String, bottomPadding: Dp = 16.dp) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = bottomPadding),
     )
 }
 
@@ -447,6 +482,8 @@ private fun LookupGroupItem(
     inAnki: Boolean,
     adding: Boolean,
     onAddToAnki: () -> Unit,
+    starred: Boolean,
+    onSetStarred: ((Boolean) -> Unit)?,
     onLookupWord: (String) -> Unit,
     onListen: () -> Unit = {},
     kanji: Map<String, KanjiInfo> = emptyMap(),
@@ -489,6 +526,17 @@ private fun LookupGroupItem(
                             if (inAnki) R.string.word_in_anki else R.string.action_add_to_anki,
                         ),
                         tint = if (inAnki) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (onSetStarred != null) {
+                IconToggleButton(checked = starred, onCheckedChange = onSetStarred) {
+                    Icon(
+                        imageVector = if (starred) Icons.Filled.Star else Icons.Outlined.Star,
+                        contentDescription = stringResource(
+                            if (starred) R.string.action_unstar_word else R.string.action_star_word,
+                        ),
+                        tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

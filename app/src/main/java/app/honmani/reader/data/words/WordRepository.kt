@@ -161,6 +161,17 @@ class WordRepository(
 
     suspend fun setStarred(id: Long, starred: Boolean) = dao.setStarred(id, starred)
 
+    /** Stars or unstars a saved word by its written form and reading; nothing if it isn't saved. */
+    suspend fun setStarred(expression: String, reading: String, starred: Boolean) {
+        dao.find(expression, reading)?.let { dao.setStarred(it.id, starred) }
+    }
+
+    /** Which of these words (expression, reading) are starred, as [key]s. */
+    suspend fun starredAmong(words: Collection<Pair<String, String>>): Set<String> =
+        words.filter { (expression, reading) -> dao.find(expression, reading)?.starred == true }
+            .map { (expression, reading) -> key(expression, reading) }
+            .toSet()
+
     suspend fun markLearned(id: Long) = dao.markLearned(id)
 
     suspend fun markLearning(id: Long) = dao.markLearning(id)
