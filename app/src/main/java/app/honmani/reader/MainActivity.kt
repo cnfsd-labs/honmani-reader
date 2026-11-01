@@ -45,8 +45,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Dark mode switches (by hand or at sunset) without recreating the activity: that would drop
-     * the open book and its lookup panel. Compose follows the system theme by itself; the system
+     * Dark mode, font size and language switch (by hand or at sunset) without recreating the
+     * activity: that would drop the open book and its lookup panel. Compose follows the system theme by itself; the system
      * bars' icon colours are chosen when edge-to-edge is set up, so set it up again.
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
