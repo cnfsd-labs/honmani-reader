@@ -1,5 +1,6 @@
 package app.honmani.reader.data.dictionary
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -65,6 +66,18 @@ const val LOOKUP_SQL_PLAN_CHECK =
     "EXPLAIN QUERY PLAN SELECT * FROM term WHERE expression IN ('a', 'b') " +
         "UNION ALL SELECT * FROM term WHERE reading IN ('a', 'b')"
 
+/** Sorts after every text that starts with the same prefix (U+10FFFF; SQLite compares UTF-8 bytes). */
+const val PREFIX_END = "\uDBFF\uDFFF"
+
+/** A term without its glossary, for ranking search results before loading the few shown. */
+data class TermKey(
+    val id: Long,
+    @ColumnInfo(name = "dictionary_id") val dictionaryId: Long,
+    val expression: String,
+    val reading: String,
+    val score: Double,
+)
+
 @Dao
 interface TermDao {
     @Insert
@@ -80,6 +93,35 @@ interface TermDao {
             "UNION ALL SELECT * FROM term WHERE reading IN (:texts)",
     )
     suspend fun findByExpressionOrReading(texts: List<String>): List<TermEntity>
+
+    /**
+     * Light rows of terms whose written form is at least [from] and below [to]: with `to` the
+     * prefix plus [PREFIX_END], the terms starting with a prefix, on the expression index.
+     */
+    @Query(
+        "SELECT id, dictionary_id, expression, reading, score FROM term " +
+            "WHERE expression >= :from AND expression < :to LIMIT :limit",
+    )
+    suspend fun keysByExpressionRange(from: String, to: String, limit: Int): List<TermKey>
+
+    /** As [keysByExpressionRange], on the reading. */
+    @Query(
+        "SELECT id, dictionary_id, expression, reading, score FROM term " +
+            "WHERE reading >= :from AND reading < :to LIMIT :limit",
+    )
+    suspend fun keysByReadingRange(from: String, to: String, limit: Int): List<TermKey>
+
+    /** Light rows of terms whose written form matches the GLOB [pattern]. */
+    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE expression GLOB :pattern LIMIT :limit")
+    suspend fun keysByExpressionPattern(pattern: String, limit: Int): List<TermKey>
+
+    /** Light rows of terms whose reading matches the GLOB [pattern]. */
+    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE reading GLOB :pattern LIMIT :limit")
+    suspend fun keysByReadingPattern(pattern: String, limit: Int): List<TermKey>
+
+    /** The terms with [ids] (at most [MAX_LOOKUP_TEXTS]). */
+    @Query("SELECT * FROM term WHERE id IN (:ids)")
+    suspend fun findByIds(ids: List<Long>): List<TermEntity>
 
     @Insert
     suspend fun insertPreset(preset: GlossaryPresetEntity)

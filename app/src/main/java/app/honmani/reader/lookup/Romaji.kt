@@ -68,6 +68,135 @@ object Romaji {
         return s
     }
 
+    /**
+     * Romaji typed for a search, turned into kana the way a Japanese keyboard does it (Hepburn,
+     * kunrei or wapuro; nn, n' and n before a consonant are ん, m before b/p/m too, a doubled
+     * consonant or tch is っ, - is ー, a macron doubles its vowel). Kana and other characters
+     * are kept, so "たb" works too. The letters of a syllable still being typed stay open:
+     * [Typed.pending] lists the kana they can become ("tab" is た plus ば, び, ぶ, べ or ぼ).
+     */
+    fun toKana(text: String): Typed {
+        val input = buildString {
+            for (c in text.lowercase()) {
+                val vowel = MACRONS[c]
+                if (vowel == null) append(c) else append(vowel).append(if (vowel == 'o') 'u' else vowel)
+            }
+        }
+        val out = StringBuilder()
+        var i = 0
+        while (i < input.length) {
+            val c = input[i]
+            val next = input.getOrNull(i + 1)
+            val afterNext = input.getOrNull(i + 2)
+            when {
+                c !in 'a'..'z' -> {
+                    when {
+                        c == '-' -> out.append('ー')
+                        c == '\'' && out.endsWith("ん") -> Unit
+                        else -> out.append(c)
+                    }
+                    i++
+                }
+                // nn: ん, or ん before a syllable of the n row as Hepburn writes it (konnichi).
+                c == 'n' && next == 'n' -> {
+                    out.append('ん')
+                    i += if (afterNext != null && (afterNext in VOWEL_LETTERS || afterNext == 'y')) 1 else 2
+                }
+                c == 'n' && next != null && next !in VOWEL_LETTERS && next != 'y' -> {
+                    out.append('ん')
+                    i++
+                }
+                c == 'm' && next != null && next in "bpm" -> {
+                    out.append('ん')
+                    i++
+                }
+                c == 't' && next == 'c' && afterNext == 'h' -> {
+                    out.append('っ')
+                    i++
+                }
+                c == next && c !in VOWEL_LETTERS && c != 'n' -> {
+                    out.append('っ')
+                    i++
+                }
+                else -> {
+                    val length = (minOf(MAX_INPUT, input.length - i) downTo 1)
+                        .firstOrNull { INPUT.containsKey(input.substring(i, i + it)) }
+                    if (length != null) {
+                        out.append(INPUT.getValue(input.substring(i, i + length)))
+                        i += length
+                    } else {
+                        val rest = input.substring(i)
+                        val pending = completions(rest)
+                        if (pending.isNotEmpty()) return Typed(out.toString(), pending)
+                        out.append(c)
+                        i++
+                    }
+                }
+            }
+        }
+        return Typed(out.toString(), emptyList())
+    }
+
+    /** What [toKana] made of a text: [kana], then one of [pending] if not empty. */
+    data class Typed(val kana: String, val pending: List<String>) {
+        /** True if the text ends on a finished syllable. */
+        val complete: Boolean get() = pending.isEmpty()
+    }
+
+    /** Kana the unfinished letters [rest] can still become, none the prefix of another. */
+    private fun completions(rest: String): List<String> {
+        val kana = INPUT.filterKeys { it.length > rest.length && it.startsWith(rest) }.values.distinct().sorted()
+        return kana.filter { candidate -> kana.none { it != candidate && candidate.startsWith(it) } }
+    }
+
+    private const val VOWEL_LETTERS = "aiueo"
+    private const val MAX_INPUT = 4
+
+    /** Romaji as typed, to kana. */
+    private val INPUT: Map<String, String> = buildMap {
+        val vowels = listOf("a", "i", "u", "e", "o")
+        fun row(consonant: String, kana: String) =
+            vowels.forEachIndexed { i, v -> if (kana[i] != '・') put(consonant + v, kana[i].toString()) }
+        fun glide(consonant: String, kana: String) {
+            put(consonant + "a", kana + "ゃ")
+            put(consonant + "u", kana + "ゅ")
+            put(consonant + "o", kana + "ょ")
+        }
+        row("", "あいうえお")
+        row("k", "かきくけこ")
+        row("g", "がぎぐげご")
+        row("s", "さしすせそ")
+        row("z", "ざじずぜぞ")
+        row("t", "たちつてと")
+        row("d", "だぢづでど")
+        row("n", "なにぬねの")
+        row("h", "はひふへほ")
+        row("b", "ばびぶべぼ")
+        row("p", "ぱぴぷぺぽ")
+        row("m", "まみむめも")
+        row("y", "や・ゆ・よ")
+        row("r", "らりるれろ")
+        row("w", "わ・う・を")
+        row("x", "ぁぃぅぇぉ")
+        row("l", "ぁぃぅぇぉ")
+        for ((consonant, kana) in listOf(
+            "k" to "き", "g" to "ぎ", "s" to "し", "z" to "じ", "j" to "じ", "t" to "ち", "c" to "ち",
+            "d" to "ぢ", "n" to "に", "h" to "ひ", "b" to "び", "p" to "ぴ", "m" to "み", "r" to "り",
+        )) glide(consonant + "y", kana)
+        glide("sh", "し")
+        glide("ch", "ち")
+        glide("j", "じ")
+        listOf("x", "l").forEach { put(it + "ya", "ゃ"); put(it + "yu", "ゅ"); put(it + "yo", "ょ"); put(it + "tu", "っ"); put(it + "tsu", "っ") }
+        put("shi", "し"); put("chi", "ち"); put("tsu", "つ"); put("ji", "じ"); put("fu", "ふ")
+        put("she", "しぇ"); put("che", "ちぇ"); put("je", "じぇ")
+        put("fa", "ふぁ"); put("fi", "ふぃ"); put("fe", "ふぇ"); put("fo", "ふぉ")
+        put("va", "ゔぁ"); put("vi", "ゔぃ"); put("vu", "ゔ"); put("ve", "ゔぇ"); put("vo", "ゔぉ")
+        put("thi", "てぃ"); put("dhi", "でぃ"); put("twu", "とぅ"); put("dwu", "どぅ")
+        put("tsa", "つぁ"); put("tse", "つぇ"); put("tso", "つぉ")
+        put("wi", "うぃ"); put("we", "うぇ"); put("ye", "いぇ")
+        put("nn", "ん"); put("n'", "ん")
+    }
+
     private val BASE: Map<Char, String> = buildMap {
         fun row(kana: String, vararg romaji: String) = kana.forEachIndexed { i, c -> put(c, romaji[i]) }
         row("あいうえお", "a", "i", "u", "e", "o")

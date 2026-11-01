@@ -20,6 +20,11 @@ object JapaneseText {
         for (c in text) append(if (c in KATAKANA_FIRST..KATAKANA_LAST) c - KATAKANA_TO_HIRAGANA else c)
     }
 
+    /** [text] with hiragana in katakana (ゝゞ and the rest are kept). */
+    fun toKatakana(text: String): String = buildString(text.length) {
+        for (c in text) append(if (c in 'ぁ'..'ゖ') c + KATAKANA_TO_HIRAGANA else c)
+    }
+
     fun containsKatakana(text: String): Boolean = text.any { it in KATAKANA_FIRST..KATAKANA_LAST }
 
     fun isHiragana(c: Char): Boolean = c in 'ぁ'..'ゖ'

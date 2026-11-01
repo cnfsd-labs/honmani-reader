@@ -7,8 +7,10 @@ import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.GlossaryPacker
 import app.honmani.reader.data.dictionary.KanjiDao
 import app.honmani.reader.data.dictionary.MAX_LOOKUP_TEXTS
+import app.honmani.reader.data.dictionary.PREFIX_END
 import app.honmani.reader.data.dictionary.TermDao
 import app.honmani.reader.data.dictionary.TermEntity
+import app.honmani.reader.data.dictionary.TermKey
 import app.honmani.reader.data.dictionary.TermMetaDao
 import app.honmani.reader.data.dictionary.TermMetaEntity
 
@@ -207,6 +209,80 @@ class DictionaryLookup(
             .thenBy { meta[metaKey(it.term.expression, it.term.reading)]?.rank ?: Double.MAX_VALUE }
             .then(entryOrder)
         return LookupResult(entries.sortedWith(order), meta = meta)
+    }
+
+    /**
+     * Searches the dictionaries for [query] as typed so far ([SearchQuery]: Japanese, romaji also
+     * half typed, wildcards). The words it spells out come first, then other script and
+     * deinflected forms, then words that start with it (or match its pattern); each tier the
+     * more common word first. At most about [maxWords] words start with the query.
+     */
+    suspend fun search(query: String, maxWords: Int = MAX_SEARCH_WORDS): LookupResult {
+        val dictionaries = dictionaryDao.enabledReady().associateBy { it.id }
+        if (dictionaries.values.none { it.termCount > 0 }) {
+            return LookupResult(emptyList(), dictionariesAvailable = false)
+        }
+        val parsed = SearchQuery.parse(query)
+        if (parsed.isEmpty) return LookupResult(emptyList())
+
+        val tiers = HashMap<Long, Int>()
+        val found = ArrayList<LookupEntry>()
+        parsed.exact.forEachIndexed { index, text ->
+            for (entry in lookup(text, maxLength = text.codePointCount(0, text.length)).entries) {
+                // Only the whole text: た is no result for たべる.
+                if (entry.source != text) continue
+                val tier = if (index == 0 && entry.inflections.isEmpty()) TIER_EXACT else TIER_VARIANT
+                if (entry.term.id !in tiers) found += entry
+                tiers.merge(entry.term.id, tier, ::minOf)
+            }
+        }
+
+        val known = found.mapTo(HashSet()) { it.term.expression to it.term.reading }
+        val keys = buildList {
+            for (prefix in parsed.prefixes) {
+                addAll(termDao.keysByExpressionRange(prefix, prefix + PREFIX_END, SEARCH_KEY_LIMIT))
+                addAll(termDao.keysByReadingRange(prefix, prefix + PREFIX_END, SEARCH_KEY_LIMIT))
+            }
+            for (pattern in parsed.patterns) {
+                addAll(termDao.keysByExpressionPattern(pattern, SEARCH_KEY_LIMIT))
+                addAll(termDao.keysByReadingPattern(pattern, SEARCH_KEY_LIMIT))
+            }
+        }.filter { it.dictionaryId in dictionaries && it.id !in tiers && (it.expression to it.reading) !in known }
+            .distinctBy { it.id }
+        // Ranked on light rows; only the words shown are loaded and unpacked.
+        val keyMeta = metaOfWords(keys.map { it.expression to it.reading }.distinct(), dictionaries)
+        val keyOrder = compareBy<TermKey> { keyMeta[metaKey(it.expression, it.reading)]?.rank ?: Double.MAX_VALUE }
+            .thenBy { DictionaryCatalog.isNames(dictionaries.getValue(it.dictionaryId).title) }
+            .thenBy { it.expression.length }
+            .thenBy(dictionaryOrder) { dictionaries.getValue(it.dictionaryId) }
+            .thenByDescending { it.score }
+        val words = keys.sortedWith(keyOrder).map { it.expression to it.reading }.distinct().take(maxWords).toHashSet()
+        val source = query.trim()
+        val started = keys.filter { (it.expression to it.reading) in words }.map { it.id }
+            .chunked(MAX_LOOKUP_TEXTS)
+            .flatMap { termDao.findByIds(it) }
+            .map { term ->
+                val dictionary = dictionaries.getValue(term.dictionaryId)
+                LookupEntry(
+                    term = unpacked(term, dictionary),
+                    dictionary = dictionary,
+                    source = source,
+                    inflections = emptyList(),
+                    matchedExpression = parsed.patterns.isNotEmpty() || parsed.prefixes.any { term.expression.startsWith(it) },
+                )
+            }
+        val (startedEntries, pointers) = followPointers(started) { _, _ -> false }
+
+        val entries = found + startedEntries
+        val meta = meta(entries, dictionaries)
+        val order = compareBy<LookupEntry> { tiers[it.term.id] ?: TIER_PREFIX }
+            .thenBy { it.term.id in pointers }
+            .thenBy { meta[metaKey(it.term.expression, it.term.reading)]?.rank ?: Double.MAX_VALUE }
+            .thenBy { DictionaryCatalog.isNames(it.dictionary.title) }
+            .thenBy { it.inflections.size }
+            .thenBy { it.term.expression.length }
+            .then(entryOrder)
+        return LookupResult(entries.sortedWith(order).distinctBy { it.term.id }, meta = meta)
     }
 
     /**
@@ -431,6 +507,17 @@ class DictionaryLookup(
         conditions == WordClass.ANY || conditions and termClasses != 0
 
     private companion object {
+        /** Search tiers: the query as typed, its other forms, words starting with it. */
+        const val TIER_EXACT = 0
+        const val TIER_VARIANT = 1
+        const val TIER_PREFIX = 2
+
+        /** Words a search shows at most (besides the ones it spells out). */
+        const val MAX_SEARCH_WORDS = 50
+
+        /** Light rows a search reads per prefix or pattern and column, to rank by frequency. */
+        const val SEARCH_KEY_LIMIT = 200
+
         /** Matches the tap bridge's scan length. */
         const val MAX_SOURCE_LENGTH = 20
 

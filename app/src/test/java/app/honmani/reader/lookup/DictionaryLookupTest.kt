@@ -536,4 +536,78 @@ class DictionaryLookupTest {
         val formal = lookup.lookup("宅へ", ruby = listOf(RubySpan(0, 1, "たく")))
         assertEquals(listOf("宅"), formal.headwords())
     }
+
+    private suspend fun jitenRanks(vararg ranks: Pair<String, Int>) {
+        val rows = ranks.joinToString(",", "[", "]") { (word, rank) -> """["$word","freq",$rank]""" }
+        val files = mapOf(
+            "index.json" to index("Jiten", extra = ",\"frequencyMode\":\"rank-based\""),
+            "term_meta_bank_1.json" to rows,
+        )
+        DictionaryImporter(database).import(writeZip(temp.root, files, "jiten.zip"))
+    }
+
+    private suspend fun searched(query: String) = LookupGroups.from(lookup.search(query), 50).map { it.expression }
+
+    @Test
+    fun searchFindsTheWordARomajiQuerySpellsFirst() = runTest {
+        jmdict()
+        jitenRanks("食べ物" to 50, "食べる" to 100, "猫" to 500)
+
+        assertEquals("食べる", searched("taberu").first())
+        assertEquals("食べる", searched("たべる").first())
+        // Deinflected: 食べた is 食べる.
+        assertEquals("食べる", searched("tabeta").first())
+    }
+
+    @Test
+    fun searchShowsWordsStartingWithAHalfTypedSyllable_moreCommonFirst() = runTest {
+        jmdict()
+        jitenRanks("食べ物" to 50, "食べる" to 100, "猫" to 500)
+
+        assertEquals(listOf("食べ物", "食べる"), searched("tab"))
+        assertEquals(listOf("食べ物", "食べる"), searched("たb"))
+        assertTrue(searched("t").containsAll(listOf("食べる", "高い")))
+    }
+
+    @Test
+    fun searchFindsCatByItsReadingAndItsStart() = runTest {
+        jmdict()
+        jitenRanks("猫" to 500)
+
+        assertEquals(listOf("猫", "ねこ"), searched("ねこ"))
+        assertEquals(listOf("猫", "ねこ"), searched("neko"))
+        assertEquals(listOf("猫", "ねこ"), searched("ne"))
+        assertEquals("猫", searched("nek").first())
+        assertEquals(listOf("猫"), searched("猫"))
+    }
+
+    @Test
+    fun searchWithWildcards() = runTest {
+        jmdict()
+
+        assertEquals(setOf("食べる", "食べ物"), searched("食*").toSet())
+        assertEquals(setOf("食べる", "食べ物", "高い"), searched("ta*").toSet())
+        assertEquals(setOf("帰る", "来る"), searched("?る").toSet())
+        assertEquals(listOf("勉強"), searched("*きょう"))
+    }
+
+    @Test
+    fun searchWithoutDictionariesSaysSo() = runTest {
+        assertFalse(lookup.search("neko").dictionariesAvailable)
+        jmdict()
+        assertTrue(lookup.search("").entries.isEmpty())
+        assertTrue(lookup.search("zzz").entries.isEmpty())
+    }
+
+    @Test
+    fun searchPrefixQueryUsesTheIndexes() {
+        val plan = listOf("expression", "reading").joinToString("\n") { column ->
+            database.query("EXPLAIN QUERY PLAN SELECT id FROM term WHERE $column >= 'a' AND $column < 'b'", null).use { cursor ->
+                buildList { while (cursor.moveToNext()) add(cursor.getString(cursor.getColumnIndexOrThrow("detail"))) }
+            }.joinToString("\n")
+        }
+
+        assertTrue(plan, plan.contains("index_term_expression"))
+        assertTrue(plan, plan.contains("index_term_reading"))
+    }
 }

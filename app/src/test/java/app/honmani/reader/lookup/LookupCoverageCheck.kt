@@ -6,6 +6,7 @@ import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.GlossaryPresetEntity
 import app.honmani.reader.data.dictionary.TermDao
 import app.honmani.reader.data.dictionary.TermEntity
+import app.honmani.reader.data.dictionary.TermKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -143,6 +144,7 @@ class LookupCoverageCheck {
 
     private class TsvTermDao(file: File) : TermDao {
         private val byText = HashMap<String, MutableList<TermEntity>>()
+        private val all = ArrayList<TermEntity>()
         val dictionaryIds = HashSet<Long>()
 
         init {
@@ -163,6 +165,7 @@ class LookupCoverageCheck {
                     termTags = null,
                 )
                 dictionaryIds += term.dictionaryId
+                all += term
                 byText.getOrPut(term.expression) { ArrayList(1) } += term
                 if (term.reading.isNotEmpty() && term.reading != term.expression) {
                     byText.getOrPut(term.reading) { ArrayList(1) } += term
@@ -172,6 +175,27 @@ class LookupCoverageCheck {
 
         override suspend fun findByExpressionOrReading(texts: List<String>): List<TermEntity> =
             texts.flatMap { byText[it].orEmpty() }
+
+        private fun keys(limit: Int, test: (TermEntity) -> Boolean) =
+            all.asSequence().filter(test).take(limit).map { TermKey(it.id, it.dictionaryId, it.expression, it.reading, it.score) }.toList()
+
+        private fun glob(pattern: String) =
+            Regex(Regex.escape(pattern).replace("*", "\\E.*\\Q").replace("?", "\\E.\\Q").replace("[[]", "["))
+
+        override suspend fun keysByExpressionRange(from: String, to: String, limit: Int) =
+            keys(limit) { it.expression >= from && it.expression < to }
+
+        override suspend fun keysByReadingRange(from: String, to: String, limit: Int) =
+            keys(limit) { it.reading >= from && it.reading < to }
+
+        override suspend fun keysByExpressionPattern(pattern: String, limit: Int) =
+            glob(pattern).let { regex -> keys(limit) { regex.matches(it.expression) } }
+
+        override suspend fun keysByReadingPattern(pattern: String, limit: Int) =
+            glob(pattern).let { regex -> keys(limit) { regex.matches(it.reading) } }
+
+        override suspend fun findByIds(ids: List<Long>): List<TermEntity> =
+            ids.toSet().let { wanted -> all.filter { it.id in wanted } }
 
         override suspend fun glossaryPreset(dictionaryId: Long): ByteArray? = null
         override suspend fun insertAll(terms: List<TermEntity>) = error("read only")
