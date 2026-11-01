@@ -1,6 +1,8 @@
 package app.honmani.reader.data.sync
 
+import app.honmani.reader.data.TooLargeException
 import app.honmani.reader.data.readBytesAtMost
+import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 import java.io.IOException
 import java.net.URLDecoder
@@ -124,6 +126,7 @@ class EpubPositions private constructor(
         internal const val MAX_DOCUMENT_BYTES = 32 * 1024 * 1024
         private val DOC_FRAGMENT = Regex("""^/body/DocFragment\[(\d+)]""")
         private val STEP = Regex("""^([^\[\].]+)(?:\[(\d+)])?(?:\.(\d+))?$""")
+        private const val TAG = "Honmani.sync"
         private const val BYTE_ORDER_MARK = '\uFEFF'
         private val ENCODING = Regex("""^<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']""")
 
@@ -136,7 +139,14 @@ class EpubPositions private constructor(
                 val starts = IntArray(spine.size)
                 for ((i, name) in spine.withIndex()) {
                     starts[i] = total
-                    val body = zip.text(name)?.let { bodyOf(Xhtml.parse(it)) } ?: continue
+                    val text = try {
+                        zip.text(name)
+                    } catch (e: TooLargeException) {
+                        // Counting needs the whole document; skipping it would shift every later position.
+                        logWarning(TAG, "No progress sync for this book: $name is larger than ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB")
+                        return null
+                    }
+                    val body = text?.let { bodyOf(Xhtml.parse(it)) } ?: continue
                     walk(body) { node ->
                         total += count(node.text!!)
                         true
