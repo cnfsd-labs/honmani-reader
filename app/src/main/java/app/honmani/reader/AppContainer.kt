@@ -97,7 +97,7 @@ class AppContainer(context: Context) {
     private val database: HonmaniDatabase by lazy { HonmaniDatabase.create(appContext) }
 
     /** For work that outlives a screen, such as automatic imports. */
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val dictionaryRepository: DictionaryRepository by lazy {
         DictionaryRepository(database.dictionaryDao())

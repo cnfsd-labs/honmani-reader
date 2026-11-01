@@ -78,6 +78,12 @@ class WordRepository(
 
     suspend fun setAnkiNote(id: Long, noteId: Long?) = dao.setAnkiNote(id, noteId)
 
+    /** Marks many words as in Anki (word id to note id) in one transaction: the lists re-read once. */
+    suspend fun setAnkiNotes(notes: Map<Long, Long>) {
+        if (notes.isEmpty()) return
+        database.withTransaction { for ((id, noteId) in notes) dao.setAnkiNote(id, noteId) }
+    }
+
     /** "expression\u0000reading" keys of the words among [expressions] that are in Anki. */
     suspend fun inAnki(expressions: Collection<String>): Set<String> {
         if (expressions.isEmpty()) return emptySet()

@@ -6,7 +6,9 @@ import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.dictionary.DictionaryImporter
 import app.honmani.reader.data.dictionary.index
 import app.honmani.reader.data.dictionary.writeZip
+import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.data.words.LookedUpWord
+import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.DictionaryLookup
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +67,11 @@ class WordsViewModelTest {
         bookTitle = null,
     )
 
-    private fun viewModel(writeDocument: suspend (String, String) -> Unit = { _, _ -> }): WordsViewModel {
+    private fun viewModel(
+        addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>) -> AnkiResult = { _, _ -> AnkiResult.Refused },
+        markInAnki: suspend (Map<Long, Long>) -> Unit = {},
+        writeDocument: suspend (String, String) -> Unit = { _, _ -> },
+    ): WordsViewModel {
         val lookup = DictionaryLookup(
             database.dictionaryDao(),
             database.termDao(),
@@ -75,6 +81,8 @@ class WordsViewModelTest {
         return WordsViewModel(
             repository = repository,
             writeDocument = writeDocument,
+            addCardDeferred = addCardDeferred,
+            markInAnki = markInAnki,
             zone = { ZoneId.of("UTC") },
             showFrequency = showFrequency,
             frequencyOf = { words -> lookup.frequencies(words) },
@@ -104,12 +112,34 @@ class WordsViewModelTest {
     }
 
     @Test
+    fun addAllToAnkiWritesTheMarksInChunksNotOneByOne() = runTest {
+        repeat(120) { repository.record(lookedUp("語$it")) }
+        val written = mutableListOf<Map<Long, Long>>()
+        val viewModel = viewModel(
+            addCardDeferred = { word, marks ->
+                marks[word.id] = word.id + 1000
+                AnkiResult.Added(word.id + 1000)
+            },
+            markInAnki = { written += it; repository.setAnkiNotes(it) },
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.learning?.size == 120 }
+
+        viewModel.addAllToAnki()
+        val outcome = viewModel.ankiOutcomes.first()
+
+        assertEquals(AnkiOutcome.Many(120, null, null, 0), outcome)
+        assertEquals(listOf(50, 50, 20), written.map { it.size })
+        assertEquals(120, repository.learning.first().count { it.ankiNoteId != null })
+    }
+
+    @Test
     fun theCsvExportHoldsEverySavedWordNotJustTheListShown() = runTest {
         repository.record(lookedUp("猫"))
         repository.record(lookedUp("犬"))
         repository.markLearned(repository.learning.first().first { it.expression == "犬" }.id)
         var written = ""
-        val viewModel = viewModel { _, text -> written = text }
+        val viewModel = viewModel(writeDocument = { _, text -> written = text })
 
         viewModel.exportCsv("content://x/y")
 

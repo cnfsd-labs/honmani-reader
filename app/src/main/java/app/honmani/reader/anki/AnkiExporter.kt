@@ -49,8 +49,13 @@ class AnkiExporter(
 ) {
     private val mutex = Mutex()
 
-    /** Adds [word] with the sentence of [lookup], or of its latest lookup if null. */
-    suspend fun add(word: WordEntity, lookup: WordLookupEntity? = null): AnkiResult = add(content(word, lookup))
+    /**
+     * Adds [word] with the sentence of [lookup], or of its latest lookup if null. With [deferred],
+     * the word's "in Anki" mark (word id to note id) is put there instead of written, so a caller
+     * adding many can write them in one go ([WordRepository.setAnkiNotes]).
+     */
+    suspend fun add(word: WordEntity, lookup: WordLookupEntity? = null, deferred: MutableMap<Long, Long>? = null): AnkiResult =
+        add(content(word, lookup), deferred)
 
     /** [words] as a text file for Anki's import ([AnkiTextFile]), for the chosen deck. */
     suspend fun textFile(words: List<WordEntity>): String {
@@ -137,10 +142,10 @@ class AnkiExporter(
     }
 
     /** Adds a card for [content] and marks the saved word, if there is one, as in Anki. */
-    suspend fun add(content: CardContent): AnkiResult = mutex.withLock {
+    suspend fun add(content: CardContent, deferred: MutableMap<Long, Long>? = null): AnkiResult = mutex.withLock {
         withContext(Dispatchers.IO) {
             try {
-                addLocked(content)
+                addLocked(content, deferred)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -150,14 +155,14 @@ class AnkiExporter(
         }
     }
 
-    private suspend fun addLocked(content: CardContent): AnkiResult {
+    private suspend fun addLocked(content: CardContent, deferred: MutableMap<Long, Long>?): AnkiResult {
         if (anki.packageName() == null) return AnkiResult.NotInstalled
         if (!anki.hasPermission()) return AnkiResult.NoPermission
         val noteType = noteType() ?: return AnkiResult.Refused
         val deck = anki.deck(settings.deck.value) ?: return AnkiResult.Refused
         val plain = AnkiCard.fields(content)
         anki.findNote(noteType, plain[0], plain[1])?.let { existing ->
-            markInAnki(content, existing)
+            markInAnki(content, existing, deferred)
             return AnkiResult.AlreadyInAnki
         }
 
@@ -181,7 +186,7 @@ class AnkiExporter(
             }
             val fields = AnkiCard.fields(content, wordAudio, sentenceAudio)
             val noteId = anki.addNote(noteType, deck, fields, setOf(AnkiCard.TAG)) ?: return AnkiResult.Refused
-            markInAnki(content, noteId)
+            markInAnki(content, noteId, deferred)
             return AnkiResult.Added(noteId, audioProblem)
         } finally {
             made.forEach { it.delete() }
@@ -232,8 +237,9 @@ class AnkiExporter(
         }
     }
 
-    private suspend fun markInAnki(content: CardContent, noteId: Long) {
-        words.find(content.expression, content.reading)?.let { words.setAnkiNote(it.id, noteId) }
+    private suspend fun markInAnki(content: CardContent, noteId: Long, deferred: MutableMap<Long, Long>?) {
+        val word = words.find(content.expression, content.reading) ?: return
+        if (deferred != null) deferred[word.id] = noteId else words.setAnkiNote(word.id, noteId)
     }
 
     private fun shortHash(text: String): String =

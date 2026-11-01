@@ -25,9 +25,11 @@ import app.honmani.reader.data.export.CsvExports
 import java.io.IOException
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -138,6 +140,12 @@ class WordsViewModel(
     private val repository: WordRepository,
     /** Adds a word to Anki with the sentence of a lookup (null: the latest). */
     private val addCard: suspend (WordEntity, WordLookupEntity?) -> AnkiResult = { _, _ -> AnkiResult.Refused },
+    /** Like [addCard], but puts the "in Anki" mark (word id to note id) in the map instead of writing it. */
+    private val addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>) -> AnkiResult = { word, _ -> addCard(word, null) },
+    /** Writes many "in Anki" marks (word id to note id) at once. */
+    private val markInAnki: suspend (Map<Long, Long>) -> Unit = {},
+    /** Where "Add all to Anki" runs, so it goes on if the screen is left; null: with the screen. */
+    private val longRunning: CoroutineScope? = null,
     /** The words as a text file for Anki's import. */
     private val ankiText: suspend (List<WordEntity>) -> String = { "" },
     /** Writes text to a document the reader picked (a content URI). */
@@ -333,21 +341,30 @@ class WordsViewModel(
         if (ankiProgress.value != null) return
         // Set now, not after the list is read, so a second tap can't start a second run.
         ankiProgress.value = 0 to 1
-        viewModelScope.launch {
+        (longRunning ?: viewModelScope).launch {
             var added = 0
             var leftOut = 0
             var stopped: AnkiResult? = null
             var audioProblem: VoiceProblem? = null
+            // The marks are written in chunks, not one by one: each write makes the lists re-read.
+            val marks = LinkedHashMap<Long, Long>()
+            suspend fun flushMarks() {
+                if (marks.isEmpty()) return
+                val batch = LinkedHashMap(marks)
+                marks.clear()
+                withContext(NonCancellable) { markInAnki(batch) }
+            }
             try {
                 val suggested = lists.first().learning.filter { it.ankiNoteId == null && it.id !in grammarWords.value }
                 for ((i, word) in suggested.withIndex()) {
                     ankiProgress.value = i to suggested.size
+                    if (marks.size >= MARK_CHUNK) flushMarks()
                     if (isGrammarWord(word)) {
                         grammarWords.update { it + word.id }
                         leftOut++
                         continue
                     }
-                    when (val result = addCard(word, null)) {
+                    when (val result = addCardDeferred(word, marks)) {
                         is AnkiResult.Added -> {
                             added++
                             audioProblem = audioProblem ?: result.audioProblem
@@ -360,6 +377,7 @@ class WordsViewModel(
                     }
                 }
             } finally {
+                flushMarks()
                 ankiProgress.value = null
             }
             _ankiOutcomes.send(AnkiOutcome.Many(added, stopped, audioProblem, leftOut))
@@ -460,6 +478,9 @@ class WordsViewModel(
     }
 
     companion object {
+        /** Cards added between writes of their "in Anki" marks. */
+        private const val MARK_CHUNK = 50
+
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
@@ -467,6 +488,9 @@ class WordsViewModel(
                 WordsViewModel(
                     repository = container.wordRepository,
                     addCard = { word, lookup -> container.ankiExporter.add(word, lookup) },
+                    addCardDeferred = { word, marks -> container.ankiExporter.add(word, null, marks) },
+                    markInAnki = { container.wordRepository.setAnkiNotes(it) },
+                    longRunning = container.applicationScope,
                     ankiText = { list -> container.ankiExporter.textFile(list) },
                     checkAnki = { container.ankiSync.check() },
                     writeDocument = { uri, text ->
