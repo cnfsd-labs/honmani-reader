@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.Orientation
@@ -833,7 +834,7 @@ private fun KanjiReadings(label: String, readings: List<AnnotatedString>) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.secondary,
             modifier = Modifier
-                .width(32.dp)
+                .widthIn(min = 32.dp)
                 .padding(top = 2.dp),
         )
         Text(
