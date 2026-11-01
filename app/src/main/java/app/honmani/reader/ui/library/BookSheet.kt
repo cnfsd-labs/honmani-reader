@@ -170,7 +170,7 @@ fun BookSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
-                        .height(52.dp),
+                        .heightIn(min = 52.dp),
                 ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Text(
