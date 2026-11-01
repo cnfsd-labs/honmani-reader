@@ -39,8 +39,13 @@ class BookGraderTest {
             lexiconsBuilt++
             lexicon
         },
-        texts = { book -> texts[book.contentHash]?.let { sequenceOf(RubyText(it)) } },
+        texts = { book ->
+            if (book.contentHash in broken) error("unreadable")
+            texts[book.contentHash]?.let { sequenceOf(RubyText(it)) }
+        },
     )
+
+    private val broken = mutableSetOf<String>()
 
     @Test
     fun gradesEachBookOnce_andKeepsTheGradesInFiles() = runBlocking {
@@ -61,6 +66,19 @@ class BookGraderTest {
         assertEquals(0, grader(reopened).gradeAll())
         // Nothing to grade: no lexicon built.
         assertEquals(1, lexiconsBuilt)
+    }
+
+    @Test
+    fun aBookThatThrowsIsKeptAsZeroAndTheOthersAreStillGraded() = runBlocking {
+        val store = DifficultyStore(folder.root)
+        library = listOf(book("bad"), book("a"))
+        broken += "bad"
+
+        assertEquals(2, grader(store).gradeAll())
+
+        assertEquals(0, store.grades.value.getValue("bad").difficulty.score)
+        assertEquals(true, store.grades.value.getValue("a").difficulty.score > 0)
+        assertEquals(0, grader(store).gradeAll())
     }
 
     @Test

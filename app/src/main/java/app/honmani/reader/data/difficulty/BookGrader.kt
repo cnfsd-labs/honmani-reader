@@ -2,6 +2,8 @@ package app.honmani.reader.data.difficulty
 
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.sync.RubyText
+import app.honmani.reader.diagnostics.logWarning
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,8 +62,16 @@ class BookGrader(
             val split = segmenter ?: Segmenter(lexicon(sources)).also { segmenter = it }
             val started = System.nanoTime()
             // Unreadable or too short: kept as score 0, so it isn't tried again on every run.
-            val measured = texts(book)?.let { Difficulty.measure(it, split) }
-            measured?.let { store.saveWords(book.contentHash, it.words) }
+            // Likewise a book that throws: it would otherwise be tried first on every run and
+            // stop the books behind it from ever being graded.
+            val measured = try {
+                texts(book)?.let { Difficulty.measure(it, split) }?.also { store.saveWords(book.contentHash, it.words) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logWarning("Honmani.difficulty", "Grading \"${book.title}\" failed; kept as score 0", e)
+                null
+            }
             val difficulty = measured?.difficulty
                 ?: BookDifficulty(Difficulty.VERSION, score = 0, r95 = 0, kanjiShare = 0f, sentenceLength = 0f, words = 0, distinctWords = 0, unknownShare = 0f)
             store.save(book.contentHash, StoredDifficulty(difficulty, signature))
