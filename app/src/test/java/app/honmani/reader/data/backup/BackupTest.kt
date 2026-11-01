@@ -293,6 +293,42 @@ class BackupTest {
     }
 
     @Test
+    fun aNewerBackupUpdatesAWaitingBookItKnowsFurtherAlong() = runTest {
+        val first = throughFile(oldPhone().backup.export(readerSettings = null))
+        val new = Phone("new")
+        new.backup.restore(first)
+        val key = first.books.first { it.key == "hash-a" }
+        val further = first.copy(
+            books = first.books.map {
+                if (it.key == "hash-a") it.copy(book = it.book!!.copy(characters = 9_000)) else it
+            },
+        )
+
+        new.backup.restore(further)
+
+        assertEquals(9_000L, new.restored.waiting().first { it.key == "hash-a" }.details?.characters)
+        assertEquals(1, new.restored.waiting().count { it.key == "hash-a" })
+        assertEquals(key.book!!.characters, 5_000L)
+        val book = new.addBook("hash-a")
+        val merged = new.backup.onBookAdded(book)
+        assertEquals(9_000L, merged.characters)
+    }
+
+    @Test
+    fun aNonNumberProgressInABackupBecomesZero() = runTest {
+        val backup = oldPhone().backup.export(readerSettings = null)
+        val new = Phone("new")
+        val book = new.addBook("hash-a", characters = 100, progress = 0.5f)
+        val nan = backup.copy(
+            books = backup.books.map { if (it.key == "hash-a") it.copy(book = it.book!!.copy(progress = Float.NaN)) else it },
+        )
+
+        new.backup.restore(nan)
+
+        assertEquals(0f, new.database.bookDao().find(book.id)!!.progress, 0f)
+    }
+
+    @Test
     fun restoringOnTheSamePhoneDoesNotCountTheReadingOfRemovedBooksTwice() = runTest {
         val phone = oldPhone()
         // A lookup in the removed book (id 99), too.

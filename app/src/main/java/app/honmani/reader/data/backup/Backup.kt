@@ -148,12 +148,6 @@ class Backup(
 
     /** Merges [backup] into what this phone has; ttu's reader settings are the caller's. */
     suspend fun restore(backup: BackupFile): RestoreSummary {
-        restoreSettings(backup.settings)
-        milestones.restore(
-            backup.milestones.mapNotNull { (id, day) -> runCatching { id to LocalDate.parse(day) }.getOrNull() }.toMap(),
-        )
-        stretches.merge(backup.stretches.mapValues { (_, steps) -> steps.toIntArray() })
-
         val waitingBefore = restored.waiting().associateBy { it.key }
         val newWaiting = ArrayList<WaitingBook>()
         val positions = ArrayList<BookEntity>()
@@ -190,6 +184,11 @@ class Backup(
                 } else if (entry.key !in waitingBefore && details != null) {
                     ids[entry.key] = nextId
                     newWaiting += WaitingBook(entry.key, nextId--, details)
+                } else if (details != null && waitingBefore[entry.key]?.let { it.details == null || details.characters > it.details.characters } == true) {
+                    // A newer backup knows the book further along (or knew only its statistics before).
+                    val waiting = waitingBefore.getValue(entry.key)
+                    ids[entry.key] = waiting.id
+                    newWaiting += waiting.copy(details = details)
                 } else {
                     idOf(entry.key)
                 }
@@ -276,8 +275,16 @@ class Backup(
                 )
                 catalogsAdded++
             }
+            // Still inside the transaction: a kill before the commit loses both, a kill after it
+            // can't leave reading days under ids no waiting book knows (a retry reuses these ids).
+            restored.addWaiting(newWaiting)
         }
-        restored.addWaiting(newWaiting)
+        // The database came first: a failed restore leaves the settings and files as they were.
+        restoreSettings(backup.settings)
+        milestones.restore(
+            backup.milestones.mapNotNull { (id, day) -> runCatching { id to LocalDate.parse(day) }.getOrNull() }.toMap(),
+        )
+        stretches.merge(backup.stretches.mapValues { (_, steps) -> steps.toIntArray() })
         for (book in positions) restored.setPosition(book.contentHash, position(book, savedAt[book.id] ?: backup.exportedAt))
         wordProgress.restore(progress)
         return RestoreSummary(
@@ -385,7 +392,7 @@ class Backup(
         fun merge(book: BookEntity, details: BackupBookDetails): BookEntity {
             val further = details.characters > book.characters
             return book.copy(
-                progress = if (further) details.progress.coerceIn(0f, 1f) else book.progress,
+                progress = if (further) details.progress.takeUnless { it.isNaN() }?.coerceIn(0f, 1f) ?: 0f else book.progress,
                 characters = if (further) details.characters else book.characters,
                 finishedAt = book.finishedAt ?: details.finishedAt,
                 lastOpenedAt = listOfNotNull(book.lastOpenedAt, details.lastOpenedAt).maxOrNull(),
