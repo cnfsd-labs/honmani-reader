@@ -88,9 +88,12 @@ class BookImporter(
                     // The library keeps text as UTF-8, and Aozora Bunko texts as EPUBs so their
                     // furigana show as ruby. The hash above stays that of the original file.
                     val aozora = try {
-                        TextEncoding.convertToUtf8(temp)
-                        convertAozora(temp, hash, displayName)
+                        convertText(temp, hash, displayName)
                     } catch (_: IOException) {
+                        return Result.Unreadable
+                    } catch (e: OutOfMemoryError) {
+                        // A huge text file: report it as unreadable instead of crashing.
+                        logWarning("Honmani.library", "Not enough memory to import a text file", e)
                         return Result.Unreadable
                     }
                     aozora?.let {
@@ -150,10 +153,17 @@ class BookImporter(
         }
     }
 
-    /** Rewrites [file] as an EPUB if it is an Aozora Bunko text; returns the book, or null. */
-    private fun convertAozora(file: File, hash: String, displayName: String): AozoraBook? {
-        val text = file.readText(Charsets.UTF_8)
-        if (!AozoraText.isAozora(text)) return null
+    /**
+     * Rewrites the text file [file] as UTF-8, or as an EPUB if it is an Aozora Bunko text (the
+     * book is returned then, else null). The file is decoded once.
+     */
+    private fun convertText(file: File, hash: String, displayName: String): AozoraBook? {
+        val decoded = TextEncoding.read(file)
+        val text = decoded.text
+        if (!AozoraText.isAozora(text)) {
+            if (decoded.rewrite) file.writeText(text, Charsets.UTF_8)
+            return null
+        }
         val book = AozoraText.parse(text, fallbackTitle = titleFromFileName(displayName))
         AozoraEpub.write(book, identifier = "urn:sha256:$hash", target = file)
         return book

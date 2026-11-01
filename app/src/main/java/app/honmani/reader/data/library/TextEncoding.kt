@@ -16,8 +16,29 @@ import java.nio.charset.CodingErrorAction
 object TextEncoding {
     private const val SAMPLE_BYTES = 64 * 1024
 
-    /** The longest Japanese novels are about 10 MB of text; the file is held in memory several times over. */
-    internal const val MAX_TEXT_BYTES = 50 * 1024 * 1024
+    /**
+     * The longest Japanese novels are about 10 MB of text (3 bytes per character). The file is
+     * held in memory as bytes and as a String at once, and Aozora conversion builds more on top.
+     */
+    internal const val MAX_TEXT_BYTES = 20 * 1024 * 1024
+
+    /** A text file as it reads: the [text] without byte order mark, in the detected [charset]. */
+    class Decoded(val charset: Charset, val text: String, val rewrite: Boolean)
+
+    /**
+     * Reads [file] once and decodes it. [Decoded.rewrite] says whether the file itself is not yet
+     * plain UTF-8 (another encoding, or a byte order mark) and so has to be written back.
+     * The raw bytes are released before this returns.
+     *
+     * @throws TooLargeException if the file is larger than [maxBytes] (an IOException)
+     */
+    fun read(file: File, maxBytes: Int = MAX_TEXT_BYTES): Decoded {
+        if (file.length() > maxBytes) throw TooLargeException(maxBytes.toLong())
+        val bytes = file.readBytes()
+        val charset = detect(bytes)
+        val start = bomLength(bytes)
+        return Decoded(charset, String(bytes, start, bytes.size - start, charset), rewrite = charset != Charsets.UTF_8 || start != 0)
+    }
 
     /**
      * Rewrites [file] as UTF-8 (without BOM) unless it already is; returns the detected encoding.
@@ -25,14 +46,9 @@ object TextEncoding {
      * @throws TooLargeException if the file is larger than [maxBytes] (an IOException)
      */
     fun convertToUtf8(file: File, maxBytes: Int = MAX_TEXT_BYTES): Charset {
-        if (file.length() > maxBytes) throw TooLargeException(maxBytes.toLong())
-        val bytes = file.readBytes()
-        val charset = detect(bytes)
-        val start = bomLength(bytes)
-        if (charset == Charsets.UTF_8 && start == 0) return charset
-        val text = String(bytes, start, bytes.size - start, charset)
-        file.writeText(text, Charsets.UTF_8)
-        return charset
+        val decoded = read(file, maxBytes)
+        if (decoded.rewrite) file.writeText(decoded.text, Charsets.UTF_8)
+        return decoded.charset
     }
 
     /** The most likely encoding of [bytes], judged from a byte order mark or the first 64 KB. */

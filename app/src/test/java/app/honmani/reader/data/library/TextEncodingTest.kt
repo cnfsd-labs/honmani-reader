@@ -20,6 +20,21 @@ class TextEncodingTest {
     }
 
     @Test
+    fun readDecodesOnce_andSaysWhetherTheFileNeedsRewriting() {
+        fun read(bytes: ByteArray) = TextEncoding.read(File(folder.root, "r.txt").apply { writeBytes(bytes) })
+
+        val utf8 = read(text.toByteArray(Charsets.UTF_8))
+        assertEquals(text, utf8.text)
+        assertEquals(false, utf8.rewrite)
+        val sjis = read(text.toByteArray(charset("windows-31j")))
+        assertEquals(text, sjis.text)
+        assertEquals(true, sjis.rewrite)
+        val bom = read(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + text.toByteArray(Charsets.UTF_8))
+        assertEquals(text, bom.text)
+        assertEquals(true, bom.rewrite)
+    }
+
+    @Test
     fun utf8StaysAsItIs() {
         val bytes = text.toByteArray(Charsets.UTF_8)
         val file = File(folder.root, "same.txt").apply { writeBytes(bytes) }
