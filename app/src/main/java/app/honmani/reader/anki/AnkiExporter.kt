@@ -81,7 +81,8 @@ class AnkiExporter(
                         if (voice != null && problem == null) {
                             try {
                                 wordAudio = packageSound(voice, content.reading.ifEmpty { content.expression }, dir, media)
-                                if (content.sentence.isNotBlank()) {
+                                // Too long for the voice: this card's sentence goes without audio, the rest go on.
+                                if (content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength) {
                                     val rate = settings.sentenceSpeed.value.rate
                                     sentenceAudio = packageSound(voice, content.sentence, dir, media, rate)
                                 }
@@ -170,7 +171,8 @@ class AnkiExporter(
                 try {
                     // The reading, not the written form: a voice can misread kanji, never kana.
                     wordAudio = sound(voice, content.reading.ifEmpty { content.expression }, made)
-                    if (content.sentence.isNotBlank()) {
+                    // A sentence too long for the voice goes without audio; the card still gets its word.
+                    if (content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength) {
                         sentenceAudio = sound(voice, content.sentence, made, settings.sentenceSpeed.value.rate)
                     }
                 } catch (e: VoiceException) {
@@ -197,7 +199,7 @@ class AnkiExporter(
 
     /** The rate is part of the name: Anki keeps the first file of a name. */
     private fun soundName(voice: CardVoice, text: String, rate: Double) =
-        "honmani_" + shortHash(text + "\u0000" + voice.javaClass.simpleName + "\u0000" + rate)
+        "honmani_" + shortHash(text + "\u0000" + voice.id + "\u0000" + rate)
 
     private fun noteType(): Long? {
         val id = settings.noteTypeId?.takeIf { anki.noteTypeExists(it) }

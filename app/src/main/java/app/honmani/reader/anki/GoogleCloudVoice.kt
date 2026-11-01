@@ -40,6 +40,11 @@ class GoogleCloudVoice(
 ) : CardVoice {
     override val extension = "mp3"
 
+    override val id: String get() = "${javaClass.name}:$voice"
+
+    /** The API takes 5,000 bytes of text; Japanese is three bytes a character. */
+    override val maxInputLength: Int get() = 1_600
+
     override suspend fun speak(text: String, out: File, rate: Double) {
         val body = buildJsonObject {
             putJsonObject("input") { put("text", text) }

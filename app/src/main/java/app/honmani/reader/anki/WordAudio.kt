@@ -117,7 +117,7 @@ class WordAudio(
 
         /** Different voices make different recordings of the same text. */
         internal fun name(voice: CardVoice, text: String): String {
-            val digest = MessageDigest.getInstance("SHA-1").digest("${voice.javaClass.name}:$text".toByteArray())
+            val digest = MessageDigest.getInstance("SHA-1").digest("${voice.id}:$text".toByteArray())
             return digest.joinToString("") { "%02x".format(it) }.take(20)
         }
     }

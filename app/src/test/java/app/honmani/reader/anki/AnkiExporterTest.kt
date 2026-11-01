@@ -227,6 +227,24 @@ class AnkiExporterTest {
     }
 
     @Test
+    fun aSentenceTooLongForTheVoiceGoesWithoutAudio_andNoProblemIsRaised() = runBlocking {
+        val word = savedWord()
+        voice.maxInputLength = 3
+
+        val result = exporter.add(word)
+
+        assertEquals(null, (result as AnkiResult.Added).audioProblem)
+        val fields = anki.notes.single().fields
+        assertTrue(fields[6].startsWith("[sound:honmani_"))
+        assertEquals("", fields[7])
+        assertEquals(listOf("なまえ"), voice.spoken)
+
+        val out = java.io.ByteArrayOutputStream()
+        assertEquals(null, exporter.ankiPackage(listOf(word), out))
+        assertEquals(listOf("なまえ", "なまえ"), voice.spoken)
+    }
+
+    @Test
     fun aVoiceProblemStillAddsTheCard_withoutAudio() = runBlocking {
         val word = savedWord()
         voice.problem = VoiceProblem.NO_JAPANESE
@@ -297,6 +315,7 @@ class AnkiExporterTest {
         var problem: VoiceProblem? = null
 
         override val extension = "wav"
+        override var maxInputLength = Int.MAX_VALUE
 
         override suspend fun speak(text: String, out: File, rate: Double) {
             problem?.let { throw VoiceException(it) }

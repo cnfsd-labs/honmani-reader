@@ -85,4 +85,14 @@ class WordAudioTest {
         }
         assertNotEquals(WordAudio.name(CountingVoice(), "たべる"), WordAudio.name(other, "たべる"))
     }
+
+    @Test
+    fun recordingsOfAnotherNamedVoiceOfTheSameKindHaveOtherNames() {
+        fun voice(name: String) = object : CardVoice {
+            override val extension = "mp3"
+            override val id = "cloud:$name"
+            override suspend fun speak(text: String, out: File, rate: Double) = Unit
+        }
+        assertNotEquals(WordAudio.name(voice("a"), "たべる"), WordAudio.name(voice("b"), "たべる"))
+    }
 }

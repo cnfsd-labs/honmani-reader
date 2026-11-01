@@ -2,6 +2,7 @@ package app.honmani.reader.anki
 
 import android.content.Context
 import android.os.Bundle
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import java.io.File
@@ -41,6 +42,15 @@ interface CardVoice {
     val extension: String
 
     /**
+     * What makes this voice's recordings differ from another's (engine, voice name): part of the
+     * cache key and the sound file name, so a changed voice doesn't reuse old audio.
+     */
+    val id: String get() = javaClass.name
+
+    /** The longest text (in characters) the voice takes in one go; longer text isn't spoken. */
+    val maxInputLength: Int get() = Int.MAX_VALUE
+
+    /**
      * Writes [text] spoken to [out], at [rate] times the normal speed; throws [VoiceException]
      * on failure.
      */
@@ -69,6 +79,12 @@ class PhoneVoice(
     private var idle: Job? = null
 
     override val extension = "wav"
+
+    // The default engine is part of the identity: a recording differs after switching it.
+    override val id: String
+        get() = "${javaClass.name}:" + (runCatching { Settings.Secure.getString(context.contentResolver, "tts_default_synth") }.getOrNull() ?: "")
+
+    override val maxInputLength: Int get() = TextToSpeech.getMaxSpeechInputLength()
 
     override suspend fun speak(text: String, out: File, rate: Double) {
         mutex.withLock {
