@@ -81,7 +81,7 @@ interface WordDao {
     @Query("UPDATE word SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 
-    @Query("UPDATE word SET anki_note_id = :noteId WHERE id = :id")
+    @Query("UPDATE word SET anki_note_id = :noteId, scheduler = CASE WHEN :noteId IS NULL THEN 'HONMANI' ELSE 'ANKI' END WHERE id = :id")
     suspend fun setAnkiNote(id: Long, noteId: Long?)
 
     /** Words among [expressions] that are in Anki, to mark them in the lookup panel. */

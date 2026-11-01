@@ -1,0 +1,158 @@
+package app.honmani.reader.data.review
+
+import androidx.room.withTransaction
+import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.WordScheduler
+import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+
+/** What it takes to take back a review: the card as it was and the log row written. */
+class ReviewUndo(val before: ReviewCardEntity, val logId: Long)
+
+/**
+ * Reviews of saved words: the queue, grading with undo, the controls on a card and the evidence
+ * from reading and lookups ([ReviewRules]). No UI yet. A [zone] provider makes "today" follow the
+ * device's current zone.
+ */
+class ReviewRepository(
+    private val database: HonmaniDatabase,
+    private val now: () -> Long = System::currentTimeMillis,
+    private val zone: () -> ZoneId = ZoneId::systemDefault,
+) {
+    private val dao = database.reviewDao()
+    private val words = database.wordDao()
+
+    /** Cards due today (before the next local midnight), not buried. Observed when subscribed: re-subscribe after midnight. */
+    fun observeDueCount(): Flow<Int> = now().let { dao.observeDueCount(ReviewRules.dueCutoff(it, zone()), it) }
+
+    suspend fun dueCount(): Int = now().let { dao.dueCount(ReviewRules.dueCutoff(it, zone()), it) }
+
+    /** Due cards, most overdue first. A card graded Again in a session comes back after 10 minutes: ask again then. */
+    suspend fun dueCards(limit: Int): List<CardWithWord> =
+        now().let { dao.dueCards(ReviewRules.dueCutoff(it, zone()), it, limit) }
+
+    /** Cards introduced but never reviewed, oldest first. */
+    suspend fun newCards(limit: Int): List<CardWithWord> = dao.newCards(now(), limit)
+
+    /** Reviews done since the start of today, and new words among them. */
+    suspend fun reviewsToday(): Int = dao.reviewsSince(ReviewRules.startOfDay(now(), zone()))
+
+    suspend fun newWordsToday(): Int = dao.firstReviewsSince(ReviewRules.startOfDay(now(), zone()))
+
+    suspend fun card(wordId: Long): ReviewCardEntity? = dao.find(wordId)
+
+    /** Puts a word into review as a new card; false if it is Anki's, unknown or already there. */
+    suspend fun introduce(wordId: Long): Boolean = database.withTransaction {
+        val word = words.find(wordId) ?: return@withTransaction false
+        if (word.scheduler != WordScheduler.HONMANI) return@withTransaction false
+        val time = now()
+        dao.insertIfMissing(ReviewCardEntity(wordId = wordId, due = time, addedAt = time)) != -1L
+    }
+
+    /**
+     * A real review on the review screen: grades the card (a new one is introduced first), logs it
+     * and returns what [undo] needs; null for an unknown or Anki word, or a suspended card.
+     */
+    suspend fun record(wordId: Long, grade: Grade, inSession: Boolean = true): ReviewUndo? = database.withTransaction {
+        val word = words.find(wordId) ?: return@withTransaction null
+        if (word.scheduler != WordScheduler.HONMANI) return@withTransaction null
+        val time = now()
+        val before = dao.find(wordId) ?: ReviewCardEntity(wordId = wordId, due = time, addedAt = time)
+        if (before.state == ReviewState.SUSPENDED) return@withTransaction null
+        val after = ReviewRules.grade(before, grade, time, zone(), real = true, inSession = inSession)
+        dao.upsert(after)
+        val elapsed = before.lastReviewAt?.let { (time - it) / ReviewRules.DAY_MS.toDouble() } ?: 0.0
+        val logId = dao.insertLog(ReviewLogEntity(wordId = wordId, at = time, grade = grade.value, elapsedDays = elapsed))
+        ReviewUndo(before, logId)
+    }
+
+    /** Takes back a review made by [record]: the card as it was, without the log row. */
+    suspend fun undo(undo: ReviewUndo) = database.withTransaction {
+        dao.deleteLog(undo.logId)
+        if (words.find(undo.before.wordId) != null) dao.upsert(undo.before)
+    }
+
+    /** Hides a card until tomorrow (the next local midnight). */
+    suspend fun bury(wordId: Long) = change(wordId) { it.copy(buriedUntil = ReviewRules.buryUntil(now(), zone())) }
+
+    /** "Don't review": the card keeps its memory but leaves the queue and ignores reading. */
+    suspend fun suspend(wordId: Long) = change(wordId) { it.copy(state = ReviewState.SUSPENDED) }
+
+    suspend fun unsuspend(wordId: Long) = change(wordId) {
+        if (it.state == ReviewState.SUSPENDED) it.copy(state = if (it.reps > 0) ReviewState.REVIEW else ReviewState.NEW) else it
+    }
+
+    /** Due now, whatever the schedule says (pull forward) and unburied. */
+    suspend fun reviewNow(wordId: Long) = change(wordId) { it.copy(due = now(), buriedUntil = null) }
+
+    /**
+     * Marks a word known by hand: its card (made if missing) gets at least [knownAfterDays] of
+     * stability, counts as passed and is next due after that long.
+     */
+    suspend fun setKnown(wordId: Long, knownAfterDays: Int = ReviewRules.DEFAULT_KNOWN_AFTER_DAYS): Boolean = database.withTransaction {
+        val word = words.find(wordId) ?: return@withTransaction false
+        if (word.scheduler != WordScheduler.HONMANI) return@withTransaction false
+        val time = now()
+        val card = dao.find(wordId) ?: ReviewCardEntity(wordId = wordId, due = time, addedAt = time)
+        val stability = maxOf(card.stability, knownAfterDays.toDouble())
+        dao.upsert(
+            card.copy(
+                state = ReviewState.REVIEW,
+                stability = stability,
+                difficulty = if (card.difficulty > 0) card.difficulty else 5.0,
+                due = ReviewRules.startOfDay(time, zone(), Fsrs.interval(stability)),
+                passedReviews = maxOf(card.passedReviews, 1),
+                lastGrade = Grade.GOOD.value,
+                lastReviewAt = time,
+                buriedUntil = null,
+            ),
+        )
+        true
+    }
+
+    /** Forgets what the card knew: a new card again (the review log stays). */
+    suspend fun reset(wordId: Long) = change(wordId) {
+        val time = now()
+        ReviewCardEntity(wordId = wordId, due = time, addedAt = time)
+    }
+
+    /** Takes a word out of review for good (its card goes; the log stays). */
+    suspend fun remove(wordId: Long) = dao.delete(wordId)
+
+    /**
+     * The words were met in a book without a lookup. Each due-ish card of a word that passed a
+     * real review gets a Hard, once per local day ([ReviewRules.onRead]). Returns the words that moved.
+     */
+    suspend fun onRead(wordIds: Collection<Long>): List<Long> = database.withTransaction {
+        val time = now()
+        val day = ReviewRules.localDay(time, zone())
+        wordIds.filter { id ->
+            val card = dao.find(id) ?: return@filter false
+            val word = words.find(id) ?: return@filter false
+            val after = ReviewRules.onRead(card, word.scheduler, time, zone(), readToday = dao.readsOn(id, day) > 0)
+            // The read is counted only when it moved a card, so a read before the card was due-ish
+            // doesn't use up the day.
+            if (after == null) return@filter false
+            dao.insertReadDay(ReadDayEntity(id, day, 0))
+            dao.incrementReadDay(id, day)
+            dao.upsert(after)
+            true
+        }
+    }
+
+    /** A lookup of a saved word: an Again if [ReviewRules.onLookup] counts it. True if the card moved. */
+    suspend fun onLookup(wordId: Long, origin: LookupOrigin): Boolean = database.withTransaction {
+        val card = dao.find(wordId) ?: return@withTransaction false
+        val word = words.find(wordId) ?: return@withTransaction false
+        val after = ReviewRules.onLookup(card, word.scheduler, origin, now(), zone()) ?: return@withTransaction false
+        dao.upsert(after)
+        true
+    }
+
+    private suspend fun change(wordId: Long, transform: (ReviewCardEntity) -> ReviewCardEntity) =
+        database.withTransaction {
+            val card = dao.find(wordId) ?: return@withTransaction
+            dao.upsert(transform(card))
+        }
+}

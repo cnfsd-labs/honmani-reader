@@ -25,6 +25,10 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogDao
 import app.honmani.reader.data.opds.OpdsCatalogEntity
+import app.honmani.reader.data.review.ReadDayEntity
+import app.honmani.reader.data.review.ReviewCardEntity
+import app.honmani.reader.data.review.ReviewDao
+import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.stats.ReadingDao
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.WordDao
@@ -32,8 +36,9 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.WordLookupEntity
 
-// Frozen since 2026-10-19 (Play closed test): every change to the schema needs a new version, a
-// migration in MIGRATIONS and a test in DatabaseMigrationTest. Users' data must survive updates.
+// Edited in place (version 1) until the first public release, when the schema freezes: from then
+// on every change needs a new version, a migration in MIGRATIONS and a test in
+// DatabaseMigrationTest. Users' data must survive updates.
 @Database(
     entities = [
         DictionaryEntity::class,
@@ -49,6 +54,9 @@ import app.honmani.reader.data.words.WordLookupEntity
         RemovedBookEntity::class,
         ReadingDayEntity::class,
         GlossaryPresetEntity::class,
+        ReviewCardEntity::class,
+        ReviewLogEntity::class,
+        ReadDayEntity::class,
     ],
     version = 1,
     exportSchema = true,
@@ -72,6 +80,8 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun opdsCatalogDao(): OpdsCatalogDao
 
     abstract fun readingDao(): ReadingDao
+
+    abstract fun reviewDao(): ReviewDao
 
     /** Reads the dictionary tables for book grading; no tables of its own. */
     abstract fun difficultyDao(): DifficultyDao

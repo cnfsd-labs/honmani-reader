@@ -37,7 +37,23 @@ data class WordEntity(
     @ColumnInfo(name = "last_book_title") val lastBookTitle: String? = null,
     /** The AnkiDroid note made from this word, if one was added. */
     @ColumnInfo(name = "anki_note_id") val ankiNoteId: Long? = null,
+    /** Who schedules reviews of this word; Anki words never enter Honmani's review queue. */
+    @ColumnInfo(defaultValue = "'HONMANI'") val scheduler: WordScheduler = WordScheduler.HONMANI,
 )
+
+enum class WordScheduler {
+    HONMANI,
+
+    /** Set when the word is sent to Anki ([WordEntity.ankiNoteId]); reviews, reads and lookups leave its card alone. */
+    ANKI,
+}
+
+/** Where a lookup came from; only [READER] lookups count as evidence against a review card. */
+enum class LookupOrigin {
+    READER,
+    SEARCH,
+    REVIEW,
+}
 
 enum class WordStatus {
     LEARNING,
@@ -74,6 +90,7 @@ data class WordLookupEntity(
     @ColumnInfo(name = "book_id") val bookId: Long? = null,
     @ColumnInfo(name = "book_title") val bookTitle: String? = null,
     @ColumnInfo(name = "looked_up_at") val lookedUpAt: Long,
+    @ColumnInfo(defaultValue = "'READER'") val origin: LookupOrigin = LookupOrigin.READER,
 )
 
 /**

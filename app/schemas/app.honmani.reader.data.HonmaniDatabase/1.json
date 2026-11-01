@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "9f33fc2ef17c0481cdfc4148f9d4a60a",
+    "identityHash": "cae8dd07e901549c08150408d6ae7002",
     "entities": [
       {
         "tableName": "dictionary",
@@ -599,7 +599,7 @@
       },
       {
         "tableName": "word",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER, `scheduler` TEXT NOT NULL DEFAULT 'HONMANI')",
         "fields": [
           {
             "fieldPath": "id",
@@ -688,6 +688,13 @@
             "fieldPath": "ankiNoteId",
             "columnName": "anki_note_id",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "scheduler",
+            "columnName": "scheduler",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'HONMANI'"
           }
         ],
         "primaryKey": {
@@ -720,7 +727,7 @@
       },
       {
         "tableName": "word_lookup",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `word_id` INTEGER NOT NULL, `surface` TEXT NOT NULL, `sentence` TEXT NOT NULL, `surface_start` INTEGER NOT NULL, `surface_end` INTEGER NOT NULL, `book_id` INTEGER, `book_title` TEXT, `looked_up_at` INTEGER NOT NULL, FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `word_id` INTEGER NOT NULL, `surface` TEXT NOT NULL, `sentence` TEXT NOT NULL, `surface_start` INTEGER NOT NULL, `surface_end` INTEGER NOT NULL, `book_id` INTEGER, `book_title` TEXT, `looked_up_at` INTEGER NOT NULL, `origin` TEXT NOT NULL DEFAULT 'READER', FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -773,6 +780,13 @@
             "columnName": "looked_up_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "origin",
+            "columnName": "origin",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'READER'"
           }
         ],
         "primaryKey": {
@@ -1029,11 +1043,224 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "review_card",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `due` INTEGER NOT NULL, `stability` REAL NOT NULL, `difficulty` REAL NOT NULL, `reps` INTEGER NOT NULL, `lapses` INTEGER NOT NULL, `passed_reviews` INTEGER NOT NULL, `last_grade` INTEGER, `last_review_at` INTEGER, `buried_until` INTEGER, `added_at` INTEGER NOT NULL, PRIMARY KEY(`word_id`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "wordId",
+            "columnName": "word_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "due",
+            "columnName": "due",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stability",
+            "columnName": "stability",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "difficulty",
+            "columnName": "difficulty",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reps",
+            "columnName": "reps",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lapses",
+            "columnName": "lapses",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "passedReviews",
+            "columnName": "passed_reviews",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastGrade",
+            "columnName": "last_grade",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastReviewAt",
+            "columnName": "last_review_at",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "buriedUntil",
+            "columnName": "buried_until",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "addedAt",
+            "columnName": "added_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "word_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_review_card_state_due",
+            "unique": false,
+            "columnNames": [
+              "state",
+              "due"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_review_card_state_due` ON `${TABLE_NAME}` (`state`, `due`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "word",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "word_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "review_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `word_id` INTEGER NOT NULL, `at` INTEGER NOT NULL, `grade` INTEGER NOT NULL, `elapsed_days` REAL NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wordId",
+            "columnName": "word_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "at",
+            "columnName": "at",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grade",
+            "columnName": "grade",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "elapsedDays",
+            "columnName": "elapsed_days",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_review_log_word_id_at",
+            "unique": false,
+            "columnNames": [
+              "word_id",
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_review_log_word_id_at` ON `${TABLE_NAME}` (`word_id`, `at`)"
+          },
+          {
+            "name": "index_review_log_at",
+            "unique": false,
+            "columnNames": [
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_review_log_at` ON `${TABLE_NAME}` (`at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "read_day",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `day` INTEGER NOT NULL, `count` INTEGER NOT NULL, PRIMARY KEY(`word_id`, `day`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "wordId",
+            "columnName": "word_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "day",
+            "columnName": "day",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "count",
+            "columnName": "count",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "word_id",
+            "day"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "word",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "word_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9f33fc2ef17c0481cdfc4148f9d4a60a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cae8dd07e901549c08150408d6ae7002')"
     ]
   }
 }

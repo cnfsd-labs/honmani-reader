@@ -34,9 +34,12 @@ repository is public: never copy those notes, personal details or discussions in
   `docs/privacy-policy.md`, which must change with any new network use.
 - **Library:** Honmani owns the book files (app storage, named by SHA-256); ttu's IndexedDB is a
   rebuildable cache fed through ttu's own import input (`library-bridge.js`).
-- **Database:** one Room database, **schema frozen** (version 1 in `app/schemas`). A change needs
-  a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test in `DatabaseMigrationTest` and
-  the exported JSON committed. No destructive fallback. Manual DI in `AppContainer`, no Hilt.
+- **Database:** one Room database, schema version 1 in `app/schemas`. Until the first public
+  release it is edited in place (commit the regenerated JSON); an install made before a schema
+  change must be uninstalled (identity-hash crash). **Frozen from the first public release on:**
+  a change then needs a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test in
+  `DatabaseMigrationTest` and the exported JSON committed. No destructive fallback. Manual DI in
+  `AppContainer`, no Hilt.
 - **Android backup** keeps the `settings` preferences and `files/auto-backup/` (`AutoBackup`:
   the Settings backup zip, rewritten at most every 6 h when the app goes to the background,
   dropped over 10 MB; offered once on a new install and not overwritten until answered).

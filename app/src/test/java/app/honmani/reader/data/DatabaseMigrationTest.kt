@@ -16,7 +16,8 @@ import org.robolectric.RobolectricTestRunner
  * Users' data must survive updates: a database made from each exported schema (`app/schemas`)
  * opens with the current code, through [HonmaniDatabase.MIGRATIONS], and keeps its rows.
  *
- * Changing the schema: raise the version in [HonmaniDatabase], build once to export the new
+ * Until the first public release the schema is edited in place (version 1), so there is no
+ * migration yet. Changing the schema afterwards: raise the version in [HonmaniDatabase], build once to export the new
  * schema, add the migration to [HonmaniDatabase.MIGRATIONS] and a test here that creates the old
  * version, fills it, runs `helper.runMigrationsAndValidate` and reads the rows back.
  */
@@ -45,6 +46,7 @@ class DatabaseMigrationTest {
             val word = database.wordDao().find("猫", "ねこ")!!
             assertEquals(3, word.lookupCount)
             assertEquals(true, word.starred)
+            assertEquals(app.honmani.reader.data.words.WordScheduler.HONMANI, word.scheduler)
             assertEquals(1, database.wordDao().countLookups().first())
         } finally {
             database.close()

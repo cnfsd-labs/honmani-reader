@@ -41,6 +41,7 @@ import app.honmani.reader.data.opds.KeystoreCredentialCipher
 import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
+import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
@@ -157,6 +158,8 @@ class AppContainer(context: Context) {
     private val credentialCipher = KeystoreCredentialCipher()
 
     val wordRepository: WordRepository by lazy { WordRepository(database) }
+
+    val reviewRepository: ReviewRepository by lazy { ReviewRepository(database) }
 
     val ankiSettings: AnkiSettings by lazy {
         AnkiSettings(settingsPreferences, credentialCipher, devicePreferences)
