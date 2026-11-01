@@ -27,21 +27,23 @@ data class LexiconFrequency(
 
 /**
  * Reads the dictionaries page by page (ordered by id, after the last id read) to build a
- * [Lexicon], so the whole of Jitendex never sits in memory as rows.
+ * [Lexicon], so the whole of Jitendex never sits in memory as rows. One dictionary per query:
+ * `dictionary_id = ? AND id > ?` is served by the dictionary index in id order, whereas
+ * `IN (...)` makes SQLite sort all remaining rows for every page.
  */
 @Dao
 interface DifficultyDao {
     @Query(
-        "SELECT id, expression, reading, rules FROM term WHERE dictionary_id IN (:dictionaries) AND id > :after " +
+        "SELECT id, expression, reading, rules FROM term WHERE dictionary_id = :dictionary AND id > :after " +
             "ORDER BY id LIMIT :limit",
     )
-    suspend fun terms(dictionaries: List<Long>, after: Long, limit: Int): List<LexiconTerm>
+    suspend fun terms(dictionary: Long, after: Long, limit: Int): List<LexiconTerm>
 
     @Query(
-        "SELECT id, dictionary_id, expression, sequence FROM term WHERE dictionary_id IN (:dictionaries) " +
+        "SELECT id, dictionary_id, expression, sequence FROM term WHERE dictionary_id = :dictionary " +
             "AND sequence > 0 AND id > :after ORDER BY id LIMIT :limit",
     )
-    suspend fun spellings(dictionaries: List<Long>, after: Long, limit: Int): List<Spelling>
+    suspend fun spellings(dictionary: Long, after: Long, limit: Int): List<Spelling>
 
     @Query(
         "SELECT id, expression, reading, value, display FROM term_meta WHERE dictionary_id = :dictionary " +

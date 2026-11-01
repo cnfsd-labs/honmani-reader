@@ -69,12 +69,14 @@ class SpellingVariants(private val variants: Map<String, Array<String>>) {
             if (dictionaries.isEmpty()) return EMPTY
             read(cache, signature)?.let { return it }
             val builder = Builder()
-            var after = 0L
-            while (true) {
-                val page = dao.spellings(dictionaries, after, PAGE)
-                if (page.isEmpty()) break
-                for (row in page) builder.add(row.dictionaryId, row.sequence, row.expression)
-                after = page.last().id
+            for (dictionary in dictionaries) {
+                var after = 0L
+                while (true) {
+                    val page = dao.spellings(dictionary, after, PAGE)
+                    if (page.isEmpty()) break
+                    for (row in page) builder.add(row.dictionaryId, row.sequence, row.expression)
+                    after = page.last().id
+                }
             }
             val groups = builder.groups()
             write(cache, signature, groups)

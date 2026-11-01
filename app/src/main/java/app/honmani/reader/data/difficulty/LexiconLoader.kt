@@ -43,18 +43,20 @@ class LexiconLoader(private val dao: DifficultyDao) {
     suspend fun load(sources: LexiconSources): Lexicon {
         val builder = Lexicon.Builder()
         val termIds = sources.terms.map { it.id }
-        var after = 0L
-        while (true) {
-            val page = dao.terms(termIds, after, PAGE)
-            if (page.isEmpty()) break
-            for (term in page) {
-                val classes = WordClass.fromRules(term.rules)
-                builder.add(term.expression, classes, 0)
-                if (term.reading.isNotEmpty() && term.reading != term.expression) builder.add(term.reading, classes, 0)
+        for (dictionary in termIds) {
+            var after = 0L
+            while (true) {
+                val page = dao.terms(dictionary, after, PAGE)
+                if (page.isEmpty()) break
+                for (term in page) {
+                    val classes = WordClass.fromRules(term.rules)
+                    builder.add(term.expression, classes, 0)
+                    if (term.reading.isNotEmpty() && term.reading != term.expression) builder.add(term.reading, classes, 0)
+                }
+                after = page.last().id
             }
-            after = page.last().id
         }
-        after = 0L
+        var after = 0L
         while (true) {
             val page = dao.frequencies(sources.frequency.id, after, PAGE)
             if (page.isEmpty()) break
