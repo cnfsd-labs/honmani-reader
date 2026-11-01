@@ -22,6 +22,7 @@ import app.honmani.reader.R
 import app.honmani.reader.data.dictionary.yomitan.InvalidDictionaryException
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -38,6 +39,9 @@ class DictionaryImportWorker(
         val container = (applicationContext as HonmaniApplication).container
         val copy = File(applicationContext.cacheDir, "dictionary-import-$id.zip")
         val throttle = ProgressThrottle()
+        // True when the system stopped the worker and WorkManager will run it again: the retry
+        // needs the picked document's access, so it is only released at a final outcome.
+        var willRetry = false
         try {
             runInForeground(null)
             if (url != null) {
@@ -65,6 +69,11 @@ class DictionaryImportWorker(
                 if (throttle.shouldPost(progress.title, progress.percent)) runInForeground(progress)
             }
             return Result.success()
+        } catch (e: CancellationException) {
+            // Stopped by the system (constraints, timeout): WorkManager runs it again. Nothing in
+            // the app cancels imports.
+            willRetry = true
+            throw e
         } catch (e: DownloadException) {
             return failure(ImportError.DOWNLOAD_FAILED, e.message)
         } catch (e: InvalidDictionaryException) {
@@ -83,7 +92,7 @@ class DictionaryImportWorker(
             return failure(ImportError.FAILED, e.message)
         } finally {
             copy.delete()
-            if (uri != null) {
+            if (uri != null && !willRetry) {
                 runCatching {
                     resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
