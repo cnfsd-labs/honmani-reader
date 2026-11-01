@@ -378,9 +378,10 @@ private fun AccentPicker(
     val context = LocalContext.current
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 12.dp)) {
+        // The swatches are 40 dp inside 48 dp touch targets; 4 dp + the 8 dp margin keeps the 12 dp gaps.
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
             maxItemsInEachRow = SWATCHES_PER_ROW,
         ) {
             for (accent in Accent.entries) {
@@ -446,27 +447,33 @@ private fun AccentSwatch(
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(color)
-            .border(
-                width = 2.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                shape = CircleShape,
-            )
+            .size(48.dp)
             .semantics { contentDescription = label }
             .selectable(selected = isSelected, role = Role.RadioButton, onClick = onClick),
     ) {
-        val tint = if (color.luminance() > 0.4f) Color.Black else Color.White
-        if (isSelected) {
-            Icon(Icons.Filled.Check, contentDescription = null, tint = tint)
-        } else if (adjustable) {
-            Icon(
-                painterResource(R.drawable.ic_tune),
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(20.dp),
-            )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(color)
+                .border(
+                    width = 2.dp,
+                    color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                    shape = CircleShape,
+                ),
+        ) {
+            val tint = if (color.luminance() > 0.4f) Color.Black else Color.White
+            if (isSelected) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = tint)
+            } else if (adjustable) {
+                Icon(
+                    painterResource(R.drawable.ic_tune),
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
