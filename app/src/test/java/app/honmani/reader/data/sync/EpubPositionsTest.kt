@@ -90,19 +90,52 @@ class EpubPositionsTest {
         assertNull(EpubPositions.texts(folder.root.resolve("empty.epub")))
     }
 
-    private fun epubWithChapter(name: String, chapter: String): java.io.File {
+    private fun epubWithChapter(name: String, chapter: String): java.io.File = epubWithChapter(name, chapter.toByteArray())
+
+    private fun epubWithChapter(name: String, chapter: ByteArray): java.io.File {
         val file = folder.newFile(name)
         java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
-            fun put(path: String, text: String) {
+            fun putBytes(path: String, bytes: ByteArray) {
                 zip.putNextEntry(java.util.zip.ZipEntry(path))
-                zip.write(text.toByteArray())
+                zip.write(bytes)
                 zip.closeEntry()
             }
+            fun put(path: String, text: String) = putBytes(path, text.toByteArray())
             put("META-INF/container.xml", """<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>""")
             put("content.opf", """<package><manifest><item id="c" href="c.xhtml"/></manifest><spine><itemref idref="c"/></spine></package>""")
-            put("c.xhtml", chapter)
+            putBytes("c.xhtml", chapter)
         }
         return file
+    }
+
+    @Test
+    fun utf16PagesAreDecoded_withAndWithoutByteOrderMark() {
+        val page = """<?xml version="1.0" encoding="UTF-16"?><html><body><p>吾輩は猫である。</p></body></html>"""
+        val withoutDeclaration = "<html><body><p>吾輩は猫である。</p></body></html>"
+        val bom = { first: Int, second: Int -> byteArrayOf(first.toByte(), second.toByte()) }
+        val samples = mapOf(
+            "le-bom" to bom(0xFF, 0xFE) + page.toByteArray(Charsets.UTF_16LE),
+            "be-bom" to bom(0xFE, 0xFF) + page.toByteArray(Charsets.UTF_16BE),
+            "le" to page.toByteArray(Charsets.UTF_16LE),
+            "be" to page.toByteArray(Charsets.UTF_16BE),
+            "le-plain" to withoutDeclaration.toByteArray(Charsets.UTF_16LE),
+            "be-plain" to withoutDeclaration.toByteArray(Charsets.UTF_16BE),
+            "utf8-bom" to byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + page.toByteArray(),
+            // Declared UTF-16 but really UTF-8: the declaration must not garble it.
+            "utf8-liar" to page.toByteArray(),
+        )
+        for ((name, bytes) in samples) {
+            val file = epubWithChapter("$name.epub", bytes)
+            assertEquals(name, 7, EpubPositions.read(file)!!.total)
+            assertEquals(name, "吾輩は猫である。", EpubPositions.texts(file)!!.single().text.trim())
+        }
+    }
+
+    @Test
+    fun shiftJisDeclarationStillWorks() {
+        val page = """<?xml version="1.0" encoding="Shift_JIS"?><html><body><p>吾輩は猫である。</p></body></html>"""
+        val file = epubWithChapter("sjis.epub", page.toByteArray(charset("Shift_JIS")))
+        assertEquals(7, EpubPositions.read(file)!!.total)
     }
 
     @Test

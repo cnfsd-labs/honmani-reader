@@ -317,12 +317,45 @@ class EpubPositions private constructor(
             return parts.joinToString("/")
         }
 
-        /** UTF-8 unless the XML declaration names another encoding (Shift_JIS in older Japanese books). */
-        private fun decodeText(bytes: ByteArray): String {
-            val head = String(bytes, 0, minOf(bytes.size, 200), Charsets.ISO_8859_1)
-            val name = ENCODING.find(head)?.groupValues?.get(1)
-            val charset = name?.let { runCatching { Charset.forName(it) }.getOrNull() } ?: Charsets.UTF_8
+        /**
+         * UTF-8 unless a byte order mark, UTF-16's zero bytes or the XML declaration say otherwise
+         * (Shift_JIS in older Japanese books, UTF-16 in some tool-made ones).
+         */
+        internal fun decodeText(bytes: ByteArray): String {
+            val charset = utf16Charset(bytes) ?: declaredCharset(bytes) ?: Charsets.UTF_8
             return String(bytes, charset).trimStart(BYTE_ORDER_MARK)
+        }
+
+        /** UTF-16 by byte order mark, or, without one, by the zero bytes that its ASCII markup leaves. */
+        private fun utf16Charset(bytes: ByteArray): Charset? {
+            if (bytes.size >= 2) {
+                val a = bytes[0].toInt() and 0xFF
+                val b = bytes[1].toInt() and 0xFF
+                if (a == 0xFE && b == 0xFF) return Charsets.UTF_16BE
+                if (a == 0xFF && b == 0xFE) return Charsets.UTF_16LE
+            }
+            // A page starts with ASCII ("<?xm", "<htm"): in its first characters every other byte is 0.
+            val pairs = minOf(bytes.size / 2, 4)
+            if (pairs < 4) return null
+            var evenZeros = 0
+            var oddZeros = 0
+            for (i in 0 until pairs) {
+                if (bytes[2 * i].toInt() == 0) evenZeros++
+                if (bytes[2 * i + 1].toInt() == 0) oddZeros++
+            }
+            return when {
+                evenZeros == pairs && oddZeros == 0 -> Charsets.UTF_16BE
+                oddZeros == pairs && evenZeros == 0 -> Charsets.UTF_16LE
+                else -> null
+            }
+        }
+
+        /** The encoding named in the XML declaration, if Java knows it (UTF-16 is only trusted when detected). */
+        private fun declaredCharset(bytes: ByteArray): Charset? {
+            val head = String(bytes, 0, minOf(bytes.size, 200), Charsets.ISO_8859_1)
+            val name = ENCODING.find(head)?.groupValues?.get(1) ?: return null
+            if (name.startsWith("UTF-16", ignoreCase = true)) return null
+            return runCatching { Charset.forName(name) }.getOrNull()
         }
     }
 }
