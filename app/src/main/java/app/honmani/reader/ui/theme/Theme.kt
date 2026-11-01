@@ -57,10 +57,9 @@ fun accentColorScheme(accent: Color, darkTheme: Boolean): ColorScheme {
             onTertiary = onAccent,
         )
     } else {
-        // A little darker on light backgrounds, for contrast with white text and the background.
-        val primary = lerp(accent, Color.Black, 0.15f)
-        // Light accents (amber, a custom yellow) keep dark text.
-        val onPrimary = if (primary.luminance() > 0.4f) Color.Black else Color.White
+        // Darker on light backgrounds until white text on it (and it as text on the page) reads at 4.5:1.
+        val primary = darkenForWhiteText(accent)
+        val onPrimary = Color.White
         val container = lerp(accent, Color.White, 0.8f)
         val onContainer = lerp(accent, Color.Black, 0.6f)
         lightColorScheme(
@@ -77,3 +76,23 @@ fun accentColorScheme(accent: Color, darkTheme: Boolean): ColorScheme {
         )
     }
 }
+
+/** WCAG contrast ratio of two opaque colours, 1 to 21. */
+fun contrastRatio(a: Color, b: Color): Float {
+    val l1 = a.luminance()
+    val l2 = b.luminance()
+    return (maxOf(l1, l2) + 0.05f) / (minOf(l1, l2) + 0.05f)
+}
+
+/** [accent] mixed toward black in 5 % steps, starting at 15 %, until white on it has a contrast of 4.5:1. */
+fun darkenForWhiteText(accent: Color): Color {
+    var amount = 0.15f
+    var color = lerp(accent, Color.Black, amount)
+    while (contrastRatio(Color.White, color) < MIN_TEXT_CONTRAST && amount < 1f) {
+        amount += 0.05f
+        color = lerp(accent, Color.Black, amount)
+    }
+    return color
+}
+
+private const val MIN_TEXT_CONTRAST = 4.5f
