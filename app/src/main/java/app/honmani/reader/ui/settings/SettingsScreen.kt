@@ -150,6 +150,7 @@ fun SettingsScreen(
         onOpenAbout = { showingAbout = true },
         onOpenNetworkActivity = { showingNetwork = true },
         onOpenSample = onOpenSample,
+        review = { ReviewSettingsSection() },
         anki = { AnkiSettingsRow(onClick = { showingAnki = true }) },
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
@@ -181,6 +182,7 @@ private fun SettingsContent(
     onOpenAbout: () -> Unit,
     onOpenNetworkActivity: () -> Unit = {},
     onOpenSample: (SampleBook) -> Unit = {},
+    review: @Composable () -> Unit = {},
     anki: @Composable () -> Unit = {},
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
@@ -281,6 +283,7 @@ private fun SettingsContent(
                 )
             }
             item { SectionHeading(R.string.settings_section_flashcards) }
+            item { review() }
             item { anki() }
             item { SectionHeading(R.string.settings_section_books) }
             items(catalogs, key = { it.id }) { catalog ->

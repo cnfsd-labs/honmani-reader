@@ -638,6 +638,9 @@ class ReaderViewModel(
         /** For the dictionary search in Words: saves words only when asked. */
         val SearchFactory = factory(LookupOrigin.SEARCH)
 
+        /** For "Look up" on a review card: saves nothing, and a lookup there never counts as a lapse. */
+        val ReviewFactory = factory(LookupOrigin.REVIEW)
+
         private fun factory(origin: LookupOrigin) = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container

@@ -78,6 +78,9 @@ interface WordDao {
     @Update
     suspend fun update(word: WordEntity)
 
+    @Query("UPDATE word SET gloss = :gloss WHERE id = :id")
+    suspend fun setGloss(id: Long, gloss: String)
+
     @Query("UPDATE word SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 

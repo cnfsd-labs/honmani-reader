@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
             container.openedBooks.receive(intent)
             container.searchRequests.receive(intent)
             addSearchShortcut()
+            addReviewShortcut()
         }
         setContent {
             val accent by appearance.accent.collectAsStateWithLifecycle()
@@ -99,6 +100,21 @@ class MainActivity : ComponentActivity() {
         } catch (e: RuntimeException) {
             // A launcher's rate limit or a missing shortcut service: the app works without it.
             android.util.Log.w("Honmani", "Adding the search shortcut failed", e)
+        }
+    }
+
+    /** "Review" in the launcher's menu of the app icon: the review screen. */
+    private fun addReviewShortcut() {
+        val shortcut = ShortcutInfoCompat.Builder(this, "review")
+            .setShortLabel(getString(R.string.shortcut_review))
+            .setLongLabel(getString(R.string.shortcut_review_long))
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_review))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(SearchRequests.ACTION_REVIEW))
+            .build()
+        try {
+            ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
+        } catch (e: RuntimeException) {
+            android.util.Log.w("Honmani", "Adding the review shortcut failed", e)
         }
     }
 }

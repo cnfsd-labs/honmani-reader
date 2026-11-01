@@ -55,6 +55,27 @@ interface ReviewDao {
     )
     suspend fun newCards(now: Long, limit: Int): List<CardWithWord>
 
+    @Transaction
+    @Query("SELECT * FROM review_card WHERE word_id = :wordId")
+    suspend fun cardWithWord(wordId: Long): CardWithWord?
+
+    /** Learning words of Honmani's scheduler that have no card yet, best ranked first. */
+    @Query("SELECT w.id FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC LIMIT :limit")
+    suspend fun unintroducedIds(limit: Int): List<Long>
+
+    @Query("SELECT COUNT(*) FROM word w WHERE $UNINTRODUCED")
+    fun observeUnintroducedCount(): Flow<Int>
+
+    /** Introduced, not yet reviewed and not buried at [now]. */
+    @Query(
+        "SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'NEW' AND w.scheduler = 'HONMANI' " +
+            "AND (c.buried_until IS NULL OR c.buried_until <= :now)",
+    )
+    fun observeNewCardCount(now: Long): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM (SELECT word_id FROM review_log GROUP BY word_id HAVING MIN(at) >= :from)")
+    fun observeFirstReviewsSince(from: Long): Flow<Int>
+
     @Insert
     suspend fun insertLog(log: ReviewLogEntity): Long
 
@@ -83,3 +104,6 @@ interface ReviewDao {
 
 private const val DUE =
     "c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND c.due < :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now)"
+
+private const val UNINTRODUCED =
+    "w.status = 'LEARNING' AND w.scheduler = 'HONMANI' AND NOT EXISTS (SELECT 1 FROM review_card c WHERE c.word_id = w.id)"

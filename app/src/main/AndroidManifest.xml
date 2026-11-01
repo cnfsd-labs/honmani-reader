@@ -58,6 +58,11 @@
                 <action android:name="app.honmani.reader.action.SEARCH" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- The launcher's "Review" shortcut: the review screen. -->
+            <intent-filter>
+                <action android:name="app.honmani.reader.action.REVIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <!-- "Open with" for books in file managers and a browser's downloads. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

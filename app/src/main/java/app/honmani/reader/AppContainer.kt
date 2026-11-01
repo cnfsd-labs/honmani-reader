@@ -46,6 +46,7 @@ import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
+import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -142,6 +143,9 @@ class AppContainer(context: Context) {
 
     /** The daily reading goal (Settings; shown in the statistics). */
     val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }
+
+    /** New cards a day, the card front and the days to "known" (Settings → Flashcards). */
+    val reviewSettings: ReviewSettings by lazy { ReviewSettings(settingsPreferences) }
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }

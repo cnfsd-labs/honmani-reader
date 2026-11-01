@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
@@ -58,9 +60,25 @@ private fun HomeTab.TabIcon() {
     }
 }
 
-/** [badges]: tabs with something new, such as dictionary updates, marked with a dot. */
+/** A dot for [dot], or a number for a [count] above 0 (the words due for review, say). */
 @Composable
-fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet()) {
+private fun TabBadge(dot: Boolean, count: Int) {
+    if (count > 0) {
+        val description = stringResource(R.string.review_nav_badge, count)
+        Badge(modifier = Modifier.semantics { contentDescription = description }) {
+            Text(if (count > 99) "99+" else count.toString())
+        }
+    } else if (dot) {
+        Badge()
+    }
+}
+
+/**
+ * [badges]: tabs with something new, such as dictionary updates, marked with a dot. [counts]: a
+ * number on a tab, hidden at 0.
+ */
+@Composable
+fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet(), counts: Map<HomeTab, Int> = emptyMap()) {
     NavigationBar {
         // A little inset at both ends, so the outer labels don't sit at the screen edge.
         Spacer(modifier = Modifier.width(EDGE_INSET))
@@ -69,7 +87,7 @@ fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Se
                 selected = tab == selected,
                 onClick = { onSelect(tab) },
                 icon = {
-                    BadgedBox(badge = { if (tab in badges) Badge() }) {
+                    BadgedBox(badge = { TabBadge(tab in badges, counts[tab] ?: 0) }) {
                         tab.TabIcon()
                     }
                 },
@@ -85,7 +103,7 @@ fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Se
  * there. Centred top to bottom, so the thumb reaches every tab.
  */
 @Composable
-fun HomeNavigationRail(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet()) {
+fun HomeNavigationRail(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet(), counts: Map<HomeTab, Int> = emptyMap()) {
     NavigationRail {
         Spacer(modifier = Modifier.weight(1f))
         for (tab in HomeTab.entries) {
@@ -93,7 +111,7 @@ fun HomeNavigationRail(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: S
                 selected = tab == selected,
                 onClick = { onSelect(tab) },
                 icon = {
-                    BadgedBox(badge = { if (tab in badges) Badge() }) {
+                    BadgedBox(badge = { TabBadge(tab in badges, counts[tab] ?: 0) }) {
                         tab.TabIcon()
                     }
                 },

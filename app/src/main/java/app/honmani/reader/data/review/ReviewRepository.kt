@@ -5,7 +5,12 @@ import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordScheduler
 import java.time.ZoneId
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 
 /** What it takes to take back a review: the card as it was and the log row written. */
 class ReviewUndo(val before: ReviewCardEntity, val logId: Long)
@@ -34,6 +39,43 @@ class ReviewRepository(
 
     /** Cards introduced but never reviewed, oldest first. */
     suspend fun newCards(limit: Int): List<CardWithWord> = dao.newCards(now(), limit)
+
+    /**
+     * New cards a session may show today, for the card in Words: what is left of [newPerDay]
+     * after today's first reviews, at most the introduced new cards plus the Learning words that
+     * could still be introduced. Like [observeDueCount], re-subscribe after midnight.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeNewAvailable(newPerDay: Flow<Int>): Flow<Int> = newPerDay.flatMapLatest { limit ->
+        flow {
+            val time = now()
+            emitAll(
+                combine(
+                    dao.observeNewCardCount(time),
+                    dao.observeUnintroducedCount(),
+                    dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone())),
+                ) { existing, fresh, done -> minOf(maxOf(limit - done, 0), existing + fresh) },
+            )
+        }
+    }
+
+    /**
+     * Up to [limit] new cards for a session: cards introduced but not reviewed yet, oldest
+     * first, then Learning words without a card (best ranked first), which are introduced here.
+     */
+    suspend fun introduceNew(limit: Int): List<CardWithWord> = database.withTransaction {
+        if (limit <= 0) return@withTransaction emptyList()
+        val existing = dao.newCards(now(), limit)
+        val fresh = dao.unintroducedIds(limit - existing.size).mapNotNull { id ->
+            if (introduce(id)) dao.cardWithWord(id) else null
+        }
+        existing + fresh
+    }
+
+    /** Puts a card back as it was (takes back a bury, a suspension or a change of memory). */
+    suspend fun restore(card: ReviewCardEntity) {
+        if (words.find(card.wordId) != null) dao.upsert(card)
+    }
 
     /** Reviews done since the start of today, and new words among them. */
     suspend fun reviewsToday(): Int = dao.reviewsSince(ReviewRules.startOfDay(now(), zone()))

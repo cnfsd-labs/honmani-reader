@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
+import app.honmani.reader.ui.review.ReviewEntry
 import app.honmani.reader.ui.search.SearchContent
 import app.honmani.reader.ui.search.SearchField
 import app.honmani.reader.ui.search.SearchViewModel
@@ -136,6 +137,10 @@ fun WordsScreen(
     /** The launcher's "Search" shortcut asks for the search field; [onSearchFocused] once it has it. */
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
+    /** The review's entrance under the search field: cards due, new words the session would start. */
+    reviewDue: Int = 0,
+    reviewNew: Int = 0,
+    onStartReview: () -> Unit = {},
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
     // Its own lookup panel, apart from the reader's: a search saves no word by itself.
@@ -350,6 +355,9 @@ fun WordsScreen(
         offerKnown = offerKnown,
         onOfferKnown = knownFromAnki::start,
         onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
+        reviewDue = reviewDue,
+        reviewNew = reviewNew,
+        onStartReview = onStartReview,
     )
     val state = panel
     if (state != null) {
@@ -415,6 +423,9 @@ private fun WordsContent(
     searchField: @Composable () -> Unit = {},
     /** While searching: the results, in place of the tabs and lists. */
     searchContent: (@Composable (Modifier) -> Unit)? = null,
+    reviewDue: Int = 0,
+    reviewNew: Int = 0,
+    onStartReview: () -> Unit = {},
 ) {
     val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
     val scope = rememberCoroutineScope()
@@ -429,6 +440,15 @@ private fun WordsContent(
             Surface(color = TabRowDefaults.primaryContainerColor) {
                 Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
                 searchField()
+                // Nothing to show before the first word: the card would only say "nothing to review".
+                if (searchContent == null && (reviewDue + reviewNew > 0 || !uiState.learning.isNullOrEmpty())) {
+                    ReviewEntry(
+                        due = reviewDue,
+                        newWords = reviewNew,
+                        onStart = onStartReview,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
                 if (searchContent == null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PrimaryTabRow(selectedTabIndex = pager.currentPage, modifier = Modifier.weight(1f)) {
                         WordFilter.entries.forEachIndexed { index, filter ->

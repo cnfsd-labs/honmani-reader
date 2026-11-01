@@ -167,6 +167,9 @@ class WordRepository(
         }
     }
 
+    /** Replaces the meaning kept for the word list and review (a lookup with a meaning of its own overwrites it). */
+    suspend fun setGloss(id: Long, gloss: String) = dao.setGloss(id, gloss.take(MAX_GLOSS_LENGTH))
+
     suspend fun setStarred(id: Long, starred: Boolean) = dao.setStarred(id, starred)
 
     /** Stars or unstars a saved word by its written form and reading; nothing if it isn't saved. */

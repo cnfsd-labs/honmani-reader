@@ -53,6 +53,7 @@ import app.honmani.reader.data.settings.ReaderSettings
 import app.honmani.reader.data.words.SessionWords
 import app.honmani.reader.ui.HomeNavigationBar
 import app.honmani.reader.ui.HomeNavigationRail
+import app.honmani.reader.ui.review.ReviewScreen
 import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
@@ -69,8 +70,10 @@ import app.honmani.reader.ui.words.SessionSheet
 import app.honmani.reader.ui.words.WordsScreen
 import app.honmani.reader.ui.words.openInDictionary
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 
 /**
@@ -172,6 +175,21 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             focusSearch = true
         }
     }
+    // The review screen, from Words or the launcher's "Review" shortcut.
+    var reviewShown by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(container) {
+        container.searchRequests.reviewReceived.collect {
+            if (!atLibrary) viewModel.closeBook()
+            tab = HomeTab.WORDS
+            reviewShown = true
+        }
+    }
+    // Words due, for the badge on the Words tab, and the new words a session would start.
+    val reviewDue by remember(container) { flow { emitAll(container.reviewRepository.observeDueCount()) } }
+        .collectAsStateWithLifecycle(0)
+    val reviewNew by remember(container) {
+        flow { emitAll(container.reviewRepository.observeNewAvailable(container.reviewSettings.newPerDay)) }
+    }.collectAsStateWithLifecycle(0)
     LaunchedEffect(viewModel) {
         viewModel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
     }
@@ -321,14 +339,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 dictionariesShown = false
             }
             val badges = if (dictionaryUpdates.isNotEmpty()) setOf(HomeTab.SETTINGS) else emptySet()
+            val counts = mapOf(HomeTab.WORDS to reviewDue)
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 // In landscape (wider than tall) the tabs go at the side and the screens get no bottom bar.
                 val atTheSide = maxWidth > maxHeight
                 val bottomBar = @Composable {
-                    if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges)
+                    if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
                 }
                 Row(modifier = Modifier.fillMaxSize()) {
-                    if (atTheSide) HomeNavigationRail(selected = tab, onSelect = onSelectTab, badges = badges)
+                    if (atTheSide) HomeNavigationRail(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -349,6 +368,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 scrollToTop = wordsTaps,
                                 focusSearch = focusSearch,
                                 onSearchFocused = { focusSearch = false },
+                                reviewDue = reviewDue,
+                                reviewNew = reviewNew,
+                                onStartReview = { reviewShown = true },
                             )
                             HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
                             HomeTab.SETTINGS -> SettingsScreen(
@@ -425,6 +447,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (sessionShown) {
             val session by container.wordRepository.session.collectAsStateWithLifecycle(SessionWords(null, emptyList()))
             SessionSheet(session, onDismiss = { sessionShown = false })
+        }
+        if (reviewShown) {
+            ReviewScreen(
+                onClose = { reviewShown = false },
+                onOpenBook = {
+                    reviewShown = false
+                    tab = HomeTab.LIBRARY
+                    library.open(it)
+                },
+            )
         }
         if (readerSettings) {
             // On top of everything; closing it reloads the reader if anything changed.
