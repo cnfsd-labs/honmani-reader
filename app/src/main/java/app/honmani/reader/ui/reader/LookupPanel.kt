@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.semantics.Role
@@ -663,6 +664,7 @@ private fun Headword(
     // Every segment reserves the ruby line, so kana and kanji share one baseline.
     val rubyStyle = MaterialTheme.typography.labelMedium.copy(lineHeight = 14.sp)
     // Wraps between segments, so a long expression stays readable at a large font size.
+    val showKanji = stringResource(R.string.lookup_show_kanji)
     FlowRow(itemVerticalAlignment = Alignment.Bottom) {
         segments.forEach { segment ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -682,7 +684,8 @@ private fun Headword(
                             style = MaterialTheme.typography.headlineSmall,
                             modifier = if (character in tappable) {
                                 Modifier
-                                    .clickable { onKanji(character) }
+                                    // Padding the glyph to 48 dp would push the word apart.
+                                    .clickable(onClickLabel = showKanji, role = Role.Button) { onKanji(character) }
                                     .drawBehind {
                                         val y = size.height - stroke
                                         drawLine(underline, Offset(size.width * 0.1f, y), Offset(size.width * 0.9f, y), stroke)
@@ -741,6 +744,7 @@ private fun characters(text: String): List<String> =
 private fun KanjiOfWord(expression: String, kanji: Map<String, KanjiInfo>, onShowKanji: (String) -> Unit) {
     val shown = remember(expression, kanji) { JapaneseText.kanjiIn(expression).mapNotNull { kanji[it] } }
     if (shown.isEmpty()) return
+    val showKanji = stringResource(R.string.lookup_show_kanji)
     Column {
         Text(
             text = stringResource(R.string.lookup_kanji_title),
@@ -751,7 +755,8 @@ private fun KanjiOfWord(expression: String, kanji: Map<String, KanjiInfo>, onSho
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onShowKanji(info.character) }
+                    .clickable(onClickLabel = showKanji, role = Role.Button) { onShowKanji(info.character) }
+                    .heightIn(min = 48.dp)
                     .padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -853,14 +858,18 @@ private fun KanjiReadings(label: String, readings: List<AnnotatedString>) {
 
 @Composable
 private fun DetailLink(text: String, onClick: () -> Unit) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
+    Box(
         modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-    )
+            .clickable(onClickLabel = text, role = Role.Button, onClick = onClick)
+            .heightIn(min = 48.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 }
 
 /** A folded result: its first meaning on one line. */
