@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -455,6 +456,6 @@ private fun SwitchRow(title: Int, details: Int?, checked: Boolean, onCheckedChan
             null
         },
         trailingContent = { Switch(checked = checked, onCheckedChange = null) },
-        modifier = Modifier.clickable(role = Role.Switch) { onCheckedChange(!checked) },
+        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
     )
 }

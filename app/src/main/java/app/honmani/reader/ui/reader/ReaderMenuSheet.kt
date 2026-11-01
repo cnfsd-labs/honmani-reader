@@ -1,6 +1,8 @@
 package app.honmani.reader.ui.reader
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -67,7 +69,7 @@ fun ReaderMenuSheet(
                 supportingContent = { Text(stringResource(R.string.reader_menu_progress_details)) },
                 trailingContent = { Switch(checked = showProgress, onCheckedChange = null) },
                 colors = colors,
-                modifier = Modifier.clickable { onSetShowProgress(!showProgress) },
+                modifier = Modifier.toggleable(value = showProgress, role = Role.Switch, onValueChange = onSetShowProgress),
             )
             HorizontalDivider()
             ListItem(

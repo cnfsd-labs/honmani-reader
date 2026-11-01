@@ -119,7 +119,7 @@ private fun FolderBackupRow() {
             }
         },
         trailingContent = { Switch(checked = on, onCheckedChange = null) },
-        modifier = Modifier.clickable {
+        modifier = Modifier.toggleable(value = on, role = Role.Switch) { _ ->
             // Off, or no longer reachable: pick the folder (again); otherwise switch off.
             if (state is FolderBackupState.On) folderBackup.disable() else pick.launch(null)
         },
