@@ -21,7 +21,6 @@ import org.robolectric.RobolectricTestRunner
 private class FakeFolder : FolderTarget {
     val files = mutableMapOf<String, ByteArray>()
     val granted = mutableSetOf<String>()
-    var created = 0
     var denyGrant = false
     var denyWrite = false
     var folderGone = false
@@ -35,27 +34,51 @@ private class FakeFolder : FolderTarget {
         granted -= folder
     }
 
-    override fun findOrCreate(folder: String, name: String): String {
+    override fun find(folder: String, name: String): String? {
+        if (folderGone) throw FileNotFoundException(folder)
+        return "$folder/$name".takeIf { it in files }
+    }
+
+    override fun create(folder: String, name: String): String {
         if (folderGone) throw FileNotFoundException(folder)
         val address = "$folder/$name"
-        if (address !in files) {
-            files[address] = ByteArray(0)
-            created++
-        }
+        files[address] = ByteArray(0)
         return address
     }
+
+    /** Fails after [failAfter] bytes, as a card pulled out half way would. */
+    var failAfter: Int? = null
 
     override fun open(file: String): OutputStream {
         if (denyWrite) throw SecurityException("permission lost")
         if (file !in files) throw FileNotFoundException(file)
         val bytes = ByteArrayOutputStream()
         return object : OutputStream() {
-            override fun write(b: Int) = bytes.write(b)
+            override fun write(b: Int) {
+                if (failAfter != null && bytes.size() >= failAfter!!) throw IOException("gone")
+                bytes.write(b)
+            }
 
             override fun close() {
                 files[file] = bytes.toByteArray()
             }
         }
+    }
+
+    override fun delete(file: String): Boolean {
+        files.remove(file)
+        return true
+    }
+
+    var renamable = true
+
+    override fun canRename(file: String) = renamable
+
+    override fun rename(file: String, name: String): String {
+        val address = file.substringBeforeLast('/') + "/" + name
+        if (address in files) throw IOException("exists")
+        files[address] = files.remove(file)!!
+        return address
     }
 }
 
@@ -96,8 +119,32 @@ class FolderBackupTest {
         backup.copy(source)
 
         assertEquals(mapOf(file to "zip two"), folder.files.mapValues { String(it.value) })
-        assertEquals(1, folder.created)
         assertEquals(FolderBackupState.On(9_000L), backup.state.value)
+    }
+
+    @Test
+    fun aFailedWriteLeavesTheEarlierBackupAndNoTemporaryFile() = runBlocking {
+        backup.choose("content://tree/a")
+        backup.copy(source)
+
+        source.writeText("zip two, longer")
+        folder.failAfter = 3
+        backup.copy(source)
+
+        assertEquals(FolderBackupState.Unavailable, backup.state.value)
+        assertEquals(mapOf(file to "zip one"), folder.files.mapValues { String(it.value) })
+    }
+
+    @Test
+    fun aProviderThatCannotRenameIsOverwrittenInPlaceAndLeavesNothingBehind() = runBlocking {
+        folder.renamable = false
+        backup.choose("content://tree/a")
+        backup.copy(source)
+        source.writeText("zip two")
+        backup.copy(source)
+
+        assertEquals(mapOf(file to "zip two"), folder.files.mapValues { String(it.value) })
+        assertEquals(FolderBackupState.On(5_000L), backup.state.value)
     }
 
     @Test
@@ -118,7 +165,6 @@ class FolderBackupTest {
         backup.copy(source)
 
         assertEquals("zip one", String(folder.files[file]!!))
-        assertEquals(2, folder.created)
         assertEquals(FolderBackupState.On(7_000L), backup.state.value)
     }
 

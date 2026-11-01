@@ -22,11 +22,23 @@ interface FolderTarget {
     /** Gives that right up again; never throws. */
     fun release(folder: String)
 
-    /** The file called [name] in [folder] (its address), made if it isn't there yet. */
-    fun findOrCreate(folder: String, name: String): String
+    /** The file called [name] in [folder] (its address), or null if there is none. */
+    fun find(folder: String, name: String): String?
+
+    /** Makes a new, empty file called [name] in [folder]; the provider may alter the name. */
+    fun create(folder: String, name: String): String
 
     /** Opens [file] to be overwritten. */
     fun open(file: String): OutputStream
+
+    /** Deletes [file]; returns whether it is gone. */
+    fun delete(file: String): Boolean
+
+    /** Whether the provider can rename [file]. */
+    fun canRename(file: String): Boolean
+
+    /** Renames [file] to [name] (which must be free) and returns its new address; throws if it can't. */
+    fun rename(file: String, name: String): String
 }
 
 /** How the copy of the backup in the chosen folder stands. */
@@ -75,7 +87,6 @@ class FolderBackup(
         if (earlier != null && earlier != folder) target.release(earlier)
         device.edit()
             .putString(KEY_FOLDER, folder)
-            .remove(KEY_FILE)
             .remove(KEY_LAST)
             .putBoolean(KEY_FAILED, false)
             .apply()
@@ -86,7 +97,7 @@ class FolderBackup(
     /** Stops copying: gives the folder's right back and forgets it. The copy already there stays. */
     fun disable() {
         device.getString(KEY_FOLDER, null)?.let(target::release)
-        device.edit().remove(KEY_FOLDER).remove(KEY_FILE).remove(KEY_LAST).remove(KEY_FAILED).apply()
+        device.edit().remove(KEY_FOLDER).remove(KEY_LAST).remove(KEY_FAILED).apply()
         _state.value = FolderBackupState.Off
     }
 
@@ -115,32 +126,45 @@ class FolderBackup(
         }
     }
 
+    /**
+     * The copy is written whole into a temporary file first, so an interruption (storage full,
+     * the card pulled, the process killed) leaves the earlier backup untouched. Only then the
+     * old file is deleted and the new one renamed. A provider that can't rename gets the old
+     * file overwritten in place instead, while the finished temporary file still exists.
+     */
     private fun write(folder: String, source: File) {
-        var file = device.getString(KEY_FILE, null)
-        for (attempt in 0..1) {
-            val remembered = file != null
-            try {
-                if (file == null) {
-                    file = target.findOrCreate(folder, FILE_NAME)
-                    device.edit().putString(KEY_FILE, file).apply()
-                }
-                val output = target.open(file)
-                output.use { out -> source.inputStream().use { it.copyTo(out) } }
-                return
-            } catch (e: IOException) {
-                // The file may have been deleted since: make it once more.
-                if (!remembered || attempt == 1) throw e
-                file = null
-                device.edit().remove(KEY_FILE).apply()
+        target.find(folder, TEMP_NAME)?.let { target.delete(it) }
+        val temp = target.create(folder, TEMP_NAME)
+        var complete = false
+        try {
+            copyInto(temp, source)
+            complete = true
+            val old = target.find(folder, FILE_NAME)
+            if (target.canRename(temp)) {
+                if (old != null && !target.delete(old)) throw IOException("Cannot replace $old")
+                target.rename(temp, FILE_NAME)
+            } else {
+                copyInto(old ?: target.create(folder, FILE_NAME), source)
+                target.delete(temp)
             }
+        } catch (e: Exception) {
+            // A finished temporary file may be all that is left if the swap failed: keep it then.
+            runCatching {
+                if (!complete || target.find(folder, FILE_NAME) != null) target.delete(temp)
+            }
+            throw e
         }
+    }
+
+    private fun copyInto(file: String, source: File) {
+        target.open(file).use { out -> source.inputStream().use { it.copyTo(out) } }
     }
 
     companion object {
         const val FILE_NAME = AutoBackup.FILE_NAME
+        private const val TEMP_NAME = "tmp-$FILE_NAME"
 
         private const val KEY_FOLDER = "folder_backup_uri"
-        private const val KEY_FILE = "folder_backup_file"
         private const val KEY_LAST = "folder_backup_last"
         private const val KEY_FAILED = "folder_backup_failed"
     }

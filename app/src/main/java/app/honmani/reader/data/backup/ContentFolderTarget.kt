@@ -28,10 +28,9 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
         }
     }
 
-    override fun findOrCreate(folder: String, name: String): String {
+    override fun find(folder: String, name: String): String? {
         val tree = Uri.parse(folder)
         val parentId = DocumentsContract.getTreeDocumentId(tree)
-        // A file from an earlier choice of this folder is reused, so there is only ever the one.
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, parentId)
         resolver.query(
             children,
@@ -46,7 +45,12 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
                 }
             }
         }
-        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, parentId)
+        return null
+    }
+
+    override fun create(folder: String, name: String): String {
+        val tree = Uri.parse(folder)
+        val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val created = DocumentsContract.createDocument(resolver, parent, "application/zip", name)
             ?: throw FileNotFoundException("Cannot create $name in $folder")
         return created.toString()
@@ -54,4 +58,19 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
 
     override fun open(file: String): OutputStream =
         resolver.openOutputStream(Uri.parse(file), "wt") ?: throw IOException("Cannot write $file")
+
+    override fun delete(file: String): Boolean = try {
+        DocumentsContract.deleteDocument(resolver, Uri.parse(file))
+    } catch (_: FileNotFoundException) {
+        true
+    }
+
+    override fun canRename(file: String): Boolean =
+        resolver.query(Uri.parse(file), arrayOf(DocumentsContract.Document.COLUMN_FLAGS), null, null, null)
+            ?.use { it.moveToFirst() && it.getInt(0) and DocumentsContract.Document.FLAG_SUPPORTS_RENAME != 0 }
+            ?: false
+
+    override fun rename(file: String, name: String): String =
+        DocumentsContract.renameDocument(resolver, Uri.parse(file), name)?.toString()
+            ?: throw IOException("Cannot rename $file to $name")
 }
