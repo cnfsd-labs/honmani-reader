@@ -582,6 +582,24 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun searchFindsRomajiWithUnwrittenLongVowels_belowExactMatches() = runTest {
+        install(
+            "JMdict",
+            listOf("東京", "とうきょう", "", 10, "Tokyo"),
+            listOf("時給", "じきゅう", "", 10, "hourly wage"),
+            listOf("時", "とき", "", 10, "time"),
+            listOf("通り", "とおり", "", 10, "street"),
+            listOf("取り", "とり", "", 10, "taking"),
+            listOf("鳥", "とり", "", 10, "bird"),
+        )
+
+        assertEquals("東京", searched("tokyo").first())
+        assertEquals("時給", searched("jikyu").first())
+        val tori = searched("tori")
+        assertTrue(tori.toString(), tori.indexOf("通り") > maxOf(tori.indexOf("鳥"), tori.indexOf("取り")))
+    }
+
+    @Test
     fun searchWithWildcards() = runTest {
         jmdict()
 

@@ -237,7 +237,26 @@ class DictionaryLookup(
             }
         }
 
-        val known = found.mapTo(HashSet()) { it.term.expression to it.term.reading }
+        val source = query.trim()
+        // Romaji without its long vowels: "tokyo" is 東京 (とうきょう), below what it spells exactly.
+        val longVowelTerms = parsed.longVowels.chunked(MAX_LOOKUP_TEXTS)
+            .flatMap { termDao.findByExpressionOrReading(it) }
+            .filter { it.dictionaryId in dictionaries && it.id !in tiers }
+            .distinctBy { it.id }
+        val longVowelForms = parsed.longVowels.toHashSet()
+        val longVowelEntries = longVowelTerms.map { term ->
+            tiers[term.id] = TIER_LONG_VOWEL
+            val dictionary = dictionaries.getValue(term.dictionaryId)
+            LookupEntry(
+                term = unpacked(term, dictionary),
+                dictionary = dictionary,
+                source = source,
+                inflections = emptyList(),
+                matchedExpression = term.expression in longVowelForms,
+            )
+        }
+
+        val known = (found + longVowelEntries).mapTo(HashSet()) { it.term.expression to it.term.reading }
         val keys = buildList {
             for (prefix in parsed.prefixes) {
                 addAll(termDao.keysByExpressionRange(prefix, prefix + PREFIX_END, SEARCH_KEY_LIMIT))
@@ -257,7 +276,6 @@ class DictionaryLookup(
             .thenBy(dictionaryOrder) { dictionaries.getValue(it.dictionaryId) }
             .thenByDescending { it.score }
         val words = keys.sortedWith(keyOrder).map { it.expression to it.reading }.distinct().take(maxWords).toHashSet()
-        val source = query.trim()
         val started = keys.filter { (it.expression to it.reading) in words }.map { it.id }
             .chunked(MAX_LOOKUP_TEXTS)
             .flatMap { termDao.findByIds(it) }
@@ -271,7 +289,7 @@ class DictionaryLookup(
                     matchedExpression = parsed.patterns.isNotEmpty() || parsed.prefixes.any { term.expression.startsWith(it) },
                 )
             }
-        val (startedEntries, pointers) = followPointers(started) { _, _ -> false }
+        val (startedEntries, pointers) = followPointers(longVowelEntries + started) { _, _ -> false }
 
         val entries = found + startedEntries
         val meta = meta(entries, dictionaries)
@@ -507,10 +525,11 @@ class DictionaryLookup(
         conditions == WordClass.ANY || conditions and termClasses != 0
 
     private companion object {
-        /** Search tiers: the query as typed, its other forms, words starting with it. */
+        /** Search tiers: the query as typed, its other forms, with unwritten long vowels, words starting with it. */
         const val TIER_EXACT = 0
         const val TIER_VARIANT = 1
-        const val TIER_PREFIX = 2
+        const val TIER_LONG_VOWEL = 2
+        const val TIER_PREFIX = 3
 
         /** Words a search shows at most (besides the ones it spells out). */
         const val MAX_SEARCH_WORDS = 50

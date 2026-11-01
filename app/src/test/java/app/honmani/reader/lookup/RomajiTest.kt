@@ -125,6 +125,19 @@ class RomajiTest {
     }
 
     @Test
+    fun romajiAlsoLooksForUnwrittenLongVowels() {
+        val tokyo = SearchQuery.parse("tokyo")
+        assertEquals(listOf("ときょ", "トキョ"), tokyo.exact)
+        assertTrue(tokyo.longVowels.toString(), tokyo.longVowels.containsAll(listOf("とうきょう", "とおきょお", "トーキョー")))
+        assertTrue("ときょ" !in tokyo.longVowels)
+        assertTrue(SearchQuery.parse("ru").longVowels.contains("るう"))
+        // Written out already, typed in kana, or with no o or u: nothing to add.
+        assertTrue(SearchQuery.parse("ou").longVowels.none { it.startsWith("おうう") })
+        assertTrue(SearchQuery.parse("ときょ").longVowels.isEmpty())
+        assertTrue(SearchQuery.parse("taberi").longVowels.isEmpty())
+    }
+
+    @Test
     fun wildcardsBecomeGlobPatterns() {
         assertEquals(listOf("た*る", "タ*ル"), SearchQuery.parse("ta*ru").patterns)
         assertEquals(listOf("食?"), SearchQuery.parse("食？").patterns)
