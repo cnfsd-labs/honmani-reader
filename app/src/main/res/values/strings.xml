@@ -595,6 +595,9 @@
     <string name="stats_day_chart">Reading time per day</string>
     <string name="stats_week_of">Week of %1$s</string>
     <string name="stats_speed_trend">Speed per week</string>
+    <string name="stats_chart_description">%1$s, chart with %2$d values</string>
+    <string name="stats_chart_previous">Previous value</string>
+    <string name="stats_chart_next">Next value</string>
     <string name="stats_speed_trend_empty">Weeks with at least 10 minutes of reading show here.</string>
     <plurals name="stats_characters">
         <item quantity="one">%1$s character</item>

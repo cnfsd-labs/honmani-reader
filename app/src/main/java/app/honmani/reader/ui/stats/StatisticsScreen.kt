@@ -45,6 +45,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -358,11 +365,15 @@ private fun BarChart(title: String, bars: List<DayTotal>, label: @Composable (Da
     val bar = bars[selected.coerceIn(bars.indices)]
     val color = MaterialTheme.colorScheme.primary
     val baseline = MaterialTheme.colorScheme.outlineVariant
+    val readout = "${label(bar)} · ${duration(bar.seconds)} · ${characters(bar.characters)}"
+    val description = stringResource(R.string.stats_chart_description, title, bars.size)
+    val previousLabel = stringResource(R.string.stats_chart_previous)
+    val nextLabel = stringResource(R.string.stats_chart_next)
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                text = "${label(bar)} · ${duration(bar.seconds)} · ${characters(bar.characters)}",
+                text = readout,
                 style = MaterialTheme.typography.bodyMedium,
             )
             val maxMinutes = bars.maxOf { it.seconds / 60f }.coerceAtLeast(1f)
@@ -370,6 +381,21 @@ private fun BarChart(title: String, bars: List<DayTotal>, label: @Composable (Da
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
+                    .semantics {
+                        contentDescription = description
+                        stateDescription = readout
+                        liveRegion = LiveRegionMode.Polite
+                        customActions = listOf(
+                            CustomAccessibilityAction(previousLabel) {
+                                selected = (selected - 1).coerceIn(bars.indices)
+                                true
+                            },
+                            CustomAccessibilityAction(nextLabel) {
+                                selected = (selected + 1).coerceIn(bars.indices)
+                                true
+                            },
+                        )
+                    }
                     .pointerInput(bars) {
                         detectTapGestures { offset ->
                             val slot = size.width.toFloat() / bars.size
@@ -422,8 +448,16 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                 )
                 return@Column
             }
+            val readout = "${stringResource(R.string.stats_week_of, week.start.format(dateFormat))} · ${speed(weekSpeed)}"
+            val description = stringResource(
+                R.string.stats_chart_description,
+                stringResource(R.string.stats_speed_trend),
+                measured.size,
+            )
+            val previousLabel = stringResource(R.string.stats_chart_previous)
+            val nextLabel = stringResource(R.string.stats_chart_next)
             Text(
-                "${stringResource(R.string.stats_week_of, week.start.format(dateFormat))} · ${speed(weekSpeed)}",
+                readout,
                 style = MaterialTheme.typography.bodyMedium,
             )
             val values = measured.map { it.value.charactersPerHour!!.toFloat() }
@@ -434,6 +468,21 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp)
+                    .semantics {
+                        contentDescription = description
+                        stateDescription = readout
+                        liveRegion = LiveRegionMode.Polite
+                        customActions = listOf(
+                            CustomAccessibilityAction(previousLabel) {
+                                measured.lastOrNull { it.index < selected }?.let { selected = it.index }
+                                true
+                            },
+                            CustomAccessibilityAction(nextLabel) {
+                                measured.firstOrNull { it.index > selected }?.let { selected = it.index }
+                                true
+                            },
+                        )
+                    }
                     .pointerInput(weeks) {
                         detectTapGestures { offset ->
                             val slot = size.width.toFloat() / weeks.size
