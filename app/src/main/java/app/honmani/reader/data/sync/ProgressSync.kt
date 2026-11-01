@@ -263,24 +263,41 @@ class ProgressSync(
     /** Sends the positions that couldn't be sent before: a network is back, or the app started. */
     fun resend() {
         if (settings.account.value == null) return
-        scope.launch { pushLock.withLock { settings.account.value?.let { sendUnsent(it) } } }
+        scope.launch { pushLock.withLock { settings.account.value?.let { settle(it) } } }
     }
 
     private suspend fun push() = pushLock.withLock {
         val (ttuId, characters) = synchronized(this) { pending.also { pending = null } } ?: return@withLock
         val account = settings.account.value ?: return@withLock
+        // Before the book is parsed (slow): a process kill meanwhile must not lose the position.
+        unsent.putRaw(RawPosition(ttuId, characters, now()))
+        settle(account)
+    }
+
+    /** Turns the raw position into an unsent one, then sends what [unsent] holds. */
+    private suspend fun settle(account: KoSyncAccount) {
+        unsent.raw()?.let { record(it) }
+        sendUnsent(account)
+    }
+
+    private suspend fun record(raw: RawPosition) {
+        val (ttuId, characters) = raw.ttuId to raw.characters
         if (synchronized(synced) { synced[ttuId] } != characters) {
             try {
-                val book = books.findByTtuId(ttuId)?.takeIf { it.format == BookFormat.EPUB } ?: return@withLock
-                val document = document(book) ?: return@withLock
-                val xpointer = document.positions.xpointerAt(characters.toInt()) ?: return@withLock
-                val percentage = characters.toDouble() / document.total
-                unsent.put(UnsentPosition(ttuId, document.id, xpointer, percentage.coerceIn(0.0, 1.0), characters, now()))
+                val book = books.findByTtuId(ttuId)?.takeIf { it.format == BookFormat.EPUB }
+                val document = book?.let { document(it) }
+                val xpointer = document?.positions?.xpointerAt(characters.toInt())
+                if (document != null && xpointer != null) {
+                    val percentage = characters.toDouble() / document.total
+                    unsent.put(UnsentPosition(ttuId, document.id, xpointer, percentage.coerceIn(0.0, 1.0), characters, raw.readAt))
+                }
             } catch (e: IOException) {
+                // Kept in the raw file: the next resend tries again.
                 Log.i(TAG, "Progress not sent: ${e.message}")
+                return
             }
         }
-        sendUnsent(account)
+        unsent.removeRaw(raw)
     }
 
     /** Sends what [unsent] holds, until the server can't be reached. */

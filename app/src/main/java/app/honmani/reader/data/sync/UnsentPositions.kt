@@ -28,12 +28,20 @@ data class UnsentPosition(
 )
 
 /**
+ * A position as ttu reported it, kept before the book is parsed for the sync id and XPointer
+ * (slow for a big book): a process kill in that time must not lose it.
+ */
+@Serializable
+data class RawPosition(val ttuId: Long, val characters: Long, val readAt: Long)
+
+/**
  * The newest unsent position per book, kept in a file so that pages read without a connection
  * (away from a home server, say) still reach the server when the app runs again. Not backed up:
  * the positions belong to this phone's sync account.
  */
 class UnsentPositions(private val file: File) {
     private var positions: Map<String, UnsentPosition>? = null
+    private val rawFile = File(file.parentFile, file.name + ".raw")
 
     @Synchronized
     fun all(): List<UnsentPosition> = load().values.toList()
@@ -64,10 +72,39 @@ class UnsentPositions(private val file: File) {
         if (document in saved) save(saved - document)
     }
 
+    /** The position waiting to be turned into an [UnsentPosition], if any. */
+    @Synchronized
+    fun raw(): RawPosition? = try {
+        if (rawFile.isFile) json.decodeFromString<RawPosition>(rawFile.readText()) else null
+    } catch (_: IOException) {
+        null
+    } catch (_: SerializationException) {
+        null
+    } catch (_: IllegalArgumentException) {
+        null
+    }
+
+    /** Keeps [position] in the file at once (the newest one replaces an older one). */
+    @Synchronized
+    fun putRaw(position: RawPosition) {
+        try {
+            writeTextAtomically(rawFile, json.encodeToString(position))
+        } catch (_: IOException) {
+            // Still sent from memory.
+        }
+    }
+
+    /** Drops the raw position, unless a newer one replaced [position] meanwhile. */
+    @Synchronized
+    fun removeRaw(position: RawPosition) {
+        if (raw() == position) rawFile.delete()
+    }
+
     @Synchronized
     fun clear() {
         positions = emptyMap()
         file.delete()
+        rawFile.delete()
     }
 
     private fun load(): Map<String, UnsentPosition> = positions ?: try {

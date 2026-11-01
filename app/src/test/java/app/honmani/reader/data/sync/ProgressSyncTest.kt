@@ -213,6 +213,19 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun aPositionSavedBeforeTheBookWasParsed_isSentAfterAProcessKill() = runBlocking {
+        // The app died after the raw position was written and before the book was parsed.
+        UnsentPositions(unsentFile).putRaw(RawPosition(ttuId = 5, characters = 12, readAt = 5_000_000))
+        val rawFile = File(folder.root, "sync-unsent.json.raw")
+        assertTrue(rawFile.isFile)
+
+        newSync().resend()
+
+        assertEquals("/body/DocFragment[1]/body/div[1]/p[2]/text()[2].1", waitForProgress()["progress"]!!.jsonPrimitive.content)
+        waitFor { !rawFile.exists() && !unsentFile.exists() }
+    }
+
+    @Test
     fun anUnsentPositionGivesWayToOneReadFurtherOnElsewhere() = runBlocking {
         server.down = true
         sync.onPosition(5, 12)
