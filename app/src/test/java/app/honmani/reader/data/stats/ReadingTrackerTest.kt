@@ -267,9 +267,29 @@ class ReadingTrackerTest {
         assertEquals(15L, store.seconds[7L to DAY])
     }
 
+    @Test
+    fun aStretchAcrossMidnightIsSplitBetweenTheTwoDays_timeAndCharacters() = runTest {
+        val tracker = tracker()
+        store.positions[7] = 1_000
+        now = DAY_START + 16 * 60 * 60_000L - 60_000L // 23:59
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        now += 4 * 60_000L // 00:03: one minute before midnight, three after
+        tracker.onPage(7, 2_000, null)
+        tracker.setVisible(false)
+        advanceUntilIdle()
+
+        assertEquals(60L, store.seconds[7L to DAY])
+        assertEquals(180L, store.seconds[7L to NEXT_DAY])
+        assertEquals(250L, store.characters[7L to DAY])
+        assertEquals(750L, store.characters[7L to NEXT_DAY])
+    }
+
     private companion object {
         /** 2026-10-17 08:00 UTC. */
         const val DAY_START = 1_792_224_000_000L
         const val DAY = "2026-10-17"
+        const val NEXT_DAY = "2026-10-18"
     }
 }

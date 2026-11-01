@@ -1,6 +1,7 @@
 package app.honmani.reader.data.stats
 
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -62,11 +63,14 @@ class ReadingTracker(
     /** Start of the time not counted yet, while active. */
     private var mark: Long? = null
 
-    /** Time counted since the book's reading position last changed: what its characters may use. */
-    private val secondsSinceReport = HashMap<Long, Long>()
+    /**
+     * Milliseconds counted since the book's reading position last changed, by day: what its
+     * characters may use, and the days they are shared between.
+     */
+    private val sinceReport = HashMap<Long, Map<String, Long>>()
 
     /** Time of page turns that kept the position, waiting for the turn that moves it. */
-    private val carriedSeconds = HashMap<Long, Long>()
+    private val carried = HashMap<Long, Map<String, Long>>()
 
     /** Milliseconds counted but not written yet, by book and day. */
     private val pending = HashMap<Pair<Long, String>, Long>()
@@ -105,14 +109,14 @@ class ReadingTracker(
             }
         }
         // The time up to this page turn is taken now, before a later page adds to it.
-        val onThisPage = synchronized(lock) { secondsSinceReport.remove(ttuId) ?: 0L }
+        val onThisPage = synchronized(lock) { sinceReport.remove(ttuId).orEmpty() }
         scope.launch {
             writes.withLock {
                 val known = store.position(ttuId)
                 if (known == null) {
                     // Nothing to measure the page against (a new or restored book): counting
                     // from 0 would credit the whole distance to the start. Just remember it.
-                    synchronized(lock) { carriedSeconds.remove(ttuId) }
+                    synchronized(lock) { carried.remove(ttuId) }
                     safely { store.setPosition(ttuId, characters) }
                     return@withLock
                 }
@@ -120,17 +124,18 @@ class ReadingTracker(
                 // ttu saves the same position again when a page turn stays in one paragraph:
                 // the time keeps adding up until the position moves.
                 if (characters == before) {
-                    synchronized(lock) { carriedSeconds.merge(ttuId, onThisPage, Long::plus) }
+                    synchronized(lock) { carried[ttuId] = carried[ttuId].orEmpty() + onThisPage }
                     return@withLock
                 }
-                val seconds = onThisPage + synchronized(lock) { carriedSeconds.remove(ttuId) ?: 0L }
+                val byDay = onThisPage + synchronized(lock) { carried.remove(ttuId).orEmpty() }
+                val seconds = byDay.values.sum() / 1_000
                 val read = if (seconds >= MIN_PAGE_SECONDS) {
                     (characters - before).coerceIn(0L, seconds * MAX_CHARACTERS_PER_SECOND)
                 } else {
                     0L
                 }
                 if (read > 0) {
-                    safely { store.add(ttuId, day(clock()), 0, read) }
+                    addCharacters(ttuId, read, byDay)
                     // The book's length from the new position: characters at progress.
                     if (progress != null && progress > 0f && characters > 0) {
                         val total = characters / progress.toDouble()
@@ -150,12 +155,11 @@ class ReadingTracker(
                 for ((ttuId, characters) in positions) {
                     val before = store.position(ttuId) ?: 0L
                     if (characters == before) continue
-                    val seconds = synchronized(lock) {
-                        (secondsSinceReport.remove(ttuId) ?: 0L) + (carriedSeconds.remove(ttuId) ?: 0L)
-                    }
+                    val byDay = synchronized(lock) { sinceReport.remove(ttuId).orEmpty() + carried.remove(ttuId).orEmpty() }
+                    val seconds = byDay.values.sum() / 1_000
                     val allowed = seconds * MAX_CHARACTERS_PER_SECOND + SLACK_CHARACTERS
                     val read = (characters - before).coerceIn(0L, allowed)
-                    if (read > 0) safely { store.add(ttuId, day(clock()), 0, read) }
+                    if (read > 0) addCharacters(ttuId, read, byDay)
                     safely { store.setPosition(ttuId, characters) }
                 }
             }
@@ -209,10 +213,41 @@ class ReadingTracker(
         val book = book ?: return
         val millis = (now - from).coerceIn(0L, IDLE_MS)
         if (millis == 0L) return
-        val key = book to day(now)
+        // The stretch ran from the mark; the part before local midnight belongs to the day before.
+        val end = from + millis
+        val startDay = date(from)
+        val midnight = startDay.plusDays(1).atStartOfDay(zone()).toInstant().toEpochMilli()
+        if (end <= midnight) {
+            countOn(book, startDay.toString(), millis)
+        } else {
+            countOn(book, startDay.toString(), midnight - from)
+            countOn(book, date(end).toString(), end - midnight)
+        }
+    }
+
+    private fun countOn(book: Long, day: String, millis: Long) {
+        if (millis <= 0) return
+        val key = book to day
         pending[key] = (pending[key] ?: 0L) + millis
-        // Whole seconds for the characters' allowance; the rest waits in the next stretch.
-        secondsSinceReport[book] = (secondsSinceReport[book] ?: 0L) + millis / 1_000
+        // Kept in milliseconds: the characters' allowance floors only the total.
+        sinceReport[book] = sinceReport[book].orEmpty().let { it + (day to (it[day] ?: 0L) + millis) }
+    }
+
+    /**
+     * Credits [read] characters to the days the time went to, in proportion to that time; a page
+     * read on one day (or with no time known) goes to today.
+     */
+    private suspend fun addCharacters(ttuId: Long, read: Long, byDay: Map<String, Long>) {
+        val days = byDay.toSortedMap().filterValues { it > 0 }
+        val total = days.values.sum()
+        if (days.size < 2) return safely { store.add(ttuId, day(clock()), 0, read) }
+        var left = read
+        val last = days.keys.last()
+        for ((day, millis) in days) {
+            val share = if (day == last) left else read * millis / total
+            left -= share
+            if (share > 0) safely { store.add(ttuId, day, 0, share) }
+        }
     }
 
     private fun flushIfDue() {
@@ -220,7 +255,9 @@ class ReadingTracker(
         if (due) flush()
     }
 
-    private fun day(millis: Long): String = Instant.ofEpochMilli(millis).atZone(zone()).toLocalDate().toString()
+    private fun date(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(zone()).toLocalDate()
+
+    private fun day(millis: Long): String = date(millis).toString()
 
     /** Statistics never get in the way of reading. */
     private suspend fun safely(write: suspend () -> Unit) {
