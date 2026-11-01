@@ -158,7 +158,7 @@ private fun PeriodPicker(period: StatsPeriod, onPick: (StatsPeriod) -> Unit) {
                 selected = entry == period,
                 onClick = { onPick(entry) },
                 shape = SegmentedButtonDefaults.itemShape(index, StatsPeriod.entries.size),
-                label = { Text(periodName(entry), maxLines = 1) },
+                label = { Text(periodName(entry), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         }
     }

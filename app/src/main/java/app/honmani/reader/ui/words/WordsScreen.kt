@@ -318,6 +318,7 @@ private fun WordsContent(
                                             if (filter == WordFilter.LEARNING) uiState.learning?.size ?: 0 else uiState.knownCount,
                                         ),
                                         maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 },
                             )

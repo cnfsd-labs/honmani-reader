@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -440,7 +441,7 @@ private fun <T> Choice(options: List<Pair<T, Int>>, selected: T?, onSelect: (T) 
                 selected = value == selected,
                 onClick = { onSelect(value) },
                 shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                label = { Text(stringResource(label), maxLines = 1) },
+                label = { Text(stringResource(label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         }
     }

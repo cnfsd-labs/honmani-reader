@@ -101,7 +101,7 @@ fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = 
                         Tab(
                             selected = index == pager.currentPage,
                             onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                            text = { Text(stringResource(entry.label), maxLines = 1) },
+                            text = { Text(stringResource(entry.label), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         )
                     }
                 }

@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
@@ -362,7 +363,7 @@ private fun SentenceSpeedPicker(selected: SentenceSpeed, onSelect: (SentenceSpee
                     selected = speed == selected,
                     onClick = { onSelect(speed) },
                     shape = SegmentedButtonDefaults.itemShape(index, SentenceSpeed.entries.size),
-                    label = { Text(stringResource(speed.label()), maxLines = 1) },
+                    label = { Text(stringResource(speed.label()), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 )
             }
         }
