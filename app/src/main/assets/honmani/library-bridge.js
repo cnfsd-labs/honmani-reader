@@ -5,10 +5,13 @@
  * ("books" database, "data" store keyed by id, unique by title). The app calls these functions
  * with evaluateJavascript, and they answer through the `honmani` message channel:
  *
- *   honmaniLibrary.ensure({ requestId, ttuId, ttuTitle, url, fileName })
+ *   honmaniLibrary.ensure({ requestId, ttuId, ttuTitle, url, fileName, keepIds, titleSuffix })
  *     Makes sure ttu has the book. If ttu still holds ttuId under ttuTitle, answers at once;
  *     otherwise fetches url (served by the app from the library) and imports it through ttu's own
  *     import input on its book list, so ttu parses and stores it as if the user had picked it.
+ *     ttu replaces a book of the same title under the old id, so a book whose title one of the
+ *     ttu ids in keepIds (other library books') already holds is stored as a new book instead,
+ *     under its title plus titleSuffix: both keep their own text and reading position.
  *     → { type: 'library.ready', requestId, id, title } or { type: 'library.failed', requestId, message }
  *   honmaniLibrary.remove({ requestId, ttuId })
  *     Deletes the book and its bookmark from ttu. → { type: 'library.removed', requestId }
@@ -111,19 +114,29 @@
 
   /** Wraps IDBObjectStore's put and add, which ttu uses to store an updated or a new book. */
   function watchDataWrites() {
+    const originalAdd = IDBObjectStore.prototype.add;
     for (const method of ['put', 'add']) {
       const original = IDBObjectStore.prototype[method];
       IDBObjectStore.prototype[method] = function (value, ...rest) {
-        const request = original.call(this, value, ...rest);
         const pending = pendingImport;
-        if (
+        const ours =
           pending &&
           this.name === 'data' &&
           value &&
           typeof value.title === 'string' &&
           typeof value.elementHtml === 'string' &&
-          (value.lastBookModified || 0) >= pending.since
-        ) {
+          (value.lastBookModified || 0) >= pending.since;
+        let request;
+        if (ours && pending.keepIds.includes(value.id) && pending.titleSuffix) {
+          // ttu found another library book under this title and would overwrite it: store a new row.
+          const { id, ...renamed } = value;
+          renamed.title = value.title + pending.titleSuffix;
+          value = renamed;
+          request = originalAdd.call(this, value);
+        } else {
+          request = original.call(this, value, ...rest);
+        }
+        if (ours) {
           const title = value.title;
           const transaction = this.transaction;
           request.addEventListener('success', () => {
@@ -160,7 +173,7 @@
     });
   }
 
-  async function importBook(url, fileName) {
+  async function importBook(url, fileName, keepIds, titleSuffix) {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`The book file is missing (${response.status})`);
     const file = new File([await response.blob()], fileName);
@@ -176,6 +189,8 @@
       };
       pendingImport = {
         since: Date.now(),
+        keepIds,
+        titleSuffix,
         resolve: (result) => finish(null, result),
         reject: (error) => finish(error),
       };
@@ -194,14 +209,19 @@
     queue = queue.then(work, work);
   }
 
-  function ensure({ requestId, ttuId, ttuTitle, url, fileName }) {
+  function ensure({ requestId, ttuId, ttuTitle, url, fileName, keepIds, titleSuffix }) {
     enqueue(async () => {
       try {
         if (await hasBook(ttuId, ttuTitle)) {
           post({ type: 'library.ready', requestId, id: ttuId, title: ttuTitle });
           return;
         }
-        const { id, title } = await importBook(url, fileName);
+        const { id, title } = await importBook(
+          url,
+          fileName,
+          Array.isArray(keepIds) ? keepIds : [],
+          typeof titleSuffix === 'string' ? titleSuffix : '',
+        );
         post({ type: 'library.ready', requestId, id, title });
       } catch (error) {
         post({ type: 'library.failed', requestId, message: String((error && error.message) || error) });

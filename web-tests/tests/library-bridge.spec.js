@@ -32,6 +32,9 @@ const BOOKS = {
     title: '吾輩は猫である',
     paragraphs: ['吾輩は猫である。名前はまだ無い。', 'どこで生れたかとんと見当がつかぬ。'],
   }),
+  // Two editions of one work: same title, different text.
+  'edition-a.epub': buildEpub({ title: '同じ題', paragraphs: ['初版の本文です。'] }),
+  'edition-b.epub': buildEpub({ title: '同じ題', paragraphs: ['改訂版の本文です。'] }),
   'long.epub': buildEpub({
     title: '長い本',
     paragraphs: Array.from({ length: 300 }, (_, i) => `第${i + 1}段落。${'吾輩は猫である。'.repeat(20)}`),
@@ -107,8 +110,21 @@ async function call(page, command, args = {}) {
   return handle.jsonValue();
 }
 
-async function ensure(page, fileName, ttuId = null, ttuTitle = null) {
-  return call(page, 'ensure', { ttuId, ttuTitle, url: `/honmani-books/${fileName}`, fileName });
+async function ensure(page, fileName, ttuId = null, ttuTitle = null, extra = {}) {
+  return call(page, 'ensure', { ttuId, ttuTitle, url: `/honmani-books/${fileName}`, fileName, ...extra });
+}
+
+async function storedTexts(page) {
+  return page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const request = indexedDB.open('books');
+        request.onsuccess = () => {
+          const all = request.result.transaction('data').objectStore('data').getAll();
+          all.onsuccess = () => resolve(all.result.map((row) => ({ id: row.id, title: row.title, html: row.elementHtml })));
+        };
+      }),
+  );
 }
 
 async function progress(page) {
@@ -178,6 +194,49 @@ test('a stale id (ttu reset, or another book under that id) imports the book aga
 
   expect(reply).toMatchObject({ type: 'library.ready', title: '長い本' });
   expect(reply.id).not.toBe(neko.id);
+});
+
+test('without the other book\'s id ttu replaces a book of the same title under its id (the bug)', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const a = await ensure(page, 'edition-a.epub');
+  const b = await ensure(page, 'edition-b.epub');
+
+  expect(b.id).toBe(a.id);
+  expect(await storedTexts(page)).toHaveLength(1);
+});
+
+test('two library books with one title keep their own text and reading position in ttu', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const a = await ensure(page, 'edition-a.epub');
+  await call(page, 'setBookmark', { ttuId: a.id, characters: 11, progress: 0.1 });
+
+  const b = await ensure(page, 'edition-b.epub', null, null, { keepIds: [a.id], titleSuffix: ' (2)' });
+  expect(b.id).not.toBe(a.id);
+  expect(b.title).toBe('同じ題 (2)');
+  expect(await call(page, 'bookmark', { ttuId: b.id })).toMatchObject({ characters: null });
+  await call(page, 'setBookmark', { ttuId: b.id, characters: 22, progress: 0.2 });
+
+  // Opening either again imports nothing, and each has its own text and position.
+  expect(await ensure(page, 'edition-a.epub', a.id, a.title, { keepIds: [b.id], titleSuffix: ' (1)' })).toMatchObject({ id: a.id, title: '同じ題' });
+  expect(await ensure(page, 'edition-b.epub', b.id, b.title, { keepIds: [a.id], titleSuffix: ' (2)' })).toMatchObject({ id: b.id });
+  expect(await call(page, 'bookmark', { ttuId: a.id })).toMatchObject({ characters: 11 });
+  expect(await call(page, 'bookmark', { ttuId: b.id })).toMatchObject({ characters: 22 });
+  const rows = await storedTexts(page);
+  expect(rows.find((row) => row.id === a.id).html).toContain('初版');
+  expect(rows.find((row) => row.id === b.id).html).toContain('改訂版');
+});
+
+test('a book re-imported under its own id (not another library book\'s) is replaced, not duplicated', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const a = await ensure(page, 'edition-a.epub');
+
+  const again = await ensure(page, 'edition-b.epub', a.id, 'stale title', { keepIds: [], titleSuffix: ' (2)' });
+
+  expect(again.id).toBe(a.id);
+  expect(await storedTexts(page)).toHaveLength(1);
 });
 
 test('a book ttu cannot read is reported as failed', async ({ page }) => {

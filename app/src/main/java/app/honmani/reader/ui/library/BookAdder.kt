@@ -42,7 +42,7 @@ class BookAdder(
 
     /** Imports a new book into the reader now, so problems show up at once and it opens fast. */
     private suspend fun handToReader(book: BookEntity): Result = try {
-        link(book, ttu.ensure(null, LibraryViewModel.fileUrl(book), LibraryViewModel.readerFileName(book)))
+        link(book, ensureInReader(book, null))
         Result.Added(book)
     } catch (_: TtuLibraryException) {
         // A book the reader cannot show is no use in the library.
@@ -51,9 +51,18 @@ class BookAdder(
         Result.ReaderFailed(book.title)
     }
 
+    /** Has the reader hold [book], without replacing another library book that shares its title. */
+    suspend fun ensureInReader(book: BookEntity, known: TtuBook?): TtuBook = ttu.ensure(
+        known,
+        LibraryViewModel.fileUrl(book),
+        LibraryViewModel.readerFileName(book),
+        keepIds = dao.ttuIdsExcept(book.id),
+        titleSuffix = " (${book.id})",
+    )
+
     suspend fun link(book: BookEntity, ttuBook: TtuBook) {
         dao.setTtuBook(book.id, ttuBook.id, ttuBook.title)
-        // ttu keeps one book per title; another library book with this title must re-import.
+        // Normally no other book has this id; after a reader reset or an old version's overwrite one may.
         dao.forgetTtuBookExcept(ttuBook.id, book.id)
     }
 }

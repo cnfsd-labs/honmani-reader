@@ -27,6 +27,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
@@ -106,6 +107,18 @@ class LibraryViewModelTest {
         assertEquals("吾輩は猫である.epub", ensure["fileName"]!!.jsonPrimitive.content)
         assertEquals(page.lastTtuId, book.ttuId)
         assertEquals("吾輩は猫である", book.ttuTitle)
+    }
+
+    @Test
+    fun aSecondBookWithTheSameTitle_asksTheReaderToKeepTheFirst() = runBlocking {
+        val first = addAndWait("a.epub", TestBooks.epub(author = "初版"))
+        val second = addAndWait("b.epub", TestBooks.epub(author = "改訂版"))
+
+        val ensure = page.commands.last { it.first == "ensure" }.second
+        assertEquals(listOf(first.ttuId), ensure["keepIds"]!!.jsonArray.map { it.jsonPrimitive.longOrNull })
+        assertEquals(" (${second.id})", ensure["titleSuffix"]!!.jsonPrimitive.content)
+        // Both stay linked: neither re-imports over the other when opened.
+        assertEquals(first.ttuId, dao.find(first.id)!!.ttuId)
     }
 
     @Test
@@ -412,6 +425,9 @@ private class FakeBookDao : BookDao {
 
     override suspend fun setTtuBook(id: Long, ttuId: Long, ttuTitle: String) =
         change({ it.id == id }) { it.copy(ttuId = ttuId, ttuTitle = ttuTitle) }
+
+    override suspend fun ttuIdsExcept(id: Long) =
+        books.value.filter { it.id != id }.mapNotNull { it.ttuId }
 
     override suspend fun forgetTtuBookExcept(ttuId: Long, keepId: Long) =
         change({ it.ttuId == ttuId && it.id != keepId }) { it.copy(ttuId = null, ttuTitle = null) }

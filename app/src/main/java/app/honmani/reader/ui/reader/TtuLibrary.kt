@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -77,14 +78,25 @@ class TtuLibrary(
     /**
      * Makes sure ttu holds the book: the one it stored as [known], if still there, or a fresh
      * import of the file at [url] (a path on the reader origin) named [fileName].
+     * ttu replaces a book of the same title under its old id, so when it holds one of [keepIds]
+     * (other library books) under the new book's title, the new book is stored as a separate book
+     * under its title plus [titleSuffix].
      */
-    suspend fun ensure(known: TtuBook?, url: String, fileName: String): TtuBook {
+    suspend fun ensure(
+        known: TtuBook?,
+        url: String,
+        fileName: String,
+        keepIds: List<Long> = emptyList(),
+        titleSuffix: String = "",
+    ): TtuBook {
         val reply = command(importTimeoutMs, "ensure") { requestId ->
             put("requestId", requestId)
             put("ttuId", known?.id)
             put("ttuTitle", known?.title)
             put("url", url)
             put("fileName", fileName)
+            put("keepIds", JsonArray(keepIds.map(::JsonPrimitive)))
+            put("titleSuffix", titleSuffix)
         }
         return when (reply) {
             is LibraryMessage.Ready -> TtuBook(reply.id, reply.title)

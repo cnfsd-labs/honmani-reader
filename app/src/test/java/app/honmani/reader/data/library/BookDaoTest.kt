@@ -84,6 +84,18 @@ class BookDaoTest {
     }
 
     @Test
+    fun ttuIdsExcept_listsTheTtuIdsOfTheOtherBooks() = runTest {
+        val a = dao.insert(book("a", addedAt = 1))
+        val b = dao.insert(book("b", addedAt = 2))
+        dao.insert(book("c", addedAt = 3))
+        dao.setTtuBook(a, ttuId = 3, ttuTitle = "same title")
+        dao.setTtuBook(b, ttuId = 5, ttuTitle = "same title")
+
+        assertEquals(listOf(5L), dao.ttuIdsExcept(a))
+        assertEquals(listOf(3L, 5L), dao.ttuIdsExcept(-1).sorted())
+    }
+
+    @Test
     fun forgetTtuBookExcept_clearsOtherBooksWithThatTtuId() = runTest {
         val a = dao.insert(book("a", addedAt = 1))
         val b = dao.insert(book("b", addedAt = 2))

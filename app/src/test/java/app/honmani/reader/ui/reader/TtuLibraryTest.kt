@@ -56,6 +56,19 @@ class TtuLibraryTest {
     }
 
     @Test
+    fun ensure_sendsTheIdsOfOtherBooksToKeepAndTheTitleSuffix() = runTest {
+        library.attach(page)
+        val result = async { library.ensure(null, "/u", "a.epub", keepIds = listOf(4L, 7L), titleSuffix = " (9)") }
+        runCurrent()
+
+        val arguments = page.lastArguments()
+        assertEquals(listOf(4L, 7L), arguments["keepIds"]!!.jsonArray.map { it.jsonPrimitive.long })
+        assertEquals(" (9)", arguments["titleSuffix"]!!.jsonPrimitive.content)
+        library.onMessage(LibraryMessage.Ready(page.lastRequestId(), 1, "a (9)"))
+        result.await()
+    }
+
+    @Test
     fun ensure_withoutAKnownBook_sendsNulls() = runTest {
         library.attach(page)
         val result = async { library.ensure(null, "/honmani-books/a.epub", "a.epub") }

@@ -35,6 +35,10 @@ interface BookDao {
     @Query("UPDATE book SET ttu_id = :ttuId, ttu_title = :ttuTitle WHERE id = :id")
     suspend fun setTtuBook(id: Long, ttuId: Long, ttuTitle: String)
 
+    /** The ttu ids of the books but [id]: ttu must keep these rows when it imports [id]. */
+    @Query("SELECT ttu_id FROM book WHERE ttu_id IS NOT NULL AND id != :id")
+    suspend fun ttuIdsExcept(id: Long): List<Long>
+
     /** Clears [ttuId] from every book but [keepId]: ttu now holds a different book under it. */
     @Query("UPDATE book SET ttu_id = NULL, ttu_title = NULL WHERE ttu_id = :ttuId AND id != :keepId")
     suspend fun forgetTtuBookExcept(ttuId: Long, keepId: Long)

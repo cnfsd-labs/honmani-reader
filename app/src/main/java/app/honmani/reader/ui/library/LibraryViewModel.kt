@@ -306,7 +306,7 @@ class LibraryViewModel(
                 val book = dao.find(id) ?: return@launch
                 val known = book.ttuId?.let { ttuId -> book.ttuTitle?.let { TtuBook(ttuId, it) } }
                 val ttuBook = try {
-                    ttu.ensure(known, fileUrl(book), readerFileName(book))
+                    adder.ensureInReader(book, known)
                 } catch (_: TtuLibraryException) {
                     _notices.send(LibraryNotice.ReaderFailed(book.title))
                     return@launch
