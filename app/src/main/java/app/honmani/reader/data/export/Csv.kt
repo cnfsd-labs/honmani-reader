@@ -12,10 +12,20 @@ object Csv {
     /** [rows] as text, the first being the header. Every row ends with CRLF. */
     fun write(rows: List<List<String>>): String = buildString {
         for (row in rows) {
-            row.joinTo(this, ",") { quote(it) }
+            row.joinTo(this, ",") { quote(safe(it)) }
             append("\r\n")
         }
     }
+
+    /**
+     * A spreadsheet would run a cell that starts with = + - @ (or a tab or carriage return) as a
+     * formula (OWASP "CSV injection"): such a cell gets a leading apostrophe. Only for files meant
+     * for a spreadsheet; the text file for Anki's import ([app.honmani.reader.anki.AnkiTextFile])
+     * stays raw and doesn't come through here.
+     */
+    fun safe(field: String): String = if (field.firstOrNull() in FORMULA_STARTS) "'$field" else field
+
+    private val FORMULA_STARTS = setOf('=', '+', '-', '@', '\t', '\r')
 
     /** A field is quoted when it holds a comma, quote, line break, or begins or ends with a space. */
     fun quote(field: String): String {

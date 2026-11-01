@@ -31,6 +31,16 @@ class CsvTest {
     }
 
     @Test
+    fun cellsASpreadsheetWouldRunAsFormulasGetALeadingApostrophe() {
+        assertEquals(
+            "'=1+1,'+1,'-1,'@SUM(A1),'\tx,\"'\rx\"\r\n",
+            Csv.write(listOf(listOf("=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx"))),
+        )
+        // A formula character not at the start stays as it is.
+        assertEquals("a=b,1-2\r\n", Csv.write(listOf(listOf("a=b", "1-2"))))
+    }
+
+    @Test
     fun emptyFieldsStayEmpty() {
         assertEquals(",,\r\n", Csv.write(listOf(listOf("", "", ""))))
     }
