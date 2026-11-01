@@ -67,4 +67,14 @@ class AnkiCardTest {
         assertEquals(3578598137L, AnkiCard.checksum("名前"))
         assertEquals(567984260L, AnkiCard.checksum("<b>食べる</b>"))
     }
+
+    @Test
+    fun checksumDecodesTheEntitiesEscapeWrites() {
+        // sha1 of the decoded text: AT&T, a<b>c, "quoted" it's, R&D <>
+        assertEquals(2973542706L, AnkiCard.checksum(AnkiCard.escape("AT&T")))
+        assertEquals(303421242L, AnkiCard.checksum(AnkiCard.escape("a<b>c")))
+        assertEquals(1492148111L, AnkiCard.checksum(AnkiCard.escape("\"quoted\" it's")))
+        assertEquals(1322740652L, AnkiCard.checksum("R&amp;D <i>&lt;&gt;</i>"))
+        assertEquals(1322740652L, AnkiCard.checksum("R&#38;D &#x3C;&#62;"))
+    }
 }

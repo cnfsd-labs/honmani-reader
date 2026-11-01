@@ -124,14 +124,38 @@ object AnkiCard {
 
     /**
      * Anki's duplicate checksum of a first field: the first 8 hex digits of the SHA-1 of the
-     * field without HTML, as a number. AnkiDroid stores it per note, so duplicates can be found
+     * field without HTML (tags removed, then entities such as `&amp;` decoded), as a number. AnkiDroid stores it per note, so duplicates can be found
      * without reading every note.
      */
     fun checksum(field: String): Long {
-        val text = field.replace(Regex("<[^>]*>"), "")
+        val text = decodeEntities(field.replace(Regex("<[^>]*>"), ""))
         val digest = MessageDigest.getInstance("SHA-1").digest(text.toByteArray(Charsets.UTF_8))
         return digest.take(4).fold(0L) { value, byte -> (value shl 8) or (byte.toLong() and 0xFF) }
     }
+
+    private val entity = Regex("&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);")
+
+    /** The entities [escape] writes, plus numeric ones and the few named ones Anki's field text can carry. */
+    private fun decodeEntities(text: String): String = if ('&' !in text) text else entity.replace(text) { match ->
+        val name = match.groupValues[1]
+        val decoded = when {
+            name.startsWith("#x") || name.startsWith("#X") -> name.substring(2).toIntOrNull(16)?.let(::codePoint)
+            name.startsWith("#") -> name.substring(1).toIntOrNull()?.let(::codePoint)
+            else -> when (name) {
+                "amp" -> "&"
+                "lt" -> "<"
+                "gt" -> ">"
+                "quot" -> "\""
+                "apos" -> "'"
+                "nbsp" -> " "
+                else -> null
+            }
+        }
+        decoded ?: match.value
+    }
+
+    private fun codePoint(value: Int): String? =
+        if (Character.isValidCodePoint(value)) String(Character.toChars(value)) else null
 
     fun escape(text: String): String = buildString(text.length) {
         for (c in text) {
