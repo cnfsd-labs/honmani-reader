@@ -30,6 +30,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -41,6 +42,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -98,6 +100,8 @@ class StatisticsViewModel(
     private val goalMinutes: Flow<Int?> = flowOf(null),
     private val today: () -> LocalDate = LocalDate::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** The current time; only used to wait for local midnight. */
+    private val now: () -> Instant = Instant::now,
     /** Writes text to a document the reader picked (a content URI). */
     private val writeDocument: suspend (uri: String, text: String) -> Unit = { _, _ -> },
 ) : ViewModel() {
@@ -109,15 +113,25 @@ class StatisticsViewModel(
     private val _period = MutableStateFlow(StatsPeriod.TODAY)
     val period: StateFlow<StatsPeriod> = _period.asStateFlow()
 
-    /** The period with its lookups, counted in the database. */
-    private val periodLookups: Flow<Pair<StatsPeriod, Int>> = _period.flatMapLatest { period ->
-        val from = firstDay(period, today())?.atStartOfDay(zone())?.toInstant()?.toEpochMilli()
-        lookups(from).map { period to it }
-    }
+    /** Today's date, again at each local midnight, so a screen left open moves on to the new day. */
+    private val day: Flow<LocalDate> = flow {
+        while (true) {
+            emit(today())
+            val zone = zone()
+            val next = now().atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
+            delay((next.toEpochMilli() - now().toEpochMilli()).coerceAtLeast(1_000L))
+        }
+    }.distinctUntilChanged()
+
+    /** The period and the day it is counted on, with the period's lookups, counted in the database. */
+    private val periodLookups: Flow<Triple<StatsPeriod, LocalDate, Int>> =
+        combine(_period, day) { period, today -> period to today }.flatMapLatest { (period, today) ->
+            val from = firstDay(period, today)?.atStartOfDay(zone())?.toInstant()?.toEpochMilli()
+            lookups(from).map { Triple(period, today, it) }
+        }
 
     val uiState: StateFlow<StatisticsUiState?> =
-        combine(days, books, periodLookups, words, goalMinutes) { days, books, (period, lookups), words, goalMinutes ->
-            val today = today()
+        combine(days, books, periodLookups, words, goalMinutes) { days, books, (period, today, lookups), words, goalMinutes ->
             val zone = zone()
             val from = firstDay(period, today)
             fun inPeriod(millis: Long) = from == null || !Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().isBefore(from)

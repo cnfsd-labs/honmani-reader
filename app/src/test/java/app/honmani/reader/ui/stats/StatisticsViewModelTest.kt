@@ -26,7 +26,10 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class StatisticsViewModelTest {
     private val zone = ZoneId.of("Asia/Tokyo")
-    private val today = LocalDate.of(2026, 10, 19)
+    private var today = LocalDate.of(2026, 10, 19)
+
+    /** The fake clock: 23:00 on [today] in [zone]; the tests move it with the virtual time. */
+    private var clock = LocalDate.of(2026, 10, 19).atTime(23, 0).atZone(zone).toInstant()
 
     /** Lookups in the database (times), as the statistics query counts them. */
     private val lookupTimes = MutableStateFlow(listOf<Long>())
@@ -55,6 +58,7 @@ class StatisticsViewModelTest {
         goalMinutes = flowOf(goalMinutes),
         today = { today },
         zone = { zone },
+        now = { clock },
         writeDocument = writeDocument,
     )
 
@@ -97,6 +101,22 @@ class StatisticsViewModelTest {
         // A new lookup shows at once.
         lookupTimes.value += millis(today, 10)
         assertEquals(6, viewModel.uiState.filterNotNull().first { it.lookups != 5 }.lookups)
+    }
+
+    @Test
+    fun todayMovesOnAtMidnightForReadingAndLookupsAlike() = runTest {
+        lookupTimes.value = listOf(millis(today, 21))
+        val viewModel = viewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        assertEquals(1, viewModel.uiState.filterNotNull().first().lookups)
+
+        // The clock passes midnight while the screen is open: yesterday's lookup drops out.
+        today = today.plusDays(1)
+        clock = clock.plusSeconds(3600)
+        testScheduler.advanceTimeBy(3_600_000L + 1_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(0, viewModel.uiState.value?.lookups)
     }
 
     @Test
