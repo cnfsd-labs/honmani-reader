@@ -163,6 +163,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             library.addOpened(uris)
         }
     }
+    // The launcher's "Search" shortcut: Words with its search field focused, out of an open book.
+    var focusSearch by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(container) {
+        container.searchRequests.received.collect {
+            if (!atLibrary) viewModel.closeBook()
+            tab = HomeTab.WORDS
+            focusSearch = true
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
     }
@@ -335,7 +344,12 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 onShowProgress = { tab = HomeTab.PROGRESS },
                                 scrollToTop = libraryTaps,
                             )
-                            HomeTab.WORDS -> WordsScreen(bottomBar = bottomBar, scrollToTop = wordsTaps)
+                            HomeTab.WORDS -> WordsScreen(
+                                bottomBar = bottomBar,
+                                scrollToTop = wordsTaps,
+                                focusSearch = focusSearch,
+                                onSearchFocused = { focusSearch = false },
+                            )
                             HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
                             HomeTab.SETTINGS -> SettingsScreen(
                                 bottomBar = bottomBar,

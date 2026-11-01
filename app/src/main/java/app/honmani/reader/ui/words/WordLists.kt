@@ -4,7 +4,9 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordProgress
 import app.honmani.reader.data.words.WordStatus
+import app.honmani.reader.lookup.JapaneseText
 import app.honmani.reader.lookup.LookupGroup
+import app.honmani.reader.lookup.SearchQuery
 
 /**
  * The Words tab's two lists. [learning]: saved words not known yet, starred first, then the most
@@ -73,6 +75,20 @@ fun filterWords(words: List<WordEntity>, query: String): List<WordEntity> {
     return words.filter {
         it.expression.lowercase().contains(wanted) || it.reading.lowercase().contains(wanted) ||
             it.gloss.lowercase().contains(wanted)
+    }
+}
+
+/**
+ * "In your words" under a dictionary search: [filterWords], and also words whose reading or
+ * written form starts with what [query] spells as kana (romaji "neko" finds 猫 ねこ).
+ */
+fun searchWords(words: List<WordEntity>, query: String): List<WordEntity> {
+    if (query.isBlank()) return emptyList()
+    val parsed = SearchQuery.parse(query)
+    val starts = (parsed.exact + parsed.prefixes).map(JapaneseText::toHiragana).distinct()
+    val plain = filterWords(words, query).toHashSet()
+    return words.filter { word ->
+        word in plain || starts.any { JapaneseText.toHiragana(word.reading).startsWith(it) || word.expression.startsWith(it) }
     }
 }
 

@@ -46,4 +46,12 @@ class WordSearchTest {
         assertEquals(listOf("雨" to 3), filterReadWords(read, "雨"))
         assertEquals(read, filterReadWords(read, ""))
     }
+
+    @Test
+    fun dictionarySearchFindsSavedWordsByRomajiReading() {
+        assertEquals(listOf(words[0]), searchWords(words, "neko"))
+        assertEquals(listOf(words[0]), searchWords(words, "nek"))
+        assertEquals(listOf(words[1]), searchWords(words, "dog"))
+        assertEquals(emptyList<WordEntity>(), searchWords(words, " "))
+    }
 }

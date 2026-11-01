@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.reader
 
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -154,6 +156,8 @@ fun LookupPanel(
     previousSentence: String = "",
     /** The read-aloud button: say the tapped sentence. */
     onReadSentence: () -> Unit = {},
+    /** "+ Learn" of a word found by a search: save it to Words; null (a tap in a book, which saves by itself) shows none. */
+    onLearn: ((LookupGroup) -> Unit)? = null,
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -395,6 +399,12 @@ fun LookupPanel(
                             },
                             onListen = { onListen(group) },
                             onLookupWord = onLookupWord,
+                            onLearn = if (onLearn != null && state.previous == null) {
+                                { onLearn(group) }
+                            } else {
+                                null
+                            },
+                            saved = WordRepository.key(group.expression, group.reading) in state.saved,
                             kanji = state.kanji,
                             onShowKanji = onShowKanji,
                         )
@@ -562,6 +572,8 @@ private fun LookupGroupItem(
     onSetStarred: ((Boolean) -> Unit)?,
     onLookupWord: (String) -> Unit,
     onListen: () -> Unit = {},
+    onLearn: (() -> Unit)? = null,
+    saved: Boolean = false,
     kanji: Map<String, KanjiInfo> = emptyMap(),
     onShowKanji: (String) -> Unit = {},
 ) {
@@ -621,6 +633,7 @@ private fun LookupGroupItem(
             FoldedMeaning(group)
             return@Column
         }
+        if (onLearn != null) LearnButton(saved, onLearn)
         val brief = detail == Detail.BRIEF
         // Grammar ("te-form · teiru") and dictionary names only in the full view.
         if (!brief) InflectionLabels(group)
@@ -644,6 +657,30 @@ private fun LookupGroupItem(
         when {
             brief && hidden -> DetailLink(stringResource(R.string.lookup_show_more)) { onDetail(Detail.FULL) }
             detail == Detail.FULL -> DetailLink(stringResource(R.string.lookup_show_less)) { onDetail(Detail.BRIEF) }
+        }
+    }
+}
+
+/** "+ Learn" for a word found by a search, or that it is in Words already. */
+@Composable
+private fun LearnButton(saved: Boolean, onLearn: () -> Unit) {
+    if (saved) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Icon(
+                Icons.Filled.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                stringResource(R.string.lookup_in_words),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    } else {
+        FilledTonalButton(onClick = onLearn) {
+            Text(stringResource(R.string.lookup_learn))
         }
     }
 }

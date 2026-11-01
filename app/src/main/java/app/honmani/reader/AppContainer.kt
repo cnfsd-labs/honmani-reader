@@ -44,6 +44,7 @@ import app.honmani.reader.data.opds.OpdsRepository
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
+import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
@@ -70,6 +71,7 @@ import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.DictionaryLookup
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.library.OpenedBooks
+import app.honmani.reader.ui.search.SearchRequests
 import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuLibraryException
 import java.io.File
@@ -125,6 +127,7 @@ class AppContainer(context: Context) {
 
     /** Book files from other apps, on their way to the library. */
     val openedBooks = OpenedBooks()
+    val searchRequests = SearchRequests()
 
     /** The reader's choices; the only file cloud backup keeps (`res/xml/data_extraction_rules.xml`). */
     private val settingsPreferences by lazy { appContext.getSharedPreferences(SETTINGS, Context.MODE_PRIVATE) }
@@ -141,6 +144,7 @@ class AppContainer(context: Context) {
     val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
+    val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
 
     val booksDir = File(appContext.filesDir, "books")
 

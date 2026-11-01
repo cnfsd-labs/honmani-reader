@@ -53,6 +53,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- The launcher's "Search" shortcut (and `am start -a`): Words with the search field. -->
+            <intent-filter>
+                <action android:name="app.honmani.reader.action.SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
             <!-- "Open with" for books in file managers and a browser's downloads. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

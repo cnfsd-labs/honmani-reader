@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.lookup.LookupGroups
+import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
@@ -507,4 +509,37 @@ class ReaderViewModelTest {
 
         assertEquals("猫", (failing.panel.value as LookupPanelState.Results).groups.single().expression)
     }
+
+    @Test
+    fun aSearchShowsWordsWithoutSaving_untilLearn() {
+        val saved = mutableSetOf<String>()
+        val search = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { recorded += it; saved += WordRepository.key(it.expression, it.reading) },
+            origin = LookupOrigin.SEARCH,
+            savedAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.filterTo(HashSet()) { it in saved } },
+        )
+        val group = LookupGroups.from(LookupResult(listOf(entry("食べる", "taberu")))).single()
+
+        search.showSearched(group)
+        val panel = search.panel.value as LookupPanelState.Results
+        assertEquals("食べる", panel.groups.single().expression)
+        assertFalse(panel.canShorten)
+        assertFalse(panel.canLengthen)
+        assertTrue(panel.saved.isEmpty())
+        // A tap in the panel's text (as from the lookup screen) saves nothing either.
+        search.onTap(tap("食べる"))
+        pending.getValue("食べる").complete(LookupResult(listOf(entry("食べる", "食べる"))))
+        assertTrue(recorded.isEmpty())
+
+        search.learn((search.panel.value as LookupPanelState.Results).groups.single())
+
+        val word = recorded.single()
+        assertEquals("食べる", word.expression)
+        assertEquals("食べる", word.surface)
+        assertEquals(LookupOrigin.SEARCH, word.origin)
+        assertEquals(setOf(WordRepository.key("食べる", "食べる")), (search.panel.value as LookupPanelState.Results).saved)
+    }
 }
+

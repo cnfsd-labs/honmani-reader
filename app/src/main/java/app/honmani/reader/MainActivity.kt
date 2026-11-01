@@ -8,8 +8,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.ui.HonmaniApp
+import app.honmani.reader.ui.search.SearchRequests
 import app.honmani.reader.ui.theme.HonmaniTheme
 
 class MainActivity : ComponentActivity() {
@@ -34,6 +38,8 @@ class MainActivity : ComponentActivity() {
             container.checkAutoBackupOffer()
             container.sweepLeftovers()
             container.openedBooks.receive(intent)
+            container.searchRequests.receive(intent)
+            addSearchShortcut()
         }
         setContent {
             val accent by appearance.accent.collectAsStateWithLifecycle()
@@ -75,6 +81,24 @@ class MainActivity : ComponentActivity() {
     /** Another app opened or shared a book while Honmani was running (one task: `singleTask`). */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        (application as HonmaniApplication).container.openedBooks.receive(intent)
+        val container = (application as HonmaniApplication).container
+        container.openedBooks.receive(intent)
+        container.searchRequests.receive(intent)
+    }
+
+    /** "Search" in the launcher's menu of the app icon: Words with the search field focused. */
+    private fun addSearchShortcut() {
+        val shortcut = ShortcutInfoCompat.Builder(this, "search")
+            .setShortLabel(getString(R.string.shortcut_search))
+            .setLongLabel(getString(R.string.shortcut_search_long))
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_shortcut_search))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(SearchRequests.ACTION_SEARCH))
+            .build()
+        try {
+            ShortcutManagerCompat.pushDynamicShortcut(this, shortcut)
+        } catch (e: RuntimeException) {
+            // A launcher's rate limit or a missing shortcut service: the app works without it.
+            android.util.Log.w("Honmani", "Adding the search shortcut failed", e)
+        }
     }
 }

@@ -5,6 +5,20 @@ import android.text.format.DateUtils
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import app.honmani.reader.ui.reader.LookupPanel
+import app.honmani.reader.ui.reader.ReaderViewModel
+import app.honmani.reader.ui.search.SearchContent
+import app.honmani.reader.ui.search.SearchField
+import app.honmani.reader.ui.search.SearchViewModel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,8 +53,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -105,7 +117,7 @@ import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
-import app.honmani.reader.ui.lookup.LookupActivity
+import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.FrequencyBadge
 import app.honmani.reader.ui.reader.GlossLines
 import app.honmani.reader.ui.theme.HonmaniTheme
@@ -121,7 +133,13 @@ fun WordsScreen(
     bottomBar: @Composable () -> Unit,
     /** Counts taps on the Words tab while it is open: each one scrolls the list to the top. */
     scrollToTop: Int = 0,
+    /** The launcher's "Search" shortcut asks for the search field; [onSearchFocused] once it has it. */
+    focusSearch: Boolean = false,
+    onSearchFocused: () -> Unit = {},
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
+    search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
+    // Its own lookup panel, apart from the reader's: a search saves no word by itself.
+    searchPanel: ReaderViewModel = viewModel(key = "search", factory = ReaderViewModel.SearchFactory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -236,7 +254,77 @@ fun WordsScreen(
 
     var showSession by remember { mutableStateOf(false) }
     if (showSession) SessionSheet(uiState.session, onDismiss = { showSession = false })
+
+    // The dictionary search: results while typing, the last searches when the field is empty.
+    val searchQuery by search.query.collectAsStateWithLifecycle()
+    val searchResults by search.results.collectAsStateWithLifecycle()
+    val history by search.history.collectAsStateWithLifecycle()
+    val panel by searchPanel.panel.collectAsStateWithLifecycle()
+    var fieldFocused by remember { mutableStateOf(false) }
+    val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(focusSearch) {
+        if (focusSearch) {
+            focus.requestFocus()
+            keyboard?.show()
+            onSearchFocused()
+        }
+    }
+    LaunchedEffect(searchPanel) {
+        searchPanel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
+    }
+    LaunchedEffect(searchPanel) {
+        searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
+    }
+    BackHandler(enabled = panel == null && (searchQuery.isNotEmpty() || fieldFocused)) {
+        search.setQuery("")
+        focusManager.clearFocus()
+    }
+    val searchWords = remember(searchQuery, uiState.learning, uiState.known) {
+        searchWords(uiState.learning.orEmpty() + uiState.known.orEmpty(), searchQuery).take(MAX_WORDS_IN_SEARCH)
+    }
+    fun open(show: () -> Unit) {
+        search.remember()
+        keyboard?.hide()
+        focusManager.clearFocus()
+        show()
+    }
+    val searching = searchQuery.isNotEmpty() || (fieldFocused && history.isNotEmpty())
+
+    Box(modifier = Modifier.fillMaxSize()) {
     WordsContent(
+        searchField = {
+            SearchField(
+                query = searchQuery,
+                onQuery = search::setQuery,
+                focusRequester = focus,
+                onFocusChanged = { fieldFocused = it },
+                onSearch = {
+                    search.remember()
+                    keyboard?.hide()
+                },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        },
+        searchContent = if (searching) {
+            { modifier ->
+                SearchContent(
+                    query = searchQuery,
+                    results = searchResults,
+                    words = searchWords,
+                    history = history,
+                    onOpenGroup = { open { searchPanel.showSearched(it) } },
+                    onOpenWord = { open { searchPanel.showSearched(it.expression, it.reading) } },
+                    onHistory = search::setQuery,
+                    onForget = search::forget,
+                    onForgetAll = search::forgetAll,
+                    modifier = modifier,
+                )
+            }
+        } else {
+            null
+        },
         uiState = uiState,
         now = remember(uiState.learning, uiState.known) { System.currentTimeMillis() },
         snackbarHostState = snackbarHostState,
@@ -263,7 +351,40 @@ fun WordsScreen(
         onOfferKnown = knownFromAnki::start,
         onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
     )
+    val state = panel
+    if (state != null) {
+        BackHandler { if (!searchPanel.back()) searchPanel.dismiss() }
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = SCRIM_ALPHA))
+                // A tap beside the panel closes it, as one beside a dialog does.
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = searchPanel::dismiss),
+        ) {
+            LookupPanel(
+                state = state,
+                availableHeight = maxHeight,
+                onClose = searchPanel::dismiss,
+                onOpenDictionaries = searchPanel::dismiss,
+                onAddToAnki = { group -> anki.whenReady { searchPanel.addToAnki(group) } },
+                onSetStarred = searchPanel::setStarred,
+                onListen = searchPanel::listen,
+                onLookupWord = searchPanel::lookupWord,
+                onShowKanji = searchPanel::showKanji,
+                onBack = { searchPanel.back() },
+                onLearn = searchPanel::learn,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+            )
+        }
+    }
+    }
 }
+
+/** Saved words a search lists under the dictionaries' at most. */
+private const val MAX_WORDS_IN_SEARCH = 50
+private const val SCRIM_ALPHA = 0.32f
 
 @Composable
 private fun WordsContent(
@@ -290,6 +411,10 @@ private fun WordsContent(
     offerKnown: Boolean = false,
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
+    /** The dictionary search field, above the tabs. */
+    searchField: @Composable () -> Unit = {},
+    /** While searching: the results, in place of the tabs and lists. */
+    searchContent: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
     val scope = rememberCoroutineScope()
@@ -302,10 +427,9 @@ private fun WordsContent(
         // between like Progress's sections, and the export beside them.
         topBar = {
             Surface(color = TabRowDefaults.primaryContainerColor) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
-                ) {
+                Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+                searchField()
+                if (searchContent == null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PrimaryTabRow(selectedTabIndex = pager.currentPage, modifier = Modifier.weight(1f)) {
                         WordFilter.entries.forEachIndexed { index, filter ->
                             Tab(
@@ -333,16 +457,11 @@ private fun WordsContent(
                         exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
                     )
                 }
+                }
             }
         },
         bottomBar = bottomBar,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            val context = LocalContext.current
-            FloatingActionButton(onClick = { context.startActivity(Intent(context, LookupActivity::class.java)) }) {
-                Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_lookup_word))
-            }
-        },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -368,29 +487,15 @@ private fun WordsContent(
                     )
                 }
             }
-            if (uiState.learning?.isNotEmpty() == true || uiState.known?.isNotEmpty() == true || uiState.knownByReading.isNotEmpty()) {
-                OutlinedTextField(
-                    value = uiState.query,
-                    onValueChange = onQuery,
-                    singleLine = true,
-                    placeholder = { Text(stringResource(R.string.words_search_hint)) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (uiState.query.isNotEmpty()) {
-                            IconButton(onClick = { onQuery("") }) {
-                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-            }
             val listStates = WordFilter.entries.map { rememberLazyListState() }
             val firstScrollToTop = remember { scrollToTop }
             LaunchedEffect(scrollToTop) {
                 if (scrollToTop != firstScrollToTop) listStates[pager.currentPage].animateScrollToItem(0)
+            }
+            if (searchContent != null) {
+                // Above the keyboard: the results end where it starts.
+                searchContent(Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding())
+                return@Column
             }
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                 val filter = WordFilter.entries[page]

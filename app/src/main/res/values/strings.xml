@@ -499,6 +499,16 @@
     <string name="action_lookup_word">Look up</string>
     <string name="action_more_options">More options</string>
     <string name="words_search_hint">Search saved words</string>
+    <string name="search_hint">Search dictionaries</string>
+    <string name="search_history">Recent searches</string>
+    <string name="search_history_clear">Clear</string>
+    <string name="search_history_remove">Remove %1$s from recent searches</string>
+    <string name="search_nothing_found">Nothing in the dictionaries for \"%1$s\".</string>
+    <string name="search_in_your_words">In your words</string>
+    <string name="lookup_learn">+ Learn</string>
+    <string name="lookup_in_words">In Words</string>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_search_long">Search dictionaries</string>
     <string name="words_search_clear">Clear search</string>
     <string name="words_search_empty">No saved words match \"%1$s\".</string>
     <string name="listen_failed">Can\'t say it: %1$s.</string>

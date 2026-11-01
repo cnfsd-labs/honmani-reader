@@ -11,6 +11,7 @@ import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.CardContent
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.LookedUpWord
+import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.KanjiInfo
@@ -53,6 +54,8 @@ sealed interface LookupPanelState {
         val inAnki: Set<String> = emptySet(),
         /** Words starred in the word list, as [WordRepository.key]s. */
         val starred: Set<String> = emptySet(),
+        /** Words in the word list, as [WordRepository.key]s; only a search ([LookupOrigin.SEARCH]) asks. */
+        val saved: Set<String> = emptySet(),
         /** Words whose card is being made right now, as [WordRepository.key]s. */
         val addingToAnki: Set<String> = emptySet(),
         /** The results this word was reached from by tapping a reference; null for a tap in the book. */
@@ -119,7 +122,16 @@ class ReaderViewModel(
     private val stopSpeaking: () -> Unit = {},
     /** Where lookups run and results become what the panel shows (parsing definitions), off the main thread. */
     private val compute: CoroutineDispatcher = Dispatchers.Default,
+    /**
+     * Where the lookups come from. A tap in a book ([LookupOrigin.READER]) saves its word; a
+     * dictionary search ([LookupOrigin.SEARCH]) saves one only on "+ Learn", a star or an Anki card.
+     */
+    private val origin: LookupOrigin = LookupOrigin.READER,
+    /** Which of these words (expression, reading) are in the word list, as [WordRepository.key]s. */
+    private val savedAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
 ) : ViewModel() {
+    private val recordsTaps = origin == LookupOrigin.READER
+
     // The open library book, still being looked up right after ttu opens it.
     private var book: Deferred<ReadingBook?>? = null
 
@@ -222,7 +234,7 @@ class ReaderViewModel(
                         show(LookupPanelState.NothingFound(tap))
                         return@launch
                     }
-                    record(tap, groups.first())
+                    if (recordsTaps) record(tap, groups.first())
                     LookupPanelState.Results(
                         tap = tap,
                         groups = groups,
@@ -279,7 +291,7 @@ class ReaderViewModel(
                 return@launch
             }
             val groups = withContext(compute) { LookupGroups.from(found) }
-            record(tap, groups.first())
+            if (recordsTaps) record(tap, groups.first())
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
@@ -289,6 +301,75 @@ class ReaderViewModel(
             val starred = starredWords(groups)
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, kanji = kanji) }
+        }
+    }
+
+    /**
+     * Shows [group], a result of a dictionary search, in the panel: nothing is saved until
+     * [learn] (or a star or an Anki card).
+     */
+    fun showSearched(group: LookupGroup) {
+        lookupJob?.cancel()
+        stopReading()
+        lookupJob = viewModelScope.launch { showGroups(listOf(group)) }
+    }
+
+    /**
+     * Looks up [expression] and shows the entries for it, [reading] first: a word from the
+     * word list picked in a search. Saves nothing.
+     */
+    fun showSearched(expression: String, reading: String) {
+        lookupJob?.cancel()
+        stopReading()
+        lookupJob = viewModelScope.launch {
+            val result = withContext(compute) { lookup(expression, emptyList()) }
+            val groups = withContext(compute) { LookupGroups.from(result) }
+                .filter { it.expression == expression }
+                .sortedBy { it.reading != reading }
+            if (groups.isEmpty()) {
+                show(LookupPanelState.NothingFound(TapLookup(text = expression, sentence = "", sentenceOffset = 0)))
+            } else {
+                showGroups(groups)
+            }
+        }
+    }
+
+    private suspend fun showGroups(groups: List<LookupGroup>) {
+        val expression = groups.first().expression
+        val tap = TapLookup(text = expression, sentence = "", sentenceOffset = 0)
+        val length = expression.length
+        show(
+            LookupPanelState.Results(
+                tap = tap,
+                groups = groups,
+                highlight = Highlight(++lookupCount, length),
+                // No shorter or longer match: the word was chosen, not tapped in a text.
+                longestMatch = length,
+                shortestMatch = length,
+            ),
+        )
+        refreshMarks(tap, groups)
+    }
+
+    /** Anki, star, kept and kanji of [groups] in the panel of [tap]. */
+    private suspend fun refreshMarks(tap: TapLookup, groups: List<LookupGroup>) {
+        val inAnki = wordsInAnki(groups)
+        val starred = starredWords(groups)
+        val saved = savedWords(groups)
+        val kanji = kanjiOf(groups)
+        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, saved = saved, kanji = kanji) }
+    }
+
+    /** "+ Learn" in a search: saves [group] to the word list (origin [LookupOrigin.SEARCH]). */
+    fun learn(group: LookupGroup) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        updateResults(tap) { it.copy(saved = it.saved + key) }
+        viewModelScope.launch {
+            record(tap, group).join()
+            val saved = savedWords(state.groups)
+            updateResults(tap) { it.copy(saved = saved) }
         }
     }
 
@@ -358,6 +439,14 @@ class ReaderViewModel(
         emptySet()
     }
 
+    private suspend fun savedWords(groups: List<LookupGroup>): Set<String> = try {
+        if (recordsTaps) emptySet() else savedAmong(groups.map { it.expression to it.reading })
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        emptySet()
+    }
+
     private suspend fun starredWords(groups: List<LookupGroup>): Set<String> = try {
         starredAmong(groups.map { it.expression to it.reading })
     } catch (e: CancellationException) {
@@ -380,6 +469,7 @@ class ReaderViewModel(
             try {
                 if (state.previous == null) record(tap, group).join()
                 saveStar(group.expression, group.reading, starred)
+                if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -400,6 +490,7 @@ class ReaderViewModel(
         val fromBook = state.previous == null
         viewModelScope.launch {
             if (fromBook) record(tap, group).join()
+            if (fromBook && !recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
             val start = tap.sentenceOffset.coerceIn(0, tap.sentence.length)
             val content = CardContent(
                 expression = group.expression,
@@ -471,9 +562,11 @@ class ReaderViewModel(
             expression = best.expression,
             reading = best.reading,
             gloss = best.sections.firstOrNull()?.senses?.firstOrNull()?.glosses?.joinToString("; ").orEmpty(),
-            surface = best.source,
+            // A search's text is what was typed ("taberu"): the word stands for itself.
+            surface = if (recordsTaps) best.source else best.expression,
             sentence = tap.sentence,
             surfaceStart = tap.sentenceOffset,
+            origin = origin,
         )
         val openBook = book
         return viewModelScope.launch {
@@ -540,7 +633,12 @@ class ReaderViewModel(
     }
 
     companion object {
-        val Factory = viewModelFactory {
+        val Factory = factory(LookupOrigin.READER)
+
+        /** For the dictionary search in Words: saves words only when asked. */
+        val SearchFactory = factory(LookupOrigin.SEARCH)
+
+        private fun factory(origin: LookupOrigin) = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
                 val lookup = container.dictionaryLookup
@@ -568,6 +666,11 @@ class ReaderViewModel(
                     say = { container.wordAudio.play(it) },
                     readAloud = { container.wordAudio.playSentence(it) },
                     stopSpeaking = { container.wordAudio.stop() },
+                    origin = origin,
+                    savedAmong = { words ->
+                        words.filter { (expression, reading) -> container.wordRepository.find(expression, reading) != null }
+                            .mapTo(HashSet()) { (expression, reading) -> WordRepository.key(expression, reading) }
+                    },
                 )
             }
         }
