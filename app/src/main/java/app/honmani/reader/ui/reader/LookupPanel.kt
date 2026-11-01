@@ -651,6 +651,7 @@ private fun LookupGroupItem(
  * The word with furigana over its kanji, so it can be read at a glance. Kanji in [tappable]
  * are underlined in the accent colour and open their entry through [onKanji].
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Headword(
     expression: String,
@@ -661,7 +662,8 @@ private fun Headword(
     val segments = remember(expression, reading) { Furigana.segments(expression, reading) }
     // Every segment reserves the ruby line, so kana and kanji share one baseline.
     val rubyStyle = MaterialTheme.typography.labelMedium.copy(lineHeight = 14.sp)
-    Row(verticalAlignment = Alignment.Bottom) {
+    // Wraps between segments, so a long expression stays readable at a large font size.
+    FlowRow(itemVerticalAlignment = Alignment.Bottom) {
         segments.forEach { segment ->
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
