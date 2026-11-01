@@ -158,10 +158,35 @@ class DictionariesViewModelTest {
         val jmdict = DictionaryCatalog.dictionaries.single { it.id == "jmdict-english" }
 
         viewModel.download(jmdict)
-        scheduler.imports.value = listOf(ImportStatus.Failed("1", ImportError.DOWNLOAD_FAILED, "offline"))
+        scheduler.imports.value = listOf(ImportStatus.Failed("1", ImportError.DOWNLOAD_FAILED, "offline", jmdict.id))
         viewModel.download(jmdict)
 
         assertEquals(listOf(jmdict, jmdict), scheduler.downloads)
+    }
+
+    @Test
+    fun retryingRequestsOnlyTheFailedDownloadsAndKeepsTheRunningOnesTracked() = runTest {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        fun state(id: String) = (viewModel.uiState.value as DictionariesUiState.Loaded).catalog
+            .single { it.dictionary.id == id }.state
+        val jmdict = DictionaryCatalog.dictionaries.single { it.id == "jmdict-english" }
+        val other = DictionaryCatalog.dictionaries.first { it.id != jmdict.id }
+
+        viewModel.download(jmdict)
+        viewModel.download(other)
+        scheduler.imports.value = listOf(
+            ImportStatus.Failed("1", ImportError.DOWNLOAD_FAILED, "offline", jmdict.id),
+            ImportStatus.Running("2", null),
+        )
+        // The failure puts only its own dictionary back on offer.
+        assertEquals(CatalogItem.State.AVAILABLE, state(jmdict.id))
+        assertEquals(CatalogItem.State.IN_PROGRESS, state(other.id))
+
+        viewModel.retryFailed(listOf(jmdict, other))
+
+        assertEquals(listOf(jmdict, other, jmdict), scheduler.downloads)
+        assertEquals(CatalogItem.State.IN_PROGRESS, state(jmdict.id))
+        assertEquals(CatalogItem.State.IN_PROGRESS, state(other.id))
     }
 
     @Test

@@ -246,7 +246,9 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
                     )
                     WorkInfo.State.FAILED -> {
                         val (error, detail) = DictionaryImportWorker.errorOf(info.outputData)
-                        ImportStatus.Failed(id, error, detail)
+                        val dictionaryId = info.tags.firstOrNull { it.startsWith(DICTIONARY_TAG) }
+                            ?.removePrefix(DICTIONARY_TAG)
+                        ImportStatus.Failed(id, error, detail, dictionaryId)
                     }
                     WorkInfo.State.SUCCEEDED, WorkInfo.State.CANCELLED -> null
                 }
@@ -257,6 +259,7 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
         val request = OneTimeWorkRequestBuilder<DictionaryImportWorker>()
             .setInputData(DictionaryImportWorker.downloadInputData(dictionary))
             .addTag(TAG)
+            .addTag(DICTIONARY_TAG + dictionary.id)
             .build()
         workManager.enqueue(request)
     }
@@ -275,5 +278,8 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
 
     private companion object {
         const val TAG = "dictionary-import"
+
+        /** Prefix of the tag that names the catalog dictionary a download is for. */
+        const val DICTIONARY_TAG = "dictionary-import:"
     }
 }

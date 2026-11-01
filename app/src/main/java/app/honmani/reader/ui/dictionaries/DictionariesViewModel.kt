@@ -84,7 +84,9 @@ class DictionariesViewModel(
             val catalog = DictionaryCatalog.dictionaries.map { dictionary ->
                 val state = when {
                     DictionaryCatalog.isInstalled(dictionary, titles) -> CatalogItem.State.INSTALLED
-                    dictionary.id in requested && imports.none { it is ImportStatus.Failed } ->
+                    // Only this dictionary's own failure puts it back on offer; the others go on.
+                    dictionary.id in requested &&
+                        imports.none { it is ImportStatus.Failed && it.dictionaryId == dictionary.id } ->
                         CatalogItem.State.IN_PROGRESS
                     else -> CatalogItem.State.AVAILABLE
                 }
@@ -126,6 +128,18 @@ class DictionariesViewModel(
     }
 
     fun checkForUpdates() = updateChecker.start(all = true)
+
+    /**
+     * Retries the failed downloads among [pack] only: their failures are forgotten and they are
+     * requested again, while downloads still running stay tracked.
+     */
+    fun retryFailed(pack: List<CatalogDictionary>) {
+        val failed = (uiState.value as? DictionariesUiState.Loaded)?.imports
+            .orEmpty().filterIsInstance<ImportStatus.Failed>().mapNotNull { it.dictionaryId }.toSet()
+        requested.update { it - failed }
+        importScheduler.clearFailures()
+        pack.filter { it.id in failed }.forEach(::download)
+    }
 
     fun dismissFailures() {
         // A failed download may be retried.

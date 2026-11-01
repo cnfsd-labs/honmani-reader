@@ -99,6 +99,8 @@ sealed interface StarterPackState {
             return when {
                 installed == pack.size -> Ready
                 !started -> NotStarted
+                // Failed only once nothing is left running; a failure beside running downloads waits.
+                items.any { it.state == CatalogItem.State.IN_PROGRESS } -> Downloading(installed, pack.size)
                 loaded.imports.any { it is ImportStatus.Failed } -> Failed
                 else -> Downloading(installed, pack.size)
             }
@@ -158,7 +160,7 @@ fun OnboardingScreen(
             download()
             page = page.next()
         },
-        onRetry = download,
+        onRetry = { dictionaries.retryFailed(pack) },
         onSkipDictionaries = { page = page.next() },
         onBackToDictionaries = { page.back()?.let { page = it } },
         onTrySample = onTrySample,

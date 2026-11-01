@@ -32,4 +32,21 @@ class StarterPackStateTest {
         val failed = ImportStatus.Failed("x", ImportError.entries.first(), null)
         assertEquals(StarterPackState.Failed, StarterPackState.of(pack, state(2, listOf(failed)), started = true))
     }
+
+    @Test
+    fun aFailureWaitsForTheDownloadsStillRunning() {
+        val failed = ImportStatus.Failed("x", ImportError.entries.first(), null, pack[0].id)
+        fun loaded(running: Set<Int>) = DictionariesUiState.Loaded(
+            dictionaries = emptyList(),
+            imports = listOf(failed),
+            catalog = DictionaryCatalog.dictionaries.map { dictionary ->
+                val index = pack.indexOf(dictionary)
+                CatalogItem(dictionary, if (index in running) CatalogItem.State.IN_PROGRESS else CatalogItem.State.AVAILABLE)
+            },
+        )
+        // One failed, two still running: still downloading.
+        assertEquals(StarterPackState.Downloading(0, 4), StarterPackState.of(pack, loaded(setOf(1, 2)), started = true))
+        // Nothing left running: failed.
+        assertEquals(StarterPackState.Failed, StarterPackState.of(pack, loaded(emptySet()), started = true))
+    }
 }

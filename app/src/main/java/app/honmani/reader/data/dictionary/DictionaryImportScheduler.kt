@@ -33,7 +33,13 @@ sealed interface ImportStatus {
         val download: DownloadProgress? = null,
     ) : ImportStatus
 
-    data class Failed(override val id: String, val error: ImportError, val detail: String?) : ImportStatus
+    data class Failed(
+        override val id: String,
+        val error: ImportError,
+        val detail: String?,
+        /** The catalog dictionary whose download failed; null for imports of files and updates. */
+        val dictionaryId: String? = null,
+    ) : ImportStatus
 }
 
 data class DownloadProgress(
