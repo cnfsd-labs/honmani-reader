@@ -227,7 +227,7 @@ class LibraryViewModel(
         }
         viewModelScope.launch {
             ttu.progress.collect { books ->
-                books.forEach { dao.setProgressByTtuId(it.id, it.progress) }
+                dao.setProgressByTtuIds(books.associate { it.id to it.progress })
             }
         }
         viewModelScope.launch {

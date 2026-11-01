@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -41,8 +42,15 @@ interface BookDao {
     @Query("UPDATE book SET last_opened_at = :openedAt WHERE id = :id")
     suspend fun setLastOpened(id: Long, openedAt: Long)
 
-    @Query("UPDATE book SET progress = :progress WHERE ttu_id = :ttuId")
+    /** Only writes if the progress differs, so an unchanged report doesn't make observers re-read the table. */
+    @Query("UPDATE book SET progress = :progress WHERE ttu_id = :ttuId AND progress != :progress")
     suspend fun setProgressByTtuId(ttuId: Long, progress: Float)
+
+    /** Sets the progress of every book in [progress] (ttu id to 0..1) in one transaction: observers read once. */
+    @Transaction
+    suspend fun setProgressByTtuIds(progress: Map<Long, Float>) {
+        for ((ttuId, value) in progress) setProgressByTtuId(ttuId, value)
+    }
 
     @Query("UPDATE book SET characters = :characters WHERE ttu_id = :ttuId")
     suspend fun setCharactersByTtuId(ttuId: Long, characters: Long)

@@ -68,6 +68,22 @@ class BookDaoTest {
     }
 
     @Test
+    fun progressIsSetForSeveralBooksAtOnce_andUnchangedOnesAreLeftAlone() = runTest {
+        val a = dao.insert(book("a", addedAt = 1))
+        val b = dao.insert(book("b", addedAt = 2))
+        val c = dao.insert(book("c", addedAt = 3))
+        dao.setTtuBook(a, ttuId = 1, ttuTitle = "A")
+        dao.setTtuBook(b, ttuId = 2, ttuTitle = "B")
+        dao.setProgressByTtuId(2, 0.25f)
+
+        dao.setProgressByTtuIds(mapOf(1L to 0.75f, 2L to 0.25f, 99L to 1f))
+
+        assertEquals(0.75f, dao.find(a)!!.progress)
+        assertEquals(0.25f, dao.find(b)!!.progress)
+        assertEquals(0f, dao.find(c)!!.progress)
+    }
+
+    @Test
     fun forgetTtuBookExcept_clearsOtherBooksWithThatTtuId() = runTest {
         val a = dao.insert(book("a", addedAt = 1))
         val b = dao.insert(book("b", addedAt = 2))
