@@ -10,9 +10,13 @@ import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -158,16 +162,59 @@ class WordKnowledgeTracker(
     /** Other spellings of the installed dictionaries' words. */
     private val variants: suspend () -> SpellingVariants = { SpellingVariants.EMPTY },
     context: CoroutineContext = Dispatchers.IO,
+    /** Changes arriving closer together than this (page turns, lookups) are worked out once. */
+    private val settleMillis: Long = 300,
 ) {
     /** Words already read, by content hash and grade signature: they only change when a book is graded again. */
     private val cache = ConcurrentHashMap<String, Pair<String, BookWords?>>()
     private var progress: Map<Long, WordStep>? = null
     private var generation = -1
 
-    val knowledge: Flow<WordKnowledge> = combine(books, stretches, grades, words) { books, stretches, grades, words ->
+    private class Inputs(
+        val hashes: Set<String>,
+        val stretches: Map<String, IntArray>,
+        val grades: Map<String, StoredDifficulty>,
+        val words: List<WordEntity>,
+    )
+
+    /**
+     * Only what [work] uses counts as a change: a book's place or a word's Anki mark leaves the
+     * books and words alone, so turning a page works out nothing unless it read new text.
+     */
+    @OptIn(FlowPreview::class)
+    val knowledge: Flow<WordKnowledge> = combine(
+        books.map { list -> list.mapTo(HashSet()) { it.contentHash } }.distinctUntilChanged(),
+        stretches.distinctUntilChanged(::sameStretches),
+        grades.distinctUntilChanged(),
+        words.distinctUntilChanged(::sameWords),
+        ::Inputs,
+    ).debounce(settleMillis).map { work(it) }.flowOn(context)
+
+    private fun sameStretches(a: Map<String, IntArray>, b: Map<String, IntArray>): Boolean =
+        a === b || (a.size == b.size && a.all { (hash, steps) -> b[hash]?.contentEquals(steps) == true })
+
+    /** Whether [a] and [b] agree in everything [work] reads of a word. */
+    private fun sameWords(a: List<WordEntity>, b: List<WordEntity>): Boolean {
+        if (a === b) return true
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            val x = a[i]
+            val y = b[i]
+            if (x.id != y.id || x.expression != y.expression || x.reading != y.reading || x.status != y.status ||
+                x.lookupCount != y.lookupCount || x.lastSentence != y.lastSentence ||
+                x.lastSurfaceStart != y.lastSurfaceStart || x.lastSurfaceEnd != y.lastSurfaceEnd
+            ) return false
+        }
+        return true
+    }
+
+    private suspend fun work(inputs: Inputs): WordKnowledge {
+        val stretches = inputs.stretches
+        val grades = inputs.grades
+        val words = inputs.words
         val read = HashMap<String, ReadWord>()
         val shares = HashMap<String, Float>()
-        for (hash in books.mapTo(HashSet()) { it.contentHash }) {
+        for (hash in inputs.hashes) {
             val grade = grades[hash]?.takeIf { it.difficulty.score > 0 } ?: continue
             val parts = stretches[hash]?.takeIf { it.isNotEmpty() } ?: continue
             val inBook = wordsOf(hash, grade.signature) ?: continue
@@ -201,8 +248,8 @@ class WordKnowledgeTracker(
                 ?.takeIf { it.isNotBlank() }
         }
         val known = words.filter { (updated[it.id]?.steps ?: 0) >= WordProgress.KNOWN }.mapTo(HashSet()) { it.expression }
-        WordKnowledge(read, updated, learning, shares, forms, spellings, known)
-    }.flowOn(context)
+        return WordKnowledge(read, updated, learning, shares, forms, spellings, known)
+    }
 
     /**
      * How often [word] was read: as written in its entry (分かる) or in another spelling (判る),

@@ -11,8 +11,11 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -65,6 +68,7 @@ class WordKnowledgeTrackerTest {
         store = store,
         variants = { variants },
         context = Dispatchers.Unconfined,
+        settleMillis = 0,
     )
 
     private fun store() = WordProgressStore(File(Files.createTempDirectory("progress").toFile(), "progress.json"))
@@ -118,5 +122,39 @@ class WordKnowledgeTrackerTest {
 
         // Without the link, only the two reads of 分かる count.
         assertEquals(2, tracker(words, store(), inBook).knowledge.first().progress[1]?.reads)
+    }
+
+    @Test
+    fun aBooksPlaceOrAWordsAnkiMarkWorksNothingOut() = runBlocking {
+        val books = MutableStateFlow(listOf(book))
+        val words = MutableStateFlow(listOf(word("よく分かった。", 2, 5)))
+        var rebuilds = 0
+        val tracker = WordKnowledgeTracker(
+            books = books,
+            stretches = flowOf(mapOf("h" to intArrayOf(0, BookWords.POSITIONS))),
+            grades = flowOf(mapOf("h" to grade)),
+            words = words,
+            bookWords = { bookWords },
+            store = store(),
+            variants = { rebuilds++; SpellingVariants.EMPTY },
+            context = Dispatchers.Unconfined,
+            settleMillis = 20,
+        )
+        val seen = mutableListOf<WordKnowledge>()
+        val job = launch(Dispatchers.Default) { tracker.knowledge.toList(seen) }
+        delay(300)
+        assertEquals(1, rebuilds)
+
+        books.value = listOf(book.copy(progress = 0.5f, lastOpenedAt = 5))
+        words.value = words.value.map { it.copy(ankiNoteId = 9, starred = true) }
+        delay(300)
+        assertEquals(1, rebuilds)
+
+        // A new lookup does.
+        words.value = words.value.map { it.copy(lookupCount = 2) }
+        delay(300)
+        assertEquals(2, rebuilds)
+        job.cancel()
+        assertEquals(2, seen.size)
     }
 }
