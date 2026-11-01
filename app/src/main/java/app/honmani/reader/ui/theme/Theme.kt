@@ -40,8 +40,11 @@ fun HonmaniTheme(
  * it; the containers are the accent mixed with the background, so they stay calm.
  */
 fun accentColorScheme(accent: Color, darkTheme: Boolean): ColorScheme {
-    val onAccent = if (accent.luminance() > 0.4f) Color.Black else Color.White
     return if (darkTheme) {
+        // Lighter on dark backgrounds until the accent as text reads at 4.5:1; the label on it is
+        // black or white, whichever contrasts more (always at least 4.5:1).
+        val accent = lightenForDarkBackground(accent)
+        val onAccent = readableOn(accent)
         val container = lerp(accent, Color.Black, 0.55f)
         val onContainer = lerp(accent, Color.White, 0.8f)
         darkColorScheme(
@@ -59,7 +62,7 @@ fun accentColorScheme(accent: Color, darkTheme: Boolean): ColorScheme {
     } else {
         // Darker on light backgrounds until white text on it (and it as text on the page) reads at 4.5:1.
         val primary = darkenForWhiteText(accent)
-        val onPrimary = Color.White
+        val onPrimary = readableOn(primary)
         val container = lerp(accent, Color.White, 0.8f)
         val onContainer = lerp(accent, Color.Black, 0.6f)
         lightColorScheme(
@@ -84,11 +87,34 @@ fun contrastRatio(a: Color, b: Color): Float {
     return (maxOf(l1, l2) + 0.05f) / (minOf(l1, l2) + 0.05f)
 }
 
-/** [accent] mixed toward black in 5 % steps, starting at 15 %, until white on it has a contrast of 4.5:1. */
+/** Black or white, whichever has the higher contrast against [background]. */
+fun readableOn(background: Color): Color =
+    if (contrastRatio(Color.White, background) >= contrastRatio(Color.Black, background)) Color.White else Color.Black
+
+/** [accent] mixed toward white in 5 % steps until it has a contrast of 4.5:1 against the dark background. */
+fun lightenForDarkBackground(accent: Color): Color {
+    val background = darkColorScheme().background
+    var amount = 0f
+    var color = accent
+    while (contrastRatio(color, background) < MIN_TEXT_CONTRAST && amount < 1f) {
+        amount += 0.05f
+        color = lerp(accent, Color.White, amount)
+    }
+    return color
+}
+
+/**
+ * [accent] mixed toward black in 5 % steps, starting at 15 %, until it has a contrast of 4.5:1 against white
+ * (button labels) and the light background (as text).
+ */
 fun darkenForWhiteText(accent: Color): Color {
+    val background = lightColorScheme().background
     var amount = 0.15f
     var color = lerp(accent, Color.Black, amount)
-    while (contrastRatio(Color.White, color) < MIN_TEXT_CONTRAST && amount < 1f) {
+    while (
+        (contrastRatio(Color.White, color) < MIN_TEXT_CONTRAST || contrastRatio(color, background) < MIN_TEXT_CONTRAST) &&
+        amount < 1f
+    ) {
         amount += 0.05f
         color = lerp(accent, Color.Black, amount)
     }
