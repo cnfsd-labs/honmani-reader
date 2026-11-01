@@ -32,6 +32,7 @@ import app.honmani.reader.diagnostics.logWarning
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -76,9 +77,13 @@ class KnownFromAnki internal constructor(
         }
     }
 
+    private var reading: Job? = null
+
     fun pick(deck: String) {
+        // A second tap on a deck name must not start a second read.
+        if (step !is Step.Decks) return
         step = Step.Reading(deck)
-        scope.launch {
+        reading = scope.launch {
             when (val result = container.ankiSync.deckWords(deck)) {
                 is DeckWords.Found -> if (result.matching.isEmpty()) {
                     step = null
@@ -101,7 +106,10 @@ class KnownFromAnki internal constructor(
         }
     }
 
+    /** Closes the flow; while reading AnkiDroid it also stops the read. Nothing is changed before [confirm]. */
     fun cancel() {
+        reading?.cancel()
+        reading = null
         step = null
     }
 
@@ -149,10 +157,11 @@ fun KnownFromAnkiDialogs(state: KnownFromAnki) {
             dismissButton = { TextButton(onClick = state::cancel) { Text(stringResource(R.string.action_cancel)) } },
         )
         is KnownFromAnki.Step.Reading -> AlertDialog(
-            onDismissRequest = {},
+            onDismissRequest = state::cancel,
             title = { Text(step.deck) },
             text = { CircularProgressIndicator() },
             confirmButton = {},
+            dismissButton = { TextButton(onClick = state::cancel) { Text(stringResource(R.string.action_cancel)) } },
         )
         is KnownFromAnki.Step.Confirm -> {
             val count = step.found.matching.size
