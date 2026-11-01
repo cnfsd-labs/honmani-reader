@@ -45,6 +45,8 @@ data class ReaderSettings(
     val keepScreenOn: Boolean = false,
     /** The phone's volume buttons turn pages in a book (down: next, up: previous). */
     val volumeKeys: Boolean = true,
+    /** A tap in the left or right edge of a paginated page turns the page instead of looking up (`tap-bridge.js`); off by default. */
+    val edgeTaps: Boolean = false,
     /** Selected book text (a long press and its handles) is looked up as a tap is (`tap-bridge.js`). */
     val selectionLookup: Boolean = true,
     /** Furigana is hidden over words the reader knows (`word-marks.js`); off by default. */
@@ -67,6 +69,7 @@ data class ReaderSettings(
         put(WORD_MARKS, wordMarks.storage)
         put(WAKE_LOCK, flag(keepScreenOn))
         put(VOLUME_KEYS, flag(volumeKeys))
+        put(EDGE_TAPS, flag(edgeTaps))
         put(SELECTION_LOOKUP, flag(selectionLookup))
         put(HIDE_KNOWN_FURIGANA, flag(hideKnownFurigana))
         put(TINT_ONE_UNKNOWN, flag(tintOneUnknown))
@@ -92,6 +95,7 @@ data class ReaderSettings(
         private const val PROGRESS_BAR = "honmaniProgressBar"
         private const val WORD_MARKS = "honmaniWordMarks"
         private const val VOLUME_KEYS = "honmaniVolumeKeys"
+        private const val EDGE_TAPS = "honmaniEdgeTaps"
         private const val SELECTION_LOOKUP = "honmaniSelectionLookup"
         private const val HIDE_KNOWN_FURIGANA = "honmaniHideKnownFurigana"
         private const val TINT_ONE_UNKNOWN = "honmaniTintOneUnknown"
@@ -124,6 +128,7 @@ data class ReaderSettings(
                 wordMarks = WordMarksMode.fromStorage(values[WORD_MARKS]),
                 keepScreenOn = flag(WAKE_LOCK, defaults.keepScreenOn),
                 volumeKeys = flag(VOLUME_KEYS, defaults.volumeKeys),
+                edgeTaps = flag(EDGE_TAPS, defaults.edgeTaps),
                 selectionLookup = flag(SELECTION_LOOKUP, defaults.selectionLookup),
                 hideKnownFurigana = flag(HIDE_KNOWN_FURIGANA, defaults.hideKnownFurigana),
                 tintOneUnknown = flag(TINT_ONE_UNKNOWN, defaults.tintOneUnknown),

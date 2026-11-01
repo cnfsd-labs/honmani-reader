@@ -720,6 +720,8 @@
     <string name="reader_settings_keep_screen_on">Keep the screen on while reading</string>
     <string name="reader_settings_volume_keys">Turn pages with the volume buttons</string>
     <string name="reader_settings_volume_keys_details">Volume down for the next page, volume up for the previous one</string>
+    <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
+    <string name="reader_settings_edge_taps_details">A tap at the left or right edge turns the page instead of looking up; paginated mode only</string>
     <string name="reader_settings_hide_known_furigana">Hide furigana over words you know</string>
     <string name="reader_settings_hide_known_furigana_details">Words looked up and learned, or read many times. The page keeps its layout; looking a word up brings its furigana back. Takes effect when the book is opened again.</string>
     <string name="reader_settings_tint_one_unknown">Tint sentences with one new word</string>

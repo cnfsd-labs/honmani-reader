@@ -122,6 +122,10 @@ class TapLookupTest {
 
         assertEquals(BridgeMessage.Lookup(TapLookup("猫", "猫だ。", 0)), BridgeMessage.parse(lookup))
         assertEquals(BridgeMessage.Dismiss, BridgeMessage.parse("""{"type":"dismiss"}"""))
+        assertEquals(BridgeMessage.TurnPage(true), BridgeMessage.parse("""{"type":"turnPage","next":true}"""))
+        assertEquals(BridgeMessage.TurnPage(false), BridgeMessage.parse("""{"type":"turnPage","next":false}"""))
+        assertNull(BridgeMessage.parse("""{"type":"turnPage","next":"true"}"""))
+        assertNull(BridgeMessage.parse("""{"type":"turnPage"}"""))
         assertEquals(BridgeMessage.Activity, BridgeMessage.parse("""{"type":"reader.activity"}"""))
         assertEquals(BridgeMessage.OpenSettings, BridgeMessage.parse("""{"type":"reader.settings"}"""))
         assertEquals(BridgeMessage.OpenMenu, BridgeMessage.parse("""{"type":"reader.menu"}"""))

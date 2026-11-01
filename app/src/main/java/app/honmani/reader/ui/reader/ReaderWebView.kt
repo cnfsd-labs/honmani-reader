@@ -298,6 +298,9 @@ fun ReaderWebView(
                         when (message) {
                             is BridgeMessage.Lookup -> currentOnLookup(message.tap)
                             BridgeMessage.Dismiss -> currentOnDismiss()
+                            // Like a volume button: the first one only closes an open lookup panel.
+                            is BridgeMessage.TurnPage ->
+                                if (currentPanelOpen) currentOnDismiss() else webViewRef.view?.let { turnPage(it, message.next) }
                             is BridgeMessage.Library -> ttuLibrary.onMessage(message.message)
                             is BridgeMessage.BookShown, BridgeMessage.SettingsShown ->
                                 if (uncover[0] != null) uncoverAfter(UNCOVER_SETTLE_MS)

@@ -682,3 +682,74 @@ test('the app can highlight a selection lookup like a tap', async ({ page }) => 
 
   expect(await page.evaluate(() => CSS.highlights.has('honmani-lookup'))).toBe(true);
 });
+
+test.describe('edge taps (honmaniEdgeTaps)', () => {
+  const edgeOn = (page) => page.evaluate(() => window.localStorage.setItem('honmaniEdgeTaps', '1'));
+  const rowY = (page, selector) =>
+    page.evaluate((selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    }, selector);
+  const width = (page) => page.evaluate(() => innerWidth);
+
+  test('off by default: an edge tap still looks up', async ({ page }) => {
+    const y = await rowY(page, '#h2');
+    await page.mouse.click(5, y);
+    expect((await messages(page)).map((m) => m.type)).toEqual(['lookup']);
+  });
+
+  test('on: the right edge of horizontal text turns to the next page, the left to the previous', async ({ page }) => {
+    await edgeOn(page);
+    const y = await rowY(page, '#h2');
+    const w = await width(page);
+    await page.mouse.click(w - 5, y);
+    await page.mouse.click(5, y);
+    expect(await messages(page)).toEqual([
+      { type: 'turnPage', next: true },
+      { type: 'turnPage', next: false },
+    ]);
+  });
+
+  test('on: vertical text (right to left) turns next at the left edge, previous at the right', async ({ page }) => {
+    await edgeOn(page);
+    // ttu's book fills the page; the fixture's block is only as wide as its lines.
+    await page.addStyleTag({ content: '#vertical { width: 100%; }' });
+    const y = await rowY(page, '#v2');
+    const w = await width(page);
+    await page.mouse.click(5, y);
+    await page.mouse.click(w - 5, y);
+    expect(await messages(page)).toEqual([
+      { type: 'turnPage', next: true },
+      { type: 'turnPage', next: false },
+    ]);
+  });
+
+  test('on: the zone is 15 percent of the width; a tap on a word further in looks up', async ({ page }) => {
+    await edgeOn(page);
+    const w = await width(page);
+    const y = await rowY(page, '#blank');
+    await page.mouse.click(w * 0.14, y);
+    await page.mouse.click(w * 0.86, y);
+    expect((await messages(page)).map((m) => m.type)).toEqual(['turnPage', 'turnPage']);
+    await page.mouse.click(w * 0.5, y);
+    await tapChar(page, '#h3', '東');
+    expect((await messages(page)).map((m) => m.type)).toEqual(['turnPage', 'turnPage', 'dismiss', 'lookup']);
+  });
+
+  test('on: links and text outside the book are left alone', async ({ page }) => {
+    await edgeOn(page);
+    const w = await width(page);
+    const outside = await rowY(page, '#outside');
+    await page.mouse.click(5, outside);
+    await page.mouse.click(w - 5, outside);
+    expect((await messages(page)).filter((m) => m.type === 'turnPage')).toEqual([]);
+  });
+
+  test('on, but continuous mode: edge taps keep looking up', async ({ page }) => {
+    await edgeOn(page);
+    await page.evaluate(() => window.localStorage.setItem('viewMode', 'continuous'));
+    const y = await rowY(page, '#h2');
+    await page.mouse.click(5, y);
+    expect((await messages(page)).map((m) => m.type)).toEqual(['lookup']);
+  });
+});

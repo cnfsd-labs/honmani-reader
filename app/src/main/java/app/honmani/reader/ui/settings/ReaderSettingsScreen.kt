@@ -213,6 +213,9 @@ private fun ReaderSettingsContent(
         SwitchRow(R.string.reader_settings_volume_keys, R.string.reader_settings_volume_keys_details, settings.volumeKeys) {
             onChange(settings.copy(volumeKeys = it))
         }
+        SwitchRow(R.string.reader_settings_edge_taps, R.string.reader_settings_edge_taps_details, settings.edgeTaps) {
+            onChange(settings.copy(edgeTaps = it))
+        }
         SwitchRow(R.string.reader_settings_selection_lookup, R.string.reader_settings_selection_lookup_details, settings.selectionLookup) {
             onChange(settings.copy(selectionLookup = it))
         }

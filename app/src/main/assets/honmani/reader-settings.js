@@ -46,6 +46,7 @@
     'honmaniProgressBar',
     'honmaniWordMarks',
     'honmaniVolumeKeys',
+    'honmaniEdgeTaps',
     'honmaniSelectionLookup',
     'honmaniHideKnownFurigana',
     'honmaniTintOneUnknown',

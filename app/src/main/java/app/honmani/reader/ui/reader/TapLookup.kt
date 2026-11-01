@@ -16,6 +16,9 @@ sealed interface BridgeMessage {
     /** A tap on the book away from text: close the lookup panel. */
     data object Dismiss : BridgeMessage
 
+    /** An edge tap turns the page: [next] or the previous one (`assets/honmani/tap-bridge.js`). */
+    data class TurnPage(val next: Boolean) : BridgeMessage
+
     data class Library(val message: LibraryMessage) : BridgeMessage
 
     /** An opened book is laid out and on screen (`assets/honmani/book-shown.js`). */
@@ -69,6 +72,7 @@ sealed interface BridgeMessage {
             val compact by lazy { message.replace(" ", "") }
             return when (type) {
                 "lookup" -> TapLookup.parse(message)?.let(::Lookup)
+                "turnPage" -> parseTurnPage(obj)
                 "dismiss" -> Dismiss.takeIf { compact == DISMISS_MESSAGE }
                 "bookShown" -> parseBookShown(message, obj)
                 "reader.position" -> parsePosition(message, obj)
@@ -105,6 +109,15 @@ sealed interface BridgeMessage {
                 null
             } catch (_: IllegalArgumentException) {
                 null
+            }
+
+        private fun parseTurnPage(obj: JsonObject): TurnPage? =
+            (obj["next"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.let {
+                when (it) {
+                    "true" -> TurnPage(true)
+                    "false" -> TurnPage(false)
+                    else -> null
+                }
             }
 
         private fun parseBookShown(message: String, obj: JsonObject): BookShown? {

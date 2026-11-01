@@ -29,6 +29,7 @@ class ReaderSettingsTest {
                 "honmaniProgressBar" to "0",
                 "honmaniWordMarks" to "new",
                 "honmaniVolumeKeys" to "0",
+                "honmaniEdgeTaps" to "1",
                 "honmaniSelectionLookup" to "0",
                 "honmaniHideKnownFurigana" to "1",
                 "honmaniTintOneUnknown" to "1",
@@ -36,7 +37,7 @@ class ReaderSettingsTest {
         )
 
         assertEquals(
-            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true),
+            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true),
             settings,
         )
     }
@@ -65,6 +66,7 @@ class ReaderSettingsTest {
         assertEquals("1", stored["honmaniProgressBar"])
         assertEquals("learning", stored["honmaniWordMarks"])
         assertEquals("1", stored["honmaniVolumeKeys"])
+        assertEquals("0", stored["honmaniEdgeTaps"])
         assertEquals("1", stored["honmaniSelectionLookup"])
         assertEquals("0", stored["honmaniHideKnownFurigana"])
         assertEquals("0", stored["honmaniTintOneUnknown"])

@@ -51,6 +51,11 @@ Long-press a word: the lookup panel opens, no blue selection handles or Copy too
 panel offers "Copy word" and "Copy sentence". With the panel open a volume press only closes it;
 the next one turns the page.
 
+Edge taps (Reader settings, off by default): with the switch on, a tap in the outer 15 % at the left or
+right of a paginated page turns it (vertical text: left = next, right = previous; horizontal: the
+reverse); with the panel open the first edge tap only closes it; a tap on a link, the footer or the top
+bar, a long press and the middle of the page work as before; with the switch off edge taps look up.
+
 Lookup panel height: tap a short word and a long one, a kanji and a non-word: the panel's top edge
 stays at the same place (about 40% of the screen), the content scrolls inside. Drag the handle or
 header up: it grows to about 88%; tap the handle: it toggles (TalkBack: "Expand"/"Collapse");

@@ -13,6 +13,12 @@
  * "ruby" lists furigana for ruby bases that lie wholly inside "text" (indexes into "text"); it is
  * left out when there are none.
  *   { "type": "dismiss" }   (a tap on book content that is not on text)
+ *   { "type": "turnPage", "next": <bool> }
+ *                           (a tap in the left or right EDGE_ZONE of a paginated page, instead
+ *                           of a lookup, when localStorage "honmaniEdgeTaps" = "1"; the app turns
+ *                           the page, or closes an open lookup panel first. Next is the left edge
+ *                           in vertical text and the right edge in horizontal text. Taps on links
+ *                           and buttons, on the footer and the top bar are not affected)
  *
  * Selected book text (a long press) is looked up in the same message, with "selection": true,
  * once the selection has settled, and then deselected: "text" is the selection, up to
@@ -242,6 +248,28 @@
   /** A tap on book content that is not on a link, button or similar. */
   function isBookBackground(target) {
     return target.closest(BOOK_ROOT_SELECTOR) !== null && target.closest(INTERACTIVE_SELECTOR) === null;
+  }
+
+  /** The share of the page's width at each side where a tap turns the page (edge taps on). */
+  const EDGE_ZONE = 0.15;
+
+  function edgeTapsOn() {
+    try {
+      return window.localStorage.getItem('honmaniEdgeTaps') === '1' &&
+        (window.localStorage.getItem('viewMode') || 'paginated') === 'paginated';
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /** For a tap in an edge zone of the book page: whether it turns to the next page; else null. */
+  function edgeTurn(x, target) {
+    const root = target.closest(BOOK_ROOT_SELECTOR);
+    if (!root || target.closest(INTERACTIVE_SELECTOR) || !edgeTapsOn()) return null;
+    const left = x < innerWidth * EDGE_ZONE;
+    if (!left && x <= innerWidth * (1 - EDGE_ZONE)) return null;
+    const vertical = getComputedStyle(root).writingMode.startsWith('vertical');
+    return vertical ? left : !left;
   }
 
   /** The text node and index of the character under (x, y), or null. */
@@ -551,6 +579,14 @@
     if (!(target instanceof Element)) return;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed) return;
+
+    const next = edgeTurn(x, target);
+    if (next !== null) {
+      clearHighlight();
+      tapNumber++;
+      post({ type: 'turnPage', next });
+      return;
+    }
 
     const message = lookupAt(x, y, target);
     if (message) {
