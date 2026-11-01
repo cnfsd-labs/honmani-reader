@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -265,9 +264,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         dictionariesShown = true
                         viewModel.ttuLibrary.show(LIBRARY_PATH)
                     },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .heightIn(max = maxHeight * PANEL_MAX_HEIGHT_FRACTION),
+                    availableHeight = maxHeight,
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
         }
@@ -454,4 +452,3 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 private const val LIBRARY_PATH = "/manage"
 
 /** The panel leaves most of the page visible. */
-private const val PANEL_MAX_HEIGHT_FRACTION = 0.55f

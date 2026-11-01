@@ -416,6 +416,8 @@
     <string name="catalog_kind_japanese">Japanese definitions</string>
     <string name="catalog_wiktionary_japanese">Meanings explained in Japanese, with examples and synonyms, from the Japanese Wiktionary. For advanced learners; put it first under Installed to see it before English.</string>
     <string name="catalog_kanjidic">Meanings, readings and stroke counts of over 10,000 kanji. Tap a kanji in a looked-up word to see it.</string>
+    <string name="lookup_panel_expand">Expand</string>
+    <string name="lookup_panel_collapse">Collapse</string>
     <string name="lookup_back">Back to the previous word</string>
     <string name="lookup_kanji_title">Kanji</string>
     <string name="kanji_onyomi">On</string>

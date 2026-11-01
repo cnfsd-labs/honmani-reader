@@ -1,7 +1,11 @@
 package app.honmani.reader.ui.reader
 
 import androidx.compose.animation.core.animate
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -71,6 +75,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -111,12 +116,18 @@ import app.honmani.reader.ui.theme.HonmaniTheme
 
 /**
  * Dictionary results for the last tap, at the bottom of the reader. The book stays tappable.
- * Swiping down closes it: on the header row, or on the results when they are already scrolled to
- * the top when the swipe starts (so scrolling back up never closes it by accident).
+ * The panel always opens at the same height ([PanelSizing]: about 40% of [availableHeight]) so its
+ * top edge stays put from word to word; the content scrolls inside it. Dragging the handle or
+ * header up expands it (about 88%), tapping the handle toggles. Swiping down collapses and then
+ * closes it: on the header row, or on the results when they are already scrolled to the top when
+ * the swipe starts (so scrolling back up never closes it by accident). A new tap opens collapsed;
+ * back, kanji and longer or shorter keep the state.
  */
 @Composable
 fun LookupPanel(
     state: LookupPanelState,
+    /** The height the panel may use, e.g. the reader area; the panel sizes itself from it. */
+    availableHeight: Dp,
     onClose: () -> Unit,
     onOpenDictionaries: () -> Unit,
     modifier: Modifier = Modifier,
@@ -146,9 +157,24 @@ fun LookupPanel(
     // and moves that ran after the release cancelled the closing animation, leaving the panel
     // half pushed down (it looked smaller instead of closing).
     var offset by remember { mutableFloatStateOf(0f) }
+    // How far the panel is grown from its collapsed height, 0..heights.extra.
+    var extra by remember { mutableFloatStateOf(0f) }
     val height = remember { floatArrayOf(0f) }
-    val closeDistance = with(LocalDensity.current) { CLOSE_DISTANCE.toPx() }
-    val closeVelocity = with(LocalDensity.current) { CLOSE_VELOCITY.toPx() }
+    val density = LocalDensity.current
+    val closeDistance = with(density) { CLOSE_DISTANCE.toPx() }
+    val closeVelocity = with(density) { CLOSE_VELOCITY.toPx() }
+    val heights = PanelSizing.heights(
+        available = with(density) { availableHeight.toPx() },
+        minCollapsed = with(density) { MIN_COLLAPSED.toPx() },
+    )
+    val maxExtra = rememberUpdatedState(heights.extra)
+    // A new tap opens collapsed; navigation inside the panel keeps the tap and so the state.
+    val shownTap = remember { arrayOf(state.tap) }
+    if (shownTap[0] != state.tap) {
+        shownTap[0] = state.tap
+        extra = 0f
+    }
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val swipe = remember { SwipeState() }
     // A new word (a referenced one, or back) starts at the top.
@@ -157,11 +183,29 @@ fun LookupPanel(
     // How much of each result is shown, by position; reset for every new word.
     val details = remember(groups) { mutableStateMapOf<Int, Detail>() }
 
+    // Up grows the panel (after bringing it back to its place), down shrinks it, then pushes it away.
     fun dragBy(delta: Float) {
-        offset = (offset + delta).coerceAtLeast(0f)
+        if (delta < 0f) {
+            val back = maxOf(delta, -offset)
+            offset += back
+            extra = (extra - (delta - back)).coerceAtMost(maxExtra.value)
+        } else {
+            val shrink = minOf(delta, extra)
+            extra -= shrink
+            offset += delta - shrink
+        }
+    }
+
+    suspend fun settleExtra(velocity: Float) {
+        val target = if (PanelSizing.settlesExpanded(extra, maxExtra.value, velocity, closeVelocity)) maxExtra.value else 0f
+        animate(extra, target, initialVelocity = -velocity) { value, _ -> extra = value }
     }
 
     suspend fun settle(velocity: Float) {
+        if (offset <= 0f) {
+            settleExtra(velocity)
+            return
+        }
         val closes = offset > closeDistance || offset > height[0] * CLOSE_FRACTION ||
             (velocity > closeVelocity && offset > 0f)
         if (closes) {
@@ -195,7 +239,7 @@ fun LookupPanel(
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
-                if (offset <= 0f) return Velocity.Zero
+                if (offset <= 0f && (extra <= 0f || extra >= maxExtra.value)) return Velocity.Zero
                 settle(available.y)
                 return available
             }
@@ -205,6 +249,7 @@ fun LookupPanel(
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .height(with(density) { (heights.collapsed + extra).toDp() })
             .offset { IntOffset(0, offset.roundToInt()) }
             .onSizeChanged { height[0] = it.height.toFloat() },
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -212,15 +257,39 @@ fun LookupPanel(
         shadowElevation = 8.dp,
     ) {
         Column(modifier = Modifier.navigationBarsPadding()) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .draggable(
                         state = rememberDraggableState { dragBy(it) },
                         orientation = Orientation.Vertical,
                         onDragStopped = { velocity -> settle(velocity) },
-                    )
-                    .padding(start = 20.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                    ),
+            ) {
+            val expanded = extra > maxExtra.value / 2f
+            val handleLabel = stringResource(if (expanded) R.string.lookup_panel_collapse else R.string.lookup_panel_expand)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(HANDLE_AREA)
+                    .clickable(onClickLabel = handleLabel, role = Role.Button) {
+                        scope.launch {
+                            animate(extra, if (expanded) 0f else maxExtra.value) { value, _ -> extra = value }
+                        }
+                    }
+                    .semantics { contentDescription = handleLabel },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 32.dp, height = 4.dp)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), CircleShape),
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 4.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val canGoBack = when (state) {
@@ -264,6 +333,7 @@ fun LookupPanel(
                     Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
                 }
             }
+            }
             // The selection is gone after a long press: its text can be copied here, found or not.
             val results = state as? LookupPanelState.Results
             if (state.tap.bySelection && results?.previous == null) {
@@ -287,9 +357,9 @@ fun LookupPanel(
             when (state) {
                 is LookupPanelState.Results -> LazyColumn(
                     state = listState,
-                    // Shares the panel's maximum height with the header row.
+                    // Fills the panel below the header; a short list leaves empty space.
                     modifier = Modifier
-                        .weight(1f, fill = false)
+                        .weight(1f)
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -331,11 +401,11 @@ fun LookupPanel(
                 is LookupPanelState.Kanji -> KanjiCard(
                     kanji = state.kanji,
                     modifier = Modifier
-                        .weight(1f, fill = false)
+                        .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
                 )
-                is LookupPanelState.NothingFound -> Column {
+                is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
                     Message(
                         stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
                         bottomPadding = 0.dp,
@@ -348,7 +418,7 @@ fun LookupPanel(
                         onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
                     )
                 }
-                is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
                     Message(stringResource(R.string.lookup_no_dictionaries))
                     TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
                         Text(stringResource(R.string.lookup_open_dictionaries))
@@ -442,6 +512,10 @@ private fun MatchControls(
 
 /** The header's buttons: the usual 48 dp touch size, for the thumb at the bottom of a tall phone. */
 private val HEADER_BUTTON = 48.dp
+private val HANDLE_AREA = 24.dp
+
+/** In a short (landscape) area the collapsed panel is at least this tall, up to 60% of the area. */
+private val MIN_COLLAPSED = 220.dp
 private val CLOSE_DISTANCE = 56.dp
 private val CLOSE_VELOCITY = 600.dp
 
@@ -938,6 +1012,7 @@ private fun LookupPanelPreview() {
                 ),
                 highlight = Highlight(lookupId = 1, length = 5),
             ),
+            availableHeight = 700.dp,
             onClose = {},
             onOpenDictionaries = {},
         )

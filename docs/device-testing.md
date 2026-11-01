@@ -51,6 +51,12 @@ Long-press a word: the lookup panel opens, no blue selection handles or Copy too
 panel offers "Copy word" and "Copy sentence". With the panel open a volume press only closes it;
 the next one turns the page.
 
+Lookup panel height: tap a short word and a long one, a kanji and a non-word: the panel's top edge
+stays at the same place (about 40% of the screen), the content scrolls inside. Drag the handle or
+header up: it grows to about 88%; tap the handle: it toggles (TalkBack: "Expand"/"Collapse");
+drag down: it shrinks, then closes. A new tap opens it small again; back, kanji and longer/shorter
+keep its size. Rotated to landscape the panel stays usable.
+
 ## Back up and restore
 
 Settings → Back up and restore → Back up…, save the file (to Downloads, say). Uninstall Honmani,
