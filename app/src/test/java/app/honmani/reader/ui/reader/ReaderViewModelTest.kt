@@ -7,6 +7,8 @@ import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.TermEntity
 import app.honmani.reader.data.words.LookedUpWord
+import app.honmani.reader.data.words.LookupUndo
+import app.honmani.reader.data.words.WordUndo
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.Inflection
 import app.honmani.reader.lookup.KanjiInfo
@@ -44,7 +46,7 @@ class ReaderViewModelTest {
     private val viewModel = ReaderViewModel(
         lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
         compute = Dispatchers.Unconfined,
-        recordLookup = { recorded += it },
+        recordLookup = { recorded += it; null },
         findBook = { ttuId -> ReadingBook(id = ttuId * 10, title = "Book $ttuId").takeIf { ttuId == 4L } },
         lookupKanji = { text -> kanji.filterKeys { it in text } },
     )
@@ -278,7 +280,7 @@ class ReaderViewModelTest {
         val model = ReaderViewModel(
             lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
             compute = Dispatchers.Unconfined,
-            recordLookup = { recorded += it },
+            recordLookup = { recorded += it; null },
             findBook = { null },
             lookupKanji = { text -> kanji.filterKeys { it in text } },
             inAnki = { anki.await() },
@@ -297,13 +299,42 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun dontCountTakesBackTheTapsLookupsAndClosesThePanel_butNotAStarredWord() {
+        val undone = mutableListOf<LookupUndo>()
+        val model = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { LookupUndo(WordUndo(1, WordRepository.key(it.expression, it.reading), null, 1, 1, emptyList()), null, null) },
+            undoLookup = { undone += it },
+            findBook = { null },
+        )
+        model.onTap(tap("食べました。"))
+        pending.getValue("食べました。").complete(LookupResult(listOf(entry("食べる", "食べました"))))
+        assertEquals(model.panel.value?.tap, model.countedTap.value)
+
+        model.dontCount()
+        assertNull(model.panel.value)
+        assertNull(model.countedTap.value)
+        assertEquals(1, undone.size)
+
+        model.dontCount()
+        assertEquals("nothing more to take back", 1, undone.size)
+
+        // A word starred from the panel is the reader's choice: nothing is left to take back.
+        model.onTap(tap("食べました。"))
+        val group = (model.panel.value as LookupPanelState.Results).groups.single()
+        model.setStarred(group, true)
+        assertNull(model.countedTap.value)
+    }
+
+    @Test
     fun starringAWordShowsAtOnceAndSavesTheWordFirst() {
         val stars = mutableListOf<Triple<String, String, Boolean>>()
         val saved = mutableSetOf<String>()
         val model = ReaderViewModel(
             lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
             compute = Dispatchers.Unconfined,
-            recordLookup = { saved += it.expression },
+            recordLookup = { saved += it.expression; null },
             starredAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.toSet() },
             saveStar = { e, r, starred -> stars += Triple(e, r, starred && e in saved) },
         )
@@ -392,7 +423,7 @@ class ReaderViewModelTest {
         val viewModel = ReaderViewModel(
             lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
             compute = compute,
-            recordLookup = {},
+            recordLookup = { null },
             lookupKanji = { text -> kanji.filterKeys { it in text } },
         )
         viewModel.onTap(tap("食べました。"))
@@ -469,7 +500,7 @@ class ReaderViewModelTest {
         val slow = ReaderViewModel(
             lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
             compute = Dispatchers.Unconfined,
-            recordLookup = { recorded += it },
+            recordLookup = { recorded += it; null },
             findBook = { found.await() },
             lookupKanji = { emptyMap() },
         )
@@ -516,7 +547,7 @@ class ReaderViewModelTest {
         val search = ReaderViewModel(
             lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
             compute = Dispatchers.Unconfined,
-            recordLookup = { recorded += it; saved += WordRepository.key(it.expression, it.reading) },
+            recordLookup = { recorded += it; saved += WordRepository.key(it.expression, it.reading); null },
             origin = LookupOrigin.SEARCH,
             savedAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.filterTo(HashSet()) { it in saved } },
         )

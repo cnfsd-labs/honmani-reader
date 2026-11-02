@@ -278,12 +278,20 @@ class ReviewRepository(
     }
 
     /** A lookup of a saved word: an Again if [ReviewRules.onLookup] counts it. True if the card moved. */
-    suspend fun onLookup(wordId: Long, origin: LookupOrigin): Boolean = database.withTransaction {
-        val card = dao.find(wordId) ?: return@withTransaction false
-        val word = words.find(wordId) ?: return@withTransaction false
-        val after = ReviewRules.onLookup(card, word.scheduler, origin, now(), zone()) ?: return@withTransaction false
+    suspend fun onLookup(wordId: Long, origin: LookupOrigin): Boolean = lapse(wordId, origin) != null
+
+    /** [onLookup] for the saved word [expression] read [reading]: the card as it was before an Again, or null if it didn't move. */
+    suspend fun lapse(expression: String, reading: String, origin: LookupOrigin): ReviewCardEntity? {
+        val word = words.find(expression, reading) ?: return null
+        return lapse(word.id, origin)
+    }
+
+    private suspend fun lapse(wordId: Long, origin: LookupOrigin): ReviewCardEntity? = database.withTransaction {
+        val card = dao.find(wordId) ?: return@withTransaction null
+        val word = words.find(wordId) ?: return@withTransaction null
+        val after = ReviewRules.onLookup(card, word.scheduler, origin, now(), zone()) ?: return@withTransaction null
         dao.upsert(after)
-        true
+        card
     }
 
     private suspend fun change(wordId: Long, transform: (ReviewCardEntity) -> ReviewCardEntity) =

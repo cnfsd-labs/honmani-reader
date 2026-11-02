@@ -123,6 +123,16 @@ class WordProgressStore(private val file: File) {
         }
     }
 
+    /** Sets the word's stored step back to [step] (null: none), as it was before a lookup that is taken back. */
+    fun revert(wordId: Long, step: WordStep?) {
+        synchronized(this) {
+            val all = read().toMutableMap()
+            if (step == null) all.remove(wordId) else all[wordId] = step
+            save(all)
+            generation++
+        }
+    }
+
     private fun read(): Map<Long, WordStep> = readStored(file, emptyMap()) {
         val json = JSONObject(it.readText())
         json.keys().asSequence().associate { id ->

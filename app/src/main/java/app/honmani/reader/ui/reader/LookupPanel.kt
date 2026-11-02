@@ -158,6 +158,8 @@ fun LookupPanel(
     onReadSentence: () -> Unit = {},
     /** "+ Learn" of a word found by a search: save it to Words; null (a tap in a book, which saves by itself) shows none. */
     onLearn: ((LookupGroup) -> Unit)? = null,
+    /** "Don't count": takes back what this tap changed (see [ReaderViewModel.dontCount]); null when it changed nothing. */
+    onDontCount: (() -> Unit)? = null,
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -317,6 +319,16 @@ fun LookupPanel(
                     )
                 } else {
                     Spacer(modifier = Modifier.weight(1f))
+                }
+                if (onDontCount != null && state is LookupPanelState.Results && state.previous == null) {
+                    val description = stringResource(R.string.lookup_dont_count_description)
+                    TextButton(
+                        onClick = onDontCount,
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.semantics { contentDescription = description },
+                    ) {
+                        Text(stringResource(R.string.lookup_dont_count), maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
                 if (state.tap.sentence.isNotBlank()) {
                     IconButton(onClick = onReadSentence, modifier = Modifier.size(HEADER_BUTTON)) {

@@ -30,6 +30,20 @@ data class WordCounts(val learning: Int = 0, val starred: Int = 0, val learned: 
 
 class DeletedWord(val word: WordEntity, val lookups: List<WordLookupEntity>)
 
+/**
+ * What one [WordRepository.record] changed, to take back with [WordRepository.undo]: the word as it
+ * was before ([before]; null: the lookup created it), the lookup row and event it added, and the
+ * older lookup rows it pushed out of the kept few ([pruned]).
+ */
+class WordUndo(
+    val wordId: Long,
+    val key: String,
+    val before: WordEntity?,
+    val lookupId: Long,
+    val eventId: Long,
+    val pruned: List<WordLookupEntity>,
+)
+
 /** Saved words: every lookup is recorded, words are ranked by [WordScore]. */
 class WordRepository(
     private val database: HonmaniDatabase,
@@ -96,9 +110,9 @@ class WordRepository(
     /**
      * Records a lookup. Looking the same word up again in the same sentence soon after (a
      * second tap, a correction) does not count again. A learned word looked up is being learned
-     * again.
+     * again. Returns what it changed, or null if nothing was saved (a repeat).
      */
-    suspend fun record(word: LookedUpWord) {
+    suspend fun record(word: LookedUpWord): WordUndo? {
         val time = now()
         val sentence = word.sentence.take(MAX_SENTENCE_LENGTH).let {
             // Not half a surrogate pair at the cut.
@@ -107,8 +121,9 @@ class WordRepository(
         val start = word.surfaceStart.coerceIn(0, sentence.length)
         val end = (start + word.surface.length).coerceAtMost(sentence.length)
         val gloss = word.gloss.take(MAX_GLOSS_LENGTH)
-        database.withTransaction {
+        return database.withTransaction {
             val existing = dao.find(word.expression, word.reading)
+            val lookupsBefore = if (existing == null) emptyList() else dao.allLookups(existing.id)
             val wordId = if (existing == null) {
                 dao.insert(
                     WordEntity(
@@ -131,7 +146,7 @@ class WordRepository(
                 // at most one lookup event per hour per word and sentence.
                 val latest = dao.latestLookup(existing.id)
                 if (latest != null && latest.sentence == sentence && time - latest.lookedUpAt < REPEAT_WINDOW_MS) {
-                    return@withTransaction
+                    return@withTransaction null
                 }
                 dao.update(
                     existing.copy(
@@ -149,7 +164,7 @@ class WordRepository(
                 )
                 existing.id
             }
-            dao.insertLookup(
+            val lookupId = dao.insertLookup(
                 WordLookupEntity(
                     wordId = wordId,
                     surface = word.surface,
@@ -163,7 +178,41 @@ class WordRepository(
                 ),
             )
             dao.pruneLookups(wordId, KEPT_LOOKUPS)
-            dao.insertLookupEvent(LookupEventEntity(lookedUpAt = time, bookId = word.bookId))
+            val eventId = dao.insertLookupEvent(LookupEventEntity(lookedUpAt = time, bookId = word.bookId))
+            val kept = if (lookupsBefore.isEmpty()) emptySet() else dao.allLookups(wordId).mapTo(HashSet()) { it.id }
+            WordUndo(wordId, key(word.expression, word.reading), existing, lookupId, eventId, lookupsBefore.filter { it.id !in kept })
+        }
+    }
+
+    /**
+     * Takes back what [undo] ([record]'s result) changed: a word the lookup created is deleted;
+     * a word it only looked up again gets back the fields a lookup moves (status, count, rank,
+     * sentence) and loses the lookup row and event, while a star or an Anki note stay.
+     */
+    suspend fun undo(undo: WordUndo) {
+        database.withTransaction {
+            dao.deleteLookupEvent(undo.eventId)
+            val before = undo.before
+            if (before == null) {
+                dao.delete(undo.wordId)
+                return@withTransaction
+            }
+            dao.deleteLookup(undo.lookupId)
+            if (undo.pruned.isNotEmpty()) dao.insertLookups(undo.pruned)
+            val now = dao.find(undo.wordId) ?: return@withTransaction
+            dao.update(
+                now.copy(
+                    status = before.status,
+                    gloss = before.gloss,
+                    lookupCount = before.lookupCount,
+                    lastLookedUpAt = before.lastLookedUpAt,
+                    rankKey = before.rankKey,
+                    lastSentence = before.lastSentence,
+                    lastSurfaceStart = before.lastSurfaceStart,
+                    lastSurfaceEnd = before.lastSurfaceEnd,
+                    lastBookTitle = before.lastBookTitle,
+                ),
+            )
         }
     }
 

@@ -11,7 +11,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap
 - Marks in the book on the words you are learning or have not met yet, and a list of the words
   a book holds that you do not know
-- Every word you look up is saved with its sentence; send words to Anki (AnkiDroid or an
+- Every word you look up is saved with its sentence ("Don't count" in the panel takes a lookup back); send words to Anki (AnkiDroid or an
   `.apkg` for Anki on a computer)
 - Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search")
 - Flashcard review of the words you are learning, with the sentence you met them in: two buttons

@@ -276,6 +276,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     .windowInsetsPadding(WindowInsets.safeDrawing),
             )
             val state = panel
+            val countedTap by viewModel.countedTap.collectAsStateWithLifecycle()
             if (state != null && !atLibrary) {
                 // The frame after this state was first composed: it has been drawn (for the log).
                 LaunchedEffect(state) {
@@ -296,6 +297,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onBack = { viewModel.back() },
                     previousSentence = if (showPreviousSentence) state.tap.previousSentence else "",
                     onReadSentence = viewModel::readSentence,
+                    onDontCount = if (countedTap == state.tap) viewModel::dontCount else null,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },
                     onOpenDictionaries = {

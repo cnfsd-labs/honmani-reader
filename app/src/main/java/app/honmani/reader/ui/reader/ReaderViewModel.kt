@@ -12,6 +12,7 @@ import app.honmani.reader.anki.CardContent
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.LookupUndo
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.KanjiInfo
@@ -100,8 +101,10 @@ class ReaderViewModel(
     val ttuLibrary: TtuLibrary = TtuLibrary(),
     /** Where the library keeps book files, which the reader WebView serves to ttu. */
     val booksDir: File = File("books"),
-    /** Saves a lookup to the word list. */
-    private val recordLookup: suspend (LookedUpWord) -> Unit = {},
+    /** Saves a lookup to the word list; returns what it changed, null if nothing. */
+    private val recordLookup: suspend (LookedUpWord) -> LookupUndo? = { null },
+    /** Takes back what [recordLookup] changed ("Don't count"). */
+    private val undoLookup: suspend (LookupUndo) -> Unit = {},
     /** The library book that ttu holds under an id. */
     private val findBook: suspend (ttuId: Long) -> ReadingBook? = { null },
     /** Adds a card to Anki; see [app.honmani.reader.anki.AnkiExporter]. */
@@ -149,6 +152,49 @@ class ReaderViewModel(
     private var lookupJob: Job? = null
     private var lookupCount = 0L
 
+    /** What the lookups of one tap in the book changed, by the saved word's key, until the tap is replaced. */
+    private var counted: Pair<TapLookup, List<LookupUndo>>? = null
+    private val _countedTap = MutableStateFlow<TapLookup?>(null)
+
+    /** The tap whose lookups changed something that "Don't count" ([dontCount]) can take back; null if none. */
+    val countedTap: StateFlow<TapLookup?> = _countedTap.asStateFlow()
+
+    private fun addCounted(tap: TapLookup, undo: LookupUndo) {
+        val earlier = counted?.takeIf { it.first == tap }?.second.orEmpty()
+        counted = tap to earlier + undo
+        _countedTap.value = tap
+    }
+
+    /** The reader meant to save the word [key] (star, Anki card, "+ Learn"): "Don't count" leaves it alone. */
+    private fun keep(key: String) {
+        val (tap, items) = counted ?: return
+        val rest = items.filter { it.key != key }
+        counted = if (rest.isEmpty()) null else tap to rest
+        _countedTap.value = if (rest.isEmpty()) null else tap
+    }
+
+    /**
+     * "Don't count": takes back what the tap in the panel changed (a new word, a lost learned mark,
+     * word progress, a lapsed card) and closes the panel. Earlier lookups of the word stay counted.
+     */
+    fun dontCount() {
+        val items = counted?.second ?: return
+        counted = null
+        _countedTap.value = null
+        dismiss()
+        viewModelScope.launch {
+            for (undo in items.asReversed()) {
+                try {
+                    undoLookup(undo)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    log("Taking back a lookup failed: $e")
+                }
+            }
+        }
+    }
+
     /** The last tap and when its message came, until its panel is drawn ([onPanelDrawn]). */
     private var tapStarted: Pair<TapLookup, TimeMark>? = null
 
@@ -192,6 +238,8 @@ class ReaderViewModel(
 
     fun onTap(tap: TapLookup) {
         lookupJob?.cancel()
+        counted = null
+        _countedTap.value = null
         val lookupId = ++lookupCount
         lookupJob = viewModelScope.launch {
             val start = TimeSource.Monotonic.markNow()
@@ -234,7 +282,7 @@ class ReaderViewModel(
                         show(LookupPanelState.NothingFound(tap))
                         return@launch
                     }
-                    if (recordsTaps) record(tap, groups.first())
+                    if (recordsTaps) record(tap, groups.first(), taps = true)
                     LookupPanelState.Results(
                         tap = tap,
                         groups = groups,
@@ -291,7 +339,7 @@ class ReaderViewModel(
                 return@launch
             }
             val groups = withContext(compute) { LookupGroups.from(found) }
-            if (recordsTaps) record(tap, groups.first())
+            if (recordsTaps) record(tap, groups.first(), taps = true)
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
@@ -366,6 +414,7 @@ class ReaderViewModel(
         val tap = state.tap
         val key = WordRepository.key(group.expression, group.reading)
         updateResults(tap) { it.copy(saved = it.saved + key) }
+        keep(key)
         viewModelScope.launch {
             record(tap, group).join()
             val saved = savedWords(state.groups)
@@ -465,6 +514,7 @@ class ReaderViewModel(
         val tap = state.tap
         val key = WordRepository.key(group.expression, group.reading)
         updateResults(tap) { it.copy(starred = if (starred) it.starred + key else it.starred - key) }
+        keep(key)
         viewModelScope.launch {
             try {
                 if (state.previous == null) record(tap, group).join()
@@ -486,6 +536,7 @@ class ReaderViewModel(
         val key = WordRepository.key(group.expression, group.reading)
         if (key in state.addingToAnki) return
         updateResults(tap) { it.copy(addingToAnki = it.addingToAnki + key) }
+        keep(key)
         // A word reached from a reference isn't in the tapped sentence: no sentence on its card.
         val fromBook = state.previous == null
         viewModelScope.launch {
@@ -557,7 +608,7 @@ class ReaderViewModel(
         }
 
     /** Saves a match (the best one on a tap) to the word list, independently of later taps. */
-    private fun record(tap: TapLookup, best: LookupGroup): Job {
+    private fun record(tap: TapLookup, best: LookupGroup, taps: Boolean = false): Job {
         val word = LookedUpWord(
             expression = best.expression,
             reading = best.reading,
@@ -573,7 +624,9 @@ class ReaderViewModel(
             try {
                 // A tap right after the book opened comes before findBook has answered.
                 val found = awaitBook(openBook)
-                recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
+                val undo = recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
+                // Only the lookups a tap made by itself can be taken back, not a word the reader chose to save.
+                if (taps && undo != null) addCounted(tap, undo)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -655,11 +708,8 @@ class ReaderViewModel(
                     diagnostics = container.readerDiagnostics,
                     ttuLibrary = container.ttuLibrary,
                     booksDir = container.booksDir,
-                    recordLookup = { word ->
-                        container.wordRepository.record(word)
-                        // A lookup in a book is a lapse of a word in review (search and review lookups aren't).
-                        container.reviewRepository.onLookup(word.expression, word.reading, word.origin)
-                    },
+                    recordLookup = { word -> container.lookupRecorder.record(word) },
+                    undoLookup = { container.lookupRecorder.undo(it) },
                     findBook = { ttuId ->
                         container.bookDao.findByTtuId(ttuId)?.let { ReadingBook(it.id, it.title) }
                     },

@@ -64,7 +64,13 @@ interface WordDao {
     fun countLookups(bookId: Long): Flow<Int>
 
     @Insert
-    suspend fun insertLookupEvent(event: LookupEventEntity)
+    suspend fun insertLookupEvent(event: LookupEventEntity): Long
+
+    @Query("DELETE FROM lookup_event WHERE id = :id")
+    suspend fun deleteLookupEvent(id: Long)
+
+    @Query("DELETE FROM word_lookup WHERE id = :id")
+    suspend fun deleteLookup(id: Long)
 
     @Query("SELECT * FROM word WHERE id = :id")
     suspend fun find(id: Long): WordEntity?

@@ -78,6 +78,7 @@ import app.honmani.reader.data.words.SpellingVariants
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordKnowledgeTracker
 import app.honmani.reader.data.words.WordMarker
+import app.honmani.reader.data.words.LookupRecorder
 import app.honmani.reader.data.words.WordProgressStore
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.data.words.WordStatus
@@ -519,6 +520,9 @@ class AppContainer(context: Context) {
     }
 
     private val wordProgressStore by lazy { WordProgressStore(File(appContext.filesDir, "word-progress.json")) }
+
+    /** Records the reader's lookups and takes them back ("Don't count"). */
+    val lookupRecorder: LookupRecorder by lazy { LookupRecorder(wordRepository, reviewRepository, wordProgressStore) }
 
     /** What a restored backup keeps for books not back in the library yet. */
     val restoredBooks: RestoredBooks by lazy { RestoredBooks(File(appContext.filesDir, "restored-books.json")) }
