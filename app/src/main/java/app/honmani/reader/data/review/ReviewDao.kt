@@ -48,7 +48,7 @@ interface ReviewDao {
     @Query("DELETE FROM review_card WHERE word_id = :wordId")
     suspend fun delete(wordId: Long)
 
-    /** Cards in review of Honmani's own scheduler that are due before [cutoff] and not buried at [now]. */
+    /** Cards in review of Honmani's own scheduler that are due before [cutoff], not buried at [now] and not retired. */
     @Query("SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
     suspend fun dueCount(cutoff: Long, now: Long): Int
 
@@ -148,8 +148,10 @@ interface ReviewDao {
     suspend fun readsOn(wordId: Long, day: Long): Int
 }
 
+/** Due: in review, Honmani's own, due before the cutoff, not buried, and not retired (stability under [ReviewRules.RETIRE_AFTER_DAYS]). */
 private const val DUE =
-    "c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND c.due < :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now)"
+    "c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND c.due < :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
+        "AND c.stability < ${ReviewRules.RETIRE_AFTER_DAYS}"
 
 private const val UNINTRODUCED =
     "w.status = 'LEARNING' AND w.scheduler = 'HONMANI' AND NOT EXISTS (SELECT 1 FROM review_card c WHERE c.word_id = w.id)"

@@ -22,6 +22,13 @@ object ReviewRules {
     const val AGAIN_DELAY_MS = 10 * 60_000L
     const val DEFAULT_KNOWN_AFTER_DAYS = 21
 
+    /**
+     * A card this stable (days) is retired: never due again, so the queue stays free of words known
+     * for good. Reading still feeds it; a reader lookup lapse ([onLookup]) drops its stability, so it
+     * comes back by itself.
+     */
+    const val RETIRE_AFTER_DAYS = 365
+
     fun retrievability(card: ReviewCardEntity, now: Long): Double {
         val last = card.lastReviewAt ?: return 1.0
         if (card.stability <= 0) return 1.0

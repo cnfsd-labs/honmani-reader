@@ -249,6 +249,33 @@ class ReviewRepositoryTest {
     }
 
     @Test
+    fun aCardStableForAYearIsRetiredUntilALookupLapsesIt() = runTest {
+        val id = word("猫")
+        val stable = ReviewCardEntity(
+            wordId = id, state = ReviewState.REVIEW, due = now - 100 * day, stability = 400.0, difficulty = 5.0, reps = 5,
+            passedReviews = 5, lastGrade = Grade.GOOD.value, lastReviewAt = now - 500 * day, reviewStability = 400.0,
+            addedAt = now - 900 * day,
+        )
+        database.reviewDao().upsert(stable)
+        val short = word("犬")
+        database.reviewDao().upsert(stable.copy(wordId = short, stability = ReviewRules.RETIRE_AFTER_DAYS - 1.0))
+        // Only the card just under a year is in the queue, in every query.
+        assertEquals(1, repository.dueCount())
+        assertEquals(listOf(short), repository.dueCards(10).map { it.word.id })
+        assertEquals(listOf(short), repository.dueToday(ReviewLimit.NO_LIMIT).map { it.id })
+        assertEquals(setOf("犬"), repository.dueExpressions(ReviewLimit.NO_LIMIT))
+        assertEquals(listOf(short), repository.observeDueToday(flowOf(ReviewLimit.NO_LIMIT)).first().map { it.id })
+        assertEquals(listOf(short), repository.dueCardsToday(ReviewLimit.NO_LIMIT).map { it.word.id })
+        // A reader lookup lapse drops the stability: the card is back the next day.
+        assertTrue(repository.onLookup(id, LookupOrigin.READER))
+        assertTrue(repository.card(id)!!.stability < ReviewRules.RETIRE_AFTER_DAYS)
+        now = repository.card(id)!!.due
+        assertEquals(setOf(id, short), repository.dueCards(10).map { it.word.id }.toSet())
+        assertEquals(2, repository.dueCount())
+        assertEquals(setOf("猫", "犬"), repository.dueExpressions(ReviewLimit.NO_LIMIT))
+    }
+
+    @Test
     fun setKnownMakesTheCardKnownAndResetStartsOver() = runTest {
         val id = word("猫")
         assertTrue(repository.setKnown(id))

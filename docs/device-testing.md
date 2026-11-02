@@ -166,6 +166,8 @@ other 20 carry over to tomorrow. A card answered today counts, so after 30 answe
 words count against "New words a day" instead); an Again comes back today whatever the limit. The
 chips other than Due ignore the limit. Switching to 200 or No limit shows all 120 again. The
 due tint in the book follows the same cards. At the largest font size the chips wrap, none is cut.
+A card whose memory has reached a year (stability 365 days or more) leaves the queue for good: it is never due,
+the badge and tint ignore it; looking such a word up in a book after it is overdue lapses it and it comes back the next day.
 Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it
 due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
 "Learn n words": they come with their sentences from the book, the ones used soonest first.
