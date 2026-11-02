@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.progress
 
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -95,6 +96,8 @@ private enum class ProgressSection(val label: Int) {
 fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = {}) {
     val pager = rememberPagerState { ProgressSection.entries.size }
     val scope = rememberCoroutineScope()
+    // Back from Skill or Statistics goes to the overview first, then on to the Library.
+    BackHandler(enabled = pager.currentPage != 0) { scope.launch { pager.animateScrollToPage(0) } }
     Scaffold(
         // No title: the bottom bar names the tab.
         topBar = {

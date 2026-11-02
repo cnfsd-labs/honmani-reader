@@ -620,8 +620,8 @@
     <string name="progress_retention">Retention</string>
     <string name="progress_retention_value">%1$d%%</string>
     <plurals name="progress_retention_note">
-        <item quantity="one">%1$d review in the last 30 days</item>
-        <item quantity="other">%1$d reviews in the last 30 days</item>
+        <item quantity="one">%1$d repeat review in the last 30 days</item>
+        <item quantity="other">%1$d repeat reviews in the last 30 days</item>
     </plurals>
     <string name="progress_retention_none">Not enough reviews yet</string>
     <string name="progress_words_in_review">Words in review</string>
