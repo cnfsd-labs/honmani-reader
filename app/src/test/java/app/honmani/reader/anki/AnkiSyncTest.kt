@@ -91,6 +91,28 @@ class AnkiSyncTest {
     }
 
     @Test
+    fun checkingFollowsTheChosenCardType() = runBlocking {
+        save("名前", "なまえ")
+        save("見当", "けんとう")
+        val honmaniCard = card("名前", "なまえ")
+        val sentenceCard = anki.addNote(
+            anki.noteType(SentenceCard.NOTE_TYPE),
+            listOf(AnkiCard.escape("見当"), AnkiCard.escape("けんとう")),
+        )
+
+        settings.setCardStyle(CardStyle.SENTENCE)
+        assertEquals(AnkiCheck.Done(cleared = 0, marked = 1), sync.check())
+        assertNull(word("名前").ankiNoteId)
+        assertEquals(sentenceCard, word("見当").ankiNoteId)
+
+        settings.setCardStyle(CardStyle.HONMANI)
+        assertEquals(AnkiCheck.Done(cleared = 0, marked = 1), sync.check())
+        assertEquals(honmaniCard, word("名前").ankiNoteId)
+        // The mark of a card in the other note type stays: it is found by its id.
+        assertEquals(sentenceCard, word("見当").ankiNoteId)
+    }
+
+    @Test
     fun aMarkedCardInAnotherNoteTypeStaysMarked() = runBlocking {
         save("名前", "なまえ")
         val other = anki.addNote(anki.noteType("Older Honmani"), listOf("名前", "なまえ"))

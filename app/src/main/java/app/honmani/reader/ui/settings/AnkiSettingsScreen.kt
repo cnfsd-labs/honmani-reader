@@ -53,6 +53,7 @@ import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCard
 import app.honmani.reader.anki.CardAudio
+import app.honmani.reader.anki.CardStyle
 import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
@@ -121,6 +122,7 @@ private fun AnkiSettingsContent() {
     val voice by settings.googleVoice.collectAsStateWithLifecycle()
     val deck by settings.deck.collectAsStateWithLifecycle()
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
+    val cardStyle by settings.cardStyle.collectAsStateWithLifecycle()
     val anki = rememberAnkiAccess()
     val knownFromAnki = rememberKnownFromAnki()
     val scope = rememberCoroutineScope()
@@ -207,6 +209,7 @@ private fun AnkiSettingsContent() {
             },
             onSelect = settings::setDeck,
         )
+        CardStylePicker(cardStyle, onSelect = settings::setCardStyle)
         ListItem(
             headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
             supportingContent = { Text(stringResource(R.string.anki_known_summary)) },
@@ -345,6 +348,35 @@ private fun DeckPicker(
             }
         },
     )
+}
+
+/** Which note type new cards use: Honmani's own, or the sentence-only one. */
+@Composable
+private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) {
+    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
+        Text(stringResource(R.string.card_style), style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(R.string.card_style_details),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+            CardStyle.entries.forEachIndexed { index, style ->
+                SegmentedButton(
+                    selected = style == selected,
+                    onClick = { onSelect(style) },
+                    shape = SegmentedButtonDefaults.itemShape(index, CardStyle.entries.size),
+                    label = {
+                        val label = when (style) {
+                            CardStyle.HONMANI -> R.string.card_style_honmani
+                            CardStyle.SENTENCE -> R.string.card_style_sentence
+                        }
+                        Text(stringResource(label), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                )
+            }
+        }
+    }
 }
 
 /** How fast example sentences are spoken; the word itself always at normal speed. */

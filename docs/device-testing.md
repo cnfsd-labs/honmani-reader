@@ -107,8 +107,15 @@ adb shell bmgr enable false
 
 Words → Learning: "Check against Anki" (beside "Add all N to Anki") forgets the "in Anki" mark of
 cards deleted in AnkiDroid and marks words whose card exists there. It only looks at Honmani's
-own note type and at words already saved. "Choose a deck" (also in Settings → Anki) marks saved
+own note type of the chosen "Card type" and at words already saved. "Choose a deck" (also in Settings → Anki) marks saved
 words found in a deck's word field as learned; decks of whole sentences match almost nothing.
+
+Settings → Anki → Card type: "Honmani" (default) or "Sentence". With "Sentence", adding a word
+(lookup panel, Words → Learning, "Add all N to Anki") creates the note type "Honmani Sentence" in
+AnkiDroid: the front is the whole sentence the word came from with no mark on the word, the back
+the word, its reading and meanings (a word without a stored sentence shows the word instead).
+"Check against Anki" then looks at that note type. Words → export → "Anki package" uses the same
+choice; the text file always uses the Honmani note type.
 
 ## Reading progress sync (KOReader)
 

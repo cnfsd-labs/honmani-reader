@@ -122,6 +122,54 @@ class AnkiExporterTest {
     }
 
     @Test
+    fun theSentenceNoteTypeAddsItsOwnNoteType_withTheSentenceUnmarked() = runBlocking {
+        val word = savedWord()
+        exporter.add(word)
+        settings.setCardStyle(CardStyle.SENTENCE)
+
+        val result = exporter.add(word)
+
+        // The word is in Anki as a Honmani card; the Sentence note type is a separate note type.
+        assertTrue(result is AnkiResult.Added)
+        assertEquals(2, anki.noteTypesAdded)
+        assertEquals(2, anki.notes.map { it.noteType }.distinct().size)
+        val note = anki.notes.last()
+        assertEquals(SentenceCard.FIELDS.size, note.fields.size)
+        assertEquals("名前", note.fields[0])
+        assertEquals("なまえ", note.fields[1])
+        assertEquals("<ol><li>name; full name</li><li>reputation</li></ol>", note.fields[2])
+        assertEquals("名前はまだ無い。", note.fields[3])
+        assertTrue(note.fields[4].startsWith("[sound:honmani_"))
+        assertTrue(note.fields[5].startsWith("[sound:honmani_"))
+        assertEquals(anki.fronts.getValue(note.noteType), SentenceCard.FRONT)
+        // A second add finds the card in its own note type.
+        assertEquals(AnkiResult.AlreadyInAnki, exporter.add(word))
+        assertEquals(2, anki.notes.size)
+        assertEquals(2, anki.noteTypesAdded)
+    }
+
+    @Test
+    fun theSentenceNoteTypeUsesTheWordWhenNoSentenceIsStored() = runBlocking {
+        settings.setCardStyle(CardStyle.SENTENCE)
+        val content = CardContent("名前", "なまえ", listOf(listOf("name")), sentence = "", surfaceStart = 0, surfaceEnd = 0)
+
+        exporter.add(content)
+
+        assertEquals("名前", anki.notes.single().fields[3])
+    }
+
+    @Test
+    fun theCardStyleIsRemembered_andDefaultsToHonmani() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertEquals(CardStyle.HONMANI, settings.cardStyle.value)
+        settings.setCardStyle(CardStyle.SENTENCE)
+
+        val prefs = context.getSharedPreferences("anki-test", Context.MODE_PRIVATE)
+        assertEquals(CardStyle.SENTENCE, AnkiSettings(prefs, plainCipher).cardStyle.value)
+        assertEquals("SENTENCE", prefs.getString(AnkiSettings.KEY_CARD_STYLE, null))
+    }
+
+    @Test
     fun cardsGoToTheChosenDeck() = runBlocking {
         settings.setDeck("日本語::Words")
 
@@ -194,6 +242,45 @@ class AnkiExporterTest {
         // Nothing is added to AnkiDroid, and nothing is left behind.
         assertTrue(anki.notes.isEmpty())
         assertEquals(emptyList<String>(), folder.root.resolve("package").list()?.toList().orEmpty())
+    }
+
+    @Test
+    fun theSentencePackageHasItsOwnNoteTypeAndUnmarkedSentences() = runBlocking {
+        settings.setCardStyle(CardStyle.SENTENCE)
+        val out = java.io.ByteArrayOutputStream()
+
+        exporter.ankiPackage(listOf(savedWord()), out)
+
+        val entries = mutableMapOf<String, ByteArray>()
+        java.util.zip.ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+            while (true) entries[(zip.nextEntry ?: break).name] = zip.readBytes()
+        }
+        val file = folder.newFile("sentence.anki2").apply { writeBytes(entries.getValue("collection.anki2")) }
+        android.database.sqlite.SQLiteDatabase.openDatabase(file.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+            .use { db ->
+                db.rawQuery("SELECT models, conf FROM col", null).use {
+                    it.moveToFirst()
+                    val models = kotlinx.serialization.json.Json.parseToJsonElement(it.getString(0))
+                        as kotlinx.serialization.json.JsonObject
+                    assertEquals(setOf(SentenceCard.MODEL.id.toString()), models.keys)
+                    val type = models.getValue(SentenceCard.MODEL.id.toString()) as kotlinx.serialization.json.JsonObject
+                    assertEquals("\"Honmani Sentence\"", type.getValue("name").toString())
+                    assertEquals(SentenceCard.FIELDS.size, (type.getValue("flds") as kotlinx.serialization.json.JsonArray).size)
+                    assertTrue("{{Sentence}}" in type.getValue("tmpls").toString())
+                    assertTrue("\"curModel\":${SentenceCard.MODEL.id}" in it.getString(1))
+                }
+                db.rawQuery("SELECT n.flds, n.mid, n.guid, n.sfld FROM notes n", null).use {
+                    assertEquals(1, it.count)
+                    it.moveToFirst()
+                    val fields = it.getString(0).split('\u001f')
+                    assertEquals(SentenceCard.FIELDS.size, fields.size)
+                    assertEquals("名前はまだ無い。", fields[3])
+                    assertTrue("<b>" !in it.getString(0))
+                    assertEquals(SentenceCard.MODEL.id, it.getLong(1))
+                    assertTrue(it.getString(2).startsWith("honmani-s-"))
+                    assertEquals("名前", it.getString(3))
+                }
+            }
     }
 
     @Test

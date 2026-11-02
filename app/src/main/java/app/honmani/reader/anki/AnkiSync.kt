@@ -58,8 +58,9 @@ class AnkiSync(
         val all = words.all.first()
         val markedIds = all.mapNotNull { it.ankiNoteId }
         val existing = anki.existingNotes(markedIds) ?: return@guarded AnkiCheck.Failed("AnkiDroid gave no answer")
-        val noteType = settings.noteTypeId?.takeIf { anki.noteTypeExists(it) }
-            ?: anki.findNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS)
+        val style = settings.cardStyle.value
+        val noteType = settings.noteTypeId(style)?.takeIf { anki.noteTypeExists(it) }
+            ?: anki.findNoteType(style.model.name, style.model.fields)
         val byWord = noteType?.let { type ->
             (anki.notes(type) ?: return@guarded AnkiCheck.Failed("AnkiDroid gave no answer"))
                 .associate { (it.fields.getOrNull(0).orEmpty() to it.fields.getOrNull(1).orEmpty()) to it.id }

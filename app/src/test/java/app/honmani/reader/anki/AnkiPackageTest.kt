@@ -144,4 +144,14 @@ class AnkiPackageTest {
 
         assertEquals(emptyList<String>(), work.list()?.toList().orEmpty())
     }
+
+    @Test
+    fun theSentenceNoteTypeHasAnotherIdAndGuidThanHonmanis() {
+        val honmani = listOf("名前", "なまえ")
+        assertTrue(AnkiPackage.guid(honmani).startsWith("honmani-"))
+        assertTrue(AnkiPackage.guid(honmani, SentenceCard.MODEL).startsWith("honmani-s-"))
+        assertTrue(AnkiPackage.guid(honmani) != AnkiPackage.guid(honmani, SentenceCard.MODEL))
+        assertEquals(AnkiPackage.NOTE_TYPE_ID, AnkiCard.MODEL.id)
+        assertTrue(SentenceCard.MODEL.id != AnkiCard.MODEL.id)
+    }
 }

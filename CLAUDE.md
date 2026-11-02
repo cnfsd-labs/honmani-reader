@@ -66,8 +66,10 @@ repository is public: never copy those notes, personal details or discussions in
   estimate and grading keep exact forms (fitted on them). Cached in `files/spelling-variants.txt`
   per dictionary set.
 - **Anki:** own client for AnkiDroid's content provider (not the LGPL library); note type and
-  deck "Honmani"; `.apkg` (schema 11, fixed note type id, guid from the word) or a text file for
-  Anki on a computer. The Google Cloud key is Keystore-encrypted and only sent in
+  deck "Honmani"; a second note type "Honmani Sentence" (`SentenceCard`: unmarked sentence on the
+  front; Settings → Anki → Card type, `anki_card_style`, backed up) for AnkiDroid and `.apkg`;
+  `.apkg` (schema 11, fixed note type ids, guid from the word) or a text file (Honmani type only)
+  for Anki on a computer. The Google Cloud key is Keystore-encrypted and only sent in
   `X-Goog-Api-Key`.
 - **Credentials and servers:** OPDS 1.x only, own parser and `HttpURLConnection` client.
   Passwords are AES-GCM with a Keystore key (not androidx security-crypto). A login only goes to

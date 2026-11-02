@@ -71,6 +71,11 @@ class AnkiSettings(
     /** The AnkiDroid deck new cards go to ("Honmani" unless another was chosen). */
     val deck: StateFlow<String> = _deck.asStateFlow()
 
+    private val _cardStyle = MutableStateFlow(CardStyle.fromName(preferences.getString(KEY_CARD_STYLE, null)))
+
+    /** Which note type new cards and the package use ([CardStyle.HONMANI] unless changed). */
+    val cardStyle: StateFlow<CardStyle> = _cardStyle.asStateFlow()
+
     private val _hasGoogleKey = MutableStateFlow(devicePreferences.contains(KEY_GOOGLE_KEY))
     val hasGoogleKey: StateFlow<Boolean> = _hasGoogleKey.asStateFlow()
 
@@ -95,6 +100,11 @@ class AnkiSettings(
     fun setSentenceSpeed(speed: SentenceSpeed) {
         _sentenceSpeed.value = speed
         preferences.edit().putString(KEY_SENTENCE_SPEED, speed.name).apply()
+    }
+
+    fun setCardStyle(style: CardStyle) {
+        _cardStyle.value = style
+        preferences.edit().putString(KEY_CARD_STYLE, style.name).apply()
     }
 
     /** A blank name goes back to the "Honmani" deck. */
@@ -138,6 +148,7 @@ class AnkiSettings(
         _sentenceSpeed.value = SentenceSpeed.fromName(preferences.getString(KEY_SENTENCE_SPEED, null))
         _googleVoice.value = preferences.getString(KEY_GOOGLE_VOICE, null)
         _deck.value = preferences.getString(KEY_DECK, null) ?: AnkiCard.DECK
+        _cardStyle.value = CardStyle.fromName(preferences.getString(KEY_CARD_STYLE, null))
     }
 
     /** The note type whose card template Honmani has checked (see [AnkiExporter]). */
@@ -147,14 +158,20 @@ class AnkiSettings(
             devicePreferences.edit().putLong(KEY_CHECKED_NOTE_TYPE, value ?: -1L).apply()
         }
 
-    /** Honmani's note type in AnkiDroid, remembered so it isn't looked up every time. */
-    var noteTypeId: Long?
-        get() = devicePreferences.getLong(KEY_NOTE_TYPE, -1L).takeIf { it >= 0 }
-        set(value) {
-            val editor = devicePreferences.edit()
-            if (value == null) editor.remove(KEY_NOTE_TYPE) else editor.putLong(KEY_NOTE_TYPE, value)
-            editor.apply()
-        }
+    /** Honmani's note type of [style] in AnkiDroid, remembered so it isn't looked up every time. */
+    fun noteTypeId(style: CardStyle): Long? =
+        devicePreferences.getLong(noteTypeKey(style), -1L).takeIf { it >= 0 }
+
+    fun setNoteTypeId(style: CardStyle, id: Long?) {
+        val editor = devicePreferences.edit()
+        if (id == null) editor.remove(noteTypeKey(style)) else editor.putLong(noteTypeKey(style), id)
+        editor.apply()
+    }
+
+    private fun noteTypeKey(style: CardStyle) = when (style) {
+        CardStyle.HONMANI -> KEY_NOTE_TYPE
+        CardStyle.SENTENCE -> KEY_SENTENCE_NOTE_TYPE
+    }
 
     companion object {
         const val KEY_AUDIO = "anki_audio"
@@ -164,8 +181,10 @@ class AnkiSettings(
         // On this phone only: it is about this phone's AnkiDroid.
         const val KEY_KNOWN_OFFERED = "anki_known_offered"
         const val KEY_DECK = "anki_deck"
+        const val KEY_CARD_STYLE = "anki_card_style"
         // "v2": the note type got Pitch and Frequency fields; an id kept from before is not it.
         const val KEY_NOTE_TYPE = "anki_note_type_v2"
+        const val KEY_SENTENCE_NOTE_TYPE = "anki_sentence_note_type"
         const val KEY_CHECKED_NOTE_TYPE = "anki_checked_note_type_v2"
     }
 }

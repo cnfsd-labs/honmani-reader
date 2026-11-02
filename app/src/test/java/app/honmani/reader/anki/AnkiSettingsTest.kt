@@ -28,12 +28,14 @@ class AnkiSettingsTest {
 
         settings.setDeck("Japanese")
         settings.setAudio(CardAudio.GOOGLE)
+        settings.setCardStyle(CardStyle.SENTENCE)
+        settings.setNoteTypeId(CardStyle.SENTENCE, 8)
         settings.setGoogleKey("key")
-        settings.noteTypeId = 7
+        settings.setNoteTypeId(CardStyle.HONMANI, 7)
         settings.checkedNoteTypeId = 7
 
-        assertEquals(setOf("anki_deck", "anki_audio"), choices.all.keys)
-        assertEquals(3, device.all.size)
+        assertEquals(setOf("anki_deck", "anki_audio", "anki_card_style"), choices.all.keys)
+        assertEquals(4, device.all.size)
     }
 
     @Test

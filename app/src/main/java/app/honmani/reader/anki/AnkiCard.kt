@@ -29,6 +29,40 @@ data class WordDetails(
 )
 
 /**
+ * An Anki note type Honmani makes: its name, fields and card template, and how a [CardContent]
+ * fills it. [id] and [guidPrefix] are the fixed ids of the `.apkg` ([AnkiPackage]); [required]
+ * are the field indexes a card needs one of.
+ */
+class NoteModel(
+    val name: String,
+    val id: Long,
+    val guidPrefix: String,
+    val fields: List<String>,
+    val cardName: String,
+    val front: String,
+    val back: String,
+    val css: String,
+    val required: List<Int>,
+    val build: (content: CardContent, wordAudio: String, sentenceAudio: String) -> List<String>,
+)
+
+/** Which of Honmani's note types new cards use; the reader's choice in the Anki settings. */
+enum class CardStyle(val model: NoteModel) {
+    /** Word and marked sentence on the front, furigana, pitch and meanings on the back. */
+    HONMANI(AnkiCard.MODEL),
+
+    /** The whole sentence, unmarked, on the front; word, reading and meaning on the back. */
+    SENTENCE(SentenceCard.MODEL),
+    ;
+
+    companion object {
+        val DEFAULT = HONMANI
+
+        fun fromName(name: String?): CardStyle = entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
+}
+
+/**
  * Honmani's Anki note type and how a [CardContent] fills it. The front shows the word and the
  * book's sentence with the word marked; the back adds furigana, the meanings and the audio.
  */
@@ -74,6 +108,19 @@ object AnkiCard {
 .pitch { font-size: 22px; margin: 4px 0 8px; letter-spacing: 0.05em; }
 .pitch .h { border-top: 2px solid #8a5cf5; padding-top: 2px; }
 .pitch .d { border-right: 2px solid #8a5cf5; }"""
+
+    val MODEL = NoteModel(
+        name = NOTE_TYPE,
+        id = 1_726_000_000_001L,
+        guidPrefix = "honmani-",
+        fields = FIELDS,
+        cardName = CARD_NAME,
+        front = FRONT,
+        back = BACK,
+        css = CSS,
+        required = listOf(0),
+        build = { content, wordAudio, sentenceAudio -> fields(content, wordAudio, sentenceAudio) },
+    )
 
     /** The fields for [content], in [FIELDS] order, with the audio fields as given. */
     fun fields(content: CardContent, wordAudio: String = "", sentenceAudio: String = ""): List<String> {
@@ -170,4 +217,70 @@ object AnkiCard {
             }
         }
     }
+}
+
+/**
+ * The second note type, "Honmani Sentence": the front is the whole sentence the word was read in,
+ * without any mark on the word and without furigana; the back gives the word, its reading and its
+ * meanings. A word without a stored sentence has its word on the front instead.
+ */
+object SentenceCard {
+    const val NOTE_TYPE = "Honmani Sentence"
+
+    /** The first two fields are the word and its reading, as in [AnkiCard]: they identify the card. */
+    val FIELDS = listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio")
+
+    const val FRONT = """<div class="sentence">{{Sentence}}</div>
+{{SentenceAudio}}"""
+
+    const val BACK = """{{FrontSide}}
+<hr id="answer">
+<div class="word">{{Word}}</div>
+<div class="reading">{{Reading}}</div>
+<div class="meaning">{{Meaning}}</div>
+{{WordAudio}}"""
+
+    const val CSS = """.card {
+  font-family: "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 20px;
+  text-align: center;
+  color: #1f1f1f;
+  background-color: #ffffff;
+}
+.nightMode.card, .night_mode .card { color: #e6e6e6; background-color: #1f1f1f; }
+.sentence { font-size: 26px; line-height: 1.7; margin: 8px 0; }
+.word { font-size: 40px; margin: 12px 0 4px; }
+.reading { font-size: 22px; opacity: 0.7; margin-bottom: 8px; }
+.meaning { text-align: left; display: inline-block; max-width: 36em; }
+.meaning ol { padding-left: 1.4em; margin: 0; }"""
+
+    val MODEL = NoteModel(
+        name = NOTE_TYPE,
+        id = 1_726_000_000_002L,
+        guidPrefix = "honmani-s-",
+        fields = FIELDS,
+        cardName = AnkiCard.CARD_NAME,
+        front = FRONT,
+        back = BACK,
+        css = CSS,
+        // The sentence field is never empty (see [sentence]); it is what the front shows.
+        required = listOf(3),
+        build = { content, wordAudio, sentenceAudio -> fields(content, wordAudio, sentenceAudio) },
+    )
+
+    fun fields(content: CardContent, wordAudio: String = "", sentenceAudio: String = ""): List<String> {
+        val reading = content.reading.ifEmpty { content.expression }
+        return listOf(
+            AnkiCard.escape(content.expression),
+            AnkiCard.escape(reading),
+            AnkiCard.meaning(content.senses),
+            sentence(content),
+            wordAudio,
+            sentenceAudio,
+        )
+    }
+
+    /** The sentence as it is; the word itself if none was stored. */
+    fun sentence(content: CardContent): String =
+        AnkiCard.escape(content.sentence.ifBlank { content.expression })
 }

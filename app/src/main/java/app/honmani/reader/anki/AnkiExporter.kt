@@ -76,6 +76,7 @@ class AnkiExporter(
                     mkdirs()
                 }
                 try {
+                    val model = settings.cardStyle.value.model
                     val voice = settings.voice(phoneVoice)
                     var problem: VoiceProblem? = null
                     val notes = words.mapIndexed { i, word ->
@@ -96,9 +97,9 @@ class AnkiExporter(
                             }
                         }
                         onProgress(i + 1)
-                        AnkiPackage.Note(AnkiCard.fields(content, wordAudio, sentenceAudio), media)
+                        AnkiPackage.Note(model.build(content, wordAudio, sentenceAudio), media)
                     }
-                    AnkiPackage.write(notes, settings.deck.value, dir, out)
+                    AnkiPackage.write(notes, settings.deck.value, dir, out, model = model)
                     problem
                 } finally {
                     dir.deleteRecursively()
@@ -158,9 +159,11 @@ class AnkiExporter(
     private suspend fun addLocked(content: CardContent, deferred: MutableMap<Long, Long>?): AnkiResult {
         if (anki.packageName() == null) return AnkiResult.NotInstalled
         if (!anki.hasPermission()) return AnkiResult.NoPermission
-        val noteType = noteType() ?: return AnkiResult.Refused
+        val style = settings.cardStyle.value
+        val model = style.model
+        val noteType = noteType(style) ?: return AnkiResult.Refused
         val deck = anki.deck(settings.deck.value) ?: return AnkiResult.Refused
-        val plain = AnkiCard.fields(content)
+        val plain = model.build(content, "", "")
         anki.findNote(noteType, plain[0], plain[1])?.let { existing ->
             markInAnki(content, existing, deferred)
             return AnkiResult.AlreadyInAnki
@@ -184,7 +187,7 @@ class AnkiExporter(
                     audioProblem = e.problem
                 }
             }
-            val fields = AnkiCard.fields(content, wordAudio, sentenceAudio)
+            val fields = model.build(content, wordAudio, sentenceAudio)
             val noteId = anki.addNote(noteType, deck, fields, setOf(AnkiCard.TAG)) ?: return AnkiResult.Refused
             markInAnki(content, noteId, deferred)
             return AnkiResult.Added(noteId, audioProblem)
@@ -206,20 +209,21 @@ class AnkiExporter(
     private fun soundName(voice: CardVoice, text: String, rate: Double) =
         "honmani_" + shortHash(text + "\u0000" + voice.id + "\u0000" + rate)
 
-    private fun noteType(): Long? {
-        val id = settings.noteTypeId?.takeIf { anki.noteTypeExists(it) }
-            ?: anki.findNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS)
+    private fun noteType(style: CardStyle): Long? {
+        val model = style.model
+        val id = settings.noteTypeId(style)?.takeIf { anki.noteTypeExists(it) }
+            ?: anki.findNoteType(model.name, model.fields)
             ?: anki.addNoteType(
-                name = AnkiCard.NOTE_TYPE,
-                fields = AnkiCard.FIELDS,
-                cardName = AnkiCard.CARD_NAME,
-                front = AnkiCard.FRONT,
-                back = AnkiCard.BACK,
-                css = AnkiCard.CSS,
+                name = model.name,
+                fields = model.fields,
+                cardName = model.cardName,
+                front = model.front,
+                back = model.back,
+                css = model.css,
             )
             ?: return null
-        settings.noteTypeId = id
-        checkCard(id)
+        settings.setNoteTypeId(style, id)
+        checkCard(id, model)
         return id
     }
 
@@ -228,11 +232,11 @@ class AnkiExporter(
      * left behind when setting the card failed when the note type was made), sets Honmani's card.
      * Later edits in Anki are left alone.
      */
-    private fun checkCard(noteType: Long) {
+    private fun checkCard(noteType: Long, model: NoteModel) {
         if (settings.checkedNoteTypeId == noteType) return
         val front = anki.cardFront(noteType)
         val fine = front != null && "{{Sentence}}" in front
-        if (fine || anki.setCard(noteType, AnkiCard.CARD_NAME, AnkiCard.FRONT, AnkiCard.BACK)) {
+        if (fine || anki.setCard(noteType, model.cardName, model.front, model.back)) {
             settings.checkedNoteTypeId = noteType
         }
     }

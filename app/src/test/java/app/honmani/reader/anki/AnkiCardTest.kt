@@ -77,4 +77,42 @@ class AnkiCardTest {
         assertEquals(1322740652L, AnkiCard.checksum("R&amp;D <i>&lt;&gt;</i>"))
         assertEquals(1322740652L, AnkiCard.checksum("R&#38;D &#x3C;&#62;"))
     }
+
+    @Test
+    fun theSentenceNoteTypeHasTheSentenceUnmarkedOnTheFront_andWordReadingMeaningOnTheBack() {
+        val fields = SentenceCard.fields(content, wordAudio = "[sound:w.mp3]", sentenceAudio = "[sound:s.mp3]")
+
+        assertEquals(SentenceCard.FIELDS.size, fields.size)
+        assertEquals(listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio"), SentenceCard.FIELDS)
+        assertEquals("取り扱う", fields[0])
+        assertEquals("とりあつかう", fields[1])
+        assertEquals("<ol><li>to handle; to deal with</li><li>to treat</li></ol>", fields[2])
+        // No <b> around the looked-up word, no ruby.
+        assertEquals("荷物を丁寧に取り扱った。", fields[3])
+        assertEquals("[sound:w.mp3]", fields[4])
+        assertEquals("[sound:s.mp3]", fields[5])
+        assertEquals(fields, CardStyle.SENTENCE.model.build(content, "[sound:w.mp3]", "[sound:s.mp3]"))
+    }
+
+    @Test
+    fun theSentenceNoteTypeEscapesHtml_dropsTheFieldSeparator_andFallsBackToTheWord() {
+        val odd = content.copy(sentence = "1 < 2 & \u001f3")
+        assertEquals("1 &lt; 2 &amp; 3", SentenceCard.fields(odd)[3])
+
+        assertEquals("取り扱う", SentenceCard.fields(content.copy(sentence = ""))[3])
+        assertEquals("取り扱う", SentenceCard.fields(content.copy(sentence = "  "))[3])
+        assertEquals("すごい", SentenceCard.fields(content.copy(expression = "すごい", reading = ""))[1])
+    }
+
+    @Test
+    fun theTwoNoteTypesAreTold_apart() {
+        assertEquals(CardStyle.HONMANI, CardStyle.fromName(null))
+        assertEquals(CardStyle.HONMANI, CardStyle.fromName("nonsense"))
+        assertEquals(CardStyle.SENTENCE, CardStyle.fromName("SENTENCE"))
+        assertEquals("Honmani", CardStyle.HONMANI.model.name)
+        assertEquals("Honmani Sentence", CardStyle.SENTENCE.model.name)
+        assertEquals(2, CardStyle.entries.map { it.model.id }.distinct().size)
+        assertEquals(true, "{{Sentence}}" in SentenceCard.FRONT)
+        assertEquals(false, "{{Word}}" in SentenceCard.FRONT)
+    }
 }

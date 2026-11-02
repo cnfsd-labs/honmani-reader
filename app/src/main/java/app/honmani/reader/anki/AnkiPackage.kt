@@ -28,20 +28,30 @@ import kotlinx.serialization.json.putJsonObject
  * newer package updates the cards already imported instead of adding them again.
  */
 object AnkiPackage {
-    /** One note: its fields in [AnkiCard.FIELDS] order and the audio files they name. */
+    /** One note: its fields in the [NoteModel]'s order and the audio files they name. */
     class Note(val fields: List<String>, val media: List<File> = emptyList())
 
-    /** Fixed, so every package from Honmani uses the same note type in Anki. */
+    /** Fixed, so every package from Honmani uses the same note type in Anki (the "Honmani" one; see [NoteModel.id]). */
     const val NOTE_TYPE_ID = 1_726_000_000_001L
 
-    /** Writes [notes] for [deck] to [out]; [workDir] holds the database while it is written. */
-    fun write(notes: List<Note>, deck: String, workDir: File, out: OutputStream, now: Long = System.currentTimeMillis()) {
+    /**
+     * Writes [notes], made for [model], for [deck] to [out]; [workDir] holds the database while it
+     * is written.
+     */
+    fun write(
+        notes: List<Note>,
+        deck: String,
+        workDir: File,
+        out: OutputStream,
+        now: Long = System.currentTimeMillis(),
+        model: NoteModel = AnkiCard.MODEL,
+    ) {
         workDir.mkdirs()
         val database = File(workDir, "collection.anki2")
         database.delete()
         File(workDir, "collection.anki2-journal").delete()
         try {
-            writeCollection(database, notes, deck, now)
+            writeCollection(database, notes, deck, now, model)
             ZipOutputStream(out).apply {
                 putNextEntry(ZipEntry("collection.anki2"))
                 database.inputStream().use { it.copyTo(this) }
@@ -69,11 +79,14 @@ object AnkiPackage {
     fun deckId(deck: String): Long =
         1_000_000_000L + (positiveHash("deck\u0000$deck") % 1_000_000_000_000L)
 
-    /** A note's guid in Anki: from the word, so it stays the same between packages. */
-    fun guid(fields: List<String>): String =
-        "honmani-" + hex(sha1(fields[0] + "\u0000" + fields[1])).take(16)
+    /**
+     * A note's guid in Anki: from the word, so it stays the same between packages. Each note type
+     * has its own prefix, so a word in both is two notes.
+     */
+    fun guid(fields: List<String>, model: NoteModel = AnkiCard.MODEL): String =
+        model.guidPrefix + hex(sha1(fields[0] + "\u0000" + fields[1])).take(16)
 
-    private fun writeCollection(file: File, notes: List<Note>, deck: String, now: Long) {
+    private fun writeCollection(file: File, notes: List<Note>, deck: String, now: Long, model: NoteModel) {
         val db = SQLiteDatabase.openOrCreateDatabase(file, null)
         try {
             db.beginTransaction()
@@ -86,8 +99,8 @@ object AnkiPackage {
                     seconds,
                     now,
                     now,
-                    configuration(deckId, notes.size).toString(),
-                    buildJsonObject { put(NOTE_TYPE_ID.toString(), noteType(deckId, seconds)) }.toString(),
+                    configuration(deckId, notes.size, model).toString(),
+                    buildJsonObject { put(model.id.toString(), noteType(deckId, seconds, model)) }.toString(),
                     decks(deckId, deck, seconds).toString(),
                     DECK_OPTIONS,
                 ),
@@ -99,8 +112,8 @@ object AnkiPackage {
                     "INSERT INTO notes VALUES (?, ?, ?, ?, -1, ?, ?, ?, ?, 0, '')",
                     arrayOf<Any>(
                         id,
-                        guid(note.fields),
-                        NOTE_TYPE_ID,
+                        guid(note.fields, model),
+                        model.id,
                         seconds,
                         " ${AnkiCard.TAG} ",
                         note.fields.joinToString(FIELD_SEPARATOR),
@@ -121,7 +134,7 @@ object AnkiPackage {
         }
     }
 
-    private fun configuration(deckId: Long, notes: Int) = buildJsonObject {
+    private fun configuration(deckId: Long, notes: Int, model: NoteModel) = buildJsonObject {
         put("nextPos", notes + 1)
         put("estTimes", true)
         putJsonArray("activeDecks") { add(deckId) }
@@ -132,13 +145,13 @@ object AnkiPackage {
         put("curDeck", deckId)
         put("newSpread", 0)
         put("dueCounts", true)
-        put("curModel", NOTE_TYPE_ID)
+        put("curModel", model.id)
         put("collapseTime", 1200)
     }
 
-    private fun noteType(deckId: Long, seconds: Long) = buildJsonObject {
-        put("id", NOTE_TYPE_ID)
-        put("name", AnkiCard.NOTE_TYPE)
+    private fun noteType(deckId: Long, seconds: Long, model: NoteModel) = buildJsonObject {
+        put("id", model.id)
+        put("name", model.name)
         put("type", 0)
         put("mod", seconds)
         put("usn", -1)
@@ -147,10 +160,10 @@ object AnkiPackage {
         putJsonArray("tmpls") {
             add(
                 buildJsonObject {
-                    put("name", AnkiCard.CARD_NAME)
+                    put("name", model.cardName)
                     put("ord", 0)
-                    put("qfmt", AnkiCard.FRONT)
-                    put("afmt", AnkiCard.BACK)
+                    put("qfmt", model.front)
+                    put("afmt", model.back)
                     put("bqfmt", "")
                     put("bafmt", "")
                     put("did", null as String?)
@@ -158,7 +171,7 @@ object AnkiPackage {
             )
         }
         putJsonArray("flds") {
-            AnkiCard.FIELDS.forEachIndexed { i, name ->
+            model.fields.forEachIndexed { i, name ->
                 add(
                     buildJsonObject {
                         put("name", name)
@@ -172,12 +185,14 @@ object AnkiPackage {
                 )
             }
         }
-        put("css", AnkiCard.CSS)
+        put("css", model.css)
         put("latexPre", LATEX_PRE)
         put("latexPost", "\\end{document}")
         put("latexsvg", false)
-        // The card needs the first field (the word).
-        putJsonArray("req") { add(buildJsonArray { add(0); add("any"); addJsonArray { add(0) } }) }
+        // The card needs one of the fields its front shows.
+        putJsonArray("req") {
+            add(buildJsonArray { add(0); add("any"); addJsonArray { model.required.forEach { add(it) } } })
+        }
         putJsonArray("tags") {}
         putJsonArray("vers") {}
     }
