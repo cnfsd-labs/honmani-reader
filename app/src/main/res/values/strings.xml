@@ -868,7 +868,7 @@
     <string name="backup_saved_title">Backup saved</string>
     <string name="backup_saved">Keep the file somewhere safe, away from this phone (your computer or cloud storage, say). To restore it, open Settings → Back up and restore → Restore.</string>
     <string name="backup_restored_title">Backup restored</string>
-    <string name="backup_restored">Your settings, statistics, milestones and saved words are back.</string>
+    <string name="backup_restored">Your settings, statistics, milestones, saved words and review cards are back.</string>
     <plurals name="backup_restored_books">
         <item quantity="one">Progress restored for %d book in the library.</item>
         <item quantity="other">Progress restored for %d books in the library.</item>
