@@ -48,7 +48,7 @@ class BookCoverageTest {
         assertEquals(UnknownWords(listOf(UnknownWord("猫", 6), UnknownWord("行く", 3)), 3), UnknownWords.of(book, WordKnowledge.EMPTY, vocabulary = 10, limit = 2))
         // A word being learned is unknown however common, and nothing unknown gives an empty list.
         val learning = WordKnowledge(read = emptyMap(), progress = emptyMap(), learning = setOf("行く"))
-        assertEquals(listOf("行く"), UnknownWords.of(book, learning, vocabulary = 100_000).words.map { it.key })
+        assertEquals(listOf(UnknownWord("行く", 3, learning = true)), UnknownWords.of(book, learning, vocabulary = 100_000).words)
         assertEquals(emptyList<UnknownWord>(), UnknownWords.of(book, WordKnowledge.EMPTY, vocabulary = 100_000).words)
     }
 }

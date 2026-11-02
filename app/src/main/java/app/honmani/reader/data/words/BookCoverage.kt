@@ -24,8 +24,8 @@ data class BookCoverage(val known: Float, val newWords: Int) {
     }
 }
 
-/** A word of a book that the reader does not know yet, and how often the book uses it. */
-data class UnknownWord(val key: String, val uses: Int)
+/** A word of a book that the reader does not know yet, how often the book uses it, and whether it is in Learning already. */
+data class UnknownWord(val key: String, val uses: Int, val learning: Boolean = false)
 
 /**
  * The words of a book the reader does not know yet ([WordKnowledge.knows], as [BookCoverage]
@@ -53,7 +53,7 @@ data class UnknownWords(val words: List<UnknownWord>, val total: Int) {
                         .thenBy { words.keys[it] },
                 )
                 .take(limit)
-                .map { UnknownWord(words.keys[it], words.positions[it].size) }
+                .map { UnknownWord(words.keys[it], words.positions[it].size, knowledge.isLearning(words.keys[it])) }
             return UnknownWords(top, unknown.size)
         }
     }

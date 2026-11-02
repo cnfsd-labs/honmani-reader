@@ -724,6 +724,7 @@
     <string name="book_time_whole">About %1$s to read</string>
     <string name="book_time_left">About %1$s left</string>
     <string name="book_coverage_all">You know all its words.</string>
+    <string name="unknown_words_learning">In Learning</string>
     <string name="unknown_words_button">Words to learn before reading</string>
     <string name="prepare_top">Top %1$d</string>
     <plurals name="prepare_button">

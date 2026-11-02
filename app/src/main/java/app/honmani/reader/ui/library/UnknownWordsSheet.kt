@@ -98,7 +98,8 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                     ) {
                         TextButton(onClick = {
                             chosen.clear()
-                            chosen.addAll(found.words.take(PREPARE_TOP).map { it.key })
+                            // Words in Learning already have their cards: the next ones down instead.
+                            chosen.addAll(found.words.filterNot { it.learning }.take(PREPARE_TOP).map { it.key })
                         }) { Text(stringResource(R.string.prepare_top, PREPARE_TOP)) }
                         Button(
                             enabled = chosen.isNotEmpty() && !preparing,
@@ -121,10 +122,16 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                         itemsIndexed(found.words, key = { _, word -> word.key }) { _, word ->
                             ListItem(
                                 headlineContent = { Text(word.key) },
+                                supportingContent = if (word.learning) {
+                                    { Text(stringResource(R.string.unknown_words_learning)) }
+                                } else {
+                                    null
+                                },
                                 leadingContent = {
                                     Checkbox(
-                                        checked = word.key in chosen,
+                                        checked = word.learning || word.key in chosen,
                                         onCheckedChange = { if (it) chosen += word.key else chosen -= word.key },
+                                        enabled = !word.learning,
                                     )
                                 },
                                 trailingContent = {
