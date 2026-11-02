@@ -464,7 +464,7 @@
         <item quantity="one">%1$d stroke</item>
         <item quantity="other">%1$d strokes</item>
     </plurals>
-    <string name="lookup_show_more">More meanings and examples</string>
+    <string name="lookup_show_more">More meanings</string>
     <string name="lookup_show_less">Fewer meanings</string>
     <string name="lookup_frequency_explained">Frequency rank in %1$s: number %2$s among the most common Japanese words. The lower the number, the more often you will meet the word.</string>
     <string name="lookup_expand">Show this word</string>
