@@ -143,6 +143,8 @@ repository is public: never copy those notes, personal details or discussions in
 - Android's restore gives restored files a wrong modified date (1970): read dates from the file's
   contents (`AutoBackup` offers the backup's own `exportedAt`). Try Android's backup with
   `bmgr` and the local transport (`docs/device-testing.md`).
+- Android WebView paints no `text-decoration` (or `-webkit-text-stroke`) in CSS `::highlight()`;
+  background, colour and `text-shadow` work. Desktop Chromium does draw it, so check marks on the phone.
 - ttu reserves some font families (`reservedFontNames`) without their files: downloaded fonts use
   their own family ("Honmani Klee One"), or books wait for ttu's 30 s font timeout.
 
