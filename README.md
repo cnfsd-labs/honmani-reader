@@ -13,6 +13,10 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   a book holds that you do not know
 - Every word you look up is saved with its sentence; send words to Anki (AnkiDroid or an
   `.apkg` for Anki on a computer)
+- Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search")
+- Flashcard review of the words you are learning, with the sentence you met them in: two buttons
+  (Forgot / Got it), a memory model (FSRS) that also counts the words you read in books, new words
+  ordered by the book you are reading, and "Learn n words" to learn a book's words before reading it
 - Reading statistics (time, characters, speed), a reading level and milestones; the reading time per day and
   book can be exported as a CSV file for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text

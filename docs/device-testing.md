@@ -138,6 +138,28 @@ is opened again; a lookup brings it back), and tint sentences with exactly one u
 Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
 to you", higher for easy books; "Words to learn before reading" lists them, most used first.
 
+## Dictionary search
+
+Words → "Search dictionaries": results appear while you type. Try 食べる, たべる, taberu, neko and
+"cat" (English: 猫 first); saved words show in their own "In your words" section. A tap on a result
+opens the entry and adds the query to "Recent searches". Right after a dictionary is installed a
+note says English search is getting ready (about a minute); Japanese and romaji work at once.
+Long-press the launcher icon: "Search" opens Words with the field focused.
+
+## Review
+
+Add a few words to Learning (look them up in a book). The next day Words shows "Review · n due" and
+the Words icon a badge. Start: the front shows the sentence with the word marked, a tap shows the
+answer, Forgot / Got it (or swipe left/right) moves on, Undo takes the last answer back. ⋮ offers
+Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Look up, Open in book (the
+book opens at the sentence; Back returns to Words), Not a word and Remove. Back mid-session keeps the
+answers given. Chips other than Due (This book, A book…, Starred, All learning) review words early.
+Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it
+due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
+"Learn n words": they come with their sentences from the book, the ones used soonest first. At the largest font size the answer buttons
+and the menu stay usable. Progress shows reviews today, review time, retention and words in review;
+Progress → Statistics → "Export for Refold (CSV)" offers a file to share.
+
 ## Reader bottom menu
 
 In a book, tap the bottom edge of the page (the thin strip under the text). A sheet opens with
