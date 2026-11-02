@@ -25,8 +25,8 @@ object RefoldExport {
 
     /**
      * The rows of [days] (the stored reading, whose `day` is already the local date it was read
-     * on, so no time zone is applied again) after [since] (null: all) and before [today]
-     * unless [includeToday]; today is still being read. Book titles come from [titles] by book
+     * on, so no time zone is applied again) after [since] (null: all) and before [today]:
+     * today is still being read and comes in a later export. Book titles come from [titles] by book
      * id. Sorted by date, then title; a row has the whole seconds of the book that day as
      * integer milliseconds; days without time are left out. The start time and the saved-at
      * time are left empty (Refold marks them optional; Honmani does not keep them).
@@ -36,13 +36,12 @@ object RefoldExport {
         titles: Map<Long, String>,
         since: LocalDate?,
         today: LocalDate,
-        includeToday: Boolean = false,
     ): Result {
         val chosen = days.mapNotNull { row ->
             val day = runCatching { LocalDate.parse(row.day) }.getOrNull() ?: return@mapNotNull null
             val wanted = row.seconds > 0 &&
                 (since == null || day.isAfter(since)) &&
-                (includeToday || day.isBefore(today))
+                day.isBefore(today)
             if (wanted) Triple(day, nickname(titles[row.bookId]), row.seconds) else null
         }.sortedWith(compareBy({ it.first }, { it.second }))
         val rows = chosen.map { (day, nickname, seconds) ->

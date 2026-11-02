@@ -96,9 +96,8 @@ class RefoldExportTest {
         // Exporting again from that point finds nothing new until tomorrow.
         assertEquals(0, RefoldExport.build(days, titles, since.lastDay, today).rows)
         assertEquals(1, RefoldExport.build(days, titles, since.lastDay, today.plusDays(1)).rows)
-        // "Everything" leaves out the unfinished day unless asked to include it.
+        // "Everything" leaves out the unfinished day too.
         assertEquals(3, RefoldExport.build(days, titles, null, today).rows)
-        assertEquals(4, RefoldExport.build(days, titles, null, today, includeToday = true).rows)
     }
 
     @Test

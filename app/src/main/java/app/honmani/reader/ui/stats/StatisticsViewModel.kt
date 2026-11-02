@@ -206,7 +206,6 @@ class StatisticsViewModel(
             titles = titles,
             since = if (all) null else lastRefoldDay(),
             today = RefoldExport.today(now(), zone()),
-            includeToday = all,
         )
     }
 
