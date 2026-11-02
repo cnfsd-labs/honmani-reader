@@ -12,6 +12,13 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 
+/** A new card, or a Learning word that could become one ([card] null). */
+internal class NewCandidate(val wordId: Long, val expression: String, val card: CardWithWord?)
+
+/** [candidates] by [score] of their word, highest first; equal ones keep their order. */
+internal fun orderNew(candidates: List<NewCandidate>, score: (String) -> Double): List<NewCandidate> =
+    candidates.map { it to score(it.expression) }.sortedByDescending { it.second }.map { it.first }
+
 /** What it takes to take back a review: the card as it was and the log row written. */
 class ReviewUndo(val before: ReviewCardEntity, val logId: Long)
 
@@ -24,6 +31,8 @@ class ReviewRepository(
     private val database: HonmaniDatabase,
     private val now: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** How relevant a word (by how it is written) is to the book being read ([Relevance]); null without one. */
+    private val relevance: suspend () -> ((String) -> Double)? = { null },
 ) {
     private val dao = database.reviewDao()
     private val words = database.wordDao()
@@ -62,14 +71,26 @@ class ReviewRepository(
     /**
      * Up to [limit] new cards for a session: cards introduced but not reviewed yet, oldest
      * first, then Learning words without a card (best ranked first), which are introduced here.
+     * With a book being read, the words that come up soonest and most often in it go first
+     * ([Relevance]); the others keep that order.
      */
-    suspend fun introduceNew(limit: Int): List<CardWithWord> = database.withTransaction {
-        if (limit <= 0) return@withTransaction emptyList()
-        val existing = dao.newCards(now(), limit)
-        val fresh = dao.unintroducedIds(limit - existing.size).mapNotNull { id ->
-            if (introduce(id)) dao.cardWithWord(id) else null
+    suspend fun introduceNew(limit: Int): List<CardWithWord> {
+        if (limit <= 0) return emptyList()
+        val score = relevance()
+        return database.withTransaction {
+            if (score == null) {
+                val existing = dao.newCards(now(), limit)
+                val fresh = dao.unintroducedIds(limit - existing.size).mapNotNull { id ->
+                    if (introduce(id)) dao.cardWithWord(id) else null
+                }
+                return@withTransaction existing + fresh
+            }
+            val candidates = dao.newCards(now(), Int.MAX_VALUE).map { NewCandidate(it.word.id, it.word.expression, it) } +
+                dao.unintroducedWords().map { NewCandidate(it.id, it.expression, null) }
+            orderNew(candidates, score).take(limit).mapNotNull { candidate ->
+                candidate.card ?: if (introduce(candidate.wordId)) dao.cardWithWord(candidate.wordId) else null
+            }
         }
-        existing + fresh
     }
 
     /** Puts a card back as it was (takes back a bury, a suspension or a change of memory). */

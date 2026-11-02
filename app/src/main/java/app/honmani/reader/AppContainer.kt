@@ -42,6 +42,7 @@ import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
 import app.honmani.reader.data.review.ReadingPasses
+import app.honmani.reader.data.review.Relevance
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
@@ -169,7 +170,20 @@ class AppContainer(context: Context) {
 
     val wordRepository: WordRepository by lazy { WordRepository(database) }
 
-    val reviewRepository: ReviewRepository by lazy { ReviewRepository(database) }
+    val reviewRepository: ReviewRepository by lazy { ReviewRepository(database, relevance = ::openBookRelevance) }
+
+    /**
+     * How soon each word comes up in the book being read (the last one opened, unless finished
+     * or hidden), from the reading point on; null without such a book or before it is graded.
+     */
+    private suspend fun openBookRelevance(): ((String) -> Double)? {
+        val book = bookDao.observeAll().first().firstOrNull { it.lastOpenedAt != null } ?: return null
+        if (book.finishedAt != null || book.hidden) return null
+        val words = withContext(Dispatchers.IO) { difficultyStore.words(book.contentHash) } ?: return null
+        val relevance = Relevance.of(words, Relevance.step(book.progress))
+        val variants = spellingVariants()
+        return { expression -> relevance.of(expression, variants.of(expression).asList()) }
+    }
 
     val ankiSettings: AnkiSettings by lazy {
         AnkiSettings(settingsPreferences, credentialCipher, devicePreferences)

@@ -52,6 +52,20 @@ class ReviewRepositoryTest {
         )
 
     @Test
+    fun newCardsComeUpInTheOrderOfTheBookBeingRead() = runTest {
+        val scores = mapOf("五" to 3.0, "犬" to 1.0)
+        val ordered = ReviewRepository(database, now = { now }, zone = { zone }, relevance = { { scores[it] ?: 0.0 } })
+        val cat = word("猫")
+        word("五")
+        word("犬")
+        word("鳥")
+        assertTrue(ordered.introduce(cat))
+        assertEquals(listOf("五", "犬", "猫"), ordered.introduceNew(3).map { it.word.expression })
+        // Without a book: introduced first, then the best ranked.
+        assertEquals("猫", repository.introduceNew(1).single().word.expression)
+    }
+
+    @Test
     fun introduceMakesANewCardOnceAndNotForAnkiWords() = runTest {
         val id = word("猫")
         val anki = word("犬", WordScheduler.ANKI)

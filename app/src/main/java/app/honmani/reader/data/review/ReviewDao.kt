@@ -73,6 +73,10 @@ interface ReviewDao {
     @Query("SELECT w.id FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC LIMIT :limit")
     suspend fun unintroducedIds(limit: Int): List<Long>
 
+    /** [unintroducedIds] with how each word is written, all of them. */
+    @Query("SELECT w.id AS id, w.expression AS expression FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC")
+    suspend fun unintroducedWords(): List<ReviewWord>
+
     @Query("SELECT COUNT(*) FROM word w WHERE $UNINTRODUCED")
     fun observeUnintroducedCount(): Flow<Int>
 
