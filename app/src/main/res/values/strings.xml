@@ -280,15 +280,16 @@
     <string name="csv_stats_export">Export reading per day (CSV)</string>
     <string name="refold_export">Export for Refold (CSV)</string>
     <string name="refold_share">Export for Refold</string>
-    <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese. In the Refold app, import it under Import/Export. The file is not sent anywhere by Honmani; you choose where it goes. Today\'s reading comes in the next export, once the day is over.</string>
+    <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese. In the Refold app, import it under Import/Export. Each export holds only reading that was not exported before, today\'s so far included; Refold adds the rows up. The file is not sent anywhere by Honmani; you choose where it goes.</string>
+    <string name="refold_again_warning">\"Export everything again\" sends all your reading, also what Refold already has, and Refold adds it to that. Use it only for a new Refold account.</string>
     <string name="refold_never">Nothing exported yet.</string>
-    <string name="refold_last">Last export reached %1$s.</string>
+    <string name="refold_last">Last export: %1$s.</string>
     <plurals name="refold_new">
-        <item quantity="one">New since the last export (%d row)</item>
-        <item quantity="other">New since the last export (%d rows)</item>
+        <item quantity="one">Export new reading (%d row)</item>
+        <item quantity="other">Export new reading (%d rows)</item>
     </plurals>
-    <string name="refold_all">Everything</string>
-    <string name="refold_nothing">No finished day of reading to export.</string>
+    <string name="refold_all">Export everything again</string>
+    <string name="refold_nothing">No new reading to export.</string>
     <string name="export_package">Anki package</string>
     <string name="export_package_detail">Cards with audio, for Anki on a computer (.apkg)</string>
     <string name="export_text">Text file</string>

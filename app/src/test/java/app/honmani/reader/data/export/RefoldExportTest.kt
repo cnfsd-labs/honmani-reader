@@ -5,22 +5,20 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RefoldExportTest {
     private val header = "activityId,languageCode,attributedDate,duration,startTime,nickname,savedAt\r\n"
     private val today = LocalDate.of(2026, 11, 2)
 
-    private fun day(book: Long, day: String, seconds: Long) = ReadingDayEntity(book, day, seconds, characters = 100)
+    private fun day(book: Long, day: String, seconds: Long, exported: Long = 0) =
+        ReadingDayEntity(book, day, seconds, characters = 100, refoldSeconds = exported)
 
     @Test
     fun theHeaderAndRowsAreExactlyRefoldsImportFormat() {
         val result = RefoldExport.build(
             days = listOf(day(1, "2026-11-01", 90), day(2, "2026-10-31", 3600)),
             titles = mapOf(1L to "注文の多い料理店", 2L to "Kokoro"),
-            since = null,
-            today = today,
         )
         assertEquals(
             header +
@@ -29,18 +27,17 @@ class RefoldExportTest {
             result.csv,
         )
         assertEquals(2, result.rows)
-        assertEquals(LocalDate.of(2026, 11, 1), result.lastDay)
     }
 
     @Test
     fun durationIsWholeSecondsAsIntegerMilliseconds() {
-        val csv = RefoldExport.build(listOf(day(1, "2026-11-01", 1)), mapOf(1L to "A"), null, today).csv
+        val csv = RefoldExport.build(listOf(day(1, "2026-11-01", 1)), mapOf(1L to "A")).csv
         assertEquals(header + "20101,ja,2026-11-01,1000,,A,\r\n", csv)
         // Days with no time are left out.
-        val none = RefoldExport.build(listOf(day(1, "2026-11-01", 0)), mapOf(1L to "A"), null, today)
+        val none = RefoldExport.build(listOf(day(1, "2026-11-01", 0)), mapOf(1L to "A"))
         assertEquals(header, none.csv)
         assertEquals(0, none.rows)
-        assertNull(none.lastDay)
+        assertEquals(emptyList<RefoldExport.Mark>(), none.marks)
     }
 
     @Test
@@ -54,8 +51,6 @@ class RefoldExportTest {
         val csv = RefoldExport.build(
             days = (1L..4L).map { day(it, "2026-11-01", 60) },
             titles = titles,
-            since = null,
-            today = today,
         ).csv
         assertEquals(
             header +
@@ -72,8 +67,6 @@ class RefoldExportTest {
         val csv = RefoldExport.build(
             listOf(day(1, "2026-11-01", 60), day(2, "2026-11-01", 60)),
             mapOf(2L to "   "),
-            null,
-            today,
         ).csv
         assertEquals(
             header + "20101,ja,2026-11-01,60000,,Honmani,\r\n" + "20101,ja,2026-11-01,60000,,Honmani,\r\n",
@@ -82,22 +75,49 @@ class RefoldExportTest {
     }
 
     @Test
-    fun sinceTheLastExportTakesOnlyLaterFinishedDays() {
-        val days = listOf(
-            day(1, "2026-10-30", 60),
-            day(1, "2026-10-31", 120),
-            day(1, "2026-11-01", 180),
-            day(1, "2026-11-02", 240), // today, still being read
-        )
+    fun todayIsIncluded_andOnlyTheRemainderOfAnExportedDayComesLater() {
         val titles = mapOf(1L to "A")
-        val since = RefoldExport.build(days, titles, LocalDate.of(2026, 10, 30), today)
-        assertEquals(header + "20101,ja,2026-10-31,120000,,A,\r\n20101,ja,2026-11-01,180000,,A,\r\n", since.csv)
-        assertEquals(LocalDate.of(2026, 11, 1), since.lastDay)
-        // Exporting again from that point finds nothing new until tomorrow.
-        assertEquals(0, RefoldExport.build(days, titles, since.lastDay, today).rows)
-        assertEquals(1, RefoldExport.build(days, titles, since.lastDay, today.plusDays(1)).rows)
-        // "Everything" leaves out the unfinished day too.
-        assertEquals(3, RefoldExport.build(days, titles, null, today).rows)
+        // Today, 100 s read so far: the whole of it goes out.
+        val first = RefoldExport.build(listOf(day(1, "2026-11-02", 100)), titles)
+        assertEquals(header + "20101,ja,2026-11-02,100000,,A,\r\n", first.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 100)), first.marks)
+        // After marking, nothing is new.
+        assertEquals(0, RefoldExport.build(listOf(day(1, "2026-11-02", 100, exported = 100)), titles).rows)
+        // 70 s more were read: a second row holds just those, and marks the new total.
+        val second = RefoldExport.build(listOf(day(1, "2026-11-02", 170, exported = 100)), titles)
+        assertEquals(header + "20101,ja,2026-11-02,70000,,A,\r\n", second.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 170)), second.marks)
+    }
+
+    @Test
+    fun nothingNewGivesNoRows() {
+        val result = RefoldExport.build(
+            listOf(day(1, "2026-10-31", 60, exported = 60), day(2, "2026-11-02", 30, exported = 30), day(3, "2026-11-01", 0)),
+            mapOf(1L to "A", 2L to "B", 3L to "C"),
+        )
+        assertEquals(header, result.csv)
+        assertEquals(0, result.rows)
+        assertEquals(emptyList<RefoldExport.Mark>(), result.marks)
+    }
+
+    @Test
+    fun anOlderDayThatGrewAfterItsExportIsSentAsTheDifference() {
+        val days = listOf(
+            day(1, "2026-10-30", 90, exported = 60), // grew by 30 s
+            day(1, "2026-10-31", 120, exported = 120),
+            day(1, "2026-11-01", 180),
+        )
+        val result = RefoldExport.build(days, mapOf(1L to "A"))
+        assertEquals(header + "20101,ja,2026-10-30,30000,,A,\r\n20101,ja,2026-11-01,180000,,A,\r\n", result.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-10-30", 90), RefoldExport.Mark(1, "2026-11-01", 180)), result.marks)
+    }
+
+    @Test
+    fun againSendsTheFullTotalsOfEveryDayAndBook() {
+        val days = listOf(day(1, "2026-11-01", 180, exported = 180), day(1, "2026-11-02", 170, exported = 100), day(2, "2026-11-02", 0))
+        val result = RefoldExport.build(days, mapOf(1L to "A", 2L to "B"), again = true)
+        assertEquals(header + "20101,ja,2026-11-01,180000,,A,\r\n20101,ja,2026-11-02,170000,,A,\r\n", result.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-01", 180), RefoldExport.Mark(1, "2026-11-02", 170)), result.marks)
     }
 
     @Test
@@ -106,12 +126,6 @@ class RefoldExportTest {
         val now = Instant.parse("2026-11-01T23:30:00Z")
         assertEquals(LocalDate.of(2026, 11, 2), RefoldExport.today(now, ZoneId.of("Pacific/Auckland")))
         assertEquals(LocalDate.of(2026, 11, 1), RefoldExport.today(now, ZoneId.of("America/Los_Angeles")))
-        // The stored day is the local date it was read on and is not shifted again.
-        val rows = listOf(day(1, "2026-11-01", 60))
-        val auckland = RefoldExport.build(rows, mapOf(1L to "A"), null, RefoldExport.today(now, ZoneId.of("Pacific/Auckland")))
-        val losAngeles = RefoldExport.build(rows, mapOf(1L to "A"), null, RefoldExport.today(now, ZoneId.of("America/Los_Angeles")))
-        assertEquals(1, auckland.rows)
-        assertEquals(0, losAngeles.rows)
     }
 
     @Test
@@ -119,8 +133,6 @@ class RefoldExportTest {
         val csv = RefoldExport.build(
             listOf(day(1, "2026-11-01", 60), day(2, "2026-11-01", 60), day(2, "2026-10-01", 60), day(1, "garbage", 60)),
             mapOf(1L to "Zebra", 2L to "Apple"),
-            null,
-            today,
         ).csv
         assertEquals(
             header + "20101,ja,2026-10-01,60000,,Apple,\r\n" + "20101,ja,2026-11-01,60000,,Apple,\r\n" +

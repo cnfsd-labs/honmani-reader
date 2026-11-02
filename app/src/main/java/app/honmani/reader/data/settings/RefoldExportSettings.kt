@@ -3,16 +3,16 @@ package app.honmani.reader.data.settings
 import android.content.SharedPreferences
 import java.time.LocalDate
 
-/** The last day of reading the Refold export covered, so the next one starts after it. */
+/** The day of the last Refold export, only shown in the export dialog. */
 class RefoldExportSettings(private val preferences: SharedPreferences) {
-    val lastDay: LocalDate?
-        get() = preferences.getString(KEY_LAST_DAY, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+    val lastExport: LocalDate?
+        get() = preferences.getString(KEY_LAST_EXPORT, null)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
-    fun setLastDay(day: LocalDate) {
-        preferences.edit().putString(KEY_LAST_DAY, day.toString()).apply()
+    fun setLastExport(day: LocalDate) {
+        preferences.edit().putString(KEY_LAST_EXPORT, day.toString()).apply()
     }
 
     companion object {
-        const val KEY_LAST_DAY = "refold_last_export_day"
+        const val KEY_LAST_EXPORT = "refold_last_export"
     }
 }

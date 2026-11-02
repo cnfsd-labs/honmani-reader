@@ -159,6 +159,7 @@ class BackupTest {
         val book = addBook("hash-a", characters = 5_000, progress = 0.25f, lastOpenedAt = LAST_OPENED)
         read(book.id, "2026-10-20", seconds = 600, characters = 3_000)
         read(book.id, "2026-10-21", seconds = 400, characters = 2_000)
+        database.readingDao().markRefoldExported(book.id, "2026-10-20", 200)
         // A book removed from the library: its reading still counts.
         read(99, "2026-10-19", seconds = 300, characters = 1_000)
         words.record(lookup("猫", book.id))
@@ -189,6 +190,8 @@ class BackupTest {
         assertEquals(mapOf("fontSize" to "30", "theme" to null), backup.readerSettings)
         assertEquals(6_000L, new.days().sumOf { it.characters })
         assertEquals(1_300L, new.days().sumOf { it.seconds })
+        // What the Refold export already handed out is not handed out again.
+        assertEquals(200L, new.days().sumOf { it.refoldSeconds })
         assertTrue(new.days().all { it.bookId < 0 })
         assertEquals("TEAL", new.settings.getString("accent", null))
         assertEquals(false, new.settings.getBoolean("show_difficulty", true))

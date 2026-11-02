@@ -19,4 +19,6 @@ data class ReadingDayEntity(
     val day: String,
     val seconds: Long = 0,
     val characters: Long = 0,
+    /** Seconds of this day and book the Refold export has already handed out ([RefoldExport]). */
+    @ColumnInfo(name = "refold_seconds", defaultValue = "0") val refoldSeconds: Long = 0,
 )

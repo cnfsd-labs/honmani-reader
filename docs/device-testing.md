@@ -158,7 +158,9 @@ Reading counts too: a due word read in a book moves later (once a day), a lookup
 due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
 "Learn n words": they come with their sentences from the book, the ones used soonest first. At the largest font size the answer buttons
 and the menu stay usable. Progress shows reviews today, review time, retention and words in review;
-Progress → Statistics → "Export for Refold (CSV)" offers a file to share.
+Progress → Statistics → "Export for Refold (CSV)" offers a file to share. It holds only reading that
+was not exported before, today's so far included; Refold adds every imported row up, so a second
+export the same day holds just the minutes read since ("Export everything again" repeats all, only for a new account).
 
 ## Reader bottom menu
 

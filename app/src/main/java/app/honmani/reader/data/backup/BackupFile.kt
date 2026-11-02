@@ -108,6 +108,8 @@ data class BackupReadingDay(
     val day: String,
     val seconds: Long,
     val characters: Long,
+    /** Seconds already handed out by the Refold export. */
+    val refoldSeconds: Long = 0,
 )
 
 @Serializable

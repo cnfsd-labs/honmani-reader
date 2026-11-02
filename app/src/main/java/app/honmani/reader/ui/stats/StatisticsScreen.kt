@@ -181,7 +181,7 @@ fun StatisticsContent(
     }
 }
 
-/** "Export for Refold": what the file holds and the two ways to export (new since the last time, or everything). */
+/** "Export for Refold": what the file holds and the two ways to export (reading not exported before, or everything again). */
 @Composable
 private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) {
     var info by remember { mutableStateOf<StatisticsViewModel.RefoldInfo?>(null) }
@@ -194,13 +194,14 @@ private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.refold_detail))
-                val last = current?.lastDay
+                Text(stringResource(R.string.refold_again_warning), style = MaterialTheme.typography.bodySmall)
+                val last = current?.lastExport
+                val status = buildList {
+                    add(if (last == null) stringResource(R.string.refold_never) else stringResource(R.string.refold_last, last.format(dateFormat)))
+                    if (current != null && current.newRows == 0) add(stringResource(R.string.refold_nothing))
+                }
                 Text(
-                    text = if (last == null) {
-                        stringResource(R.string.refold_never)
-                    } else {
-                        stringResource(R.string.refold_last, last.format(dateFormat))
-                    },
+                    text = status.joinToString(" "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -211,7 +212,7 @@ private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) 
                 TextButton(
                     enabled = current != null && current.newRows > 0,
                     onClick = {
-                        viewModel.exportRefold(all = false)
+                        viewModel.exportRefold(again = false)
                         onDismiss()
                     },
                 ) {
@@ -219,7 +220,7 @@ private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) 
                     Text(pluralStringResource(R.plurals.refold_new, rows, rows))
                 }
                 TextButton(onClick = {
-                    viewModel.exportRefold(all = true)
+                    viewModel.exportRefold(again = true)
                     onDismiss()
                 }) { Text(stringResource(R.string.refold_all)) }
                 TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }

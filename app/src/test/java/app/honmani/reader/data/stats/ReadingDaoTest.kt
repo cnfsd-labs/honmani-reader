@@ -3,6 +3,7 @@ package app.honmani.reader.data.stats
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.data.export.RefoldExport
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -48,5 +49,21 @@ class ReadingDaoTest {
             dao.observeBook(1).first(),
         )
         assertEquals(3, dao.observeAll().first().size)
+    }
+
+    @Test
+    fun theRefoldMarkIsSetPerDayAndBookAndNeverLowered() = runTest {
+        add(1, "2026-10-17", 60, 0)
+        add(1, "2026-10-18", 30, 0)
+        add(2, "2026-10-17", 10, 0)
+
+        dao.markRefoldExported(listOf(RefoldExport.Mark(1, "2026-10-17", 60), RefoldExport.Mark(2, "2026-10-17", 10)))
+        dao.markRefoldExported(listOf(RefoldExport.Mark(1, "2026-10-17", 20)))
+
+        val marks = dao.observeAll().first().associate { (it.bookId to it.day) to it.refoldSeconds }
+        assertEquals(mapOf((1L to "2026-10-17") to 60L, (1L to "2026-10-18") to 0L, (2L to "2026-10-17") to 10L), marks)
+        // Reading added afterwards leaves the mark where it was.
+        dao.add(1, "2026-10-17", 5, 0)
+        assertEquals(60L, dao.observeBook(1).first().first().refoldSeconds)
     }
 }

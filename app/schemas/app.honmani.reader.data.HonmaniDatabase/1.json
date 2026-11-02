@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "4b105c2b199e736ed5fe699d135d819f",
+    "identityHash": "56d16a7baa479457a863c886e4c675e9",
     "entities": [
       {
         "tableName": "dictionary",
@@ -961,7 +961,7 @@
       },
       {
         "tableName": "reading_day",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`book_id` INTEGER NOT NULL, `day` TEXT NOT NULL, `seconds` INTEGER NOT NULL, `characters` INTEGER NOT NULL, PRIMARY KEY(`book_id`, `day`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`book_id` INTEGER NOT NULL, `day` TEXT NOT NULL, `seconds` INTEGER NOT NULL, `characters` INTEGER NOT NULL, `refold_seconds` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`book_id`, `day`))",
         "fields": [
           {
             "fieldPath": "bookId",
@@ -986,6 +986,13 @@
             "columnName": "characters",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "refoldSeconds",
+            "columnName": "refold_seconds",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1267,7 +1274,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4b105c2b199e736ed5fe699d135d819f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '56d16a7baa479457a863c886e4c675e9')"
     ]
   }
 }

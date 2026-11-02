@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.stats
 
+import app.honmani.reader.data.export.RefoldExport
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.WordCounts
@@ -48,6 +49,8 @@ class StatisticsViewModelTest {
         days: List<ReadingDayEntity> = emptyList(),
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
         goalMinutes: Int? = null,
+        writeRefoldFile: suspend (String, String) -> String = { name, _ -> name },
+        markRefoldExported: suspend (List<RefoldExport.Mark>) -> Unit = {},
     ) = StatisticsViewModel(
         days = flowOf(days),
         bookDays = { flowOf(emptyList()) },
@@ -60,6 +63,8 @@ class StatisticsViewModelTest {
         zone = { zone },
         now = { clock },
         writeDocument = writeDocument,
+        writeRefoldFile = writeRefoldFile,
+        markRefoldExported = markRefoldExported,
     )
 
     private fun millis(date: LocalDate, hour: Int) = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
@@ -148,5 +153,40 @@ class StatisticsViewModelTest {
         viewModel.exportCsv("content://x/y")
 
         assertEquals(false, viewModel.exported.first())
+    }
+
+    @Test
+    fun aRefoldExportMarksTheSecondsItsFileWasBuiltFrom() = runTest {
+        val marked = mutableListOf<RefoldExport.Mark>()
+        val written = mutableListOf<String>()
+        val model = viewModel(
+            days = listOf(ReadingDayEntity(1, today.toString(), seconds = 600, refoldSeconds = 240)),
+            writeRefoldFile = { name, text -> written += text; name },
+            markRefoldExported = { marked += it },
+        )
+        assertEquals(1, model.refoldInfo().newRows)
+
+        model.exportRefold(again = false)
+        val event = model.refold.first()
+
+        assertEquals(StatisticsViewModel.RefoldEvent.Ready("honmani-refold-$today.csv", "honmani-refold-$today.csv"), event)
+        assertEquals(true, written.single().contains(",$today,360000,"))
+        assertEquals(listOf(RefoldExport.Mark(1, today.toString(), 600)), marked)
+    }
+
+    @Test
+    fun aRefoldExportWithNothingNewWritesAndMarksNothing() = runTest {
+        val marked = mutableListOf<RefoldExport.Mark>()
+        val model = viewModel(
+            days = listOf(ReadingDayEntity(1, today.toString(), seconds = 600, refoldSeconds = 600)),
+            writeRefoldFile = { _, _ -> error("no file") },
+            markRefoldExported = { marked += it },
+        )
+        assertEquals(0, model.refoldInfo().newRows)
+
+        model.exportRefold(again = false)
+
+        assertEquals(StatisticsViewModel.RefoldEvent.NoReading, model.refold.first())
+        assertEquals(emptyList<RefoldExport.Mark>(), marked)
     }
 }

@@ -108,14 +108,16 @@ class StatisticsViewModel(
     private val now: () -> Instant = Instant::now,
     /** Writes text to a document the reader picked (a content URI). */
     private val writeDocument: suspend (uri: String, text: String) -> Unit = { _, _ -> },
-    /** The last day of reading the Refold export covered; null before the first export. */
-    private val lastRefoldDay: () -> LocalDate? = { null },
-    private val setLastRefoldDay: (LocalDate) -> Unit = {},
+    /** The day of the last Refold export; null before the first one. */
+    private val lastRefoldExport: () -> LocalDate? = { null },
+    private val setLastRefoldExport: (LocalDate) -> Unit = {},
+    /** Remembers which seconds of which days and books a Refold file held (one transaction). */
+    private val markRefoldExported: suspend (List<RefoldExport.Mark>) -> Unit = {},
     /** Writes the Refold file where it can be shared and returns its content URI. */
     private val writeRefoldFile: suspend (name: String, text: String) -> String = { name, _ -> name },
 ) : ViewModel() {
-    /** What the Refold export dialog tells: the day the last export reached and the rows a new one would hold. */
-    data class RefoldInfo(val lastDay: LocalDate?, val newRows: Int)
+    /** What the Refold export dialog tells: the day of the last export and the rows a new one would hold. */
+    data class RefoldInfo(val lastExport: LocalDate?, val newRows: Int)
 
     /** What came of a Refold export. */
     sealed interface RefoldEvent {
@@ -199,32 +201,32 @@ class StatisticsViewModel(
         }
     }
 
-    private suspend fun refoldFile(all: Boolean): RefoldExport.Result {
+    private suspend fun refoldFile(again: Boolean): RefoldExport.Result {
         val titles = books.first().associate { it.id to it.title }
-        return RefoldExport.build(
-            days = days.first(),
-            titles = titles,
-            since = if (all) null else lastRefoldDay(),
-            today = RefoldExport.today(now(), zone()),
-        )
+        return RefoldExport.build(days = days.first(), titles = titles, again = again)
     }
 
-    /** What a Refold export since the last one would hold. */
-    suspend fun refoldInfo(): RefoldInfo = RefoldInfo(lastRefoldDay(), refoldFile(all = false).rows)
+    /** What the next Refold export would hold. */
+    suspend fun refoldInfo(): RefoldInfo = RefoldInfo(lastRefoldExport(), refoldFile(again = false).rows)
 
-    /** Shares the reading per day and book as a CSV file for Refold: all of it, or what is new since the last export. */
-    fun exportRefold(all: Boolean) {
+    /**
+     * Shares the reading per day and book as a CSV file for Refold: what it has not seen yet, or with
+     * [again] everything (Refold adds it to what it has, so only for a new account).
+     */
+    fun exportRefold(again: Boolean) {
         viewModelScope.launch {
             val event = try {
-                val file = refoldFile(all)
-                val lastDay = file.lastDay
-                if (file.rows == 0 || lastDay == null) {
+                val file = refoldFile(again)
+                if (file.rows == 0) {
                     RefoldEvent.NoReading
                 } else {
-                    val name = "honmani-refold-${RefoldExport.today(now(), zone())}.csv"
+                    val today = RefoldExport.today(now(), zone())
+                    val name = "honmani-refold-$today.csv"
                     val uri = writeRefoldFile(name, file.csv)
                     // The share sheet reports nothing back: the export counts as done once it is offered.
-                    setLastRefoldDay(maxOf(lastDay, lastRefoldDay() ?: lastDay))
+                    // Only the seconds the file was built from are marked, so reading added meanwhile stays new.
+                    markRefoldExported(file.marks)
+                    setLastRefoldExport(today)
                     RefoldEvent.Ready(uri, name)
                 }
             } catch (e: CancellationException) {
@@ -302,8 +304,9 @@ class StatisticsViewModel(
                     prepareBook = { hash, keys -> container.bookDao.findByHash(hash)?.let { container.prepareBook(it, keys) } ?: 0 },
                     goalMinutes = container.readingGoalSettings.goalMinutes,
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
-                    lastRefoldDay = { container.refoldExportSettings.lastDay },
-                    setLastRefoldDay = container.refoldExportSettings::setLastDay,
+                    lastRefoldExport = { container.refoldExportSettings.lastExport },
+                    setLastRefoldExport = container.refoldExportSettings::setLastExport,
+                    markRefoldExported = container.readingDao::markRefoldExported,
                     writeRefoldFile = { name, text -> writeShareFile(application, "refold", name, text) },
                 )
             }

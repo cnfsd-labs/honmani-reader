@@ -20,32 +20,33 @@ object RefoldExport {
 
     val HEADER = listOf("activityId", "languageCode", "attributedDate", "duration", "startTime", "nickname", "savedAt")
 
-    /** What an export holds: the file's [csv], its row count and the latest day it covers. */
-    data class Result(val csv: String, val rows: Int, val lastDay: LocalDate?)
+    /** Seconds of one book on one day that a file holds; they are marked as exported once it is shared. */
+    data class Mark(val bookId: Long, val day: String, val seconds: Long)
+
+    /** What an export holds: the file's [csv], its row count and the [marks] to store once it is offered. */
+    data class Result(val csv: String, val rows: Int, val marks: List<Mark>)
 
     /**
      * The rows of [days] (the stored reading, whose `day` is already the local date it was read
-     * on, so no time zone is applied again) after [since] (null: all) and before [today]:
-     * today is still being read and comes in a later export. Book titles come from [titles] by book
-     * id. Sorted by date, then title; a row has the whole seconds of the book that day as
-     * integer milliseconds; days without time are left out. The start time and the saved-at
+     * on, so no time zone is applied again) that Refold has not seen: for each day and book the
+     * seconds beyond `refoldSeconds`, today's so far included. Refold adds every imported row up,
+     * so a later export holds only the remainder. With [again] each day and book comes in full.
+     * Book titles come from [titles] by book id. Sorted by date, then title; a row has the seconds
+     * as integer milliseconds; days without time are left out. The start time and the saved-at
      * time are left empty (Refold marks them optional; Honmani does not keep them).
      */
     fun build(
         days: List<ReadingDayEntity>,
         titles: Map<Long, String>,
-        since: LocalDate?,
-        today: LocalDate,
+        again: Boolean = false,
     ): Result {
         val chosen = days.mapNotNull { row ->
             val day = runCatching { LocalDate.parse(row.day) }.getOrNull() ?: return@mapNotNull null
-            val wanted = row.seconds > 0 &&
-                (since == null || day.isAfter(since)) &&
-                day.isBefore(today)
-            if (wanted) Triple(day, nickname(titles[row.bookId]), row.seconds) else null
-        }.sortedWith(compareBy({ it.first }, { it.second }))
-        val rows = chosen.map { (day, nickname, seconds) ->
-            listOf(ACTIVITY_INTERACTIVE_READING, LANGUAGE, day.toString(), (seconds * 1000).toString(), "", nickname, "")
+            val seconds = if (again) row.seconds else row.seconds - row.refoldSeconds
+            if (seconds > 0) Row(row, day, nickname(titles[row.bookId]), seconds) else null
+        }.sortedWith(compareBy({ it.date }, { it.nickname }))
+        val rows = chosen.map {
+            listOf(ACTIVITY_INTERACTIVE_READING, LANGUAGE, it.date.toString(), (it.seconds * 1000).toString(), "", it.nickname, "")
         }
         // The title is written as it is: not the spreadsheet protection of [Csv.write].
         val csv = buildString {
@@ -54,8 +55,10 @@ object RefoldExport {
                 append("\r\n")
             }
         }
-        return Result(csv, rows.size, chosen.maxOfOrNull { it.first })
+        return Result(csv, rows.size, chosen.map { Mark(it.entity.bookId, it.entity.day, it.entity.seconds) })
     }
+
+    private class Row(val entity: ReadingDayEntity, val date: LocalDate, val nickname: String, val seconds: Long)
 
     /** The reader's today in [zone] at [now]: the day that is not finished yet. */
     fun today(now: Instant, zone: ZoneId): LocalDate = now.atZone(zone).toLocalDate()
