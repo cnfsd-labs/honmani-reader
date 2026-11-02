@@ -74,6 +74,17 @@ private fun TabBadge(dot: Boolean, count: Int) {
 }
 
 /**
+ * The tab's name; with a [count] TalkBack reads it too, as the item clears the icon's (and so the
+ * badge's) semantics when it has a label.
+ */
+@Composable
+private fun TabLabel(tab: HomeTab, count: Int) {
+    val label = stringResource(tab.label)
+    val description = if (count > 0) "$label, ${stringResource(R.string.review_nav_badge, count)}" else null
+    Text(label, modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier)
+}
+
+/**
  * [badges]: tabs with something new, such as dictionary updates, marked with a dot. [counts]: a
  * number on a tab, hidden at 0.
  */
@@ -91,7 +102,7 @@ fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Se
                         tab.TabIcon()
                     }
                 },
-                label = { Text(stringResource(tab.label)) },
+                label = { TabLabel(tab, counts[tab] ?: 0) },
             )
         }
         Spacer(modifier = Modifier.width(EDGE_INSET))
@@ -115,7 +126,7 @@ fun HomeNavigationRail(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: S
                         tab.TabIcon()
                     }
                 },
-                label = { Text(stringResource(tab.label)) },
+                label = { TabLabel(tab, counts[tab] ?: 0) },
             )
         }
         Spacer(modifier = Modifier.weight(1f))

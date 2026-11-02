@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -111,6 +113,7 @@ fun ReviewScreen(
             val result = snackbar.showSnackbar(
                 message = resources.getString(notice.message, notice.word),
                 actionLabel = if (notice.undoable) resources.getString(R.string.action_undo) else null,
+                duration = SnackbarDuration.Short,
             )
             if (result == SnackbarResult.ActionPerformed) viewModel.undo()
         }
@@ -131,6 +134,25 @@ fun ReviewScreen(
                     onOpenBook = onOpenBook,
                 )
             },
+            // The answer buttons sit in the bottom bar so a snackbar shows above them, never over them.
+            bottomBar = {
+                if (state.card != null) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        AnswerButtons(
+                            revealed = state.revealed,
+                            onReveal = viewModel::reveal,
+                            onForgot = viewModel::forgot,
+                            onGotIt = viewModel::gotIt,
+                        )
+                    }
+                }
+            },
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Column(
@@ -150,13 +172,6 @@ fun ReviewScreen(
                         onForgot = viewModel::forgot,
                         onGotIt = viewModel::gotIt,
                         modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    AnswerButtons(
-                        revealed = state.revealed,
-                        onReveal = viewModel::reveal,
-                        onForgot = viewModel::forgot,
-                        onGotIt = viewModel::gotIt,
                     )
                 } else if (!state.loading) {
                     Finished(state, onClose, modifier = Modifier.weight(1f))
