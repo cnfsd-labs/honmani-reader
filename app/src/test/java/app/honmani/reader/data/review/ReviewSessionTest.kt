@@ -211,6 +211,32 @@ class ReviewSessionTest {
     }
 
     @Test
+    fun aPassThatReachesKnownByMemoryMovesTheWordToKnownAndALapseKeepsIt() = runTest {
+        val id = dueWord("猫")
+        val card = reviews.card(id)!!
+        reviews.restore(card.copy(stability = 20.0, reviewStability = 20.0))
+        // Reading alone never moves a word to Known, however long its memory gets.
+        reviews.onReadKeys(setOf("猫"))
+        assertEquals(WordStatus.LEARNING, words.find(id)!!.status)
+        reviews.restore(card.copy(stability = 20.0, reviewStability = 20.0))
+        val session = session()
+        session.answer(Grade.GOOD)
+        assertTrue(ReviewRules.isKnownByMemory(reviews.card(id)!!))
+        assertEquals(WordStatus.LEARNED, words.find(id)!!.status)
+        session.undo()
+        assertEquals(WordStatus.LEARNING, words.find(id)!!.status)
+        session.answer(Grade.GOOD)
+        assertEquals(WordStatus.LEARNED, words.find(id)!!.status)
+        // A later Forgot drops the memory below Known but keeps the word Known and the card in review.
+        now += 400 * day
+        val later = session()
+        later.answer(Grade.AGAIN)
+        assertFalse(ReviewRules.isKnownByMemory(reviews.card(id)!!))
+        assertEquals(WordStatus.LEARNED, words.find(id)!!.status)
+        assertEquals(ReviewState.REVIEW, reviews.card(id)!!.state)
+    }
+
+    @Test
     fun reviewNowAsksAgainAtTheEndOfTheSession() = runTest {
         dueWord("一")
         dueWord("二")

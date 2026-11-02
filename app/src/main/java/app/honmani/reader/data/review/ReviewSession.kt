@@ -64,8 +64,13 @@ class ReviewSession(
         val undo = reviews.record(item.word.id, grade)
         if (undo == null) return false
         val requeue = grade == Grade.AGAIN
-        if (requeue) reviews.card(item.word.id)?.let { queue.addLast(item.copy(card = it)) }
-        actions.addLast(Action(item, undo.before, review = undo, requeued = requeue, grade = grade))
+        val after = reviews.card(item.word.id)
+        if (requeue) after?.let { queue.addLast(item.copy(card = it)) }
+        // A pass that makes the memory long enough moves the word to Known; a later lapse keeps it there.
+        val becameKnown = item.word.status == WordStatus.LEARNING && after != null &&
+            !ReviewRules.isKnownByMemory(undo.before, knownAfterDays) && ReviewRules.isKnownByMemory(after, knownAfterDays)
+        if (becameKnown) words.markLearned(item.word.id)
+        actions.addLast(Action(item, undo.before, review = undo, requeued = requeue, wasLearning = becameKnown, grade = grade))
         return true
     }
 
