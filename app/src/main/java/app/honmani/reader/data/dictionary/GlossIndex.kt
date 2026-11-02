@@ -83,7 +83,7 @@ class GlossIndex(private val database: HonmaniDatabase) {
         val started = System.nanoTime()
         val building = "$BUILD_PREFIX$dictionaryId"
         db.execSQL("DROP TABLE IF EXISTS $building")
-        db.execSQL("CREATE VIRTUAL TABLE $building USING fts4(content=\"\", gloss, tokenize=unicode61)")
+        db.execSQL("CREATE VIRTUAL TABLE $building USING fts4(content=\"\", gloss, tokenize=unicode61, matchinfo=fts3)")
         val preset = db.query("SELECT preset FROM glossary_preset WHERE dictionary_id = ?", arrayOf(dictionaryId)).use {
             if (it.moveToFirst()) it.getBlob(0) else null
         }
@@ -135,9 +135,9 @@ class GlossIndex(private val database: HonmaniDatabase) {
 
     companion object {
         private const val TAG = "GlossIndex"
-        /** Complete indexes; the version changes when [text] does, so older indexes are rebuilt. */
-        private const val PREFIX = "gloss_index_v1_"
-        private const val BUILD_PREFIX = "gloss_build_v1_"
+        /** Complete indexes; the version changes when [text] or the table options do, so older indexes are rebuilt. */
+        private const val PREFIX = "gloss_index_v2_"
+        private const val BUILD_PREFIX = "gloss_build_v2_"
         private const val CHUNK = 2_000
         private const val PARALLEL_CHUNK = 250
 

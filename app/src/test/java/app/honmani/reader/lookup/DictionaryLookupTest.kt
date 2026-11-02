@@ -639,6 +639,10 @@ class DictionaryLookupTest {
         glossIndex.sync()
         assertEquals(listOf(id), glossIndex.indexed(listOf(id)))
         assertEquals(1, glossIndex.search("\"eat\"", listOf(id), 10).size)
+        // No document lengths: nothing ranks by them, and they cost megabytes on a phone.
+        val docsize = database.openHelper.readableDatabase
+            .query("SELECT count(*) FROM sqlite_master WHERE name GLOB 'gloss_*_docsize'").use { it.moveToFirst(); it.getInt(0) }
+        assertEquals(0, docsize)
 
         database.dictionaryDao().delete(id)
         glossIndex.sync()
