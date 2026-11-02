@@ -47,44 +47,47 @@ const dueMarked = (page) => page.evaluate(() => [...(CSS.highlights.get('honmani
 const markRequest = (page) => page.evaluate(() => window.__messages.find((m) => m.type === 'marks.request'));
 
 /** Answers the first marks request with `marks` for its first block. */
-async function answer(page, marks) {
-  await page.evaluate((marks) => {
+async function answer(page, marks, color = '#ffc400') {
+  await page.evaluate(([marks, color]) => {
     const request = window.__messages.find((m) => m.type === 'marks.request');
-    window.__listener({ data: JSON.stringify({ type: 'marks', requestId: request.requestId, color: '#ffc400', blocks: [{ id: request.blocks[0].id, marks }] }) });
-  }, marks);
+    window.__listener({ data: JSON.stringify({ type: 'marks', requestId: request.requestId, color, blocks: [{ id: request.blocks[0].id, marks }] }) });
+  }, [marks, color]);
 }
 
 /** A screenshot of the paragraph. */
 const picture = (page) => page.locator('p').first().screenshot({ animations: 'disabled' });
 
-test('a word due for review gets a dotted underline over its tint', async ({ page }) => {
+test('a word due for review gets its own tint', async ({ page }) => {
   await openBook(page, '<p style="font-size: 32px">彼は東京に住む。</p>');
   const request = await markRequest(page);
   expect(request.dueMarks).toBe(true);
 
-  // 東京 is learning and due: both marks lie on it.
-  await answer(page, [[2, 2, 0], [2, 2, 4]]);
+  // 東京 is due (the app sends the due mark instead of the Learning one).
+  await answer(page, [[2, 2, 4]]);
   await expect.poll(() => dueMarked(page)).toEqual(['東京']);
   await page.waitForTimeout(400);
   const css = await page.evaluate(() => document.getElementById('honmani-marks-style').textContent);
-  expect(css).toMatch(/::highlight\(honmani-due\) \{ text-decoration-line: underline; text-decoration-style: dotted;/);
-  expect(await page.evaluate(() => [...(CSS.highlights.get('honmani-learning') ?? [])].map((range) => range.toString()))).toEqual(['東京']);
+  expect(css).toMatch(/::highlight\(honmani-due\) \{ background-color: rgba\(/);
 });
 
-for (const [name, background, color, red] of [['light', '#ffffff', '#000000', 153], ['dark', '#000000', '#ffffff', 255]]) {
-  test(`the due underline is drawn on a ${name} page`, async ({ page }) => {
+// Amber, unless the accent is near amber (the default yellow): then blue.
+for (const [name, background, color, accent, red] of [
+  ['light', '#ffffff', '#000000', '#ffc400', 60],
+  ['dark', '#000000', '#ffffff', '#ffc400', 60],
+  ['dark', '#000000', '#ffffff', '#8f66f6', 230],
+]) {
+  test(`the due tint is drawn on a ${name} page with the accent ${accent}`, async ({ page }) => {
     await openBook(page, '<p style="font-size: 32px; margin: 20px">彼は東京に住む。</p>');
     await page.evaluate(([background, color]) => {
       document.body.style.background = background;
       document.body.style.color = color;
     }, [background, color]);
     const before = await picture(page);
-    await answer(page, [[2, 2, 4]]);
+    await answer(page, [[2, 2, 4]], accent);
     await expect.poll(() => dueMarked(page)).toEqual(['東京']);
     await page.waitForTimeout(400);
-    // The underline changes pixels of the paragraph (it is drawn, not just set).
+    // The tint changes pixels of the paragraph (it is drawn, not just set).
     expect((await picture(page)).equals(before)).toBe(false);
-    // The accent as it is on a dark page, darker on a light one.
     const css = await page.evaluate(() => document.getElementById('honmani-marks-style').textContent);
     expect(Number(/::highlight\(honmani-due\) \{[^}]*rgba\((\d+),/.exec(css)[1])).toBe(red);
   });

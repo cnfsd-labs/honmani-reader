@@ -15,8 +15,9 @@
  * marks it changes neither the DOM nor the layout; the furigana over the sentence is tinted too.
  *
  * localStorage "honmaniMarkDue" = "0" turns off the due mark (on by default): words whose review
- * card is due today (kind 4, only when asked for) get a dotted underline in the app's accent
- * colour, drawn over the word's tint (a text decoration, so the two never hide each other).
+ * card is due today (kind 4, only when asked for; the app sends it instead of the Learning mark)
+ * get their own tint: amber, or blue when the accent is near amber. Android's WebView draws no
+ * text decorations in highlights, so a tint it is.
  *
  * The app splits the text into words (the splitter that grades books) and knows the reader's
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
@@ -184,13 +185,10 @@
     const sentence = dark ? 0.3 : 0.16;
     const sentences = (name, share) =>
       `::highlight(${name}) { background-color: rgba(46, 160, 110, ${(sentence * share).toFixed(3)}); }\n`;
-    // A dotted underline in the accent; on a light page the accent (yellow by default) is darkened
-    // so that it shows against the paper.
-    const [red, green, blue] = rgb.split(',').map(Number);
-    const ink = dark ? 1 : 0.6;
+    // Amber, or blue when the accent's hue is near amber (the default yellow accent is).
+    const dueRgb = nearAmber(rgb) ? '60, 140, 230' : '230, 140, 40';
     const due = (name, share) =>
-      `::highlight(${name}) { text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 2px; ` +
-      `text-decoration-color: rgba(${Math.round(red * ink)}, ${Math.round(green * ink)}, ${Math.round(blue * ink)}, ${share.toFixed(3)}); }\n`;
+      `::highlight(${name}) { background-color: rgba(${dueRgb}, ${(learning * share).toFixed(3)}); }\n`;
     style.textContent =
       tints(NAMES, 1) +
       tints(FRESH_NAMES, alpha) +
@@ -199,6 +197,18 @@
       `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n` +
       due(NAMES[DUE], 1) +
       due(FRESH_NAMES[DUE], alpha);
+  }
+
+  /** Whether the colour "r, g, b" is a colour (not a grey) whose hue lies within 45° of amber's (31°). */
+  function nearAmber(color) {
+    const [r, g, b] = color.split(',').map((part) => Number(part) / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max - min < 0.15) return false;
+    const d = max - min;
+    const hue = max === r ? 60 * (((g - b) / d + 6) % 6) : max === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+    const apart = Math.abs(hue - 31);
+    return Math.min(apart, 360 - apart) < 45;
   }
 
   /** Whether the page behind the text is dark (ttu's dark themes set it on <body>). */

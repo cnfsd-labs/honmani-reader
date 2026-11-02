@@ -136,9 +136,10 @@ its marks at once.
 Optional, in the same settings: hide the furigana over words you know (takes effect when the book
 is opened again; a lookup brings it back), and tint sentences with exactly one unknown word.
 Reader settings → "Mark words due for review" (on by default): a word whose flashcard is due today has
-a dotted underline in the accent colour, drawn over its tint (darker on a light page, so it still shows
-there). Check one word on a light and on a dark page; turn the switch off and open the book again: no
-underline. After the word is answered in a review (not due any more) it loses the underline.
+an amber tint instead of the Learning one (blue when the accent is amber or yellow, as the default is;
+Android's WebView draws no underlines in highlights). Check one word on a light and on a dark page;
+turn the switch off and open the book again: Learning tint. After the word is answered in a review (not
+due any more) it gets the Learning tint back.
 
 Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
 to you", higher for easy books; "Words to learn before reading" lists them, most used first.
@@ -164,7 +165,7 @@ Settings → Flashcards → "Reviews per day" (50 / 100 default / 200 / No limit
 other 20 carry over to tomorrow. A card answered today counts, so after 30 answers 70 are left (new
 words count against "New words a day" instead); an Again comes back today whatever the limit. The
 chips other than Due ignore the limit. Switching to 200 or No limit shows all 120 again. The
-underline in the book follows the same cards. At the largest font size the chips wrap, none is cut.
+due tint in the book follows the same cards. At the largest font size the chips wrap, none is cut.
 Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it
 due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
 "Learn n words": they come with their sentences from the book, the ones used soonest first.

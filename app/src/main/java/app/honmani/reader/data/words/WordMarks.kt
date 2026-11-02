@@ -36,7 +36,7 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
         /** A sentence with exactly one word the reader does not know yet ("i+1"): tinted whole. */
         SENTENCE,
 
-        /** A word whose review card is due today: an underline over the tint (it can lie on a [LEARNING] mark). */
+        /** A word whose review card is due today: its own tint, instead of the [LEARNING] one. */
         DUE,
     }
 }
@@ -78,20 +78,24 @@ object WordMarks {
                 null
             }
             if (form != null) {
-                if (tint) marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
-                if (isDue(token.key, due, knowledge)) marks += WordMark(token.start, form.length, WordMark.Kind.DUE)
+                // A due word gets its own tint instead of the Learning one.
+                if (isDue(token.key, due, knowledge)) {
+                    marks += WordMark(token.start, form.length, WordMark.Kind.DUE)
+                } else if (tint) {
+                    marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
+                }
                 formEnd = token.start + form.length
                 continue
             }
             // Names and other text no dictionary knows stay unmarked.
             if (token.rank == Token.UNKNOWN) continue
             val kind = when {
+                isDue(token.key, due, knowledge) -> WordMark.Kind.DUE
                 tint && knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
                 tint && mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
                 else -> null
             }
             if (kind != null) marks += WordMark(token.start, token.length, kind)
-            if (isDue(token.key, due, knowledge)) marks += WordMark(token.start, token.length, WordMark.Kind.DUE)
             // Also for a word marked learned in Words and never read: it is new and known at once.
             if (knownWords && knowledge.isKnown(token.key)) marks += WordMark(token.start, token.length, WordMark.Kind.KNOWN)
         }

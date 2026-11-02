@@ -844,7 +844,7 @@
     <string name="reader_settings_tint_one_unknown">Tint sentences with one new word</string>
     <string name="reader_settings_tint_one_unknown_details">A sentence with exactly one word you have not met or are still learning gets a soft green background: good sentences to learn from. Takes effect when the book is opened again.</string>
     <string name="reader_settings_mark_due">Mark words due for review</string>
-    <string name="reader_settings_mark_due_details">Words whose flashcard is due today get a dotted underline in the book, over their tint. Takes effect when the book is opened again.</string>
+    <string name="reader_settings_mark_due_details">Words whose flashcard is due today get an amber tint in the book (blue if your accent colour is amber or yellow). Takes effect when the book is opened again.</string>
     <string name="reader_settings_selection_lookup">Look up selected text</string>
     <string name="reader_settings_selection_lookup_details">Select text with a long press to look it up; copying still works</string>
     <string name="reader_settings_all">All ッツ reader settings</string>

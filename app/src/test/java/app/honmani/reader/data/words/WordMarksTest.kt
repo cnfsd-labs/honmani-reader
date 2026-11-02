@@ -138,16 +138,13 @@ class WordMarksTest {
     }
 
     @Test
-    fun aWordDueForReviewGetsADueMarkOverItsTint() {
+    fun aWordDueForReviewGetsTheDueMarkInsteadOfItsTint() {
         val text = "私は猫を食べた"
         fun marks(mode: WordMarksMode, due: Set<String>) =
             WordMarks.of(text, segmenter, knowledge, mode, due = due).map { text.substring(it.start, it.start + it.length) to it.kind }
 
-        // 食べた is learning and due: the tint and the due mark lie on the same characters.
-        assertEquals(
-            listOf("食べた" to WordMark.Kind.LEARNING, "食べた" to WordMark.Kind.DUE),
-            marks(WordMarksMode.LEARNING, setOf("食べる")),
-        )
+        // 食べた is learning and due: the due mark replaces the Learning tint.
+        assertEquals(listOf("食べた" to WordMark.Kind.DUE), marks(WordMarksMode.LEARNING, setOf("食べる")))
         // The due mark does not need the tint, and another due word marks only itself.
         assertEquals(listOf("食べた" to WordMark.Kind.DUE), marks(WordMarksMode.OFF, setOf("食べる")))
         assertEquals(listOf("猫" to WordMark.Kind.DUE), marks(WordMarksMode.OFF, setOf("猫")))

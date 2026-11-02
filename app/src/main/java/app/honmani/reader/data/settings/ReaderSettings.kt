@@ -53,7 +53,7 @@ data class ReaderSettings(
     val hideKnownFurigana: Boolean = false,
     /** Sentences with exactly one unknown word are tinted (`word-marks.js`); off by default. */
     val tintOneUnknown: Boolean = false,
-    /** Words whose review card is due today get a dotted underline (`word-marks.js`); on by default. */
+    /** Words whose review card is due today get their own tint (`word-marks.js`); on by default. */
     val markDue: Boolean = true,
 ) {
     /** The values to store, as ttu writes them. */
