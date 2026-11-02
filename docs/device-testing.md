@@ -167,6 +167,13 @@ opens the entry and adds the query to "Recent searches". Right after a dictionar
 note says English search is getting ready (about a minute); Japanese and romaji work at once.
 Long-press the launcher icon: "Search" opens Words with the field focused.
 
+Radical search: the button 部 ("Search by radical") at the end of the field opens a sheet with the
+radicals by stroke count. Pick 木 and 日: the kanji list shows what contains both (東, 杳, ...), radicals
+that lead nowhere are dimmed, "Reset" clears the picks. A tap on a kanji inserts it at the cursor
+of the field and closes the sheet; the search runs as for typed text. Check it at font size
+"Largest" on a narrow phone (nothing clipped) and with TalkBack (radicals read "Radical 木, 4
+strokes" and as checkboxes). Handwriting is the keyboard's job (Gboard's Japanese handwriting layout).
+
 ## Review
 
 Add a few words to Learning (look them up in a book). The next day Words shows "Review · n due" and

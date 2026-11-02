@@ -78,6 +78,8 @@
     <string name="about_android_libraries_details">Kotlin, AndroidX, Jetpack Compose, Room, WorkManager, kotlinx · Apache License 2.0</string>
     <string name="about_downloads">Downloaded content</string>
     <string name="about_downloads_details">Dictionaries and fonts come from their publishers when you download them, under their own licences.</string>
+    <string name="about_radicals">Radical search data</string>
+    <string name="about_radicals_details">RADKFILE, KRADFILE and KANJIDIC2 · © Electronic Dictionary Research and Development Group (edrdg.org) · CC BY-SA 4.0</string>
     <string name="about_fonts">Reader fonts</string>
     <string name="about_fonts_details">%1$s · SIL Open Font License 1.1</string>
     <string name="about_sample_book">Sample books</string>
@@ -518,6 +520,15 @@
     <string name="action_more_options">More options</string>
     <string name="words_search_hint">Search saved words</string>
     <string name="search_hint">Search dictionaries</string>
+    <string name="radical_search">Search by radical</string>
+    <string name="radical_reset">Reset</string>
+    <string name="radical_hint">Pick the parts of a kanji to find it. Radicals that lead nowhere are dimmed.</string>
+    <string name="radical_kanji_found">%1$d kanji · tap one to add it to the search</string>
+    <plurals name="radical_strokes">
+        <item quantity="one">%1$d stroke</item>
+        <item quantity="other">%1$d strokes</item>
+    </plurals>
+    <string name="radical_description">Radical %1$s, %2$s</string>
     <string name="search_history">Recent searches</string>
     <string name="search_history_clear">Clear</string>
     <string name="search_history_remove">Remove %1$s from recent searches</string>

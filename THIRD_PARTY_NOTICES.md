@@ -38,6 +38,14 @@ own release links from within the app: Jitendex (https://jitendex.org, CC BY-SA 
 for Yomitan (https://github.com/yomidevs/jmdict-yomitan; JMdict is EDRDG-licensed, CC BY-SA 4.0). Each dictionary's attribution from its
 `index.json` is stored and should be shown with its entries.
 
+## Radical search data
+
+`app/src/main/assets/radicals.txt` is derived from RADKFILEX/KRADFILE (which kanji contain which
+radicals) and KANJIDIC2 (stroke counts, frequency rank) of the Electronic Dictionary Research and
+Development Group (https://www.edrdg.org, licence: https://www.edrdg.org/edrdg/licence.html,
+CC BY-SA 4.0). `scripts/radicals/build_radicals.py` makes it; the radicals RADKFILE draws with a
+substitute kanji are mapped to their own Unicode forms. The file is shared under the same licence.
+
 ## Planned (not yet included)
 
 Kuromoji or Sudachi (Apache-2.0) with their dictionary licenses, AnkiDroid Instant-Add API

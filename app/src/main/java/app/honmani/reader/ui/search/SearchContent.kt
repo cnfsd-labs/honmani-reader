@@ -22,6 +22,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,16 +34,22 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.lookup.LookupGroup
 
-/** The dictionary search field: results follow every key, so the keyboard's search key only closes it. */
+/**
+ * The dictionary search field: results follow every key, so the keyboard's search key only closes it.
+ * The button at its end opens the radical picker, which inserts a kanji at the cursor.
+ */
 @Composable
 fun SearchField(
     query: String,
@@ -48,19 +59,48 @@ fun SearchField(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // The field keeps its own selection (a plain String has none); [query] may arrive a few keys
+    // late, so a value that echoes what was typed is no change from outside (history, clear).
+    var field by remember { mutableStateOf(TextFieldValue(query, TextRange(query.length))) }
+    val sent = remember { ArrayDeque<String>() }
+    LaunchedEffect(query) {
+        val echo = sent.indexOf(query)
+        if (echo >= 0) {
+            repeat(echo + 1) { sent.removeFirst() }
+        } else if (query != field.text) {
+            sent.clear()
+            field = TextFieldValue(query, TextRange(query.length))
+        }
+    }
+    fun change(value: TextFieldValue) {
+        val textChanged = value.text != field.text
+        field = value
+        if (textChanged) {
+            sent.addLast(value.text)
+            onQuery(value.text)
+        }
+    }
+    var picking by rememberSaveable { mutableStateOf(false) }
     OutlinedTextField(
-        value = query,
-        onValueChange = onQuery,
+        value = field,
+        onValueChange = ::change,
         singleLine = true,
         placeholder = { Text(stringResource(R.string.search_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
         trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(onClick = {
-                    onQuery("")
-                    focusRequester.requestFocus()
-                }) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (field.text.isNotEmpty()) {
+                    IconButton(onClick = {
+                        change(TextFieldValue(""))
+                        focusRequester.requestFocus()
+                    }) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
+                    }
+                }
+                val radicalSearch = stringResource(R.string.radical_search)
+                IconButton(onClick = { picking = true }, modifier = Modifier.semantics { contentDescription = radicalSearch }) {
+                    // 部, as in 部首 (radical): no icon says it better.
+                    Text("部", style = MaterialTheme.typography.titleMedium)
                 }
             }
         },
@@ -71,6 +111,17 @@ fun SearchField(
             .focusRequester(focusRequester)
             .onFocusChanged { onFocusChanged(it.isFocused) },
     )
+    if (picking) {
+        RadicalPicker(
+            onPick = { kanji ->
+                val at = field.selection
+                val text = field.text.replaceRange(at.min, at.max, kanji)
+                change(TextFieldValue(text, TextRange(at.min + kanji.length)))
+                picking = false
+            },
+            onDismiss = { picking = false },
+        )
+    }
 }
 
 /**

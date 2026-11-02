@@ -106,6 +106,11 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
                     open = LicenceText.APACHE
                 }
             }
+            item {
+                Entry(R.string.about_radicals, stringResource(R.string.about_radicals_details)) {
+                    openUrl(context, EDRDG_LICENCE_URL)
+                }
+            }
             item { Heading(R.string.about_downloads) }
             item {
                 Text(
@@ -201,3 +206,5 @@ private fun openUrl(context: Context, url: String) {
 
 /** Where Honmani's source is published, as GPL-3.0 asks. */
 const val SOURCE_URL = "https://github.com/cnfsd-labs/honmani-reader"
+
+private const val EDRDG_LICENCE_URL = "https://www.edrdg.org/edrdg/licence.html"

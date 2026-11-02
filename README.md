@@ -13,7 +13,9 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   a book holds that you do not know
 - Every word you look up is saved with its sentence ("Don't count" in the panel takes a lookup back); send words to Anki (AnkiDroid or an
   `.apkg` for Anki on a computer)
-- Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search")
+- Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search"); the
+  button 部 in the field finds a kanji by its parts (radical search). Handwriting input is left to
+  the keyboard: Gboard's Japanese handwriting layout works in the field
 - Flashcard review of the words you are learning, with the sentence you met them in: two buttons
   (Forgot / Got it), a memory model (FSRS) that also counts the words you read in books, new words
   ordered by the book you are reading, a daily limit on reviews (50, 100, 200 or none), words due today tinted in the book, cards known for a year retired from the queue, and a book's words
@@ -96,4 +98,6 @@ any later version. It comes with no warranty.
 
 It includes [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader) (BSD 3-Clause) and the
 libraries listed in the app under Settings → About Honmani. Dictionaries and fonts are downloaded
-from their publishers and keep their own licences.
+from their publishers and keep their own licences. The radical search ships EDRDG's RADKFILE,
+KRADFILE and KANJIDIC2 data (© Electronic Dictionary Research and Development Group,
+[CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html)), converted by `scripts/radicals/build_radicals.py`.
