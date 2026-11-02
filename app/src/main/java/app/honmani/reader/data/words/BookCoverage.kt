@@ -37,6 +37,9 @@ data class UnknownWords(val words: List<UnknownWord>, val total: Int) {
         /** A list this long is read before a book; more only slows the sheet down. */
         const val LIMIT = 200
 
+        /** The vocabulary (a frequency rank) taken before the reader's is estimated: a beginner's, about JLPT N5. */
+        const val BEGINNER = 1_000
+
         fun of(words: BookWords, knowledge: WordKnowledge, vocabulary: Int, limit: Int = LIMIT): UnknownWords {
             val unknown = ArrayList<Int>()
             for (i in 0 until words.size) {

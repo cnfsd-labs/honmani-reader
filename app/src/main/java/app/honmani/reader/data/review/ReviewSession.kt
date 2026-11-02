@@ -47,14 +47,22 @@ class ReviewSession(
     val forgotten: Int get() = actions.count { it.grade == Grade.AGAIN }
     val remembered: Int get() = actions.count { it.grade != null && it.grade != Grade.AGAIN }
 
-    /** Builds the queue: due cards (most overdue first), then new cards. */
-    suspend fun start() {
+    /**
+     * Builds the queue: due cards (most overdue first), then new cards. With a [filter] (a
+     * chip other than Due) only its words, and after them its Learning words not due yet,
+     * soonest due first, to review early.
+     */
+    suspend fun start(filter: ReviewFilter? = null) {
         queue.clear()
         actions.clear()
-        val due = reviews.dueCards(Int.MAX_VALUE)
+        val due = reviews.dueCards(Int.MAX_VALUE).filter { filter == null || filter.accepts(it.word) }
         val left = newPerDay - reviews.newWordsToday()
         queue.addAll(due)
-        queue.addAll(reviews.introduceNew(left).filter { fresh -> due.none { it.word.id == fresh.word.id } })
+        queue.addAll(reviews.introduceNew(left, filter).filter { fresh -> due.none { it.word.id == fresh.word.id } })
+        if (filter != null) {
+            val taken = queue.mapTo(HashSet()) { it.word.id }
+            queue.addAll(reviews.notDueLearningCards().filter { it.word.id !in taken && filter.accepts(it.word) })
+        }
     }
 
     /** Grades the current card; an Again comes back at the end. False if there is none or it can't be graded. */

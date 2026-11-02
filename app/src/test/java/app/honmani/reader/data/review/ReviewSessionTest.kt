@@ -65,6 +65,36 @@ class ReviewSessionTest {
     private suspend fun session(newPerDay: Int = 10) = ReviewSession(reviews, words, newPerDay).also { it.start() }
 
     @Test
+    fun aChipTakesOnlyItsWordsAndReviewsTheRestEarly() = runTest {
+        val due = dueWord("旧")
+        dueWord("外")
+        val early = word("早")
+        reviews.introduce(early)
+        reviews.record(early, Grade.GOOD)
+        word("他", rank = 9.0)
+        val fresh = word("新")
+        val book = setOf("旧", "新", "早")
+        val filter = ReviewFilter(score = { if (it == "新") 1.0 else 0.0 }) { it.expression in book }
+        val session = ReviewSession(reviews, words, newPerDay = 10).also { it.start(filter) }
+        val order = ArrayList<Long>()
+        while (session.current != null) {
+            order += session.current!!.word.id
+            session.bury()
+        }
+        assertEquals(listOf(due, fresh, early), order)
+    }
+
+    @Test
+    fun theStarredChipTakesStarredWords() = runTest {
+        word("他", rank = 9.0)
+        val starred = word("星")
+        words.setStarred(starred, true)
+        val session = ReviewSession(reviews, words, newPerDay = 10).also { it.start(ReviewFilter { it.starred }) }
+        assertEquals(1, session.remaining)
+        assertEquals(starred, session.current!!.word.id)
+    }
+
+    @Test
     fun dueCardsComeBeforeNewOnes() = runTest {
         val fresh = word("新", rank = 9.0)
         val due = dueWord("旧")

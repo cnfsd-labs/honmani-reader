@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.review.Grade
+import app.honmani.reader.data.review.ReviewFilter
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.review.ReviewSentence
 import app.honmani.reader.data.review.ReviewSentences
@@ -57,6 +58,8 @@ class ReviewViewModel(
     private val reviews: ReviewRepository,
     private val words: WordRepository,
     private val settings: ReviewSettings,
+    /** The words the session takes (the Review card's chip); null: due cards, then new ones. */
+    private val filter: suspend () -> ReviewFilter? = { null },
 ) : ViewModel() {
     private val _state = MutableStateFlow(ReviewUiState(showSentence = settings.showSentence.value))
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
@@ -74,7 +77,7 @@ class ReviewViewModel(
             lock.withLock {
                 _state.value = ReviewUiState(showSentence = settings.showSentence.value)
                 val next = ReviewSession(reviews, words, settings.newPerDay.value, settings.knownAfterDays.value)
-                next.start()
+                next.start(filter())
                 session = next
                 publish(next)
             }
@@ -149,7 +152,9 @@ class ReviewViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
-                ReviewViewModel(container.reviewRepository, container.wordRepository, container.reviewSettings)
+                ReviewViewModel(container.reviewRepository, container.wordRepository, container.reviewSettings) {
+                    container.reviewFilter(container.reviewScope.value)
+                }
             }
         }
     }

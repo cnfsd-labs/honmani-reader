@@ -167,6 +167,44 @@ class WordRepository(
         }
     }
 
+    /**
+     * Adds a word to learn before reading a book, with the book's sentence as a lookup of origin
+     * [LookupOrigin.PREPARE] (for the review card's front): no lookup is counted, and a word
+     * already saved keeps its status. Returns the word's id.
+     */
+    suspend fun prepare(word: LookedUpWord): Long = database.withTransaction {
+        val time = now()
+        val sentence = word.sentence.take(MAX_SENTENCE_LENGTH)
+        val start = word.surfaceStart.coerceIn(0, sentence.length)
+        val end = (start + word.surface.length).coerceAtMost(sentence.length)
+        val existing = dao.find(word.expression, word.reading)
+        val wordId = existing?.id ?: dao.insert(
+            WordEntity(
+                expression = word.expression,
+                reading = word.reading,
+                gloss = word.gloss.take(MAX_GLOSS_LENGTH),
+                lookupCount = 0,
+                firstLookedUpAt = time,
+                lastLookedUpAt = time,
+                rankKey = WordScore.add(null, time),
+                lastSentence = sentence,
+                lastSurfaceStart = start,
+                lastSurfaceEnd = end,
+                lastBookTitle = word.bookTitle,
+            ),
+        )
+        if (sentence.isNotEmpty()) {
+            dao.insertLookup(
+                WordLookupEntity(
+                    wordId = wordId, surface = word.surface, sentence = sentence, surfaceStart = start, surfaceEnd = end,
+                    bookId = word.bookId, bookTitle = word.bookTitle, lookedUpAt = time, origin = LookupOrigin.PREPARE,
+                ),
+            )
+            dao.pruneLookups(wordId, KEPT_LOOKUPS)
+        }
+        wordId
+    }
+
     /** Replaces the meaning kept for the word list and review (a lookup with a meaning of its own overwrites it). */
     suspend fun setGloss(id: Long, gloss: String) = dao.setGloss(id, gloss.take(MAX_GLOSS_LENGTH))
 

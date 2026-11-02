@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
 import app.honmani.reader.ui.review.ReviewEntry
+import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.search.SearchContent
 import app.honmani.reader.ui.search.SearchField
 import app.honmani.reader.ui.search.SearchViewModel
@@ -141,6 +142,7 @@ fun WordsScreen(
     reviewDue: Int = 0,
     reviewNew: Int = 0,
     onStartReview: () -> Unit = {},
+    reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
     // Its own lookup panel, apart from the reader's: a search saves no word by itself.
@@ -358,6 +360,7 @@ fun WordsScreen(
         reviewDue = reviewDue,
         reviewNew = reviewNew,
         onStartReview = onStartReview,
+        reviewChoice = reviewChoice,
     )
     val state = panel
     if (state != null) {
@@ -426,6 +429,7 @@ private fun WordsContent(
     reviewDue: Int = 0,
     reviewNew: Int = 0,
     onStartReview: () -> Unit = {},
+    reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
 ) {
     val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
     val scope = rememberCoroutineScope()
@@ -446,6 +450,7 @@ private fun WordsContent(
                         due = reviewDue,
                         newWords = reviewNew,
                         onStart = onStartReview,
+                        choice = reviewChoice,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     )
                 }

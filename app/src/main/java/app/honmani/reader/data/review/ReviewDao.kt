@@ -73,9 +73,18 @@ interface ReviewDao {
     @Query("SELECT w.id FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC LIMIT :limit")
     suspend fun unintroducedIds(limit: Int): List<Long>
 
-    /** [unintroducedIds] with how each word is written, all of them. */
-    @Query("SELECT w.id AS id, w.expression AS expression FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC")
-    suspend fun unintroducedWords(): List<ReviewWord>
+    /** The words of [unintroducedIds], all of them. */
+    @Query("SELECT w.* FROM word w WHERE $UNINTRODUCED ORDER BY w.rank_key DESC, w.id DESC")
+    suspend fun unintroducedWords(): List<WordEntity>
+
+    /** Cards of Learning words in review that are not due yet, soonest due first (to review early). */
+    @Transaction
+    @Query(
+        "SELECT c.* FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'REVIEW' AND w.scheduler = 'HONMANI' " +
+            "AND w.status = 'LEARNING' AND c.due >= :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
+            "ORDER BY c.due, c.word_id",
+    )
+    suspend fun notDueLearningCards(cutoff: Long, now: Long): List<CardWithWord>
 
     @Query("SELECT COUNT(*) FROM word w WHERE $UNINTRODUCED")
     fun observeUnintroducedCount(): Flow<Int>

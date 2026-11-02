@@ -1,11 +1,17 @@
 package app.honmani.reader.ui.library
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -14,9 +20,13 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +42,9 @@ import app.honmani.reader.ui.stats.StatisticsViewModel
 import app.honmani.reader.ui.stats.number
 import app.honmani.reader.ui.words.openInDictionary
 
+/** "Top 20" ticks this many words. */
+private const val PREPARE_TOP = 20
+
 /**
  * The words of a book the reader does not know yet, the most used first (at most
  * [UnknownWords.LIMIT]), to look over before reading it. A tap opens the word in the dictionary.
@@ -42,6 +55,9 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
     val context = LocalContext.current
     val flow = remember(contentHash) { viewModel.unknownWords(contentHash) }
     val unknown: UnknownWords? by flow.collectAsStateWithLifecycle(null)
+    // Words ticked to learn before reading ("Prepare"), most used first like the list.
+    val chosen = remember(contentHash) { mutableStateListOf<String>() }
+    var preparing by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(modifier = Modifier.navigationBarsPadding()) {
             Text(
@@ -73,10 +89,44 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 8.dp),
                     )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        TextButton(onClick = {
+                            chosen.clear()
+                            chosen.addAll(found.words.take(PREPARE_TOP).map { it.key })
+                        }) { Text(stringResource(R.string.prepare_top, PREPARE_TOP)) }
+                        Button(
+                            enabled = chosen.isNotEmpty() && !preparing,
+                            onClick = {
+                                preparing = true
+                                val order = found.words.map { it.key }.filter { it in chosen }
+                                viewModel.prepare(contentHash, order) { added ->
+                                    preparing = false
+                                    chosen.clear()
+                                    Toast.makeText(
+                                        context,
+                                        context.resources.getQuantityString(R.plurals.prepare_done, added, added),
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                        ) { Text(pluralStringResource(R.plurals.prepare_button, chosen.size, chosen.size)) }
+                    }
                     LazyColumn {
                         itemsIndexed(found.words, key = { _, word -> word.key }) { _, word ->
                             ListItem(
                                 headlineContent = { Text(word.key) },
+                                leadingContent = {
+                                    Checkbox(
+                                        checked = word.key in chosen,
+                                        onCheckedChange = { if (it) chosen += word.key else chosen -= word.key },
+                                    )
+                                },
                                 trailingContent = {
                                     Text(
                                         text = pluralStringResource(R.plurals.unknown_words_uses, word.uses, number(word.uses.toLong())),

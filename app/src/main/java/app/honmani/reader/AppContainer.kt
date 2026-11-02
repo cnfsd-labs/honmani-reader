@@ -34,6 +34,7 @@ import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.NetworkWatch
@@ -42,7 +43,13 @@ import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
 import app.honmani.reader.data.review.ReadingPasses
+import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.LookedUpWord
+import app.honmani.reader.data.difficulty.Segmenter
+import app.honmani.reader.data.review.BookSentences
 import app.honmani.reader.data.review.Relevance
+import app.honmani.reader.data.review.ReviewFilter
+import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
@@ -71,6 +78,7 @@ import app.honmani.reader.data.words.WordKnowledgeTracker
 import app.honmani.reader.data.words.WordMarker
 import app.honmani.reader.data.words.WordProgressStore
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.DictionaryLookup
 import app.honmani.reader.lookup.LookupGroups
@@ -172,17 +180,37 @@ class AppContainer(context: Context) {
 
     val reviewRepository: ReviewRepository by lazy { ReviewRepository(database, relevance = ::openBookRelevance) }
 
+    /** The book being read: the last one opened, unless finished or hidden. */
+    private suspend fun openBook(): BookEntity? =
+        bookDao.observeAll().first().firstOrNull { it.lastOpenedAt != null }?.takeIf { it.finishedAt == null && !it.hidden }
+
+    /** How soon each word comes up in the book being read, from the reading point on; null without one or before it is graded. */
+    private suspend fun openBookRelevance(): ((String) -> Double)? = openBook()?.let { bookFilter(it)?.score }
+
     /**
-     * How soon each word comes up in the book being read (the last one opened, unless finished
-     * or hidden), from the reading point on; null without such a book or before it is graded.
+     * The words of [book] (or of one of their spellings), ordered by how soon they come up from
+     * its reading point; null before the book is graded.
      */
-    private suspend fun openBookRelevance(): ((String) -> Double)? {
-        val book = bookDao.observeAll().first().firstOrNull { it.lastOpenedAt != null } ?: return null
-        if (book.finishedAt != null || book.hidden) return null
+    private suspend fun bookFilter(book: BookEntity): ReviewFilter? {
         val words = withContext(Dispatchers.IO) { difficultyStore.words(book.contentHash) } ?: return null
         val relevance = Relevance.of(words, Relevance.step(book.progress))
+        val keys = words.keys.toHashSet()
         val variants = spellingVariants()
-        return { expression -> relevance.of(expression, variants.of(expression).asList()) }
+        return ReviewFilter(score = { relevance.of(it, variants.of(it).asList()) }) { word ->
+            word.expression in keys || variants.of(word.expression).any { it in keys }
+        }
+    }
+
+    /** What the next review session draws from (the Review card's chips); not kept across starts of the app. */
+    val reviewScope = MutableStateFlow<ReviewScope>(ReviewScope.Due)
+
+    /** The words [scope] takes; null for [ReviewScope.Due]. A book not graded yet takes none. */
+    suspend fun reviewFilter(scope: ReviewScope): ReviewFilter? = when (scope) {
+        ReviewScope.Due -> null
+        ReviewScope.ThisBook -> openBook()?.let { bookFilter(it) } ?: ReviewFilter { false }
+        is ReviewScope.Book -> bookDao.find(scope.id)?.let { bookFilter(it) } ?: ReviewFilter { false }
+        ReviewScope.Starred -> ReviewFilter { it.starred }
+        ReviewScope.AllLearning -> ReviewFilter { it.status == WordStatus.LEARNING }
     }
 
     val ankiSettings: AnkiSettings by lazy {
@@ -357,16 +385,56 @@ class AppContainer(context: Context) {
             books = { bookDao.observeAll().first() },
             sources = { lexiconSources() },
             lexicon = { lexicon(it) },
-            texts = { book ->
-                val file = bookImporter.bookFile(book)
-                when (book.format) {
-                    BookFormat.EPUB -> EpubPositions.texts(file)?.asSequence()
-                    // Stored as UTF-8 (see TextEncoding).
-                    BookFormat.TXT -> if (file.exists()) sequenceOf(RubyText(file.readText())) else null
-                }
-            },
+            texts = ::bookTexts,
             log = { Log.i("Honmani.difficulty", it) },
         )
+    }
+
+    /** A book's text, chapter by chapter, as the grader reads it. */
+    private fun bookTexts(book: BookEntity): Sequence<RubyText>? {
+        val file = bookImporter.bookFile(book)
+        return when (book.format) {
+            BookFormat.EPUB -> EpubPositions.texts(file)?.asSequence()
+            // Stored as UTF-8 (see TextEncoding).
+            BookFormat.TXT -> if (file.exists()) sequenceOf(RubyText(file.readText())) else null
+        }
+    }
+
+    /**
+     * "Prepare a book": adds [keys] (words of [book], see [UnknownWords]) to Learning as new
+     * review cards, each with the sentence of the book where it comes up next from the reading
+     * point ([BookSentences]). Returns how many words are in review now.
+     */
+    suspend fun prepareBook(book: BookEntity, keys: List<String>): Int {
+        val words = withContext(Dispatchers.IO) { difficultyStore.words(book.contentHash) } ?: return 0
+        val lexicon = lexiconSources()?.let { lexicon(it) } ?: return 0
+        val sentences = withContext(Dispatchers.Default) {
+            val chapters = bookTexts(book)?.map { it.text }?.toList() ?: return@withContext emptyMap()
+            val segmenter = Segmenter(lexicon)
+            BookSentences.find(chapters, words, keys, Relevance.step(book.progress)) { text, onToken -> segmenter.segment(text, onToken) }
+        }
+        var added = 0
+        for (key in keys) {
+            val groups = LookupGroups.from(dictionaryLookup.lookup(key))
+            val best = groups.firstOrNull { it.expression == key } ?: groups.firstOrNull() ?: continue
+            val sentence = sentences[key]
+            val id = wordRepository.prepare(
+                LookedUpWord(
+                    expression = best.expression,
+                    reading = best.reading,
+                    gloss = best.sections.firstOrNull()?.senses?.firstOrNull()?.glosses?.joinToString("; ").orEmpty(),
+                    surface = sentence?.surface ?: key,
+                    sentence = sentence?.text.orEmpty(),
+                    surfaceStart = sentence?.start ?: 0,
+                    bookId = book.id,
+                    bookTitle = book.title,
+                    origin = LookupOrigin.PREPARE,
+                ),
+            )
+            reviewRepository.introduce(id)
+            if (reviewRepository.card(id) != null) added++
+        }
+        return added
     }
 
     private suspend fun lexiconSources(): LexiconSources? =
@@ -485,10 +553,14 @@ class AppContainer(context: Context) {
 
     /** The graded book's words the reader does not know yet, most used first (see [UnknownWords]). */
     fun unknownWords(contentHash: String): Flow<UnknownWords?> =
-        bookWordsFlow(contentHash) { words, knowledge, vocabulary -> UnknownWords.of(words, knowledge, vocabulary) }
+        bookWordsFlow(contentHash, assumedVocabulary = UnknownWords.BEGINNER) { words, knowledge, vocabulary ->
+            UnknownWords.of(words, knowledge, vocabulary)
+        }
 
+    /** [assumedVocabulary]: the vocabulary taken before the reader's is estimated; null: nothing until then. */
     private fun <T : Any> bookWordsFlow(
         contentHash: String,
+        assumedVocabulary: Int? = null,
         compute: (BookWords, WordKnowledge, Int) -> T?,
     ): Flow<T?> {
         var words: Pair<StoredDifficulty, BookWords?>? = null
@@ -496,7 +568,8 @@ class AppContainer(context: Context) {
             wordKnowledge,
             skillTracker.estimate.map { it.vocabulary?.estimate?.words }.distinctUntilChanged(),
             difficultyStore.grades.map { it[contentHash] }.distinctUntilChanged(),
-        ) { knowledge, vocabulary, grade ->
+        ) { knowledge, estimated, grade ->
+            val vocabulary = estimated ?: assumedVocabulary
             if (vocabulary == null || grade == null || grade.difficulty.score <= 0) return@combine null
             // The book's words only change when it is graded again.
             val bookWords = words?.takeIf { it.first == grade }?.second

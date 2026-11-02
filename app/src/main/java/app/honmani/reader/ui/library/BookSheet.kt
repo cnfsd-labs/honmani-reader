@@ -186,7 +186,10 @@ fun BookSheet(
                     )
                 }
                 stats?.let { DifficultyCard(it, book, skill) }
-                if ((stats?.coverage?.newWords ?: 0) > 0 && book.contentHash.isNotEmpty()) {
+                // Before the reader's vocabulary is estimated, a graded book's list assumes a beginner's (to prepare it).
+                val coverage = stats?.coverage
+                val hasNewWords = if (coverage != null) coverage.newWords > 0 else (stats?.difficulty?.score ?: 0) > 0
+                if (hasNewWords && book.contentHash.isNotEmpty()) {
                     TextButton(onClick = { showUnknown = true }, modifier = Modifier.padding(horizontal = 16.dp)) {
                         Text(stringResource(R.string.unknown_words_button))
                     }

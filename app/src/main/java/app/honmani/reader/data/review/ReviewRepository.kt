@@ -74,24 +74,30 @@ class ReviewRepository(
      * With a book being read, the words that come up soonest and most often in it go first
      * ([Relevance]); the others keep that order.
      */
-    suspend fun introduceNew(limit: Int): List<CardWithWord> {
+    suspend fun introduceNew(limit: Int, filter: ReviewFilter? = null): List<CardWithWord> {
         if (limit <= 0) return emptyList()
-        val score = relevance()
+        val score = filter?.score ?: relevance()
         return database.withTransaction {
-            if (score == null) {
+            if (score == null && filter == null) {
                 val existing = dao.newCards(now(), limit)
                 val fresh = dao.unintroducedIds(limit - existing.size).mapNotNull { id ->
                     if (introduce(id)) dao.cardWithWord(id) else null
                 }
                 return@withTransaction existing + fresh
             }
-            val candidates = dao.newCards(now(), Int.MAX_VALUE).map { NewCandidate(it.word.id, it.word.expression, it) } +
-                dao.unintroducedWords().map { NewCandidate(it.id, it.expression, null) }
-            orderNew(candidates, score).take(limit).mapNotNull { candidate ->
+            val candidates = (
+                dao.newCards(now(), Int.MAX_VALUE).map { NewCandidate(it.word.id, it.word.expression, it) } +
+                    dao.unintroducedWords().filter { filter == null || filter.accepts(it) }.map { NewCandidate(it.id, it.expression, null) }
+                ).filter { filter == null || it.card == null || filter.accepts(it.card.word) }
+            orderNew(candidates, score ?: { 0.0 }).take(limit).mapNotNull { candidate ->
                 candidate.card ?: if (introduce(candidate.wordId)) dao.cardWithWord(candidate.wordId) else null
             }
         }
     }
+
+    /** Cards of Learning words that are not due today, soonest due first: a scope's early reviews. */
+    suspend fun notDueLearningCards(): List<CardWithWord> =
+        now().let { dao.notDueLearningCards(ReviewRules.dueCutoff(it, zone()), it) }
 
     /** Puts a card back as it was (takes back a bury, a suspension or a change of memory). */
     suspend fun restore(card: ReviewCardEntity) {

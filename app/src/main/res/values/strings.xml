@@ -524,6 +524,11 @@
     <string name="review_start">Start</string>
     <string name="review_start_description">Start the review: %1$d due, %2$d new</string>
     <string name="review_chip_due">Due</string>
+    <string name="review_chip_this_book">This book</string>
+    <string name="review_chip_a_book">A book…</string>
+    <string name="review_chip_starred">Starred</string>
+    <string name="review_chip_all_learning">All learning</string>
+    <string name="review_pick_book">Words of which book?</string>
     <string name="review_nav_badge">%1$d words due for review</string>
     <string name="review_close">Leave the review</string>
     <string name="review_left">%1$d left</string>
@@ -692,6 +697,15 @@
     <string name="book_time_left">About %1$s left</string>
     <string name="book_coverage_all">You know all its words.</string>
     <string name="unknown_words_button">Words to learn before reading</string>
+    <string name="prepare_top">Top %1$d</string>
+    <plurals name="prepare_button">
+        <item quantity="one">Learn %1$d word</item>
+        <item quantity="other">Learn %1$d words</item>
+    </plurals>
+    <plurals name="prepare_done">
+        <item quantity="one">%1$d word to review, with its sentence from the book</item>
+        <item quantity="other">%1$d words to review, with their sentences from the book</item>
+    </plurals>
     <string name="unknown_words_title">Words you don\'t know yet</string>
     <plurals name="unknown_words_all">
         <item quantity="one">The one word of this book that is new to you. Tap it to look it up.</item>

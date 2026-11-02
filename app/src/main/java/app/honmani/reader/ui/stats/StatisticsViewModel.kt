@@ -96,6 +96,8 @@ class StatisticsViewModel(
     private val coverage: (contentHash: String) -> Flow<BookCoverage?> = { flowOf(null) },
     /** The words of a book (by content hash) the reader does not know yet. */
     private val unknownWords: (contentHash: String) -> Flow<UnknownWords?> = { flowOf(null) },
+    /** "Prepare a book": adds words of a book to review with its sentences; how many are in review. */
+    private val prepareBook: suspend (contentHash: String, keys: List<String>) -> Int = { _, _ -> 0 },
     /** The daily reading goal in minutes; null while it is off. */
     private val goalMinutes: Flow<Int?> = flowOf(null),
     private val today: () -> LocalDate = LocalDate::now,
@@ -214,6 +216,11 @@ class StatisticsViewModel(
     /** The words of the book with [contentHash] the reader does not know yet; null before they can be told. */
     fun unknownWords(contentHash: String): Flow<UnknownWords?> = unknownWords.invoke(contentHash)
 
+    /** Adds [keys], words of the book with [contentHash], to Learning and review; [done] gets how many are in review. */
+    fun prepare(contentHash: String, keys: List<String>, done: (Int) -> Unit) {
+        viewModelScope.launch { done(prepareBook(contentHash, keys)) }
+    }
+
     companion object {
         val Factory = viewModelFactory {
             initializer {
@@ -230,6 +237,7 @@ class StatisticsViewModel(
                     grading = container.bookGrader.state,
                     coverage = container::bookCoverage,
                     unknownWords = container::unknownWords,
+                    prepareBook = { hash, keys -> container.bookDao.findByHash(hash)?.let { container.prepareBook(it, keys) } ?: 0 },
                     goalMinutes = container.readingGoalSettings.goalMinutes,
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                 )

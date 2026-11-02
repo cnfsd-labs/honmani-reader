@@ -53,6 +53,9 @@ enum class LookupOrigin {
     READER,
     SEARCH,
     REVIEW,
+
+    /** Not a lookup: a word added with its sentence to learn before reading a book. */
+    PREPARE,
 }
 
 enum class WordStatus {

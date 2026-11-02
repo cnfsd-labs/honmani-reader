@@ -53,6 +53,22 @@ class WordRepositoryTest {
     private suspend fun learning() = repository.learning.first()
 
     @Test
+    fun aPreparedWordKeepsTheBooksSentenceWithoutCountingALookup() = runTest {
+        val id = repository.prepare(lookup("料理", sentence = "料理店に入った。", surface = "料理", bookTitle = "注文の多い料理店"))
+        val word = repository.find(id)!!
+        assertEquals(WordStatus.LEARNING, word.status)
+        assertEquals(0, word.lookupCount)
+        val saved = repository.latestLookups(id).single()
+        assertEquals(LookupOrigin.PREPARE, saved.origin)
+        assertEquals("料理店に入った。", saved.sentence)
+        assertEquals(0 until 2, saved.surfaceStart until saved.surfaceEnd)
+        assertEquals(0, repository.lookupCount(null).first())
+        // Prepared again: the same word, one more sentence, still no lookup.
+        assertEquals(id, repository.prepare(lookup("料理", sentence = "料理を出す。", bookTitle = "注文の多い料理店")))
+        assertEquals(0, repository.find(id)!!.lookupCount)
+    }
+
+    @Test
     fun aFirstLookupAddsTheWordWithItsSentence() = runTest {
         repository.record(lookup("食べる", sentence = "猫が食べました。", surface = "食べました", surfaceStart = 2, bookTitle = "猫"))
 

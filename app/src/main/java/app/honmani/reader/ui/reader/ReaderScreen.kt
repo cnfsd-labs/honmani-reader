@@ -54,6 +54,7 @@ import app.honmani.reader.data.words.SessionWords
 import app.honmani.reader.ui.HomeNavigationBar
 import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.review.ReviewScreen
+import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
@@ -185,6 +186,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     // Words due, for the badge on the Words tab, and the new words a session would start.
+    val reviewScope by container.reviewScope.collectAsStateWithLifecycle()
+    val reviewBooks by remember(container) { container.bookDao.observeAll() }.collectAsStateWithLifecycle(emptyList())
     val reviewDue by remember(container) { flow { emitAll(container.reviewRepository.observeDueCount()) } }
         .collectAsStateWithLifecycle(0)
     val reviewNew by remember(container) {
@@ -374,6 +377,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 reviewDue = reviewDue,
                                 reviewNew = reviewNew,
                                 onStartReview = { reviewShown = true },
+                                reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
+                                    container.reviewScope.value = it
+                                },
                             )
                             HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
                             HomeTab.SETTINGS -> SettingsScreen(
