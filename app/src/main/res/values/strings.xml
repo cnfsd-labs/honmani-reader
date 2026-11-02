@@ -278,6 +278,17 @@
     </plurals>
     <string name="csv_stats_exported">Reading statistics saved to a CSV file.</string>
     <string name="csv_stats_export">Export reading per day (CSV)</string>
+    <string name="refold_export">Export for Refold (CSV)</string>
+    <string name="refold_share">Export for Refold</string>
+    <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese. In the Refold app, import it under Import/Export. The file is not sent anywhere by Honmani; you choose where it goes. Today\'s reading is only included when you export everything.</string>
+    <string name="refold_never">Nothing exported yet.</string>
+    <string name="refold_last">Last export reached %1$s.</string>
+    <plurals name="refold_new">
+        <item quantity="one">New since the last export (%d row)</item>
+        <item quantity="other">New since the last export (%d rows)</item>
+    </plurals>
+    <string name="refold_all">Everything</string>
+    <string name="refold_nothing">No finished day of reading to export.</string>
     <string name="export_package">Anki package</string>
     <string name="export_package_detail">Cards with audio, for Anki on a computer (.apkg)</string>
     <string name="export_text">Text file</string>

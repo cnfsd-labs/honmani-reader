@@ -56,6 +56,7 @@ import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
+import app.honmani.reader.data.settings.RefoldExportSettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
@@ -158,6 +159,9 @@ class AppContainer(context: Context) {
 
     /** The daily reading goal (Settings; shown in the statistics). */
     val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }
+
+    /** Where the Refold export left off (Progress). */
+    val refoldExportSettings: RefoldExportSettings by lazy { RefoldExportSettings(settingsPreferences) }
 
     /** New cards a day, the card front and the days to "known" (Settings → Flashcards). */
     val reviewSettings: ReviewSettings by lazy { ReviewSettings(settingsPreferences) }

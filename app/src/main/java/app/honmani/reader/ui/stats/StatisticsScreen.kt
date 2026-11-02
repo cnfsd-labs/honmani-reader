@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.stats
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CardDefaults
@@ -96,6 +99,29 @@ fun StatisticsContent(
             ).show()
         }
     }
+    val shareTitle = stringResource(R.string.refold_share)
+    var refoldDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(viewModel) {
+        viewModel.refold.collect { event ->
+            when (event) {
+                is StatisticsViewModel.RefoldEvent.Ready -> {
+                    val send = Intent(Intent.ACTION_SEND)
+                        .setType("text/csv")
+                        .putExtra(Intent.EXTRA_STREAM, Uri.parse(event.uri))
+                        .putExtra(Intent.EXTRA_TITLE, event.name)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    context.startActivity(Intent.createChooser(send, shareTitle))
+                }
+                StatisticsViewModel.RefoldEvent.NoReading ->
+                    Toast.makeText(context, R.string.refold_nothing, Toast.LENGTH_LONG).show()
+                StatisticsViewModel.RefoldEvent.Failed ->
+                    Toast.makeText(context, R.string.anki_export_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    if (refoldDialog) {
+        RefoldDialog(viewModel, onDismiss = { refoldDialog = false })
+    }
     Column(modifier = modifier.fillMaxSize()) {
         PeriodPicker(period, viewModel::setPeriod)
         val current = state ?: return@Column
@@ -148,8 +174,58 @@ fun StatisticsContent(
             TextButton(onClick = { exportCsv.launch(csvFileName) }) {
                 Text(stringResource(R.string.csv_stats_export))
             }
+            TextButton(onClick = { refoldDialog = true }) {
+                Text(stringResource(R.string.refold_export))
+            }
         }
     }
+}
+
+/** "Export for Refold": what the file holds and the two ways to export (new since the last time, or everything). */
+@Composable
+private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) {
+    var info by remember { mutableStateOf<StatisticsViewModel.RefoldInfo?>(null) }
+    LaunchedEffect(viewModel) { info = viewModel.refoldInfo() }
+    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+    val current = info
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.refold_export)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.refold_detail))
+                val last = current?.lastDay
+                Text(
+                    text = if (last == null) {
+                        stringResource(R.string.refold_never)
+                    } else {
+                        stringResource(R.string.refold_last, last.format(dateFormat))
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(
+                    enabled = current != null && current.newRows > 0,
+                    onClick = {
+                        viewModel.exportRefold(all = false)
+                        onDismiss()
+                    },
+                ) {
+                    val rows = current?.newRows ?: 0
+                    Text(pluralStringResource(R.plurals.refold_new, rows, rows))
+                }
+                TextButton(onClick = {
+                    viewModel.exportRefold(all = true)
+                    onDismiss()
+                }) { Text(stringResource(R.string.refold_all)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

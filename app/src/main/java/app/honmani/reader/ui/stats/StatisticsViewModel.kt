@@ -21,6 +21,8 @@ import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.WordCounts
 import app.honmani.reader.data.export.CsvExports
+import app.honmani.reader.data.export.RefoldExport
+import app.honmani.reader.data.export.writeShareFile
 import app.honmani.reader.data.export.writeTextDocument
 import app.honmani.reader.data.stats.DayTotal
 import app.honmani.reader.diagnostics.logWarning
@@ -106,7 +108,29 @@ class StatisticsViewModel(
     private val now: () -> Instant = Instant::now,
     /** Writes text to a document the reader picked (a content URI). */
     private val writeDocument: suspend (uri: String, text: String) -> Unit = { _, _ -> },
+    /** The last day of reading the Refold export covered; null before the first export. */
+    private val lastRefoldDay: () -> LocalDate? = { null },
+    private val setLastRefoldDay: (LocalDate) -> Unit = {},
+    /** Writes the Refold file where it can be shared and returns its content URI. */
+    private val writeRefoldFile: suspend (name: String, text: String) -> String = { name, _ -> name },
 ) : ViewModel() {
+    /** What the Refold export dialog tells: the day the last export reached and the rows a new one would hold. */
+    data class RefoldInfo(val lastDay: LocalDate?, val newRows: Int)
+
+    /** What came of a Refold export. */
+    sealed interface RefoldEvent {
+        /** The file at [uri] is ready for the share sheet. */
+        data class Ready(val uri: String, val name: String) : RefoldEvent
+
+        /** There was no reading to export. */
+        data object NoReading : RefoldEvent
+
+        data object Failed : RefoldEvent
+    }
+
+    private val _refold = Channel<RefoldEvent>(Channel.BUFFERED)
+    val refold: Flow<RefoldEvent> = _refold.receiveAsFlow()
+
     private val _exported = Channel<Boolean>(Channel.BUFFERED)
 
     /** Whether each CSV export worked. */
@@ -175,6 +199,45 @@ class StatisticsViewModel(
         }
     }
 
+    private suspend fun refoldFile(all: Boolean): RefoldExport.Result {
+        val titles = books.first().associate { it.id to it.title }
+        return RefoldExport.build(
+            days = days.first(),
+            titles = titles,
+            since = if (all) null else lastRefoldDay(),
+            today = RefoldExport.today(now(), zone()),
+            includeToday = all,
+        )
+    }
+
+    /** What a Refold export since the last one would hold. */
+    suspend fun refoldInfo(): RefoldInfo = RefoldInfo(lastRefoldDay(), refoldFile(all = false).rows)
+
+    /** Shares the reading per day and book as a CSV file for Refold: all of it, or what is new since the last export. */
+    fun exportRefold(all: Boolean) {
+        viewModelScope.launch {
+            val event = try {
+                val file = refoldFile(all)
+                val lastDay = file.lastDay
+                if (file.rows == 0 || lastDay == null) {
+                    RefoldEvent.NoReading
+                } else {
+                    val name = "honmani-refold-${RefoldExport.today(now(), zone())}.csv"
+                    val uri = writeRefoldFile(name, file.csv)
+                    // The share sheet reports nothing back: the export counts as done once it is offered.
+                    setLastRefoldDay(maxOf(lastDay, lastRefoldDay() ?: lastDay))
+                    RefoldEvent.Ready(uri, name)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logWarning("Honmani.stats", "Refold export failed", e)
+                RefoldEvent.Failed
+            }
+            _refold.send(event)
+        }
+    }
+
     fun setPeriod(period: StatsPeriod) {
         _period.value = period
     }
@@ -240,6 +303,9 @@ class StatisticsViewModel(
                     prepareBook = { hash, keys -> container.bookDao.findByHash(hash)?.let { container.prepareBook(it, keys) } ?: 0 },
                     goalMinutes = container.readingGoalSettings.goalMinutes,
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
+                    lastRefoldDay = { container.refoldExportSettings.lastDay },
+                    setLastRefoldDay = container.refoldExportSettings::setLastDay,
+                    writeRefoldFile = { name, text -> writeShareFile(application, "refold", name, text) },
                 )
             }
         }
