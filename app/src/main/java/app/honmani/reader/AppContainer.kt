@@ -21,6 +21,7 @@ import app.honmani.reader.data.dictionary.DictionaryDownloader
 import app.honmani.reader.data.dictionary.DictionaryImportScheduler
 import app.honmani.reader.data.dictionary.DictionaryImporter
 import app.honmani.reader.data.dictionary.DictionaryRepository
+import app.honmani.reader.data.dictionary.GlossIndex
 import app.honmani.reader.data.dictionary.DictionaryUpdateChecker
 import app.honmani.reader.data.dictionary.WorkManagerDictionaryImportScheduler
 import app.honmani.reader.data.difficulty.BookGrader
@@ -131,8 +132,11 @@ class AppContainer(context: Context) {
         )
     }
 
+    /** English search: the glosses of each dictionary, indexed in the background ([startGlossIndex]). */
+    val glossIndex: GlossIndex by lazy { GlossIndex(database) }
+
     val dictionaryLookup: DictionaryLookup by lazy {
-        DictionaryLookup(database.dictionaryDao(), database.termDao(), database.termMetaDao(), database.kanjiDao())
+        DictionaryLookup(database.dictionaryDao(), database.termDao(), database.termMetaDao(), database.kanjiDao(), glossIndex)
     }
 
     val readerDiagnostics = ReaderDiagnostics()
@@ -626,6 +630,17 @@ class AppContainer(context: Context) {
     /** Once per app start: removes import copies a kill left in the books directory. */
     fun sweepLeftovers() {
         applicationScope.launch { bookImporter.sweepTemporaryFiles() }
+    }
+
+    /**
+     * Once per app start: keeps [glossIndex] in step with the installed dictionaries (builds what
+     * an import or an install from before English search lacks, drops what a removal left).
+     */
+    fun startGlossIndex() {
+        applicationScope.launch {
+            dictionaryRepository.dictionaries.map { all -> all.map { it.id }.toSet() }.distinctUntilChanged()
+                .collect { glossIndex.sync() }
+        }
     }
 
     fun startGrading() {

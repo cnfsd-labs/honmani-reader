@@ -123,6 +123,9 @@ interface TermDao {
     @Query("SELECT * FROM term WHERE id IN (:ids)")
     suspend fun findByIds(ids: List<Long>): List<TermEntity>
 
+    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE id IN (:ids)")
+    suspend fun keysByIds(ids: List<Long>): List<TermKey>
+
     @Insert
     suspend fun insertPreset(preset: GlossaryPresetEntity)
 

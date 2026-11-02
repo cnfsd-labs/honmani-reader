@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.dictionary.DictionaryFileFormat
 import app.honmani.reader.data.dictionary.DictionaryImporter
+import app.honmani.reader.data.dictionary.GlossIndex
 import app.honmani.reader.data.dictionary.LOOKUP_SQL_PLAN_CHECK
 import app.honmani.reader.data.dictionary.index
 import app.honmani.reader.data.dictionary.writeZip
@@ -597,6 +598,51 @@ class DictionaryLookupTest {
         assertEquals("時給", searched("jikyu").first())
         val tori = searched("tori")
         assertTrue(tori.toString(), tori.indexOf("通り") > maxOf(tori.indexOf("鳥"), tori.indexOf("取り")))
+    }
+
+    @Test
+    fun englishSearchRanksTheQueryAsAGlossFirst_thenCommonWords_andRomajiKeepsWorking() = runTest {
+        install(
+            "JMdict",
+            listOf("猫", "ねこ", "", 10, "cat (esp. the domestic cat)"),
+            listOf("キャット", "キャット", "", 0, "cat"),
+            listOf("三毛猫", "みけねこ", "", 5, "tortoiseshell cat"),
+            listOf("猫車", "ねこぐるま", "", 5, "wheelbarrow (cat cart)"),
+            listOf("食べる", "たべる", "v1", 10, "to eat"),
+            listOf("食う", "くう", "v5", 10, "to eat (vulgar)"),
+            listOf("食べ物", "たべもの", "", 5, "food; something to eat"),
+        )
+        // 猫車 is the most common, but only mentions a cat in brackets.
+        jitenRanks("猫車" to 10, "食べ物" to 50, "食べる" to 100, "猫" to 500, "食う" to 2000, "三毛猫" to 8000, "キャット" to 20000)
+        val glossIndex = GlossIndex(database)
+        val english = DictionaryLookup(database.dictionaryDao(), database.termDao(), database.termMetaDao(), database.kanjiDao(), glossIndex)
+        suspend fun searched(query: String) = LookupGroups.from(english.search(query), 50).map { it.expression }
+
+        assertTrue(english.search("cat").englishPending)
+        glossIndex.sync()
+        assertFalse(english.search("cat").englishPending)
+
+        assertEquals(listOf("猫", "キャット", "三毛猫", "猫車"), searched("cat"))
+        assertEquals(listOf("食べる", "食う", "食べ物"), searched("eat"))
+        assertEquals(listOf("食べる", "食う", "食べ物"), searched("to eat"))
+        assertEquals(listOf("三毛猫"), searched("Tortoiseshell Cat"))
+        // Romaji still spells words first; English matches come after.
+        assertEquals("猫", searched("neko").first())
+        assertEquals("食べる", searched("taberu").first())
+        assertEquals(listOf("猫", "猫車"), searched("猫"))
+    }
+
+    @Test
+    fun glossIndexFollowsTheInstalledDictionaries() = runTest {
+        val id = jmdict()
+        val glossIndex = GlossIndex(database)
+        glossIndex.sync()
+        assertEquals(listOf(id), glossIndex.indexed(listOf(id)))
+        assertEquals(1, glossIndex.search("\"eat\"", listOf(id), 10).size)
+
+        database.dictionaryDao().delete(id)
+        glossIndex.sync()
+        assertTrue(glossIndex.indexed(listOf(id)).isEmpty())
     }
 
     @Test

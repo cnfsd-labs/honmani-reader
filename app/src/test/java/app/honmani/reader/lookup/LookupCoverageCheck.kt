@@ -197,6 +197,9 @@ class LookupCoverageCheck {
         override suspend fun findByIds(ids: List<Long>): List<TermEntity> =
             ids.toSet().let { wanted -> all.filter { it.id in wanted } }
 
+        override suspend fun keysByIds(ids: List<Long>): List<TermKey> =
+            findByIds(ids).map { TermKey(it.id, it.dictionaryId, it.expression, it.reading, it.score) }
+
         override suspend fun glossaryPreset(dictionaryId: Long): ByteArray? = null
         override suspend fun insertAll(terms: List<TermEntity>) = error("read only")
         override suspend fun insertPreset(preset: GlossaryPresetEntity) = error("read only")

@@ -4,6 +4,7 @@ import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.dictionary.DictionaryDao
 import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
+import app.honmani.reader.data.dictionary.GlossIndex
 import app.honmani.reader.data.dictionary.GlossaryPacker
 import app.honmani.reader.data.dictionary.KanjiDao
 import app.honmani.reader.data.dictionary.MAX_LOOKUP_TEXTS
@@ -62,6 +63,8 @@ data class LookupResult(
     val dictionariesAvailable: Boolean = true,
     /** Frequency and pitch of the entries' words, by [metaKey]. */
     val meta: Map<String, WordMeta> = emptyMap(),
+    /** True if a search in English could find more once the gloss index is built ([GlossIndex]). */
+    val englishPending: Boolean = false,
 ) {
     fun metaOf(expression: String, reading: String): WordMeta = meta[metaKey(expression, reading)] ?: WordMeta.NONE
 
@@ -84,6 +87,7 @@ class DictionaryLookup(
     private val termDao: TermDao,
     private val termMetaDao: TermMetaDao? = null,
     private val kanjiDao: KanjiDao? = null,
+    private val glossIndex: GlossIndex? = null,
 ) {
     private data class Candidate(val source: String, val deinflection: Deinflection)
 
@@ -223,7 +227,9 @@ class DictionaryLookup(
             return LookupResult(emptyList(), dictionariesAvailable = false)
         }
         val parsed = SearchQuery.parse(query)
-        if (parsed.isEmpty) return LookupResult(emptyList())
+        // Latin letters are searched both as romaji and as English: "neko" spells 猫, "cat" means it.
+        val english = if (glossIndex != null) EnglishQuery.parse(query) else null
+        if (parsed.isEmpty && english == null) return LookupResult(emptyList())
 
         val tiers = HashMap<Long, Int>()
         val found = ArrayList<LookupEntry>()
@@ -291,7 +297,8 @@ class DictionaryLookup(
             }
         val (startedEntries, pointers) = followPointers(longVowelEntries + started) { _, _ -> false }
 
-        val entries = found + startedEntries
+        val englishEntries = if (english != null) englishSearch(english, dictionaries, source, tiers, maxWords) else emptyList()
+        val entries = found + startedEntries + englishEntries
         val meta = meta(entries, dictionaries)
         val order = compareBy<LookupEntry> { tiers[it.term.id] ?: TIER_PREFIX }
             .thenBy { it.term.id in pointers }
@@ -300,7 +307,64 @@ class DictionaryLookup(
             .thenBy { it.inflections.size }
             .thenBy { it.term.expression.length }
             .then(entryOrder)
-        return LookupResult(entries.sortedWith(order).distinctBy { it.term.id }, meta = meta)
+        val englishPending = english != null && glossIndex != null &&
+            dictionaries.values.filter { it.termCount > 0 }.let { glossIndex.indexed(it.map(DictionaryEntity::id)).size < it.size }
+        return LookupResult(entries.sortedWith(order).distinctBy { it.term.id }, meta = meta, englishPending = englishPending)
+    }
+
+    /**
+     * Entries whose glosses contain [query]'s words ([GlossIndex]), not already in [tiers]: the
+     * most common words among them are read and ranked by how well their glosses fit
+     * ([EnglishQuery.fit]); at most [maxWords] words. Adds their tiers to [tiers].
+     */
+    private suspend fun englishSearch(
+        query: EnglishQuery,
+        dictionaries: Map<Long, DictionaryEntity>,
+        source: String,
+        tiers: MutableMap<Long, Int>,
+        maxWords: Int,
+    ): List<LookupEntry> {
+        val index = glossIndex ?: return emptyList()
+        val ids = index.search(query.match, dictionaries.keys, ENGLISH_ID_LIMIT).filter { it !in tiers }
+        if (ids.isEmpty()) return emptyList()
+        val keys = ids.chunked(MAX_LOOKUP_TEXTS).flatMap { termDao.keysByIds(it) }.filter { it.dictionaryId in dictionaries }
+        // Light rows first: only the more common words are read in full and fitted.
+        val keyMeta = metaOfWords(keys.map { it.expression to it.reading }.distinct(), dictionaries)
+        val keyOrder = compareBy<TermKey> { keyMeta[metaKey(it.expression, it.reading)]?.rank ?: Double.MAX_VALUE }
+            .thenBy { DictionaryCatalog.isNames(dictionaries.getValue(it.dictionaryId).title) }
+            .thenByDescending { it.score }
+            .thenBy { it.expression.length }
+        val candidates = keys.sortedWith(keyOrder).map { it.expression to it.reading }.distinct()
+            .take(ENGLISH_CANDIDATE_WORDS).toHashSet()
+        val fitted = keys.filter { (it.expression to it.reading) in candidates }.map { it.id }
+            .chunked(MAX_LOOKUP_TEXTS)
+            .flatMap { termDao.findByIds(it) }
+            .map { term ->
+                val dictionary = dictionaries.getValue(term.dictionaryId)
+                val entry = LookupEntry(
+                    term = unpacked(term, dictionary),
+                    dictionary = dictionary,
+                    source = source,
+                    inflections = emptyList(),
+                    matchedExpression = false,
+                )
+                entry to query.fit(GlossaryFormatter.format(entry.term.glossary.json).map { it.glosses })
+            }
+        val bestFit = HashMap<Pair<String, String>, Int>()
+        for ((entry, fit) in fitted) bestFit.merge(entry.term.expression to entry.term.reading, fit, ::minOf)
+        val words = bestFit.keys.sortedWith(
+            compareBy<Pair<String, String>> { bestFit.getValue(it) }
+                .thenBy { keyMeta[metaKey(it.first, it.second)]?.rank ?: Double.MAX_VALUE },
+        ).take(maxWords).toHashSet()
+        return fitted.filter { (entry, _) -> entry.term.expression to entry.term.reading in words }.map { (entry, fit) ->
+            tiers[entry.term.id] = when (fit) {
+                EnglishQuery.Fit.FIRST_EXACT -> TIER_GLOSS_FIRST_EXACT
+                EnglishQuery.Fit.EXACT -> TIER_GLOSS_EXACT
+                EnglishQuery.Fit.FIRST_WORD -> TIER_GLOSS_WORD
+                else -> TIER_GLOSS
+            }
+            entry
+        }
     }
 
     /**
@@ -525,11 +589,23 @@ class DictionaryLookup(
         conditions == WordClass.ANY || conditions and termClasses != 0
 
     private companion object {
-        /** Search tiers: the query as typed, its other forms, with unwritten long vowels, words starting with it. */
+        /**
+         * Search tiers: the query as typed, its other forms, with unwritten long vowels; words
+         * with the query as the gloss of their first meaning, of another meaning; words starting
+         * with it; words with the query's words in the first meaning, elsewhere.
+         */
         const val TIER_EXACT = 0
         const val TIER_VARIANT = 1
         const val TIER_LONG_VOWEL = 2
-        const val TIER_PREFIX = 3
+        const val TIER_GLOSS_FIRST_EXACT = 3
+        const val TIER_GLOSS_EXACT = 4
+        const val TIER_PREFIX = 5
+        const val TIER_GLOSS_WORD = 6
+        const val TIER_GLOSS = 7
+
+        /** Entries an English search reads from the gloss index, and words of them it reads in full. */
+        const val ENGLISH_ID_LIMIT = 2_000
+        const val ENGLISH_CANDIDATE_WORDS = 150
 
         /** Words a search shows at most (besides the ones it spells out). */
         const val MAX_SEARCH_WORDS = 50

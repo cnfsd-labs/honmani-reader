@@ -28,6 +28,8 @@ data class SearchResults(
     val groups: List<LookupGroup> = emptyList(),
     /** False when no dictionary is installed: nothing can be found. */
     val dictionariesAvailable: Boolean = true,
+    /** True while English search is still being prepared (see [LookupResult.englishPending]). */
+    val englishPending: Boolean = false,
 )
 
 /**
@@ -60,7 +62,7 @@ class SearchViewModel(
 
     private suspend fun run(text: String): SearchResults = try {
         val result = withContext(compute) { search(text) }
-        SearchResults(text, withContext(compute) { LookupGroups.from(result, MAX_GROUPS) }, result.dictionariesAvailable)
+        SearchResults(text, withContext(compute) { LookupGroups.from(result, MAX_GROUPS) }, result.dictionariesAvailable, result.englishPending)
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

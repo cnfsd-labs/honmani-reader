@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -88,7 +90,10 @@ fun SearchContent(
     onForgetAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier = modifier) {
+    // New results start at the top: the list would otherwise follow a word that moved down.
+    val listState = rememberLazyListState()
+    LaunchedEffect(results.query) { listState.scrollToItem(0) }
+    LazyColumn(modifier = modifier, state = listState) {
         if (query.isBlank()) {
             if (history.isNotEmpty()) {
                 item(key = "history") {
@@ -128,6 +133,9 @@ fun SearchContent(
             !results.dictionariesAvailable -> item(key = "none") { Message(stringResource(R.string.lookup_no_dictionaries)) }
             results.groups.isEmpty() && results.query == query ->
                 item(key = "empty") { Message(stringResource(R.string.search_nothing_found, query.trim())) }
+        }
+        if (results.englishPending && results.query == query) {
+            item(key = "english") { Message(stringResource(R.string.search_english_pending)) }
         }
         // The last results stay until the next ones are ready: no flicker while typing.
         items(results.groups, key = { "d:${it.expression}:${it.reading}" }) { group ->

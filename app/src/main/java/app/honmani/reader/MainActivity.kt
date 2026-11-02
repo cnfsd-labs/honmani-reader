@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
             container.opdsAutoImport.start()
             container.dictionaryUpdateChecker.start()
             container.startGrading()
+            container.startGlossIndex()
             container.checkAutoBackupOffer()
             container.sweepLeftovers()
             container.openedBooks.receive(intent)
