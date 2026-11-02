@@ -156,7 +156,8 @@ book opens at the sentence; Back returns to Words), Not a word and Remove. Back 
 answers given. Chips other than Due (This book, A book…, Starred, All learning) review words early.
 Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it
 due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
-"Learn n words": they come with their sentences from the book, the ones used soonest first. At the largest font size the answer buttons
+"Learn n words": they come with their sentences from the book, the ones used soonest first.
+Words already in Learning are ticked and greyed ("In Learning"); "Top 20" picks the next ones. At the largest font size the answer buttons
 and the menu stay usable. Progress shows reviews today, review time, retention and words in review;
 Progress → Statistics → "Export for Refold (CSV)" offers a file to share. It holds only reading that
 was not exported before, today's so far included; Refold adds every imported row up, so a second
