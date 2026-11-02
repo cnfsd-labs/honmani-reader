@@ -321,13 +321,14 @@ fun LookupPanel(
                     Spacer(modifier = Modifier.weight(1f))
                 }
                 if (onDontCount != null && state is LookupPanelState.Results && state.previous == null) {
-                    val description = stringResource(R.string.lookup_dont_count_description)
-                    TextButton(
-                        onClick = onDontCount,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.semantics { contentDescription = description },
-                    ) {
-                        Text(stringResource(R.string.lookup_dont_count), maxLines = 1, style = MaterialTheme.typography.labelLarge)
+                    // An icon, not a text button: at the largest font a label left the matched word
+                    // only three characters.
+                    IconButton(onClick = onDontCount, modifier = Modifier.size(HEADER_BUTTON)) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_undo),
+                            contentDescription = stringResource(R.string.lookup_dont_count_description),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 if (state.tap.sentence.isNotBlank()) {

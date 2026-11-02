@@ -62,8 +62,8 @@ header up: it grows to about 88%; tap the handle: it toggles (TalkBack: "Expand"
 drag down: it shrinks, then closes. A new tap opens it small again; back, kanji and longer/shorter
 keep its size. Rotated to landscape the panel stays usable.
 
-Don't count: tap a word you have not looked up before: the panel's top row shows "Don't count" (not cut
-at the largest font). Press it: the panel closes and the word is not in Words (the count there is as before).
+Don't count: tap a word you have not looked up before: the panel's top row shows the undo arrow "Don't
+count" beside the speaker, and at the largest font a match of 5 characters (e.g. 食べなかった shortened once) is not cut. Press it: the panel closes and the word is not in Words (the count there is as before).
 Tap a saved word: the same button; pressing it leaves the word and its older lookups as they were (lookup
 count back, a Learned mark back, a due review card back as it was, the word's progress back). Looking up
 again within the hour in the same sentence changes nothing, so there is no button. A word starred or added
