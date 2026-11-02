@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -14,6 +15,7 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.ui.HonmaniApp
 import app.honmani.reader.ui.search.SearchRequests
+import app.honmani.reader.ui.reader.LocalExampleSentences
 import app.honmani.reader.ui.theme.HonmaniTheme
 
 class MainActivity : ComponentActivity() {
@@ -47,7 +49,9 @@ class MainActivity : ComponentActivity() {
             val accent by appearance.accent.collectAsStateWithLifecycle()
             val customHue by appearance.customHue.collectAsStateWithLifecycle()
             HonmaniTheme(accent = accent, customHue = customHue) {
-                HonmaniApp()
+                CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
+                    HonmaniApp()
+                }
             }
         }
     }

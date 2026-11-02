@@ -386,6 +386,7 @@ class Backup(
             AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
             AppearanceSettings.KEY_SHOW_PREVIOUS_SENTENCE to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_SHOW_WORD_FREQUENCY to BackupValue.BOOLEAN,
+            AppearanceSettings.KEY_SHOW_EXAMPLES to BackupValue.BOOLEAN,
             ReviewSettings.KEY_NEW_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,

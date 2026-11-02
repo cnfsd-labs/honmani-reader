@@ -31,6 +31,9 @@ Honmani only connects to the internet for these things, and only to these places
   These sites see an ordinary download request (your IP address and the app's name); Honmani
   sends no personal data. Their own privacy
   policies apply.
+- **Example sentences**, only if you switch them on in Settings: one file (about 4 MB) from
+  GitHub (github.com), over https, with the same request details as above. The sentences are
+  looked up on your phone; nothing about the words you look up is sent.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
   to the addresses you enter. If you give a user name and password, the password is stored
   encrypted on your phone and sent only to that server.

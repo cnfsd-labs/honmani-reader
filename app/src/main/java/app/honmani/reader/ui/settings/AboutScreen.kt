@@ -111,6 +111,11 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
                     openUrl(context, EDRDG_LICENCE_URL)
                 }
             }
+            item {
+                Entry(R.string.about_examples, stringResource(R.string.about_examples_details)) {
+                    openUrl(context, TATOEBA_LICENCE_URL)
+                }
+            }
             item { Heading(R.string.about_downloads) }
             item {
                 Text(
@@ -207,4 +212,5 @@ private fun openUrl(context: Context, url: String) {
 /** Where Honmani's source is published, as GPL-3.0 asks. */
 const val SOURCE_URL = "https://github.com/cnfsd-labs/honmani-reader"
 
+private const val TATOEBA_LICENCE_URL = "https://creativecommons.org/licenses/by/2.0/fr/"
 private const val EDRDG_LICENCE_URL = "https://www.edrdg.org/edrdg/licence.html"

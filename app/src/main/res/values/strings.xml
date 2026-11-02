@@ -55,6 +55,19 @@
     </plurals>
     <string name="settings_word_frequency">Show frequency in Words</string>
     <string name="settings_word_frequency_details">Shows how common each saved word is (#727), from your frequency dictionary; nothing shows without one</string>
+    <string name="settings_examples">Example sentences</string>
+    <string name="settings_examples_details">Shows sentences that use the looked-up word in the lookup panel. Needs a one-time download.</string>
+    <string name="settings_examples_credit">Tatoeba, CC BY 2.0 FR</string>
+    <string name="examples_download_title">Download example sentences, %1$s?</string>
+    <string name="examples_download_message">The Japanese sentences with English translations come from Tatoeba and are downloaded once from GitHub. You can delete them again here.</string>
+    <string name="examples_downloading">Downloading… %1$d%%</string>
+    <string name="examples_failed">Download failed: %1$s</string>
+    <string name="examples_delete_title">Delete the example sentences?</string>
+    <string name="examples_delete_message">The downloaded file (%1$s) is removed from this phone. You can download it again.</string>
+    <string name="examples_keep">Keep file</string>
+    <string name="lookup_examples">Examples (%1$d)</string>
+    <string name="lookup_examples_expanded">Expanded</string>
+    <string name="lookup_examples_collapsed">Collapsed</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
     <string name="settings_cover_difficulty">Difficulty on covers</string>
     <string name="settings_cover_difficulty_details">Each book\'s difficulty (1–100) in a corner of its cover</string>
@@ -78,6 +91,8 @@
     <string name="about_android_libraries_details">Kotlin, AndroidX, Jetpack Compose, Room, WorkManager, kotlinx · Apache License 2.0</string>
     <string name="about_downloads">Downloaded content</string>
     <string name="about_downloads_details">Dictionaries and fonts come from their publishers when you download them, under their own licences.</string>
+    <string name="about_examples">Example sentences (optional download)</string>
+    <string name="about_examples_details">Japanese sentences with English translations from Tatoeba (tatoeba.org) · CC BY 2.0 FR</string>
     <string name="about_radicals">Radical search data</string>
     <string name="about_radicals_details">RADKFILE, KRADFILE and KANJIDIC2 · © Electronic Dictionary Research and Development Group (edrdg.org) · CC BY-SA 4.0</string>
     <string name="about_fonts">Reader fonts</string>

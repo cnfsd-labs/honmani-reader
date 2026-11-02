@@ -32,6 +32,8 @@ import app.honmani.reader.data.difficulty.Lexicon
 import app.honmani.reader.data.difficulty.LexiconLoader
 import app.honmani.reader.data.difficulty.LexiconSources
 import app.honmani.reader.data.difficulty.StoredDifficulty
+import app.honmani.reader.data.examples.ExampleSentences
+import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookFormat
@@ -175,6 +177,13 @@ class AppContainer(context: Context) {
     val fontsDir = File(appContext.filesDir, "fonts")
 
     val fontStore: FontStore by lazy { FontStore(fontsDir, applicationScope, dictionaryDownloader::download) }
+
+    /** The optional example sentences (Settings → Example sentences), in `files/examples/`. */
+    val exampleStore: ExampleStore by lazy {
+        ExampleStore(File(appContext.filesDir, "examples"), applicationScope, dictionaryDownloader::download)
+    }
+
+    val exampleSentences: ExampleSentences by lazy { ExampleSentences(exampleStore, appearanceSettings.showExamples) }
 
     val bookDao: BookDao by lazy { database.bookDao() }
 

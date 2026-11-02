@@ -671,6 +671,7 @@ private fun LookupGroupItem(
             brief && hidden -> DetailLink(stringResource(R.string.lookup_show_more)) { onDetail(Detail.FULL) }
             detail == Detail.FULL -> DetailLink(stringResource(R.string.lookup_show_less)) { onDetail(Detail.BRIEF) }
         }
+        ExamplesRow(group.expression, group.reading)
     }
 }
 

@@ -48,6 +48,15 @@ class AppearanceSettingsTest {
     }
 
     @Test
+    fun exampleSentencesAreOffUntilSwitchedOn() {
+        assertEquals(false, AppearanceSettings(preferences()).showExamples.value)
+
+        AppearanceSettings(preferences()).setShowExamples(true)
+
+        assertEquals(true, AppearanceSettings(preferences()).showExamples.value)
+    }
+
+    @Test
     fun theLookupPanelHidesThePreviousSentenceUntilSwitchedOn() {
         assertEquals(false, AppearanceSettings(preferences()).showPreviousSentence.value)
 

@@ -167,7 +167,7 @@ class BackupTest {
         val dog = words.find("犬", "よみ")!!
         words.markLearned(dog.id)
         progress.save(mapOf(dog.id to WordStep(9, 4, 1, true)))
-        settings.edit().putString("accent", "TEAL").putBoolean("show_difficulty", false).putBoolean("show_previous_sentence", true).putBoolean("show_word_frequency", false).putFloat("accent_custom_hue", 120f).putBoolean("daily_goal_enabled", true).putInt("daily_goal_minutes", 45).apply()
+        settings.edit().putString("accent", "TEAL").putBoolean("show_difficulty", false).putBoolean("show_previous_sentence", true).putBoolean("show_word_frequency", false).putBoolean("show_examples", true).putFloat("accent_custom_hue", 120f).putBoolean("daily_goal_enabled", true).putInt("daily_goal_minutes", 45).apply()
         milestones.record(listOf("characters_10000"), today)
         stretches.add("hash-a", 0f, 0.25f)
         database.opdsCatalogDao().insert(
@@ -197,6 +197,7 @@ class BackupTest {
         assertEquals(false, new.settings.getBoolean("show_difficulty", true))
         assertEquals(true, new.settings.getBoolean("show_previous_sentence", false))
         assertEquals(false, new.settings.getBoolean("show_word_frequency", true))
+        assertEquals(true, new.settings.getBoolean("show_examples", false))
         assertEquals(120f, new.settings.getFloat("accent_custom_hue", 0f))
         assertEquals(true, new.settings.getBoolean("daily_goal_enabled", false))
         assertEquals(45, new.settings.getInt("daily_goal_minutes", 0))

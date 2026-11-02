@@ -46,6 +46,15 @@ Development Group (https://www.edrdg.org, licence: https://www.edrdg.org/edrdg/l
 CC BY-SA 4.0). `scripts/radicals/build_radicals.py` makes it; the radicals RADKFILE draws with a
 substitute kanji are mapped to their own Unicode forms. The file is shared under the same licence.
 
+## Example sentences (optional download)
+
+Not part of the app. When the reader switches on Settings → Example sentences, the app downloads
+a SQLite file made by `scripts/examples/build_examples.py` from Tatoeba (https://tatoeba.org)
+exports: Japanese sentences with English translations and the word index of the Tanaka corpus
+(`jpn_indices`). Sentences are © their contributors, licence CC BY 2.0 FR
+(https://creativecommons.org/licenses/by/2.0/fr/). The file is published as a release asset of
+https://github.com/cnfsd-labs/honmani-reader (tag `examples-1`) under the same licence.
+
 ## Planned (not yet included)
 
 Kuromoji or Sudachi (Apache-2.0) with their dictionary licenses, AnkiDroid Instant-Add API

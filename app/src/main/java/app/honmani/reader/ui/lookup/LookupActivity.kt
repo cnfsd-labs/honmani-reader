@@ -7,10 +7,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.MainActivity
+import app.honmani.reader.ui.reader.LocalExampleSentences
 import app.honmani.reader.ui.theme.HonmaniTheme
 
 /**
@@ -28,12 +30,15 @@ class LookupActivity : ComponentActivity() {
             return
         }
         val text = textOf(intent)
-        val appearance = (application as HonmaniApplication).container.appearanceSettings
+        val container = (application as HonmaniApplication).container
+        val appearance = container.appearanceSettings
         setContent {
             val accent by appearance.accent.collectAsStateWithLifecycle()
             val customHue by appearance.customHue.collectAsStateWithLifecycle()
             HonmaniTheme(accent = accent, customHue = customHue) {
-                LookupScreen(initialText = text, onDone = ::finish)
+                CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
+                    LookupScreen(initialText = text, onDone = ::finish)
+                }
             }
         }
     }

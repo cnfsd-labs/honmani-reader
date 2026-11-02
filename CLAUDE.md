@@ -30,7 +30,7 @@ repository is public: never copy those notes, personal details or discussions in
   change: ttu's library lives in its IndexedDB. The WebView blocks network loads. ttu doesn't
   sanitise book HTML: pages carry a Content-Security-Policy (`ReaderPolicy`, mirrored in
   `web-tests/support/ttu-server.js`), and links leave the reader only on a tap.
-- **Network use** (dictionaries, fonts, book servers, progress sync, Google voices) is listed in
+- **Network use** (dictionaries, fonts, example sentences, book servers, progress sync, Google voices) is listed in
   `docs/privacy-policy.md`, which must change with any new network use.
 - **Library:** Honmani owns the book files (app storage, named by SHA-256); ttu's IndexedDB is a
   rebuildable cache fed through ttu's own import input (`library-bridge.js`).

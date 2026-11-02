@@ -84,6 +84,14 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
      */
     val showWordFrequency: StateFlow<Boolean> = _showWordFrequency.asStateFlow()
 
+    private val _showExamples = MutableStateFlow(preferences.getBoolean(KEY_SHOW_EXAMPLES, false))
+
+    /**
+     * Whether the lookup panel shows example sentences (Tatoeba, an optional download). Off until
+     * switched on; backed up, but the file is not.
+     */
+    val showExamples: StateFlow<Boolean> = _showExamples.asStateFlow()
+
     fun setAccent(accent: Accent) {
         _accent.value = accent
         preferences.edit().putString(KEY_ACCENT, accent.name).apply()
@@ -119,6 +127,11 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
         preferences.edit().putBoolean(KEY_SHOW_WORD_FREQUENCY, show).apply()
     }
 
+    fun setShowExamples(show: Boolean) {
+        _showExamples.value = show
+        preferences.edit().putBoolean(KEY_SHOW_EXAMPLES, show).apply()
+    }
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
@@ -127,6 +140,7 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
         _librarySort.value = preferences.getString(KEY_LIBRARY_SORT, null)
         _showPreviousSentence.value = preferences.getBoolean(KEY_SHOW_PREVIOUS_SENTENCE, false)
         _showWordFrequency.value = preferences.getBoolean(KEY_SHOW_WORD_FREQUENCY, true)
+        _showExamples.value = preferences.getBoolean(KEY_SHOW_EXAMPLES, false)
     }
 
     companion object {
@@ -134,6 +148,7 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
         const val KEY_SHOW_DIFFICULTY = "show_difficulty"
         const val KEY_SHOW_PREVIOUS_SENTENCE = "show_previous_sentence"
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
+        const val KEY_SHOW_EXAMPLES = "show_examples"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"
 

@@ -73,7 +73,8 @@ libraries, a complete bundled reader, and no Play-restricted permissions.
 - **Lookup.** Honmani's own deinflection rules (`lookup/Deinflector`, with a test corpus in
   `app/src/test/resources/`) and a lookup over Yomitan dictionaries imported into Room
   (`data/dictionary/`, definitions stored compressed). The panel draws Yomitan's structured
-  content natively.
+  content natively. Optional Tatoeba example sentences (`data/examples/`, a download the reader switches on)
+  show as a collapsed "Examples (n)" row.
 - **Words and Anki.** Every lookup is saved and ranked by a decayed score (`data/words/`);
   cards go to AnkiDroid through its content provider or into an Anki package (`anki/`). Spellings
   one dictionary entry lists together (当たり前, 当り前) count as one word for word marks and
@@ -101,3 +102,8 @@ libraries listed in the app under Settings → About Honmani. Dictionaries and f
 from their publishers and keep their own licences. The radical search ships EDRDG's RADKFILE,
 KRADFILE and KANJIDIC2 data (© Electronic Dictionary Research and Development Group,
 [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html)), converted by `scripts/radicals/build_radicals.py`.
+The optional example sentences (Settings → Example sentences, off until switched on) are from
+[Tatoeba](https://tatoeba.org) (Japanese sentences with English translations,
+[CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/)), packed by
+`scripts/examples/build_examples.py` and downloaded from this repository's GitHub releases, only when the
+reader turns them on: the app's only other download besides dictionaries and fonts.

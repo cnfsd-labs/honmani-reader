@@ -155,6 +155,7 @@ fun SettingsScreen(
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
         goal = { ReadingGoalSection() },
+        examples = { ExampleSentencesSection() },
     )
 }
 
@@ -187,6 +188,7 @@ private fun SettingsContent(
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
     goal: @Composable () -> Unit = {},
+    examples: @Composable () -> Unit = {},
 ) {
     var showingSamples by rememberSaveable { mutableStateOf(false) }
     if (showingSamples) {
@@ -259,6 +261,7 @@ private fun SettingsContent(
                     ),
                 )
             }
+            item { examples() }
             item { goal() }
             item {
                 ListItem(
