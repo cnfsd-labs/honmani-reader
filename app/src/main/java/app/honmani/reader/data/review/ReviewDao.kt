@@ -52,6 +52,13 @@ interface ReviewDao {
     @Query("SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
     suspend fun dueCount(cutoff: Long, now: Long): Int
 
+    /** How the due cards' words are written, for the marks in the book. */
+    @Query("SELECT w.expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
+    fun observeDueExpressions(cutoff: Long, now: Long): Flow<List<String>>
+
+    @Query("SELECT w.expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
+    suspend fun dueExpressions(cutoff: Long, now: Long): List<String>
+
     /** Most overdue first. */
     @Transaction
     @Query("SELECT c.* FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE ORDER BY c.due, c.word_id LIMIT :limit")

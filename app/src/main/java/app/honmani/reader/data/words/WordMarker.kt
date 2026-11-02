@@ -17,6 +17,8 @@ class WordMarker(
     private val sources: suspend () -> LexiconSources?,
     private val lexicon: suspend (LexiconSources) -> Lexicon,
     private val knowledge: suspend () -> WordKnowledge,
+    /** Dictionary forms of the words whose review cards are due today. */
+    private val due: suspend () -> Set<String> = { emptySet() },
 ) {
     private val lock = Mutex()
     private var segmenter: Pair<String, Segmenter>? = null
@@ -30,6 +32,7 @@ class WordMarker(
         mode: WordMarksMode,
         knownWords: Boolean = false,
         sentences: Boolean = false,
+        dueMarks: Boolean = false,
         isStale: () -> Boolean = { false },
     ): List<List<WordMark>>? = withContext(Dispatchers.Default) {
         lock.withLock {
@@ -38,7 +41,8 @@ class WordMarker(
             val split = segmenter?.takeIf { it.first == wanted.signature }?.second
                 ?: Segmenter(lexicon(wanted)).also { segmenter = wanted.signature to it }
             val known = knowledge()
-            texts.map { WordMarks.of(it, split, known, mode, knownWords, sentences) }
+            val dueWords = if (dueMarks) due() else emptySet()
+            texts.map { WordMarks.of(it, split, known, mode, knownWords, sentences, dueWords) }
         }
     }
 }

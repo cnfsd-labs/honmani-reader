@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 
 /** A new card, or a Learning word that could become one ([card] null). */
 internal class NewCandidate(val wordId: Long, val expression: String, val card: CardWithWord?)
@@ -39,6 +40,13 @@ class ReviewRepository(
 
     /** Cards due today (before the next local midnight), not buried. Observed when subscribed: re-subscribe after midnight. */
     fun observeDueCount(): Flow<Int> = now().let { dao.observeDueCount(ReviewRules.dueCutoff(it, zone()), it) }
+
+    /** How the words with a card due today are written (the book marks them). Re-subscribe after midnight. */
+    fun observeDueExpressions(): Flow<Set<String>> =
+        now().let { time -> dao.observeDueExpressions(ReviewRules.dueCutoff(time, zone()), time).map { it.toSet() } }
+
+    suspend fun dueExpressions(): Set<String> =
+        now().let { dao.dueExpressions(ReviewRules.dueCutoff(it, zone()), it).toSet() }
 
     suspend fun dueCount(): Int = now().let { dao.dueCount(ReviewRules.dueCutoff(it, zone()), it) }
 

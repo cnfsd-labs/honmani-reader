@@ -14,10 +14,14 @@
  * does and sends each as one mark), with a green background through a highlight. Like the other
  * marks it changes neither the DOM nor the layout; the furigana over the sentence is tinted too.
  *
+ * localStorage "honmaniMarkDue" = "0" turns off the due mark (on by default): words whose review
+ * card is due today (kind 4, only when asked for) get a dotted underline in the app's accent
+ * colour, drawn over the word's tint (a text decoration, so the two never hide each other).
+ *
  * The app splits the text into words (the splitter that grades books) and knows the reader's
  * words, so the page asks it about the paragraphs near the screen, a few at a time:
  *
- *   { type: 'marks.request', requestId, mode, knownFurigana, unknownSentences, blocks: [{ id, text }] }
+ *   { type: 'marks.request', requestId, mode, knownFurigana, unknownSentences, dueMarks, blocks: [{ id, text }] }
  *     text: the paragraph without furigana (<rt>, <rp>), a <br> as "\n", as the tap bridge
  *     reads it; a long paragraph comes in pieces of up to 4,000 characters, each a block of its
  *     own (id: the piece's, unique on the page)
@@ -25,7 +29,7 @@
  * and the app answers on the same object:
  *
  *   { type: 'marks', requestId, color: '#rrggbb', blocks: [{ id, marks: [[start, length, kind]] }] }
- *     kind 0: learning, 1: new, 2: known and 3: a sentence with one unknown word (only when asked for); start and length in UTF-16 units of the block's text; color:
+ *     kind 0: learning, 1: new, 2: known, 3: a sentence with one unknown word and 4: a word due for review (the last three only when asked for); start and length in UTF-16 units of the block's text; color:
  *     the app's accent, for the learning words' tint
  *   { type: 'marks.reset' }   the reader's words changed: paragraphs are asked about again
  *
@@ -48,13 +52,15 @@
   const MODE_KEY = 'honmaniWordMarks';
   const KNOWN_FURIGANA_KEY = 'honmaniHideKnownFurigana';
   const SENTENCE_KEY = 'honmaniTintOneUnknown';
+  const DUE_KEY = 'honmaniMarkDue';
   const KNOWN = 2;
   const SENTENCE = 3;
+  const DUE = 4;
   const BOOK_ROOT_SELECTOR = '.book-content';
   const { isSkipped, isGaiji, textData } = window.honmaniText;
-  const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana', 'honmani-one-unknown'];
+  const NAMES = ['honmani-learning', 'honmani-new', 'honmani-known-furigana', 'honmani-one-unknown', 'honmani-due'];
   /** New marks, while they fade in; then they move to NAMES (the known words' furigana does not fade). */
-  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh', 'honmani-one-unknown-fresh'];
+  const FRESH_NAMES = ['honmani-learning-fresh', 'honmani-new-fresh', 'honmani-known-furigana-fresh', 'honmani-one-unknown-fresh', 'honmani-due-fresh'];
   /** Paragraphs this far from the page (in pages) are asked about before they show. */
   const AHEAD = '100%';
   const FADE_MS = 250;
@@ -91,9 +97,18 @@
     }
   }
 
-  /** Whether the app has anything to mark: the tint, the known words' furigana or the sentences. */
+  /** On unless "0": the due mark is on by default. */
+  function markDue() {
+    try {
+      return window.localStorage.getItem(DUE_KEY) !== '0';
+    } catch (error) {
+      return true;
+    }
+  }
+
+  /** Whether the app has anything to mark: the tint, the known words' furigana, the sentences or the due words. */
   function wanted() {
-    return mode() !== 'off' || hideKnownFurigana() || tintSentences();
+    return mode() !== 'off' || hideKnownFurigana() || tintSentences() || markDue();
   }
 
   function isBookPage() {
@@ -169,12 +184,21 @@
     const sentence = dark ? 0.3 : 0.16;
     const sentences = (name, share) =>
       `::highlight(${name}) { background-color: rgba(46, 160, 110, ${(sentence * share).toFixed(3)}); }\n`;
+    // A dotted underline in the accent; on a light page the accent (yellow by default) is darkened
+    // so that it shows against the paper.
+    const [red, green, blue] = rgb.split(',').map(Number);
+    const ink = dark ? 1 : 0.6;
+    const due = (name, share) =>
+      `::highlight(${name}) { text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 2px; ` +
+      `text-decoration-color: rgba(${Math.round(red * ink)}, ${Math.round(green * ink)}, ${Math.round(blue * ink)}, ${share.toFixed(3)}); }\n`;
     style.textContent =
       tints(NAMES, 1) +
       tints(FRESH_NAMES, alpha) +
       sentences(NAMES[SENTENCE], 1) +
       sentences(FRESH_NAMES[SENTENCE], alpha) +
-      `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n`;
+      `::highlight(${NAMES[KNOWN]}) { color: transparent; }\n` +
+      due(NAMES[DUE], 1) +
+      due(FRESH_NAMES[DUE], alpha);
   }
 
   /** Whether the page behind the text is dark (ttu's dark themes set it on <body>). */
@@ -386,7 +410,7 @@
       const requestId = nextRequest++;
       pending.set(requestId, { generation, parts });
       app.postMessage(
-        JSON.stringify({ type: 'marks.request', requestId, mode: mode(), knownFurigana: hideKnownFurigana(), unknownSentences: tintSentences(), blocks: batch }),
+        JSON.stringify({ type: 'marks.request', requestId, mode: mode(), knownFurigana: hideKnownFurigana(), unknownSentences: tintSentences(), dueMarks: markDue(), blocks: batch }),
       );
     }
     if (queue.size > 0 || pieces.length > 0) timer = setTimeout(send, BATCH_DELAY_MS);
@@ -486,6 +510,7 @@
       for (const mark of Array.isArray(answer.marks) ? answer.marks : []) {
         const [at, length, kind] = mark;
         if (!Number.isInteger(at) || !Number.isInteger(length) || !highlights[kind]) continue;
+        if (kind === DUE && !markDue()) continue;
         const start = piece.start + at;
         const key = `${start}:${length}:${kind}`;
         const kept = before.get(key);

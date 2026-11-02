@@ -53,6 +53,8 @@ data class ReaderSettings(
     val hideKnownFurigana: Boolean = false,
     /** Sentences with exactly one unknown word are tinted (`word-marks.js`); off by default. */
     val tintOneUnknown: Boolean = false,
+    /** Words whose review card is due today get a dotted underline (`word-marks.js`); on by default. */
+    val markDue: Boolean = true,
 ) {
     /** The values to store, as ttu writes them. */
     fun toStorage(): Map<String, String> = buildMap {
@@ -73,6 +75,7 @@ data class ReaderSettings(
         put(SELECTION_LOOKUP, flag(selectionLookup))
         put(HIDE_KNOWN_FURIGANA, flag(hideKnownFurigana))
         put(TINT_ONE_UNKNOWN, flag(tintOneUnknown))
+        put(MARK_DUE, flag(markDue))
     }
 
     companion object {
@@ -99,6 +102,7 @@ data class ReaderSettings(
         private const val SELECTION_LOOKUP = "honmaniSelectionLookup"
         private const val HIDE_KNOWN_FURIGANA = "honmaniHideKnownFurigana"
         private const val TINT_ONE_UNKNOWN = "honmaniTintOneUnknown"
+        private const val MARK_DUE = "honmaniMarkDue"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -132,6 +136,7 @@ data class ReaderSettings(
                 selectionLookup = flag(SELECTION_LOOKUP, defaults.selectionLookup),
                 hideKnownFurigana = flag(HIDE_KNOWN_FURIGANA, defaults.hideKnownFurigana),
                 tintOneUnknown = flag(TINT_ONE_UNKNOWN, defaults.tintOneUnknown),
+                markDue = flag(MARK_DUE, defaults.markDue),
             )
         }
     }

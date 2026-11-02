@@ -16,7 +16,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search")
 - Flashcard review of the words you are learning, with the sentence you met them in: two buttons
   (Forgot / Got it), a memory model (FSRS) that also counts the words you read in books, new words
-  ordered by the book you are reading, and a book's words learned before you read it (book sheet)
+  ordered by the book you are reading, words due today underlined in the book, and a book's words
+  learned before you read it (book sheet)
 - Reading statistics (time, characters, speed), a reading level and milestones; the reading time per day and
   book can be exported as a CSV file for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text

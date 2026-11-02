@@ -2,7 +2,9 @@ package app.honmani.reader.data.settings
 
 import app.honmani.reader.data.words.WordMarksMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReaderSettingsTest {
@@ -70,6 +72,10 @@ class ReaderSettingsTest {
         assertEquals("1", stored["honmaniSelectionLookup"])
         assertEquals("0", stored["honmaniHideKnownFurigana"])
         assertEquals("0", stored["honmaniTintOneUnknown"])
+        // The due mark is on unless the reader turned it off.
+        assertEquals("1", stored["honmaniMarkDue"])
+        assertTrue(ReaderSettings.fromStorage(emptyMap()).markDue)
+        assertFalse(ReaderSettings.fromStorage(mapOf("honmaniMarkDue" to "0")).markDue)
         assertEquals(settings, ReaderSettings.fromStorage(stored))
         assertEquals("1.65", ReaderSettings().toStorage()["lineHeight"])
     }

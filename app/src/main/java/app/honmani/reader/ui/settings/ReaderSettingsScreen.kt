@@ -205,6 +205,9 @@ private fun ReaderSettingsContent(
         SwitchRow(R.string.reader_settings_tint_one_unknown, R.string.reader_settings_tint_one_unknown_details, settings.tintOneUnknown) {
             onChange(settings.copy(tintOneUnknown = it))
         }
+        SwitchRow(R.string.reader_settings_mark_due, R.string.reader_settings_mark_due_details, settings.markDue) {
+            onChange(settings.copy(markDue = it))
+        }
         SwitchRow(R.string.reader_settings_progress, R.string.reader_settings_progress_details, settings.showProgress) {
             onChange(settings.copy(showProgress = it))
         }

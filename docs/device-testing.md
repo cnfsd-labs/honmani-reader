@@ -135,6 +135,11 @@ its marks at once.
 
 Optional, in the same settings: hide the furigana over words you know (takes effect when the book
 is opened again; a lookup brings it back), and tint sentences with exactly one unknown word.
+Reader settings → "Mark words due for review" (on by default): a word whose flashcard is due today has
+a dotted underline in the accent colour, drawn over its tint (darker on a light page, so it still shows
+there). Check one word on a light and on a dark page; turn the switch off and open the book again: no
+underline. After the word is answered in a review (not due any more) it loses the underline.
+
 Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
 to you", higher for easy books; "Words to learn before reading" lists them, most used first.
 

@@ -200,6 +200,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
 
+    // The words with a review card due today, for the underline in the book (word-marks.js).
+    val dueWords by remember(container) { flow { emitAll(container.reviewRepository.observeDueExpressions()) } }
+        .collectAsStateWithLifecycle(emptySet())
+
     // While a book is open: the words being learned and how they were written, so marks follow
     // lookups (word-marks.js).
     val learning by produceState<Pair<Set<String>, Set<String>>?>(null, atLibrary) {
@@ -259,8 +263,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 onBackground = { bookBackground = Color(it) },
-                marks = { texts, mode, knownWords, sentences, isStale -> container.wordMarker.mark(texts, mode, knownWords, sentences, isStale) },
-                marksKey = learning,
+                marks = { texts, mode, knownWords, sentences, dueMarks, isStale ->
+                    container.wordMarker.mark(texts, mode, knownWords, sentences, dueMarks, isStale)
+                },
+                marksKey = learning?.let { it to dueWords },
                 volumeKeysTurnPages = appSettings.volumeKeys,
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,

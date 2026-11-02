@@ -109,6 +109,9 @@ class ReviewRepositoryTest {
         database.wordDao().setAnkiNote(d, 99)
         assertEquals(listOf(a), repository.dueCards(10).map { it.word.id })
         assertEquals(1, repository.dueCount())
+        // The due set the book marks: how the due words are written, and only those.
+        assertEquals(setOf("一"), repository.dueExpressions())
+        assertEquals(setOf("一"), repository.observeDueExpressions().first())
 
         // Buried until the next local midnight; suspended stays out until unsuspended.
         now = ReviewRules.startOfDay(now, zone, 1)

@@ -778,6 +778,7 @@ test('known words lose their furigana without the DOM changing, and it works wit
 });
 
 test('without the furigana switch the page never hides a reading or asks while the tint is off', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('honmaniMarkDue', '0'));
   await openWithMarks(page, 'ruby.epub', 'off');
   await page.waitForTimeout(1_000);
   expect(await markRequests(page)).toEqual([]);
@@ -908,6 +909,7 @@ test('word marks let go of the paragraphs of chapters ttu took out of the page',
 });
 
 test('word marks ask nothing when the reader turned them off', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('honmaniMarkDue', '0'));
   await openWithMarks(page, 'neko.epub', 'off');
   await page.waitForTimeout(500);
   expect(await markRequests(page)).toEqual([]);

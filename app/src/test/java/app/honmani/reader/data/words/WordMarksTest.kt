@@ -138,6 +138,24 @@ class WordMarksTest {
     }
 
     @Test
+    fun aWordDueForReviewGetsADueMarkOverItsTint() {
+        val text = "私は猫を食べた"
+        fun marks(mode: WordMarksMode, due: Set<String>) =
+            WordMarks.of(text, segmenter, knowledge, mode, due = due).map { text.substring(it.start, it.start + it.length) to it.kind }
+
+        // 食べた is learning and due: the tint and the due mark lie on the same characters.
+        assertEquals(
+            listOf("食べた" to WordMark.Kind.LEARNING, "食べた" to WordMark.Kind.DUE),
+            marks(WordMarksMode.LEARNING, setOf("食べる")),
+        )
+        // The due mark does not need the tint, and another due word marks only itself.
+        assertEquals(listOf("食べた" to WordMark.Kind.DUE), marks(WordMarksMode.OFF, setOf("食べる")))
+        assertEquals(listOf("猫" to WordMark.Kind.DUE), marks(WordMarksMode.OFF, setOf("猫")))
+        // Nothing due: no due mark.
+        assertEquals(listOf("食べた" to WordMark.Kind.LEARNING), marks(WordMarksMode.LEARNING, emptySet()))
+    }
+
+    @Test
     fun aWordLearnedInWordsButNeverReadIsNewAndKnownAtOnce() {
         // 猫 was marked learned in Words and is not in any book read yet: the "+ New" grey and the hidden furigana both apply.
         val knowledge = WordKnowledge(read = emptyMap(), progress = emptyMap(), learning = emptySet(), known = setOf("猫"))

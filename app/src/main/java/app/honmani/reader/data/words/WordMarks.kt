@@ -35,6 +35,9 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
 
         /** A sentence with exactly one word the reader does not know yet ("i+1"): tinted whole. */
         SENTENCE,
+
+        /** A word whose review card is due today: an underline over the tint (it can lie on a [LEARNING] mark). */
+        DUE,
     }
 }
 
@@ -54,9 +57,11 @@ object WordMarks {
         knownWords: Boolean = false,
         /** Also mark the sentences with exactly one unknown word ([WordMark.Kind.SENTENCE]). */
         sentences: Boolean = false,
+        /** Dictionary forms of the words whose review cards are due today; they get a [WordMark.Kind.DUE] mark. */
+        due: Set<String> = emptySet(),
     ): List<WordMark> {
         val tint = mode != WordMarksMode.OFF
-        if (!tint && !knownWords && !sentences) return emptyList()
+        if (!tint && !knownWords && !sentences && due.isEmpty()) return emptyList()
         val marks = ArrayList<WordMark>()
         val tokens = ArrayList<Token>()
         segmenter.segment(text) { tokens += it }
@@ -67,9 +72,14 @@ object WordMarks {
             if (token.start < formEnd) continue
             // Only a form that ends where a word of the book ends: た looked up inside だった
             // marks no た at the start of ただ.
-            val form = if (tint) knowledge.learningFormAt(text, token.start) { token.start + it.length in tokenEnds } else null
+            val form = if (tint || due.isNotEmpty()) {
+                knowledge.learningFormAt(text, token.start) { token.start + it.length in tokenEnds }
+            } else {
+                null
+            }
             if (form != null) {
-                marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
+                if (tint) marks += WordMark(token.start, form.length, WordMark.Kind.LEARNING)
+                if (isDue(token.key, due, knowledge)) marks += WordMark(token.start, form.length, WordMark.Kind.DUE)
                 formEnd = token.start + form.length
                 continue
             }
@@ -81,12 +91,16 @@ object WordMarks {
                 else -> null
             }
             if (kind != null) marks += WordMark(token.start, token.length, kind)
+            if (isDue(token.key, due, knowledge)) marks += WordMark(token.start, token.length, WordMark.Kind.DUE)
             // Also for a word marked learned in Words and never read: it is new and known at once.
             if (knownWords && knowledge.isKnown(token.key)) marks += WordMark(token.start, token.length, WordMark.Kind.KNOWN)
         }
         if (sentences) marks += oneUnknownSentences(text, tokens, knowledge)
         return marks
     }
+
+    private fun isDue(key: String, due: Set<String>, knowledge: WordKnowledge): Boolean =
+        due.isNotEmpty() && (key in due || knowledge.variants.of(key).any { it in due })
 
     /** Words this common (a rank up to here: は, です, ない) are grammar, not vocabulary. */
     private const val GRAMMAR_RANK_LIMIT = 100

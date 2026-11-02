@@ -183,6 +183,11 @@ class TapLookupTest {
             BridgeMessage.Marks(7, WordMarksMode.OFF, emptyList(), unknownSentences = true),
             BridgeMessage.parse("""{"type":"marks.request","requestId":7,"mode":"off","unknownSentences":true,"blocks":[]}"""),
         )
+        // And whether to mark the words due for review.
+        assertEquals(
+            BridgeMessage.Marks(8, WordMarksMode.OFF, emptyList(), dueMarks = true),
+            BridgeMessage.parse("""{"type":"marks.request","requestId":8,"mode":"off","dueMarks":true,"blocks":[]}"""),
+        )
         assertNull(BridgeMessage.parse("""{"type":"marks.request","blocks":"x"}"""))
     }
 

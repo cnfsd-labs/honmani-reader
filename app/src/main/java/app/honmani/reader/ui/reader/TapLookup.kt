@@ -54,6 +54,8 @@ sealed interface BridgeMessage {
         val knownFurigana: Boolean = false,
         /** Also mark the sentences with exactly one unknown word. */
         val unknownSentences: Boolean = false,
+        /** Also mark the words whose review cards are due today. */
+        val dueMarks: Boolean = false,
     ) : BridgeMessage
 
     /** A paragraph's text without furigana, and the page's id for it. */
@@ -161,6 +163,7 @@ sealed interface BridgeMessage {
             val mode: String = "",
             val knownFurigana: Boolean = false,
             val unknownSentences: Boolean = false,
+            val dueMarks: Boolean = false,
             val blocks: List<MarksBlock> = emptyList(),
         )
 
@@ -169,7 +172,7 @@ sealed interface BridgeMessage {
             val envelope = decode<MarksEnvelope>(obj) ?: return null
             if (envelope.blocks.size > MAX_MARKS_BLOCKS) return null
             val blocks = envelope.blocks.filter { it.text.length <= MAX_MARKS_TEXT }
-            return Marks(envelope.requestId, WordMarksMode.fromStorage(envelope.mode), blocks, envelope.knownFurigana, envelope.unknownSentences)
+            return Marks(envelope.requestId, WordMarksMode.fromStorage(envelope.mode), blocks, envelope.knownFurigana, envelope.unknownSentences, envelope.dueMarks)
         }
 
         /** Largest of the per-kind caps (library messages); anything longer is dropped unread. */
