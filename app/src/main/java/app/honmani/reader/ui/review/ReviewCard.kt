@@ -59,7 +59,9 @@ fun ReviewEntry(
     // The counts are for "Due"; another chip can also review words early.
     val nothing = due + newWords == 0 && choice.scope == ReviewScope.Due
     var pickBook by remember { mutableStateOf(false) }
-    val startDescription = stringResource(R.string.review_start_description, due, newWords)
+    // Under another chip the counts would be wrong: the button reads plain "Start".
+    val startDescription =
+        if (choice.scope == ReviewScope.Due) stringResource(R.string.review_start_description, due, newWords) else null
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = modifier.fillMaxWidth(),
@@ -105,7 +107,7 @@ fun ReviewEntry(
                     enabled = !nothing,
                     modifier = Modifier
                         .heightIn(min = 48.dp)
-                        .semantics { contentDescription = startDescription },
+                        .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
                 ) { Text(stringResource(R.string.review_start)) }
             }
         }

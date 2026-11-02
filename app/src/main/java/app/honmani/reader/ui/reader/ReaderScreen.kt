@@ -461,8 +461,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReviewScreen(
                 onClose = { reviewShown = false },
                 onOpenBook = {
+                    // Back from the book returns to Words and its review card.
                     reviewShown = false
-                    tab = HomeTab.LIBRARY
                     library.open(it)
                 },
             )
