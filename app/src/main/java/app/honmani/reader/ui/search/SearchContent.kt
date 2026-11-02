@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -22,7 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -90,9 +90,9 @@ fun SearchContent(
     onForgetAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // New results start at the top: the list would otherwise follow a word that moved down.
-    val listState = rememberLazyListState()
-    LaunchedEffect(results.query) { listState.scrollToItem(0) }
+    // Each query's results get their own list position, starting at the top: one shared state
+    // would follow a keyed row of the previous results wherever it moved.
+    val listState = rememberSaveable(results.query, saver = LazyListState.Saver) { LazyListState() }
     LazyColumn(modifier = modifier, state = listState) {
         if (query.isBlank()) {
             if (history.isNotEmpty()) {
