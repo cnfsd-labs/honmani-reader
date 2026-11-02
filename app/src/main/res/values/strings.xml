@@ -350,7 +350,7 @@
 
     <string name="settings_anki">Anki</string>
     <string name="settings_anki_summary">Deck “%1$s” · %2$s</string>
-    <string name="settings_anki_details">Cards go to AnkiDroid, deck “Honmani”: the word and your book\'s sentence on the front; reading, meaning and audio on the back.</string>
+    <string name="settings_anki_details">Cards go to AnkiDroid, with the sentence from your book, reading, meaning and audio. Choose the deck and the card type below.</string>
     <string name="settings_card_audio">Card audio</string>
     <string name="card_audio_off">No audio</string>
     <string name="card_audio_off_details">Cards without sound</string>
