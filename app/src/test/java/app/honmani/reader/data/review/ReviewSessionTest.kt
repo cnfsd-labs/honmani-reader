@@ -65,6 +65,25 @@ class ReviewSessionTest {
     private suspend fun session(newPerDay: Int = 10) = ReviewSession(reviews, words, newPerDay).also { it.start() }
 
     @Test
+    fun theDailyLimitCutsTheDueCardsAndAChipBypassesIt() = runTest {
+        val first = dueWord("一")
+        val second = dueWord("二")
+        dueWord("三")
+        val limited = ReviewSession(reviews, words, newPerDay = 10, reviewsPerDay = 2).also { it.start() }
+        assertEquals(2, limited.remaining)
+        assertEquals(first, limited.current?.word?.id)
+        assertTrue(limited.answer(Grade.GOOD))
+        assertEquals(second, limited.current?.word?.id)
+        // A later session the same day: the one answered already counts against the limit.
+        val again = ReviewSession(reviews, words, newPerDay = 10, reviewsPerDay = 2).also { it.start() }
+        assertEquals(listOf(second), listOf(again.current?.word?.id))
+        assertEquals(1, again.remaining)
+        // A chip is a choice of words: all three are asked (the answered one is no longer due).
+        val chip = ReviewSession(reviews, words, newPerDay = 0, reviewsPerDay = 1).also { it.start(ReviewFilter { true }) }
+        assertEquals(2, chip.remaining)
+    }
+
+    @Test
     fun aChipTakesOnlyItsWordsAndReviewsTheRestEarly() = runTest {
         val due = dueWord("旧")
         dueWord("外")

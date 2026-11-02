@@ -574,6 +574,9 @@
     <string name="review_asked_again">%1$s comes back at the end</string>
     <string name="review_settings_new_per_day">New words a day</string>
     <string name="review_settings_new_per_day_details">Words from your Learning list, best ranked first, added to the review each day.</string>
+    <string name="review_settings_reviews_per_day">Reviews per day</string>
+    <string name="review_settings_reviews_per_day_details">Most cards shown as due in a day, most overdue first. The rest wait for tomorrow. Reviews you already did today count.</string>
+    <string name="review_settings_no_limit">No limit</string>
     <string name="review_settings_front">Front of a card</string>
     <string name="review_settings_front_sentence">Sentence with the word marked</string>
     <string name="review_settings_front_word">The word alone</string>

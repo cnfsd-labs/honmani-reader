@@ -496,7 +496,7 @@ class AppContainer(context: Context) {
             sources = { lexiconSources() },
             lexicon = { lexicon(it) },
             knowledge = { wordKnowledge.first() },
-            due = { reviewRepository.dueExpressions() },
+            due = { reviewRepository.dueExpressions(reviewSettings.reviewsPerDay.value) },
         )
     }
 

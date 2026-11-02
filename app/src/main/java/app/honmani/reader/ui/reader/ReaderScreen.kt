@@ -188,8 +188,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // Words due, for the badge on the Words tab, and the new words a session would start.
     val reviewScope by container.reviewScope.collectAsStateWithLifecycle()
     val reviewBooks by remember(container) { container.bookDao.observeAll() }.collectAsStateWithLifecycle(emptyList())
-    val reviewDue by remember(container) { flow { emitAll(container.reviewRepository.observeDueCount()) } }
-        .collectAsStateWithLifecycle(0)
+    val dueToday by remember(container) {
+        flow { emitAll(container.reviewRepository.observeDueToday(container.reviewSettings.reviewsPerDay)) }
+    }.collectAsStateWithLifecycle(emptyList())
+    val reviewDue = dueToday.size
     val reviewNew by remember(container) {
         flow { emitAll(container.reviewRepository.observeNewAvailable(container.reviewSettings.newPerDay)) }
     }.collectAsStateWithLifecycle(0)
@@ -201,8 +203,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     }
 
     // The words with a review card due today, for the underline in the book (word-marks.js).
-    val dueWords by remember(container) { flow { emitAll(container.reviewRepository.observeDueExpressions()) } }
-        .collectAsStateWithLifecycle(emptySet())
+    val dueWords = remember(dueToday) { dueToday.mapTo(HashSet()) { it.expression } as Set<String> }
 
     // While a book is open: the words being learned and how they were written, so marks follow
     // lookups (word-marks.js).

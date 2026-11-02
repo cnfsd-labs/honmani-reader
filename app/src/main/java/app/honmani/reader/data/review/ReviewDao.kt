@@ -20,6 +20,9 @@ data class CardWithWord(
 /** A word with a card in review: its id and how it is written. */
 data class ReviewWord(val id: Long, val expression: String)
 
+/** A word reviewed today; [carried]: its first review was before today (a new card is not [carried]). */
+data class ReviewedToday(val wordId: Long, val carried: Boolean)
+
 @Dao
 interface ReviewDao {
     /** Words in review under Honmani's own scheduler, the only ones reading can move. */
@@ -47,17 +50,27 @@ interface ReviewDao {
 
     /** Cards in review of Honmani's own scheduler that are due before [cutoff] and not buried at [now]. */
     @Query("SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
-    fun observeDueCount(cutoff: Long, now: Long): Flow<Int>
-
-    @Query("SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
     suspend fun dueCount(cutoff: Long, now: Long): Int
 
-    /** How the due cards' words are written, for the marks in the book. */
-    @Query("SELECT w.expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
-    fun observeDueExpressions(cutoff: Long, now: Long): Flow<List<String>>
+    /** The due cards' words, most overdue first (the daily limit cuts this list). */
+    @Query("SELECT w.id AS id, w.expression AS expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE ORDER BY c.due, c.word_id")
+    fun observeDueWords(cutoff: Long, now: Long): Flow<List<ReviewWord>>
 
-    @Query("SELECT w.expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
-    suspend fun dueExpressions(cutoff: Long, now: Long): List<String>
+    @Query("SELECT w.id AS id, w.expression AS expression FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE ORDER BY c.due, c.word_id")
+    suspend fun dueWords(cutoff: Long, now: Long): List<ReviewWord>
+
+    /** Words with a review since [from] (the start of today), and whether they had one before. */
+    @Query(
+        "SELECT l.word_id AS wordId, (SELECT MIN(r.at) FROM review_log r WHERE r.word_id = l.word_id) < :from AS carried " +
+            "FROM review_log l WHERE l.at >= :from GROUP BY l.word_id",
+    )
+    fun observeReviewedSince(from: Long): Flow<List<ReviewedToday>>
+
+    @Query(
+        "SELECT l.word_id AS wordId, (SELECT MIN(r.at) FROM review_log r WHERE r.word_id = l.word_id) < :from AS carried " +
+            "FROM review_log l WHERE l.at >= :from GROUP BY l.word_id",
+    )
+    suspend fun reviewedSince(from: Long): List<ReviewedToday>
 
     /** Most overdue first. */
     @Transaction

@@ -76,7 +76,9 @@ class ReviewViewModel(
         viewModelScope.launch {
             lock.withLock {
                 _state.value = ReviewUiState(showSentence = settings.showSentence.value)
-                val next = ReviewSession(reviews, words, settings.newPerDay.value, settings.knownAfterDays.value)
+                val next = ReviewSession(
+                    reviews, words, settings.newPerDay.value, settings.knownAfterDays.value, settings.reviewsPerDay.value,
+                )
                 next.start(filter())
                 session = next
                 publish(next)

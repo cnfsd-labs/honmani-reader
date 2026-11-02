@@ -6,7 +6,7 @@ import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.data.words.WordStatus
 
 /**
- * One go at the review queue: the cards due today, then up to [newPerDay] minus today's first
+ * One go at the review queue: the cards due today (as many as [reviewsPerDay] still allows), then up to [newPerDay] minus today's first
  * reviews new ones. Every answer is saved at once, so leaving the session keeps what was done.
  * A card graded Again goes to the end of the queue; every action can be taken back, last first.
  * Not thread safe: call it from one coroutine at a time.
@@ -16,6 +16,7 @@ class ReviewSession(
     private val words: WordRepository,
     private val newPerDay: Int,
     private val knownAfterDays: Int = ReviewRules.DEFAULT_KNOWN_AFTER_DAYS,
+    private val reviewsPerDay: Int = ReviewLimit.NO_LIMIT,
 ) {
     private class Action(
         val item: CardWithWord,
@@ -55,7 +56,9 @@ class ReviewSession(
     suspend fun start(filter: ReviewFilter? = null) {
         queue.clear()
         actions.clear()
-        val due = reviews.dueCards(Int.MAX_VALUE).filter { filter == null || filter.accepts(it.word) }
+        // A chip other than Due is a choice of words: the daily limit does not apply to it.
+        val due = (if (filter == null) reviews.dueCardsToday(reviewsPerDay) else reviews.dueCards(Int.MAX_VALUE))
+            .filter { filter == null || filter.accepts(it.word) }
         val left = newPerDay - reviews.newWordsToday()
         queue.addAll(due)
         queue.addAll(reviews.introduceNew(left, filter).filter { fresh -> due.none { it.word.id == fresh.word.id } })

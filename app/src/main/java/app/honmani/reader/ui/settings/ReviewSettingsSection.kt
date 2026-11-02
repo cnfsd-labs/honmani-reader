@@ -18,15 +18,17 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.data.review.ReviewLimit
 import app.honmani.reader.data.settings.ReviewSettings
 
-/** Settings → Flashcards: new words a day, the front of a card, and when a word counts as known. */
+/** Settings → Flashcards: new words and reviews a day, the front of a card, and when a word counts as known. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ReviewSettingsSection() {
     val context = LocalContext.current
     val settings = remember { (context.applicationContext as HonmaniApplication).container.reviewSettings }
     val newPerDay by settings.newPerDay.collectAsStateWithLifecycle()
+    val reviewsPerDay by settings.reviewsPerDay.collectAsStateWithLifecycle()
     val showSentence by settings.showSentence.collectAsStateWithLifecycle()
     val knownAfter by settings.knownAfterDays.collectAsStateWithLifecycle()
     ListItem(
@@ -40,6 +42,25 @@ fun ReviewSettingsSection() {
                 selected = choice == newPerDay,
                 onClick = { settings.setNewPerDay(choice) },
                 label = { Text(choice.toString()) },
+            )
+        }
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.review_settings_reviews_per_day)) },
+        supportingContent = { Text(stringResource(R.string.review_settings_reviews_per_day_details)) },
+    )
+    Chips {
+        // A value restored from a backup that isn't a preset is shown as one more chip.
+        val choices = (ReviewLimit.CHOICES + reviewsPerDay).distinct()
+        for (choice in choices.filter { it != ReviewLimit.NO_LIMIT }.sorted() + choices.filter { it == ReviewLimit.NO_LIMIT }) {
+            FilterChip(
+                selected = choice == reviewsPerDay,
+                onClick = { settings.setReviewsPerDay(choice) },
+                label = {
+                    Text(
+                        if (choice == ReviewLimit.NO_LIMIT) stringResource(R.string.review_settings_no_limit) else choice.toString(),
+                    )
+                },
             )
         }
     }

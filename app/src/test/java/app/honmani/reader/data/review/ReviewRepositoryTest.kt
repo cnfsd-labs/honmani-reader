@@ -9,6 +9,7 @@ import app.honmani.reader.data.words.WordScheduler
 import java.time.LocalDateTime
 import java.time.ZoneId
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -94,6 +95,46 @@ class ReviewRepositoryTest {
         assertEquals(1, repository.newCards(10).size)
     }
 
+    /** Five words reviewed one day apart, then 60 days on: all due, the first one the most overdue. */
+    private suspend fun fiveDueWords(): List<Long> {
+        val ids = listOf("一", "二", "三", "四", "五").map { word(it) }
+        for (id in ids) {
+            repository.record(id, Grade.GOOD)
+            now += day
+        }
+        now += 60 * day
+        return ids
+    }
+
+    @Test
+    fun theDailyLimitShowsTheMostOverdueAndCountsTodaysReviewsAgainstIt() = runTest {
+        val ids = fiveDueWords()
+        assertEquals(ids, repository.dueToday(ReviewLimit.NO_LIMIT).map { it.id })
+        assertEquals(ids.take(2), repository.dueToday(2).map { it.id })
+        assertEquals(ids.take(2), repository.observeDueToday(flowOf(2)).first().map { it.id })
+        assertEquals(setOf("一", "二"), repository.dueExpressions(2))
+        assertEquals(ids.take(2), repository.dueCardsToday(2).map { it.word.id })
+        assertEquals(5, repository.dueCards(Int.MAX_VALUE).size)
+
+        // A card answered today counts: one left of two after one review, none after two.
+        repository.record(ids[0], Grade.GOOD)
+        assertEquals(listOf(ids[1]), repository.dueToday(2).map { it.id })
+        assertEquals(listOf(ids[1]), repository.dueCardsToday(2).map { it.word.id })
+        repository.record(ids[1], Grade.GOOD)
+        assertEquals(emptyList<Long>(), repository.dueToday(2).map { it.id })
+        assertEquals(emptyList<Long>(), repository.dueCardsToday(2).map { it.word.id })
+        // A bigger limit shows the rest: the three still due, minus none beyond its room.
+        assertEquals(ids.drop(2), repository.dueToday(5).map { it.id })
+        assertEquals(ids.slice(2..3), repository.dueToday(4).map { it.id })
+
+        // An Again comes back today whatever the limit; tomorrow the count starts anew and the
+        // longest overdue come first.
+        repository.record(ids[2], Grade.AGAIN)
+        assertEquals(listOf(ids[2]), repository.dueToday(2).map { it.id })
+        now = ReviewRules.startOfDay(now, zone, 1)
+        assertEquals(listOf(ids[3], ids[4]), repository.dueToday(2).map { it.id })
+    }
+
     @Test
     fun dueCardsComeMostOverdueFirstAndSkipBuriedSuspendedAndAnki() = runTest {
         val a = word("一")
@@ -103,15 +144,15 @@ class ReviewRepositoryTest {
         for (id in listOf(a, b, c, d)) repository.record(id, Grade.GOOD)
         now += 3 * day
         assertEquals(4, repository.dueCount())
-        assertEquals(4, repository.observeDueCount().first())
+        assertEquals(4, repository.observeDueToday(flowOf(ReviewLimit.NO_LIMIT)).first().size)
         repository.bury(b)
         repository.suspend(c)
         database.wordDao().setAnkiNote(d, 99)
         assertEquals(listOf(a), repository.dueCards(10).map { it.word.id })
         assertEquals(1, repository.dueCount())
         // The due set the book marks: how the due words are written, and only those.
-        assertEquals(setOf("一"), repository.dueExpressions())
-        assertEquals(setOf("一"), repository.observeDueExpressions().first())
+        assertEquals(setOf("一"), repository.dueExpressions(ReviewLimit.NO_LIMIT))
+        assertEquals(listOf("一"), repository.observeDueToday(flowOf(ReviewLimit.NO_LIMIT)).first().map { it.expression })
 
         // Buried until the next local midnight; suspended stays out until unsuspended.
         now = ReviewRules.startOfDay(now, zone, 1)

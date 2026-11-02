@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 
 /** A new card, or a Learning word that could become one ([card] null). */
 internal class NewCandidate(val wordId: Long, val expression: String, val card: CardWithWord?)
@@ -38,21 +37,45 @@ class ReviewRepository(
     private val dao = database.reviewDao()
     private val words = database.wordDao()
 
-    /** Cards due today (before the next local midnight), not buried. Observed when subscribed: re-subscribe after midnight. */
-    fun observeDueCount(): Flow<Int> = now().let { dao.observeDueCount(ReviewRules.dueCutoff(it, zone()), it) }
+    /**
+     * Cards due today (before the next local midnight), not buried, cut to [perDay] reviews a
+     * day ([ReviewLimit]), most overdue first. Observed when subscribed: re-subscribe after midnight.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeDueToday(perDay: Flow<Int>): Flow<List<ReviewWord>> = perDay.flatMapLatest { limit ->
+        flow {
+            val time = now()
+            emitAll(
+                combine(
+                    dao.observeDueWords(ReviewRules.dueCutoff(time, zone()), time),
+                    dao.observeReviewedSince(ReviewRules.startOfDay(time, zone())),
+                ) { due, done -> ReviewLimit.apply(due, { it.id }, limit, done) },
+            )
+        }
+    }
 
-    /** How the words with a card due today are written (the book marks them). Re-subscribe after midnight. */
-    fun observeDueExpressions(): Flow<Set<String>> =
-        now().let { time -> dao.observeDueExpressions(ReviewRules.dueCutoff(time, zone()), time).map { it.toSet() } }
+    /** The words with a card due today within the limit, once. */
+    suspend fun dueToday(perDay: Int): List<ReviewWord> {
+        val time = now()
+        val due = dao.dueWords(ReviewRules.dueCutoff(time, zone()), time)
+        return ReviewLimit.apply(due, { it.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(time, zone())))
+    }
 
-    suspend fun dueExpressions(): Set<String> =
-        now().let { dao.dueExpressions(ReviewRules.dueCutoff(it, zone()), it).toSet() }
+    /** How the words due today are written (the book marks them). */
+    suspend fun dueExpressions(perDay: Int): Set<String> = dueToday(perDay).mapTo(HashSet()) { it.expression }
 
     suspend fun dueCount(): Int = now().let { dao.dueCount(ReviewRules.dueCutoff(it, zone()), it) }
 
     /** Due cards, most overdue first. A card graded Again in a session comes back after 10 minutes: ask again then. */
     suspend fun dueCards(limit: Int): List<CardWithWord> =
         now().let { dao.dueCards(ReviewRules.dueCutoff(it, zone()), it, limit) }
+
+    /** The due cards a session starts with: [dueCards] cut to [perDay] reviews a day ([ReviewLimit]). */
+    suspend fun dueCardsToday(perDay: Int): List<CardWithWord> {
+        val all = dueCards(Int.MAX_VALUE)
+        if (perDay == ReviewLimit.NO_LIMIT) return all
+        return ReviewLimit.apply(all, { it.word.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(now(), zone())))
+    }
 
     /** Cards introduced but never reviewed, oldest first. */
     suspend fun newCards(limit: Int): List<CardWithWord> = dao.newCards(now(), limit)
