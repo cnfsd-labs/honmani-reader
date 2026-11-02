@@ -631,6 +631,7 @@ private fun WordList(
                     // Known words are listed by name only; details on a tap.
                     compact = filter == WordFilter.KNOWN && !expanded,
                     steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
+                    memory = if (filter == WordFilter.LEARNING) uiState.memory[word.id] else null,
                     frequency = uiState.frequencies[word.id],
                     expanded = expanded,
                     lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
@@ -725,6 +726,32 @@ private fun StepsBar(steps: Int) {
         )
         Text(
             text = stringResource(R.string.word_progress, WordProgress.percent(steps)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/**
+ * Memory of a word in review: a ring, so it never reads as the steps bar of words not in
+ * review, filling up to known by memory.
+ */
+@Composable
+private fun MemoryRing(memory: Float) {
+    val percent = (memory * 100).toInt()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 6.dp),
+    ) {
+        CircularProgressIndicator(
+            progress = { memory },
+            modifier = Modifier.size(18.dp),
+            strokeWidth = 3.dp,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+        )
+        Text(
+            text = stringResource(R.string.word_memory, percent),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -852,6 +879,8 @@ private fun WordRow(
     lookups: List<WordLookupEntity>,
     /** Progress towards known, shown in the learning list. */
     steps: Int?,
+    /** Memory towards known (0 to 1) of a word in review, shown instead of [steps]. */
+    memory: Float? = null,
     /** How common the word is, if the setting is on and a frequency dictionary knows it. */
     frequency: Frequency? = null,
     onToggleExpanded: () -> Unit,
@@ -972,7 +1001,7 @@ private fun WordRow(
                         maxLines = 2,
                     )
                 }
-                steps?.let { StepsBar(it) }
+                if (memory != null) MemoryRing(memory) else steps?.let { StepsBar(it) }
                 Text(
                     text = details(word, now),
                     style = MaterialTheme.typography.labelSmall,

@@ -655,7 +655,11 @@ class ReaderViewModel(
                     diagnostics = container.readerDiagnostics,
                     ttuLibrary = container.ttuLibrary,
                     booksDir = container.booksDir,
-                    recordLookup = container.wordRepository::record,
+                    recordLookup = { word ->
+                        container.wordRepository.record(word)
+                        // A lookup in a book is a lapse of a word in review (search and review lookups aren't).
+                        container.reviewRepository.onLookup(word.expression, word.reading, word.origin)
+                    },
                     findBook = { ttuId ->
                         container.bookDao.findByTtuId(ttuId)?.let { ReadingBook(it.id, it.title) }
                     },

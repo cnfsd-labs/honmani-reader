@@ -17,8 +17,18 @@ data class CardWithWord(
     @Relation(parentColumn = "word_id", entityColumn = "id") val word: WordEntity,
 )
 
+/** A word with a card in review: its id and how it is written. */
+data class ReviewWord(val id: Long, val expression: String)
+
 @Dao
 interface ReviewDao {
+    /** Words in review under Honmani's own scheduler, the only ones reading can move. */
+    @Query(
+        "SELECT w.id AS id, w.expression AS expression FROM review_card c JOIN word w ON w.id = c.word_id " +
+            "WHERE c.state = 'REVIEW' AND w.scheduler = 'HONMANI'",
+    )
+    suspend fun reviewWords(): List<ReviewWord>
+
     @Query("SELECT * FROM review_card WHERE word_id = :wordId")
     suspend fun find(wordId: Long): ReviewCardEntity?
 

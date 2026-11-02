@@ -84,6 +84,9 @@ class ReviewRepository(
 
     suspend fun card(wordId: Long): ReviewCardEntity? = dao.find(wordId)
 
+    /** Every card, again after each change. */
+    fun observeCards(): Flow<List<ReviewCardEntity>> = dao.observeAll()
+
     /** Puts a word into review as a new card; false if it is Anki's, unknown or already there. */
     suspend fun introduce(wordId: Long): Boolean = database.withTransaction {
         val word = words.find(wordId) ?: return@withTransaction false
@@ -145,6 +148,7 @@ class ReviewRepository(
                 difficulty = if (card.difficulty > 0) card.difficulty else 5.0,
                 due = ReviewRules.startOfDay(time, zone(), Fsrs.interval(stability)),
                 passedReviews = maxOf(card.passedReviews, 1),
+                reviewStability = stability,
                 lastGrade = Grade.GOOD.value,
                 lastReviewAt = time,
                 buriedUntil = null,
@@ -181,6 +185,24 @@ class ReviewRepository(
             dao.upsert(after)
             true
         }
+    }
+
+    /**
+     * [onRead] for the words met in a stretch of a book: [keys] are their dictionary forms, and a
+     * word in review also counts as read when one of its [variantsOf] spellings was met.
+     */
+    suspend fun onReadKeys(keys: Set<String>, variantsOf: (String) -> Collection<String> = { emptyList() }): List<Long> {
+        if (keys.isEmpty()) return emptyList()
+        val ids = dao.reviewWords()
+            .filter { word -> word.expression in keys || variantsOf(word.expression).any { it in keys } }
+            .map { it.id }
+        return if (ids.isEmpty()) emptyList() else onRead(ids)
+    }
+
+    /** [onLookup] for the saved word [expression] read [reading], if there is one. */
+    suspend fun onLookup(expression: String, reading: String, origin: LookupOrigin): Boolean {
+        val word = words.find(expression, reading) ?: return false
+        return onLookup(word.id, origin)
     }
 
     /** A lookup of a saved word: an Again if [ReviewRules.onLookup] counts it. True if the card moved. */

@@ -321,6 +321,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.ResetFailed -> stringResource(R.string.library_reset_failed, notice.title)
     is LibraryNotice.CopySaved -> stringResource(R.string.library_copy_saved, notice.title)
     is LibraryNotice.CopyFailed -> stringResource(R.string.library_copy_failed, notice.title)
+    is LibraryNotice.PassedWhileReading -> pluralStringResource(R.plurals.passed_while_reading, notice.count, notice.count)
 }
 
 @Composable

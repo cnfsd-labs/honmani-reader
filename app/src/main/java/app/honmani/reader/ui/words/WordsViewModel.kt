@@ -31,6 +31,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
+import app.honmani.reader.data.review.ReviewRules
+import app.honmani.reader.data.review.ReviewState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -67,6 +69,8 @@ data class WordsUiState(
     val knownByReading: List<Pair<String, Int>> = emptyList(),
     /** Progress of saved words in steps of `WordProgress.KNOWN`, by id. */
     val steps: Map<Long, Int> = emptyMap(),
+    /** Memory of the words in review, 0 to 1 (1: known by memory), by id; shown instead of [steps]. */
+    val memory: Map<Long, Float> = emptyMap(),
     val knownCount: Int = 0,
     /** Words in the learning list without an Anki card, for "Add all to Anki" (grammar words it left out not counted). */
     val notInAnki: Int = 0,
@@ -160,6 +164,8 @@ class WordsViewModel(
     private val checkAnki: suspend () -> AnkiCheck = { AnkiCheck.NotInstalled },
     /** What was read and how well each word is known; null while it is worked out. */
     private val knowledge: Flow<WordKnowledge?> = flowOf(null),
+    /** Memory of the words in review (see [WordsUiState.memory]). */
+    private val memory: Flow<Map<Long, Float>> = flowOf(emptyMap()),
     /** Looks a word up in the dictionaries, as a tap in a book would. */
     private val lookUp: suspend (String) -> List<LookupGroup> = { emptyList() },
     /** Whether the list shows how common each word is (a setting). */
@@ -245,6 +251,7 @@ class WordsViewModel(
             .combine(savingPackage) { state, saving -> state.copy(savingPackage = saving) }
             .combine(checkingAnki) { state, checking -> state.copy(checkingAnki = checking) }
             .combine(readWord) { state, word -> state.copy(readWord = word) }
+            .combine(memory.onStart { emit(emptyMap()) }) { state, memory -> state.copy(memory = memory) }
             .combine(frequencies.onStart { emit(emptyMap()) }) { state, found -> state.copy(frequencies = found) }
             .combine(session) { state, session -> state.copy(session = session) }
             .combine(query) { state, query -> state.copy(query = query) }
@@ -507,6 +514,9 @@ class WordsViewModel(
                         out.use { container.ankiExporter.ankiPackage(list, it, onProgress) }
                     },
                     knowledge = container.wordKnowledge,
+                    memory = combine(container.reviewRepository.observeCards(), container.reviewSettings.knownAfterDays) { cards, knownAfter ->
+                        cards.filter { it.state == ReviewState.REVIEW }.associate { it.wordId to ReviewRules.memory(it, knownAfter) }
+                    },
                     lookUp = { word -> LookupGroups.from(container.dictionaryLookup.lookup(word, emptyList())) },
                     showFrequency = container.appearanceSettings.showWordFrequency,
                     frequencyOf = { words -> container.dictionaryLookup.frequencies(words) },

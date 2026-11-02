@@ -41,6 +41,7 @@ import app.honmani.reader.data.opds.KeystoreCredentialCipher
 import app.honmani.reader.data.opds.OpdsAutoImport
 import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsRepository
+import app.honmani.reader.data.review.ReadingPasses
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
@@ -62,6 +63,7 @@ import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.ReadStretchStore
+import app.honmani.reader.data.words.ReadStretches
 import app.honmani.reader.data.words.SpellingVariants
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordKnowledgeTracker
@@ -294,6 +296,7 @@ class AppContainer(context: Context) {
             override suspend fun addRead(ttuId: Long, from: Float, to: Float) {
                 val book = bookDao.findByTtuId(ttuId) ?: return
                 withContext(Dispatchers.IO) { readStretches.add(book.contentHash, from, to) }
+                passReadWords(book.contentHash, from, to)
             }
         }
         ReadingTracker(store, applicationScope, log = { Log.i("Honmani.stats", it) }).also { tracker ->
@@ -302,6 +305,32 @@ class AppContainer(context: Context) {
                     tracker.onPositions(books.mapNotNull { book -> book.characters?.let { book.id to it } }.toMap())
                 }
             }
+        }
+    }
+
+    /** Due words that passed while reading, for the summary when a book closes. */
+    val readingPasses = ReadingPasses()
+
+    private val readWordsLock = Mutex()
+    private var readWords: Pair<String, BookWords?>? = null
+
+    /**
+     * Reading a stretch of a book is a pass for the due words in review met there (once a day,
+     * [ReviewRepository.onRead]). Needs the book's words, kept once it is graded.
+     */
+    private suspend fun passReadWords(contentHash: String, from: Float, to: Float) {
+        val keys = HashSet<String>()
+        readWordsLock.withLock {
+            val words = readWords?.takeIf { it.first == contentHash }?.second
+                ?: withContext(Dispatchers.IO) { difficultyStore.words(contentHash) }.also { readWords = contentHash to it }
+            words?.forEachRead(ReadStretches.add(ReadStretches.NONE, from, to)) { key, _, _ -> keys += key }
+        }
+        if (keys.isEmpty()) return
+        val variants = spellingVariants()
+        val passed = reviewRepository.onReadKeys(keys) { variants.of(it).asList() }
+        if (passed.isNotEmpty()) {
+            readingPasses.add(passed)
+            Log.i("Honmani.review", "Read ${passed.size} due words in review")
         }
     }
 

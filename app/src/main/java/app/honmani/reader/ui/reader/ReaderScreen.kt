@@ -250,7 +250,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 closeRequests = viewModel.closeRequests,
                 onAtLibraryChanged = {
                     atLibrary = it
-                    if (it) viewModel.dismiss()
+                    if (it) {
+                        viewModel.dismiss()
+                        library.bookClosed()
+                    }
                 },
                 onBackground = { bookBackground = Color(it) },
                 marks = { texts, mode, knownWords, sentences, isStale -> container.wordMarker.mark(texts, mode, knownWords, sentences, isStale) },

@@ -65,6 +65,7 @@ object ReviewRules {
             reps = card.reps + 1,
             lapses = card.lapses + if (grade == Grade.AGAIN && reviewed) 1 else 0,
             passedReviews = card.passedReviews + if (real && grade.passed) 1 else 0,
+            reviewStability = if (!real) card.reviewStability else if (grade.passed) memory.stability else 0.0,
             lastGrade = grade.value,
             lastReviewAt = now,
             buriedUntil = if (real) null else card.buriedUntil,
@@ -104,16 +105,22 @@ object ReviewRules {
     private fun active(card: ReviewCardEntity, scheduler: WordScheduler, now: Long) =
         card.state == ReviewState.REVIEW && scheduler == WordScheduler.HONMANI && !isBuried(card, now)
 
+    /** How far [card] is towards known by memory, 0 to 1: its stability against [knownAfterDays]. */
+    fun memory(card: ReviewCardEntity, knownAfterDays: Int = DEFAULT_KNOWN_AFTER_DAYS): Float =
+        if (isKnownByMemory(card, knownAfterDays)) 1f else (card.stability / knownAfterDays).toFloat().coerceIn(0f, 0.99f)
+
     fun isBuried(card: ReviewCardEntity, now: Long) = (card.buriedUntil ?: 0L) > now
 
     /**
-     * Counts as known by memory: in review, stable for [knownAfterDays] or more, passed a real
-     * review at some point and not failed since (the latest grading, even from a lookup, passed).
-     * Reading can't get a card here: it needs a real review (or [ReviewRepository.setKnown]).
+     * Counts as known by memory: in review, stable for [knownAfterDays] or more, the latest real
+     * review passed at that stability already, and not failed since (the latest grading, even from
+     * a lookup, passed). Reading can't get a card here, only keep it: it needs a real review at
+     * [knownAfterDays] (or [ReviewRepository.setKnown]).
      */
     fun isKnownByMemory(card: ReviewCardEntity, knownAfterDays: Int = DEFAULT_KNOWN_AFTER_DAYS): Boolean =
         card.state == ReviewState.REVIEW &&
             card.stability >= knownAfterDays &&
+            card.reviewStability >= knownAfterDays &&
             card.passedReviews >= 1 &&
             card.lastGrade != Grade.AGAIN.value
 

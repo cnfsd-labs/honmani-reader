@@ -193,6 +193,7 @@
     <string name="words_read_no_entry">Your dictionaries have no entry for this word.</string>
     <string name="words_known_hint">Known from reading in books with a difficulty, and words you marked as learned.</string>
     <string name="word_progress">%1$d%%</string>
+    <string name="word_memory">Memory %1$d%%</string>
     <plurals name="word_read_times">
         <item quantity="one">read %1$d time</item>
         <item quantity="other">read %1$d times</item>
@@ -627,6 +628,10 @@
     <string name="milestone_anki">First Anki card</string>
     <string name="milestone_speed">%1$s characters/hour over 2 weeks</string>
     <string name="milestone_reached">Milestone: %1$s</string>
+    <plurals name="passed_while_reading">
+        <item quantity="one">%1$d due word passed while reading</item>
+        <item quantity="other">%1$d due words passed while reading</item>
+    </plurals>
     <plurals name="milestones_reached">
         <item quantity="one">%1$d new milestone</item>
         <item quantity="other">%1$d new milestones</item>

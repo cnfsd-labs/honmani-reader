@@ -29,6 +29,7 @@ class ReviewRulesTest {
         addedAt: Long = t0 - 30 * day,
         lastGrade: Int? = Grade.GOOD.value,
         buriedUntil: Long? = null,
+        reviewStability: Double = stability,
     ) = ReviewCardEntity(
         wordId = 1,
         state = state,
@@ -41,6 +42,7 @@ class ReviewRulesTest {
         lastReviewAt = lastReviewAt,
         buriedUntil = buriedUntil,
         addedAt = addedAt,
+        reviewStability = reviewStability,
     )
 
     // Stability 10: recall is 0.9 exactly 10 days after the review.
@@ -114,6 +116,48 @@ class ReviewRulesTest {
         assertFalse(ReviewRules.isKnownByMemory(card(stability = 40.0, state = ReviewState.SUSPENDED)))
         assertTrue(ReviewRules.isKnownByMemory(card(stability = 15.0), knownAfterDays = 14))
         assertTrue(ReviewRules.isKnownByMemory(card(stability = 30.0, lastGrade = Grade.HARD.value)))
+    }
+
+    @Test
+    fun knownByMemoryNeedsTheLatestRealReviewToPassAtKnownStability() {
+        // stability, stability after the latest real review, latest grade, known after: known?
+        val table = listOf(
+            Row(21.0, 21.0, Grade.GOOD, 21, true),
+            Row(40.0, 21.0, Grade.HARD, 21, true), // reads after a known review keep it known
+            Row(40.0, 5.0, Grade.HARD, 21, false), // reads after an early review can't make it known
+            Row(40.0, 20.9, Grade.HARD, 21, false),
+            Row(40.0, 0.0, Grade.HARD, 21, false), // the latest real review failed
+            Row(25.0, 15.0, Grade.HARD, 14, true),
+            Row(25.0, 15.0, Grade.HARD, 30, false),
+            Row(20.0, 30.0, Grade.GOOD, 21, false), // stability dropped since (a lapse, then reads)
+            Row(40.0, 40.0, Grade.AGAIN, 21, false),
+        )
+        for (row in table) {
+            val card = card(stability = row.stability, reviewStability = row.reviewStability, lastGrade = row.grade.value)
+            assertEquals(row.toString(), row.known, ReviewRules.isKnownByMemory(card, row.knownAfter))
+        }
+    }
+
+    private data class Row(val stability: Double, val reviewStability: Double, val grade: Grade, val knownAfter: Int, val known: Boolean)
+
+    @Test
+    fun onlyRealReviewsSetTheReviewStability() {
+        val early = ReviewRules.grade(card(stability = 3.0, lastReviewAt = t0 - 3 * day), Grade.GOOD, t0, zone, real = true)
+        assertEquals(early.stability, early.reviewStability, 0.0)
+        var read = early
+        var time = t0
+        // Daily reads of a due-ish word: stability grows, the review stability stays.
+        repeat(30) {
+            time += 40 * day
+            read = ReviewRules.onRead(read, honmani, time, zone, readToday = false) ?: read
+        }
+        assertTrue(read.stability >= 21)
+        assertEquals(early.reviewStability, read.reviewStability, 0.0)
+        assertFalse("reading alone after an early review", ReviewRules.isKnownByMemory(read))
+        val passed = ReviewRules.grade(read, Grade.GOOD, time + 40 * day, zone, real = true)
+        assertTrue(ReviewRules.isKnownByMemory(passed))
+        val failed = ReviewRules.grade(passed, Grade.AGAIN, time + 400 * day, zone, real = true)
+        assertEquals(0.0, failed.reviewStability, 0.0)
     }
 
     @Test

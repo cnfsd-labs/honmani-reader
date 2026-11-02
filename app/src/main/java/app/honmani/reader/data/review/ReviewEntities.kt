@@ -47,6 +47,12 @@ data class ReviewCardEntity(
     /** The latest [Grade.value] of any kind of grading. */
     @ColumnInfo(name = "last_grade") val lastGrade: Int? = null,
     @ColumnInfo(name = "last_review_at") val lastReviewAt: Long? = null,
+    /**
+     * Stability right after the latest real review if it passed, 0 if it failed or none was
+     * made (or after [ReviewRepository.setKnown], the stability set). Reading can't change it, so
+     * Known ([ReviewRules.isKnownByMemory]) always rests on a review.
+     */
+    @ColumnInfo(name = "review_stability", defaultValue = "0") val reviewStability: Double = 0.0,
     /** Hidden from the queue until then ("until tomorrow": the next local midnight). */
     @ColumnInfo(name = "buried_until") val buriedUntil: Long? = null,
     @ColumnInfo(name = "added_at") val addedAt: Long,

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "cae8dd07e901549c08150408d6ae7002",
+    "identityHash": "4b105c2b199e736ed5fe699d135d819f",
     "entities": [
       {
         "tableName": "dictionary",
@@ -1046,7 +1046,7 @@
       },
       {
         "tableName": "review_card",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `due` INTEGER NOT NULL, `stability` REAL NOT NULL, `difficulty` REAL NOT NULL, `reps` INTEGER NOT NULL, `lapses` INTEGER NOT NULL, `passed_reviews` INTEGER NOT NULL, `last_grade` INTEGER, `last_review_at` INTEGER, `buried_until` INTEGER, `added_at` INTEGER NOT NULL, PRIMARY KEY(`word_id`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `due` INTEGER NOT NULL, `stability` REAL NOT NULL, `difficulty` REAL NOT NULL, `reps` INTEGER NOT NULL, `lapses` INTEGER NOT NULL, `passed_reviews` INTEGER NOT NULL, `last_grade` INTEGER, `last_review_at` INTEGER, `review_stability` REAL NOT NULL DEFAULT 0, `buried_until` INTEGER, `added_at` INTEGER NOT NULL, PRIMARY KEY(`word_id`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "wordId",
@@ -1105,6 +1105,13 @@
             "fieldPath": "lastReviewAt",
             "columnName": "last_review_at",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "reviewStability",
+            "columnName": "review_stability",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0"
           },
           {
             "fieldPath": "buriedUntil",
@@ -1260,7 +1267,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'cae8dd07e901549c08150408d6ae7002')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4b105c2b199e736ed5fe699d135d819f')"
     ]
   }
 }

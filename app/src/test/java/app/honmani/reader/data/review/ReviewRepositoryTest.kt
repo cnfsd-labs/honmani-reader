@@ -129,6 +129,56 @@ class ReviewRepositoryTest {
     }
 
     @Test
+    fun wordsMetInABookPassOncePerDayWhenDueIsh() = runTest {
+        val cat = word("猫")
+        val dog = word("犬")
+        val drink = word("飲む")
+        val fresh = word("五")
+        val anki = word("食べる", WordScheduler.ANKI)
+        listOf(cat, dog, drink).forEach { repository.record(it, Grade.GOOD) }
+        repository.introduce(fresh)
+        now += 2 * day
+        val keys = setOf("猫", "犬", "呑む", "五", "食べる", "走る")
+        assertTrue("not due-ish yet (R > 0.9)", repository.onReadKeys(keys).isEmpty())
+        now += 3 * day
+        val dueBefore = repository.card(cat)!!.due
+        // 飲む counts through its other spelling 呑む; a new card and an Anki word don't move.
+        val passed = repository.onReadKeys(keys) { if (it == "飲む") listOf("呑む") else emptyList() }
+        assertEquals(setOf(cat, dog, drink), passed.toSet())
+        assertTrue("moves later", repository.card(cat)!!.due > dueBefore)
+        assertTrue("once a day", repository.onReadKeys(keys).isEmpty())
+        assertTrue(repository.onReadKeys(emptySet()).isEmpty())
+        assertEquals(0, repository.card(fresh)!!.reps)
+        assertNull(repository.card(anki))
+    }
+
+    @Test
+    fun aReaderLookupByWordMakesItDueAndReadingCantMakeItKnown() = runTest {
+        val id = word("猫")
+        repository.record(id, Grade.GOOD)
+        now += 5 * day
+        assertFalse(repository.onLookup("猫", "よみ", LookupOrigin.REVIEW))
+        assertFalse(repository.onLookup("猫", "ねこ", LookupOrigin.READER))
+        assertTrue(repository.onLookup("猫", "よみ", LookupOrigin.READER))
+        val lapsed = repository.card(id)!!
+        assertEquals(Grade.AGAIN.value, lapsed.lastGrade)
+        assertEquals(ReviewRules.startOfDay(now, zone, 1), lapsed.due)
+        now = lapsed.due
+        assertEquals(1, repository.dueCount())
+        // Months of reading after one early review: stable, but not known without a review.
+        repeat(40) {
+            now += 30 * day
+            repository.onRead(listOf(id))
+        }
+        val read = repository.card(id)!!
+        assertTrue(read.stability >= ReviewRules.DEFAULT_KNOWN_AFTER_DAYS)
+        assertFalse(ReviewRules.isKnownByMemory(read))
+        now += 30 * day
+        repository.record(id, Grade.GOOD)
+        assertTrue(ReviewRules.isKnownByMemory(repository.card(id)!!))
+    }
+
+    @Test
     fun aReaderLookupLapsesADueWordButASearchDoesNot() = runTest {
         val id = word("猫")
         repository.record(id, Grade.GOOD)

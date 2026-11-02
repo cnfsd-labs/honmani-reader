@@ -105,6 +105,9 @@ sealed interface LibraryNotice {
 
     data class CopySaved(val title: String) : LibraryNotice
 
+    /** Due words in review read in the book just closed, which count as reviewed. */
+    data class PassedWhileReading(val count: Int) : LibraryNotice
+
     data class CopyFailed(val title: String) : LibraryNotice
 }
 
@@ -129,6 +132,8 @@ class LibraryViewModel(
     private val ttu: TtuLibrary,
     private val openFile: (Uri) -> PickedFile?,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Due words passed while reading since the last book closed, counting again from 0. */
+    private val takePassedWhileReading: () -> Int = { 0 },
     /** What the automatic import from book servers is doing, if it runs. */
     val autoImport: StateFlow<AutoImportStatus?> = MutableStateFlow(null),
     /** How a title reads in kana (with the dictionary), for romaji search. */
@@ -175,6 +180,12 @@ class LibraryViewModel(
     val syncQuestion: StateFlow<SyncQuestion?> =
         _syncQuestion.map { it?.first }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val _notices = Channel<LibraryNotice>(Channel.BUFFERED)
+
+    /** A book was closed: how many due words passed while reading it, if any. */
+    fun bookClosed() {
+        val passed = takePassedWhileReading()
+        if (passed > 0) _notices.trySend(LibraryNotice.PassedWhileReading(passed))
+    }
     val notices: Flow<LibraryNotice> = _notices.receiveAsFlow()
 
     val uiState: StateFlow<LibraryUiState> =
@@ -479,6 +490,7 @@ class LibraryViewModel(
                     importer = container.bookImporter,
                     ttu = container.ttuLibrary,
                     openFile = { uri -> openPickedFile(application.contentResolver, uri) },
+                    takePassedWhileReading = container.readingPasses::take,
                     openSample = { sample ->
                         runCatching { PickedFile(sample.fileName, application.assets.open(sample.asset)) }.getOrNull()
                     },
