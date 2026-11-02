@@ -9,11 +9,17 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
+import app.honmani.reader.data.review.ReadDayEntity
+import app.honmani.reader.data.review.ReviewCardEntity
+import app.honmani.reader.data.review.ReviewLogEntity
+import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
+import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
+import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.ReadStretchStore
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
@@ -78,9 +84,14 @@ class Backup(
             val lookups: List<WordLookupEntity>,
             val removed: List<RemovedBookEntity>,
             val catalogs: List<OpdsCatalogEntity>,
+            val cards: Map<Long, ReviewCardEntity>,
+            val logs: Map<Long, List<ReviewLogEntity>>,
+            val reads: Map<Long, List<ReadDayEntity>>,
         )
         val tables = database.withTransaction {
-            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.catalogs())
+            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.catalogs(),
+                dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
+            )
         }
         val grades = grades()
         val keys = HashMap<Long, String>()
@@ -127,8 +138,12 @@ class Backup(
                         book = lookup.bookId?.let(::keyOf),
                         bookTitle = lookup.bookTitle,
                         lookedUpAt = lookup.lookedUpAt,
+                        origin = lookup.origin.name,
                     )
                 },
+                card = tables.cards[word.id]?.let(::backupCard),
+                reviews = tables.logs[word.id].orEmpty().map { BackupReview(it.at, it.grade, it.elapsedDays) },
+                reads = tables.reads[word.id].orEmpty().map { BackupReadDay(it.day, it.count) },
             )
         }
         return BackupFile(
@@ -218,6 +233,12 @@ class Backup(
 
             val words = dao.words().associateBy { WordRepository.key(it.expression, it.reading) }
             val lookups = dao.wordLookups().groupBy { it.wordId }
+            val cardsBefore = dao.reviewCards().associateBy { it.wordId }
+            val logsBefore = dao.reviewLogs().groupBy { it.wordId }
+            val readsBefore = dao.readDays().groupBy { it.wordId }
+            val cards = ArrayList<ReviewCardEntity>()
+            val newLogs = ArrayList<ReviewLogEntity>()
+            val readDays = ArrayList<ReadDayEntity>()
             val seen = HashSet<String>()
             for (word in backup.words) {
                 // The same word twice (an edited or merged file) would hit the unique index and fail the restore.
@@ -247,13 +268,26 @@ class Backup(
                             bookId = lookup.book?.let(::idOf),
                             bookTitle = lookup.bookTitle,
                             lookedUpAt = lookup.lookedUpAt,
+                            origin = LookupOrigin.entries.firstOrNull { it.name == lookup.origin } ?: LookupOrigin.READER,
                         )
                     }
+                // The backup's card wins: restoring is meant to bring the review memory back as it was.
+                word.card?.let { card -> reviewCard(id, card)?.let(cards::add) }
+                val loggedAt = logsBefore[id].orEmpty().mapTo(HashSet()) { it.at to it.grade }
+                word.reviews.filter { loggedAt.add(it.at to it.grade) }.mapTo(newLogs) {
+                    ReviewLogEntity(wordId = id, at = it.at, grade = it.grade, elapsedDays = it.elapsedDays.takeIf { d -> d.isFinite() } ?: 0.0)
+                }
+                val readsHere = readsBefore[id].orEmpty().associate { it.day to it.count }
+                word.reads.filter { it.count > 0 && it.count > (readsHere[it.day] ?: 0) }.mapTo(readDays) { ReadDayEntity(id, it.day, it.count) }
                 if (added.isNotEmpty()) {
                     wordDao.insertLookups(added)
                     wordDao.pruneLookups(id, WordRepository.KEPT_LOOKUPS)
                 }
             }
+
+            if (cards.isNotEmpty()) dao.putReviewCards(cards)
+            if (newLogs.isNotEmpty()) dao.insertReviewLogs(newLogs)
+            if (readDays.isNotEmpty()) dao.putReadDays(readDays)
 
             dao.insertRemovedBooks(
                 backup.removedBooks.mapNotNull { removed ->
@@ -347,6 +381,9 @@ class Backup(
             AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
             AppearanceSettings.KEY_SHOW_PREVIOUS_SENTENCE to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_SHOW_WORD_FREQUENCY to BackupValue.BOOLEAN,
+            ReviewSettings.KEY_NEW_PER_DAY to BackupValue.INT,
+            ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,
+            ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
             AnkiSettings.KEY_AUDIO to BackupValue.STRING,
@@ -398,6 +435,43 @@ class Backup(
                 lastOpenedAt = listOfNotNull(book.lastOpenedAt, details.lastOpenedAt).maxOrNull(),
                 hidden = book.hidden || details.hidden,
                 addedAt = minOf(book.addedAt, details.addedAt),
+            )
+        }
+
+        fun backupCard(card: ReviewCardEntity) = BackupCard(
+            state = card.state.name,
+            due = card.due,
+            stability = card.stability,
+            difficulty = card.difficulty,
+            reps = card.reps,
+            lapses = card.lapses,
+            passedReviews = card.passedReviews,
+            lastGrade = card.lastGrade,
+            lastReviewAt = card.lastReviewAt,
+            reviewStability = card.reviewStability,
+            buriedUntil = card.buriedUntil,
+            addedAt = card.addedAt,
+        )
+
+        /** The card of word [wordId] as the backup has it; null for a state this version doesn't know. */
+        fun reviewCard(wordId: Long, card: BackupCard): ReviewCardEntity? {
+            val state = ReviewState.entries.firstOrNull { it.name == card.state } ?: return null
+            // A hand-edited NaN would poison every later scheduling of the card.
+            fun finite(value: Double) = value.takeIf { it.isFinite() && it >= 0 } ?: 0.0
+            return ReviewCardEntity(
+                wordId = wordId,
+                state = state,
+                due = card.due,
+                stability = finite(card.stability),
+                difficulty = finite(card.difficulty),
+                reps = card.reps.coerceAtLeast(0),
+                lapses = card.lapses.coerceAtLeast(0),
+                passedReviews = card.passedReviews.coerceAtLeast(0),
+                lastGrade = card.lastGrade,
+                lastReviewAt = card.lastReviewAt,
+                reviewStability = finite(card.reviewStability),
+                buriedUntil = card.buriedUntil,
+                addedAt = card.addedAt,
             )
         }
 

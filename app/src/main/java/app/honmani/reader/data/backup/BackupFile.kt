@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonElement
 
 /**
  * Everything a reader wants back after installing Honmani again, except the books themselves:
- * settings, reading progress and statistics, saved words, word progress and milestones. Books are
+ * settings, reading progress and statistics, saved words, word progress, review cards and logs, and milestones. Books are
  * named by their content hash, so their progress and statistics find them again once the same
  * file is back in the library. Nothing tied to this phone is in it: no passwords, keys, sync
  * account or AnkiDroid note types.
@@ -137,7 +137,36 @@ data class BackupWord(
     /** `WordProgress` steps, reads and lookups it was worked out from, and the learned mark. */
     val progress: BackupWordStep? = null,
     val lookups: List<BackupWordLookup> = emptyList(),
+    /** The word's review memory (`ReviewCardEntity`); null if it isn't in review. Older backups have none. */
+    val card: BackupCard? = null,
+    /** Real reviews of the word (`ReviewLogEntity`), oldest first; they outlive the card but not the word. */
+    val reviews: List<BackupReview> = emptyList(),
+    /** Days the word was read in a book without a lookup (`ReadDayEntity`). */
+    val reads: List<BackupReadDay> = emptyList(),
 )
+
+/** A review card as stored: enum names and epoch milliseconds, so a restore reads it back unchanged. */
+@Serializable
+data class BackupCard(
+    val state: String,
+    val due: Long,
+    val stability: Double = 0.0,
+    val difficulty: Double = 0.0,
+    val reps: Int = 0,
+    val lapses: Int = 0,
+    val passedReviews: Int = 0,
+    val lastGrade: Int? = null,
+    val lastReviewAt: Long? = null,
+    val reviewStability: Double = 0.0,
+    val buriedUntil: Long? = null,
+    val addedAt: Long,
+)
+
+@Serializable
+data class BackupReview(val at: Long, val grade: Int, val elapsedDays: Double = 0.0)
+
+@Serializable
+data class BackupReadDay(val day: Long, val count: Int = 1)
 
 @Serializable
 data class BackupWordStep(val steps: Int, val reads: Int, val lookups: Int, val learned: Boolean, val kana: Boolean = false)
@@ -151,6 +180,8 @@ data class BackupWordLookup(
     val book: String? = null,
     val bookTitle: String? = null,
     @SerialName("at") val lookedUpAt: Long,
+    /** `LookupOrigin` name: only reader lookups count against a review card; PREPARE is no lookup. */
+    val origin: String = "READER",
 )
 
 @Serializable

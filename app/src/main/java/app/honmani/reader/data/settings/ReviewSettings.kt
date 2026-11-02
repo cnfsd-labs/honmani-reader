@@ -36,6 +36,13 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         preferences.edit().putInt(KEY_KNOWN_AFTER, _knownAfterDays.value).apply()
     }
 
+    /** Reads the stored values again (a backup was restored). */
+    fun reload() {
+        _newPerDay.value = storedNewPerDay()
+        _showSentence.value = preferences.getBoolean(KEY_SENTENCE, true)
+        _knownAfterDays.value = storedKnownAfter()
+    }
+
     private fun storedNewPerDay() = preferences.getInt(KEY_NEW_PER_DAY, DEFAULT_NEW_PER_DAY).coerceIn(0, MAX_NEW_PER_DAY)
 
     private fun storedKnownAfter() = preferences.getInt(KEY_KNOWN_AFTER, ReviewRules.DEFAULT_KNOWN_AFTER_DAYS)

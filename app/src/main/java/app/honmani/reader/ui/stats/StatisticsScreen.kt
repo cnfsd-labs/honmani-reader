@@ -308,7 +308,7 @@ private fun comparison(summary: PeriodSummary): String? {
 
 /** A headline number with its label and an optional second line. */
 @Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier, detail: String? = null) {
+internal fun StatTile(label: String, value: String, modifier: Modifier = Modifier, detail: String? = null) {
     Card(
         modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),

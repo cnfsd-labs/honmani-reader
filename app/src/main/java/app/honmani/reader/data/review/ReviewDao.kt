@@ -108,6 +108,9 @@ interface ReviewDao {
     @Query("SELECT COUNT(*) FROM review_log WHERE at >= :from")
     fun observeReviewsSince(from: Long): Flow<Int>
 
+    @Query("SELECT * FROM review_log WHERE at >= :from ORDER BY at, id")
+    fun observeLogsSince(from: Long): Flow<List<ReviewLogEntity>>
+
     @Query("SELECT COUNT(*) FROM review_log WHERE at >= :from")
     suspend fun reviewsSince(from: Long): Int
 

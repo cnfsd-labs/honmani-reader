@@ -6,7 +6,14 @@ import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.review.Grade
+import app.honmani.reader.data.review.ReadDayEntity
+import app.honmani.reader.data.review.ReviewRepository
+import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.words.LookupEventEntity
+import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.WordLookupEntity
+import java.time.ZoneId
 import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -98,6 +105,16 @@ class BackupTest {
 
         suspend fun days() = database.backupDao().readingDays()
 
+        var clock = 1_800_000_000_000L
+        val reviews = ReviewRepository(database, now = { clock }, zone = { ZoneId.of("UTC") })
+
+        /** The cards by how their word is written, ids left out. */
+        suspend fun cards() = database.backupDao().reviewCards().associate { card ->
+            database.wordDao().find(card.wordId)!!.expression to card.copy(wordId = 0)
+        }
+
+        suspend fun logs() = database.backupDao().reviewLogs().map { database.wordDao().find(it.wordId)!!.expression to it.copy(id = 0, wordId = 0) }
+
         suspend fun snapshot() = listOf(
             database.backupDao().books(),
             database.backupDao().readingDays(),
@@ -109,6 +126,9 @@ class BackupTest {
             restored.waiting(),
             stretches.all().mapValues { it.value.toList() },
             progress.load(),
+            database.backupDao().reviewCards(),
+            database.backupDao().reviewLogs().map { it.copy(id = 0) },
+            database.backupDao().readDays(),
         )
     }
 
@@ -199,6 +219,98 @@ class BackupTest {
         assertEquals(RestoredPosition(5_000, 0.25f, savedAt = LAST_OPENED), new.restored.takePosition("hash-a"))
         assertNull(new.restored.takePosition("hash-a"))
         assertTrue(new.restored.waiting().none { it.key == "hash-a" })
+    }
+
+    /** A phone with three words in review: reviewed on different days, one buried, one read, one prepared. */
+    private suspend fun reviewingPhone(): Phone = Phone("reviewing").apply {
+        val day = 24L * 3_600_000
+        words.record(lookup("猫", null))
+        words.record(lookup("犬", null))
+        words.record(lookup("鳥", null))
+        val cat = words.find("猫", "よみ")!!.id
+        val dog = words.find("犬", "よみ")!!.id
+        val bird = words.find("鳥", "よみ")!!.id
+        reviews.introduce(cat)
+        reviews.introduce(dog)
+        reviews.introduce(bird)
+        reviews.record(cat, Grade.GOOD)
+        clock += 3 * day
+        reviews.record(cat, Grade.GOOD)
+        reviews.record(dog, Grade.AGAIN)
+        reviews.record(dog, Grade.GOOD)
+        reviews.bury(bird)
+        database.backupDao().putReadDays(listOf(ReadDayEntity(cat, 20_000, 2), ReadDayEntity(dog, 20_001, 1)))
+        database.wordDao().insertLookups(
+            listOf(
+                WordLookupEntity(
+                    wordId = bird, surface = "鳥", sentence = "鳥が飛ぶ。", surfaceStart = 0, surfaceEnd = 1,
+                    lookedUpAt = clock, origin = LookupOrigin.PREPARE,
+                ),
+            ),
+        )
+        settings.edit().putInt("review_new_per_day", 20).putBoolean("review_show_sentence", false).putInt("review_known_after_days", 30).apply()
+    }
+
+    @Test
+    fun reviewCardsLogsReadsOriginsAndSettingsComeBackOnANewPhone() = runTest {
+        val old = reviewingPhone()
+        assertTrue(old.cards().getValue("猫").reviewStability > 0.0)
+        assertEquals(4, old.logs().size)
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        assertEquals(old.cards(), new.cards())
+        assertEquals(old.logs(), new.logs())
+        assertNull(new.cards().getValue("猫").buriedUntil)
+        assertTrue(new.cards().getValue("鳥").buriedUntil != null)
+        assertEquals(ReviewState.REVIEW, new.cards().getValue("猫").state)
+        assertEquals(listOf(20_000L to 2, 20_001L to 1), new.database.backupDao().readDays().map { it.day to it.count })
+        assertEquals(
+            listOf(LookupOrigin.READER, LookupOrigin.PREPARE),
+            new.database.backupDao().wordLookups().filter { it.surface == "鳥" }.map { it.origin }.sortedBy { it.ordinal },
+        )
+        assertEquals(20, new.settings.getInt("review_new_per_day", 0))
+        assertEquals(false, new.settings.getBoolean("review_show_sentence", true))
+        assertEquals(30, new.settings.getInt("review_known_after_days", 0))
+    }
+
+    @Test
+    fun restoringBringsAnAnsweredCardBackToTheBackupsState_andKeepsNewerLogs() = runTest {
+        val phone = reviewingPhone()
+        val backup = throughFile(phone.backup.export(readerSettings = null))
+        val before = phone.cards()
+        val cat = phone.words.find("猫", "よみ")!!.id
+        phone.clock += 10 * 24L * 3_600_000
+        phone.reviews.record(cat, Grade.AGAIN)
+        phone.database.wordDao().delete(phone.words.find("鳥", "よみ")!!.id)
+        assertTrue(phone.cards().getValue("猫") != before.getValue("猫"))
+
+        phone.backup.restore(backup)
+
+        assertEquals(before, phone.cards())
+        // The review made after the backup is still in the log; the removed word's card is back.
+        assertEquals(5, phone.logs().size)
+        val again = phone.backup.restore(backup)
+        assertEquals(0, again.wordsAdded)
+        assertEquals(5, phone.logs().size)
+    }
+
+    @Test
+    fun aBackupWithoutReviewDataOrWithAnUnknownCardStateRestoresWithoutCards() = runTest {
+        val old = oldPhone()
+        val plain = throughFile(old.backup.export(readerSettings = null))
+        val broken = plain.copy(
+            words = plain.words.map { it.copy(card = BackupCard(state = "BOGUS", due = 1, addedAt = 1), reads = listOf(BackupReadDay(5, 0))) },
+        )
+        val new = Phone("new")
+
+        new.backup.restore(plain)
+        Phone("other").backup.restore(broken)
+
+        assertTrue(new.database.backupDao().reviewCards().isEmpty())
+        assertTrue(plain.words.all { it.card == null && it.reviews.isEmpty() && it.reads.isEmpty() })
     }
 
     @Test

@@ -103,6 +103,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         container.appearanceSettings.reload()
         container.readingGoalSettings.reload()
         container.ankiSettings.reload()
+        container.reviewSettings.reload()
         val ttu = container.ttuLibrary
         // Books in the library whose position moved forward: ttu opens them there, unless progress
         // sync has a newer one when the book opens (the position keeps the time it was read).

@@ -111,6 +111,20 @@ class ReviewRepository(
 
     suspend fun card(wordId: Long): ReviewCardEntity? = dao.find(wordId)
 
+    /** Today's reviews, retention and time for the Progress tab, again after each review. */
+    fun observeSummary(): Flow<ReviewSummary> {
+        val time = now()
+        return combine(
+            dao.observeLogsSince(time - (ReviewStats.RETENTION_DAYS + 1) * ReviewRules.DAY_MS),
+            dao.observeAll(),
+            dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone())),
+        ) { logs, cards, firstReviews ->
+            ReviewStats.summary(
+                logs, cards.count { it.state == ReviewState.REVIEW }, cards.isNotEmpty(), firstReviews, now(), zone(),
+            )
+        }
+    }
+
     /** Every card, again after each change. */
     fun observeCards(): Flow<List<ReviewCardEntity>> = dao.observeAll()
 

@@ -8,6 +8,9 @@ import androidx.room.Update
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
+import app.honmani.reader.data.review.ReadDayEntity
+import app.honmani.reader.data.review.ReviewCardEntity
+import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.WordEntity
@@ -39,6 +42,24 @@ interface BackupDao {
 
     @Query("SELECT * FROM word_lookup ORDER BY word_id, looked_up_at, id")
     suspend fun wordLookups(): List<WordLookupEntity>
+
+    @Query("SELECT * FROM review_card ORDER BY word_id")
+    suspend fun reviewCards(): List<ReviewCardEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putReviewCards(cards: List<ReviewCardEntity>)
+
+    @Query("SELECT * FROM review_log ORDER BY word_id, at, id")
+    suspend fun reviewLogs(): List<ReviewLogEntity>
+
+    @Insert
+    suspend fun insertReviewLogs(logs: List<ReviewLogEntity>)
+
+    @Query("SELECT * FROM read_day ORDER BY word_id, day")
+    suspend fun readDays(): List<ReadDayEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putReadDays(days: List<ReadDayEntity>)
 
     @Query("SELECT * FROM removed_book")
     suspend fun removedBooks(): List<RemovedBookEntity>

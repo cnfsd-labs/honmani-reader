@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.review.ReviewSummary
 import app.honmani.reader.data.stats.DayTotal
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneStore
@@ -50,6 +51,14 @@ data class ProgressUiState(
     /** Seconds read per day, all books together, for the year calendar. */
     val calendar: Map<LocalDate, Long> = emptyMap(),
     val today: LocalDate = LocalDate.now(),
+    val reviews: ReviewSummary = ReviewSummary(),
+)
+
+private data class Library(
+    val books: List<BookEntity>,
+    val grades: Map<String, StoredDifficulty>,
+    val skill: SkillEstimate,
+    val reviews: ReviewSummary,
 )
 
 data class FittingBook(val id: Long, val title: String, val difficulty: Int)
@@ -66,11 +75,12 @@ class ProgressViewModel(
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     /** The skill; by default from speed alone (no words read). */
     private val skill: Flow<SkillEstimate> = SkillTracker(days, books, grades, flowOf(WordKnowledge.EMPTY), today = today).estimate,
+    private val reviews: Flow<ReviewSummary> = flowOf(ReviewSummary()),
 ) : ViewModel() {
-    private val library = combine(books, grades, skill) { b, g, s -> Triple(b, g, s) }
+    private val library = combine(books, grades, skill, reviews, ::Library)
 
     val uiState: StateFlow<ProgressUiState?> =
-        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill), learned, anki, seen ->
+        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews), learned, anki, seen ->
             val today = today()
             val zone = zone()
             val data = ProgressionData(
@@ -95,6 +105,7 @@ class ProgressViewModel(
                 next = Progression.next(milestones),
                 anyReading = week.anyReading,
                 skill = skill,
+                reviews = reviews,
                 calendar = rows.groupBy { LocalDate.parse(it.day) }.mapValues { (_, list) -> list.sumOf { it.seconds } },
                 today = today,
                 fitting = skill.current?.let { current ->
@@ -130,6 +141,7 @@ class ProgressViewModel(
                     store = container.milestoneStore,
                     grades = container.difficultyStore.grades,
                     skill = container.skillTracker.estimate,
+                    reviews = container.reviewRepository.observeSummary(),
                 )
             }
         }

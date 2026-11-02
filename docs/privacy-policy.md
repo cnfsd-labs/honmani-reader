@@ -13,11 +13,11 @@ on your phone, in Honmani's own app storage. Uninstalling the app deletes them.
 If you have turned on Android's backup to your Google account (or move to a new phone with
 Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki
 deck) and a copy Honmani keeps of its own backup file (see below: your saved words with their
-sentences, reading progress, statistics and the titles of your books). On a new phone Honmani
+sentences, your flashcard reviews, reading progress, statistics and the titles of your books). On a new phone Honmani
 offers to restore it. Books, dictionaries, passwords and keys are never part of it.
 
-Settings → Back up and restore writes your settings, reading progress, statistics and saved words
-to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
+Settings → Back up and restore writes your settings, reading progress, statistics, saved words
+and flashcard reviews to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
 Honmani sends it nowhere itself. The file holds no passwords or keys; it does hold your saved
 words with their sentences and the titles of your books, so keep it where only you can read it.
 

@@ -13,11 +13,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -63,12 +66,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
+import app.honmani.reader.data.review.ReviewSummary
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneKind
 import app.honmani.reader.data.stats.Progression
 import app.honmani.reader.data.stats.ReadingLevel
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.stats.StatTile
 import app.honmani.reader.ui.stats.StatisticsContent
+import app.honmani.reader.ui.stats.duration
 import app.honmani.reader.ui.stats.characters
 import app.honmani.reader.ui.stats.number
 import java.time.DayOfWeek
@@ -147,6 +153,7 @@ private fun ProgressContent(
             )
         }
         LevelCard(current)
+        if (current.reviews.any) ReviewTiles(current.reviews)
         if (current.next.isNotEmpty()) NextMilestones(current.next)
         ReadingCalendar(current.calendar, current.today)
         AllMilestones(current.milestones, recentSince = current.today.minusDays(RECENT_DAYS))
@@ -200,6 +207,42 @@ private fun LevelCard(state: ProgressUiState) {
                 )
             }
         }
+    }
+}
+
+/** Reviews today, the time they took, retention over the last 30 days and the words in review. */
+@Composable
+private fun ReviewTiles(reviews: ReviewSummary) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+        StatTile(
+            label = stringResource(R.string.progress_reviews_today),
+            value = number(reviews.today.toLong()),
+            detail = pluralStringResource(R.plurals.progress_reviews_new, reviews.newToday, reviews.newToday),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+        StatTile(
+            label = stringResource(R.string.progress_reviews_time),
+            value = duration(reviews.todayMillis / 1000),
+            detail = stringResource(R.string.progress_reviews_time_note),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+        StatTile(
+            label = stringResource(R.string.progress_retention),
+            value = reviews.retention?.let { stringResource(R.string.progress_retention_value, Math.round(it * 100).toInt()) } ?: "–",
+            detail = if (reviews.retention != null) {
+                pluralStringResource(R.plurals.progress_retention_note, reviews.retentionReviews, reviews.retentionReviews)
+            } else {
+                stringResource(R.string.progress_retention_none)
+            },
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+        StatTile(
+            label = stringResource(R.string.progress_words_in_review),
+            value = number(reviews.inReview.toLong()),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
     }
 }
 

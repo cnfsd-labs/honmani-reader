@@ -597,6 +597,21 @@
     <string name="progress_to_next">%1$s to level %2$d</string>
     <string name="progress_streak">Streak: %1$s</string>
     <string name="progress_this_week">Read on %1$d of the last 7 days</string>
+    <string name="progress_reviews_today">Reviews today</string>
+    <plurals name="progress_reviews_new">
+        <item quantity="one">%1$d new word</item>
+        <item quantity="other">%1$d new words</item>
+    </plurals>
+    <string name="progress_reviews_time">Review time today</string>
+    <string name="progress_reviews_time_note">About, from the pace of your answers</string>
+    <string name="progress_retention">Retention</string>
+    <string name="progress_retention_value">%1$d%%</string>
+    <plurals name="progress_retention_note">
+        <item quantity="one">%1$d review in the last 30 days</item>
+        <item quantity="other">%1$d reviews in the last 30 days</item>
+    </plurals>
+    <string name="progress_retention_none">Not enough reviews yet</string>
+    <string name="progress_words_in_review">Words in review</string>
     <string name="progress_next">Next milestones</string>
     <string name="progress_milestones">Milestones</string>
     <string name="progress_of_goal">%1$s of %2$s</string>
@@ -833,8 +848,8 @@
     <string name="sync_question_stay">Stay at %1$d%%</string>
     <string name="sync_question_go">Go to %1$d%%</string>
     <string name="backup_title">Back up and restore</string>
-    <string name="backup_details">Settings, progress, statistics and saved words in one file, for a new phone or a new install</string>
-    <string name="backup_message">A backup keeps your settings, reading progress, statistics, skill, saved words and milestones in one file, saved where you choose (nothing is sent anywhere). Books are not in it: after a restore, add them again (from your book server, or the same files) and their progress comes back with them.\n\nRestoring adds to what is on this phone; it never deletes anything.</string>
+    <string name="backup_details">Settings, progress, statistics, saved words and reviews in one file, for a new phone or a new install</string>
+    <string name="backup_message">A backup keeps your settings, reading progress, statistics, skill, saved words, review cards and milestones in one file, saved where you choose (nothing is sent anywhere). Books are not in it: after a restore, add them again (from your book server, or the same files) and their progress comes back with them.\n\nRestoring adds to what is on this phone; it never deletes anything. Review cards in the file replace the same word\'s card here.</string>
     <string name="backup_save">Back up…</string>
     <string name="backup_restore">Restore…</string>
     <string name="backup_working">One moment…</string>
