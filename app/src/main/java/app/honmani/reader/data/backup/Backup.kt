@@ -236,6 +236,9 @@ class Backup(
             val cardsBefore = dao.reviewCards().associateBy { it.wordId }
             val logsBefore = dao.reviewLogs().groupBy { it.wordId }
             val readsBefore = dao.readDays().groupBy { it.wordId }
+            // Removing a word keeps its review log (statistics); a restored word must not log those answers twice.
+            val liveIds = words.values.mapTo(HashSet()) { it.id }
+            val orphanLogged = logsBefore.filterKeys { it !in liveIds }.values.flatten().mapTo(HashSet()) { it.at to it.grade }
             val cards = ArrayList<ReviewCardEntity>()
             val newLogs = ArrayList<ReviewLogEntity>()
             val readDays = ArrayList<ReadDayEntity>()
@@ -274,6 +277,7 @@ class Backup(
                 // The backup's card wins: restoring is meant to bring the review memory back as it was.
                 word.card?.let { card -> reviewCard(id, card)?.let(cards::add) }
                 val loggedAt = logsBefore[id].orEmpty().mapTo(HashSet()) { it.at to it.grade }
+                if (current == null) loggedAt.addAll(orphanLogged)
                 word.reviews.filter { loggedAt.add(it.at to it.grade) }.mapTo(newLogs) {
                     ReviewLogEntity(wordId = id, at = it.at, grade = it.grade, elapsedDays = it.elapsedDays.takeIf { d -> d.isFinite() } ?: 0.0)
                 }

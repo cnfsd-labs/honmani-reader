@@ -298,6 +298,18 @@ class BackupTest {
     }
 
     @Test
+    fun aRemovedWordsLogIsNotLoggedTwiceWhenItsRestored() = runTest {
+        val phone = reviewingPhone()
+        val backup = throughFile(phone.backup.export(readerSettings = null))
+        val logsBefore = phone.database.backupDao().reviewLogs().size
+        phone.database.wordDao().delete(phone.words.find("犬", "よみ")!!.id)
+
+        phone.backup.restore(backup)
+
+        assertEquals(logsBefore, phone.database.backupDao().reviewLogs().size)
+    }
+
+    @Test
     fun aBackupWithoutReviewDataOrWithAnUnknownCardStateRestoresWithoutCards() = runTest {
         val old = oldPhone()
         val plain = throughFile(old.backup.export(readerSettings = null))
