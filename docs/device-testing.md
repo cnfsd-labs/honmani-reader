@@ -69,6 +69,11 @@ count back, a Learned mark back, a due review card back as it was, the word's pr
 again within the hour in the same sentence changes nothing, so there is no button. A word starred or added
 to Anki from the panel is kept. Taps on words and kanji inside a definition, and "Edit and look up", save
 and change nothing.
+Nested lookups: in a panel (book, search, shared text), tap a Japanese character inside an example
+sentence (Jitendex: "More meanings") or a cross-reference: that word's entry (longest match from the
+character, inflected forms too) replaces the panel and a back arrow appears. Tap a Japanese word there
+too, then Back (arrow or system) twice: each step returns one entry, the first entry is as it was; Back
+once more closes the panel. Taps on English text do nothing. Nested words are not in Words, no progress.
 
 ## Back up and restore
 

@@ -432,8 +432,10 @@ class ReaderViewModel(
     }
 
     /**
-     * Looks up [word], referenced in a definition, and shows it in the panel; back returns to
-     * the results before. Not saved to the word list: it wasn't read in the book.
+     * Looks up [word], referenced in a definition or the text from a tapped Japanese character on
+     * (longest match, see [app.honmani.reader.lookup.NestedLookup]), and shows it in the panel;
+     * back returns to the results before, as many levels deep as were opened. Never counted or
+     * saved: it wasn't read in the book.
      */
     fun lookupWord(word: String) {
         val current = _panel.value as? LookupPanelState.Results ?: return

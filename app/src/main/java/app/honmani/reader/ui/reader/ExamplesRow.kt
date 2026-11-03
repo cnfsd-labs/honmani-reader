@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.examples.Example
@@ -40,7 +41,7 @@ val LocalExampleSentences = staticCompositionLocalOf<ExampleSentences?> { null }
  * while the sentences are off or the word has none.
  */
 @Composable
-internal fun ExamplesRow(expression: String, reading: String) {
+internal fun ExamplesRow(expression: String, reading: String, onLookup: (String) -> Unit = {}) {
     val sentences = LocalExampleSentences.current ?: return
     val examples by produceState<List<Example>>(emptyList(), sentences, expression, reading) {
         value = sentences.find(expression, reading)
@@ -73,7 +74,7 @@ internal fun ExamplesRow(expression: String, reading: String) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(bottom = 8.dp)) {
                 examples.forEach { example ->
                     Column {
-                        Text(example.japanese, style = MaterialTheme.typography.bodyLarge)
+                        ScanText(AnnotatedString(example.japanese), MaterialTheme.typography.bodyLarge, onScan = onLookup)
                         Text(
                             example.english,
                             style = MaterialTheme.typography.bodySmall,

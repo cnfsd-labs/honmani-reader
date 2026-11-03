@@ -715,7 +715,7 @@ private fun ReadWordRow(expression: String, reads: Int, details: ReadWordDetails
                 // The short meaning, as a lookup in the reader first shows it.
                 entry.sections.firstOrNull()?.let { section ->
                     if (section.lines.isNotEmpty()) {
-                        GlossLines(LookupGroups.brief(section.lines), onLookup = {})
+                        GlossLines(LookupGroups.brief(section.lines), onLookup = {}, scanTaps = false)
                     } else {
                         val senses = section.senses.take(LookupGroups.BRIEF_SENSES)
                         senses.forEachIndexed { i, sense ->

@@ -10,7 +10,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   pages turn with a tap, a swipe or the volume buttons
 - Search in the open book (reader menu): every match with its surroundings and place in the book; a tap opens
   the book there and marks it
-- Readings, definitions, word frequency, pitch accent and kanji details for every tap
+- Readings, definitions, word frequency, pitch accent and kanji details for every tap; tap a Japanese
+  word inside a definition or example sentence to look it up in turn (Back steps out, nothing counted)
 - Marks in the book on the words you are learning or have not met yet, and a list of the words
   a book holds that you do not know; "Ignore word" sets aside names and wrongly split words (no mark,
   no card, not counted), with a list to undo it in Words

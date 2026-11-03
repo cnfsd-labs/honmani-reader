@@ -707,7 +707,7 @@ private fun LookupGroupItem(
             brief && hidden -> DetailLink(stringResource(R.string.lookup_show_more)) { onDetail(Detail.FULL) }
             detail == Detail.FULL -> DetailLink(stringResource(R.string.lookup_show_less)) { onDetail(Detail.BRIEF) }
         }
-        ExamplesRow(group.expression, group.reading)
+        ExamplesRow(group.expression, group.reading, onLookupWord)
     }
 }
 
@@ -1074,9 +1074,10 @@ private fun DictionarySectionItem(
         }
         senses.forEachIndexed { i, sense ->
             val glosses = sense.glosses.joinToString("; ")
-            Text(
-                text = if (senseCount > 1) "${i + 1}. $glosses" else glosses,
+            ScanText(
+                text = AnnotatedString(if (senseCount > 1) "${i + 1}. $glosses" else glosses),
                 style = MaterialTheme.typography.bodyMedium,
+                onScan = onLookupWord,
             )
         }
     }
