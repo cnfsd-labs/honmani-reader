@@ -16,6 +16,15 @@ data class SearchHit(
     val hint: String get() = before.filterNot { it.isWhitespace() }.takeLast(BookText.HINT)
 }
 
+/** The text next to a reading position: [before] and [after] it on the same line. */
+data class Around(val before: String, val after: String) {
+    /** The last letters before the place, without blanks: the reader finds the place on its page by them. */
+    val hint: String get() = before.filterNot { it.isWhitespace() }.takeLast(BookText.HINT)
+
+    /** The first letters after the place, without blanks. */
+    val match: String get() = after.filterNot { it.isWhitespace() }.take(BookText.HINT)
+}
+
 /** The hits of a search; [more] if the book has further ones past the [BookText.MAX_HITS] listed. */
 data class SearchResults(val hits: List<SearchHit>, val more: Boolean)
 
@@ -69,6 +78,29 @@ class BookText(private val documents: List<String>) {
             }
         }
         return SearchResults(hits, more = false)
+    }
+
+    /**
+     * The line of the book at ttu's character count [characters]: the text before that place
+     * (at most [CONTEXT] characters, same line) and after it (likewise). Null for an empty book.
+     */
+    fun around(characters: Int): Around? {
+        if (documents.isEmpty()) return null
+        val position = characters.coerceIn(0, total)
+        // A position at the end of a document is also the start of the next, which is the better place.
+        val index = starts.indexOfLast { it <= position }.coerceAtLeast(0)
+        var rest = position - starts[index]
+        val text = documents[index]
+        var at = 0
+        while (at < text.length) {
+            val cp = text.codePointAt(at)
+            if (EpubPositions.isCounted(cp)) {
+                if (rest == 0) break
+                rest--
+            }
+            at += Character.charCount(cp)
+        }
+        return Around(text.substring(lineStart(text, at), at), text.substring(at, lineEnd(text, at)))
     }
 
     private fun lineStart(text: String, at: Int): Int {

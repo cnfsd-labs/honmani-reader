@@ -191,6 +191,21 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun theFirstSaveAfterAJumpIsAGlanceAndNotSent_butReadingOnFromThereIs() = runBlocking {
+        pull(local = 7, savedAtMs = 0)
+        // The reader jumped to character 20; ttu saves the start of the page that holds it.
+        sync.onJump(5, 20)
+        sync.onPosition(5, 18)
+        sync.flush()
+        Thread.sleep(300)
+        assertEquals(0, server.requests.count { it.method == "PUT" })
+
+        sync.onPosition(5, 24)
+        sync.flush()
+        assertEquals(24.0 / 31, waitForProgress(device = settings.deviceId)["percentage"]!!.jsonPrimitive.double, 1e-9)
+    }
+
+    @Test
     fun anUnchangedPositionIsNotSent() = runBlocking {
         pull(local = 7, savedAtMs = 0)
         sync.onPosition(5, 7)

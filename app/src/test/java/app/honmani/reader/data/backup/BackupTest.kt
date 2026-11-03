@@ -6,6 +6,8 @@ import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
+import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.review.Grade
 import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewRepository
@@ -319,6 +321,47 @@ class BackupTest {
             listOf(FinishedBookEntity("both", "Both", 7_000), FinishedBookEntity("gone", "Gone", 5_000)),
             new.database.backupDao().finishedBooks(),
         )
+    }
+
+    @Test
+    fun bookmarksComeBackOnceEvenForBooksNotInTheLibrary_andALocalOneAtTheSameSpotStays() = runTest {
+        val old = Phone("old")
+        val bookmarks = old.database.bookmarkDao()
+        bookmarks.put(BookmarkEntity(contentHash = "h1", name = "Chapter one", characters = 100, total = 1_000, createdAt = 4))
+        bookmarks.put(BookmarkEntity(contentHash = "h1", name = "Same spot", characters = 500, total = 1_000, createdAt = 5))
+        bookmarks.put(BookmarkEntity(contentHash = "h2", name = "Other book", characters = 7, total = 90, createdAt = 6))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+        new.database.bookmarkDao().put(BookmarkEntity(contentHash = "h1", name = "Mine", characters = 500, total = 1_000, createdAt = 9))
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(
+            listOf("Chapter one", "Mine", "Other book"),
+            new.database.backupDao().bookmarks().sortedBy { it.contentHash + it.characters }.map { it.name },
+        )
+        assertEquals(listOf("Chapter one", "Mine"), new.database.bookmarkDao().observe("h1").first().map { it.name })
+    }
+
+    @Test
+    fun brokenBookmarksInABackupAreSkipped_andLongNamesCut() = runTest {
+        val old = Phone("old")
+        val good = BackupBookmark(hash = "h", name = "x".repeat(300), characters = 5, total = 10)
+        val backup = throughFile(old.backup.export(readerSettings = null)).copy(
+            bookmarks = listOf(
+                good,
+                BackupBookmark(hash = "", name = "no book", characters = 5, total = 10),
+                BackupBookmark(hash = "h", name = "negative", characters = -1, total = 10),
+                BackupBookmark(hash = "h", name = "empty book", characters = 0, total = 0),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        val kept = new.database.backupDao().bookmarks().single()
+        assertEquals(BOOKMARK_NAME_MAX, kept.name.length)
     }
 
     @Test

@@ -103,3 +103,26 @@ test('markOnScreen finds nothing for text that is not on screen', async ({ page 
   expect(await page.evaluate(() => window.honmaniSearch.markOnScreen({ before: '', match: '鍵穴' }))).toBe(false);
   expect(await page.evaluate(() => window.honmaniSearch.markOnScreen({ before: '', match: '第1章1段落' }))).toBe(true);
 });
+
+test('a jump without text just reloads at the bookmark, with nothing marked and no pages turned', async ({ page }) => {
+  await setUp(page, { viewMode: 'paginated', writingMode: 'horizontal-tb' });
+  await page.goto(`${server.url}/manage`);
+  const book = await call(page, 'ensure', { ttuId: null, ttuTitle: null, url: '/honmani-books/search.epub', fileName: 'search.epub' });
+  await page.goto(`${server.url}/b?id=${book.id}`);
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 10_000 });
+
+  await call(page, 'setBookmark', { ttuId: book.id, characters: BEFORE_HIT, progress: BEFORE_HIT / TOTAL });
+  await page.evaluate(() => {
+    window.__marked = false;
+    window.honmaniSearch.reload({ before: '', match: '' });
+  });
+  await page.waitForFunction(() => window.__marked === undefined, undefined, { timeout: 10_000 });
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByText('第3章80段落')).toBeInViewport({ timeout: 10_000 });
+
+  // Nothing is looked for: no pending hit, no mark, even after the time a mark would take.
+  await page.waitForTimeout(2_500);
+  expect(await page.evaluate(() => sessionStorage.getItem('honmaniSearchHit'))).toBeNull();
+  expect(await page.evaluate(() => CSS.highlights.has('honmani-search-hit'))).toBe(false);
+  await expect(page.getByText('第3章80段落')).toBeInViewport();
+});

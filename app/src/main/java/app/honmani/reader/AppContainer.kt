@@ -36,6 +36,7 @@ import app.honmani.reader.data.examples.ExampleSentences
 import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
+import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookImporter
@@ -201,6 +202,7 @@ class AppContainer(context: Context) {
     val exampleSentences: ExampleSentences by lazy { ExampleSentences(exampleStore, appearanceSettings.showExamples) }
 
     val bookDao: BookDao by lazy { database.bookDao() }
+    val bookmarkDao: BookmarkDao by lazy { database.bookmarkDao() }
 
     val bookImporter: BookImporter by lazy {
         BookImporter(bookDao, booksDir, File(appContext.filesDir, "covers"), restore = { backup.onBookAdded(it) })

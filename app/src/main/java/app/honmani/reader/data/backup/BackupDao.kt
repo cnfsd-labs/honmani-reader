@@ -11,6 +11,7 @@ import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
+import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
@@ -76,6 +77,12 @@ interface BackupDao {
 
     @Query("UPDATE finished_book SET finished_at = :finishedAt WHERE content_hash = :contentHash AND finished_at IS NULL")
     suspend fun setFinishedDateIfUnknown(contentHash: String, finishedAt: Long)
+
+    @Query("SELECT * FROM bookmark ORDER BY content_hash, characters, id")
+    suspend fun bookmarks(): List<BookmarkEntity>
+
+    @Insert
+    suspend fun insertBookmarks(bookmarks: List<BookmarkEntity>)
 
     @Query("SELECT * FROM opds_catalog ORDER BY added_at, id")
     suspend fun catalogs(): List<OpdsCatalogEntity>

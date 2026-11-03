@@ -8,7 +8,7 @@
  * restores the bookmark in either reading mode and writing direction.
  *
  *   honmaniSearch.reload({ before, match })
- *     Remembers the hit for the next page load and reloads. Once ttu has laid the book out, the
+ *     Remembers the hit for the next page load and reloads (just reloads if `match` is blank). Once ttu has laid the book out, the
  *     hit is marked for a moment: `match` preceded by the `before` letters (blanks aside; the
  *     match alone if that is not on screen), the first one on screen.
  *   honmaniSearch.markOnScreen({ before, match })
@@ -125,6 +125,12 @@
   }
 
   function reload(hit) {
+    // A jump without text to look for (a slider, a bookmark in a book that could not be read):
+    // the page opens where ttu puts it, with nothing marked and no pages turned.
+    if (!stripped(hit && hit.match)) {
+      window.location.reload();
+      return;
+    }
     try {
       sessionStorage.setItem(PENDING_KEY, JSON.stringify({ before: hit.before, match: hit.match }));
     } catch (error) {

@@ -113,4 +113,28 @@ class BookTextTest {
         assertEquals(hit.characters, positions.charactersAt(positions.xpointerAt(hit.characters)!!))
         assertTrue(BookText(texts).find("未ま").hits.isEmpty())
     }
+
+    @Test
+    fun around_givesTheLineTextBeforeAndAfterAPlace() {
+        val text = book("あいう\nえおかきくけこ", "さしすせそ")
+
+        // 3 characters in the first document: the place is at the start of the second line.
+        assertEquals(Around("", "えおかきくけこ"), text.around(3))
+        assertEquals(Around("あ", "いう"), text.around(1))
+        // The next document starts at 10.
+        assertEquals(Around("", "さしすせそ"), text.around(10))
+        assertEquals(Around("さし", "すせそ"), text.around(12))
+    }
+
+    @Test
+    fun around_hintAndMatchSkipBlanks_andThePlaceIsKeptInsideTheBook() {
+        val text = book("あい うえお かきくけこさし")
+
+        val around = text.around(5)!!
+        assertEquals("いうえお", around.hint.takeLast(4))
+        assertEquals("かきくけこさ", around.match)
+        assertEquals(text.around(text.total), text.around(10_000))
+        assertEquals(text.around(0), text.around(-4))
+        assertEquals(null, book().around(0))
+    }
 }

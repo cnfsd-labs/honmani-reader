@@ -18,6 +18,8 @@ import app.honmani.reader.data.settings.DaySettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
+import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
+import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -87,13 +89,14 @@ class Backup(
             val lookups: List<WordLookupEntity>,
             val removed: List<RemovedBookEntity>,
             val finished: List<FinishedBookEntity>,
+            val bookmarks: List<BookmarkEntity>,
             val catalogs: List<OpdsCatalogEntity>,
             val cards: Map<Long, ReviewCardEntity>,
             val logs: Map<Long, List<ReviewLogEntity>>,
             val reads: Map<Long, List<ReadDayEntity>>,
         )
         val tables = database.withTransaction {
-            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.catalogs(),
+            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
             )
         }
@@ -161,6 +164,7 @@ class Backup(
             removedBooks = tables.removed.map { BackupRemovedBook(it.source.name, it.sourceId, it.removedAt) },
             readingDays = readingDays,
             finishedBooks = tables.finished.map { BackupFinishedBook(it.contentHash, it.title, it.finishedAt) },
+            bookmarks = tables.bookmarks.map { BackupBookmark(it.contentHash, it.name, it.characters, it.total, it.createdAt) },
             lookupEvents = lookupEvents,
             words = words,
             catalogs = tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
@@ -310,6 +314,13 @@ class Backup(
             val finished = backup.finishedBooks.filter { it.hash.isNotEmpty() }
             dao.insertFinishedBooks(finished.map { FinishedBookEntity(it.hash, it.title, it.finishedAt) })
             for (book in finished) book.finishedAt?.let { dao.setFinishedDateIfUnknown(book.hash, it) }
+            // A place this phone has at the same spot stays (its name may have been edited here).
+            val placed = dao.bookmarks().mapTo(HashSet()) { it.contentHash to it.characters }
+            dao.insertBookmarks(
+                backup.bookmarks
+                    .filter { it.hash.isNotEmpty() && it.characters >= 0 && it.total > 0 && placed.add(it.hash to it.characters) }
+                    .map { BookmarkEntity(contentHash = it.hash, name = it.name.take(BOOKMARK_NAME_MAX), characters = it.characters, total = it.total, createdAt = it.createdAt) },
+            )
             val urls = dao.catalogs().mapTo(HashSet()) { it.url }
             for (catalog in backup.catalogs) {
                 if (!urls.add(catalog.url)) continue

@@ -47,6 +47,8 @@ data class BackupFile(
     val readingDays: List<BackupReadingDay> = emptyList(),
     /** Finished books removed from the library, so the finished counts keep them. */
     val finishedBooks: List<BackupFinishedBook> = emptyList(),
+    /** Named places in books, by content hash. */
+    val bookmarks: List<BackupBookmark> = emptyList(),
     val lookupEvents: List<BackupLookupEvent> = emptyList(),
     val words: List<BackupWord> = emptyList(),
     /** Book servers, without their passwords. */
@@ -106,6 +108,10 @@ data class BackupRemovedBook(val source: String, val sourceId: String, val remov
 /** A finished book no longer in the library, by content hash. */
 @Serializable
 data class BackupFinishedBook(val hash: String, val title: String, val finishedAt: Long? = null)
+
+/** A named place in a book, by content hash. */
+@Serializable
+data class BackupBookmark(val hash: String, val name: String, val characters: Long, val total: Long, val createdAt: Long = 0)
 
 @Serializable
 data class BackupReadingDay(

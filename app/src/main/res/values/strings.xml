@@ -297,6 +297,21 @@
         <item quantity="one">%1$d match</item>
         <item quantity="other">%1$d matches</item>
     </plurals>
+    <string name="reader_menu_slider">Go to a place in the book</string>
+    <string name="reader_menu_slider_label">%1$d%% · %2$s / %3$s</string>
+    <string name="reader_menu_add_bookmark">Add bookmark</string>
+    <string name="reader_menu_bookmarks">Bookmarks</string>
+    <string name="bookmark_dialog_title">New bookmark</string>
+    <string name="bookmark_rename_title">Rename bookmark</string>
+    <string name="bookmark_name_label">Name</string>
+    <string name="bookmark_default_name">Bookmark at %1$d%%</string>
+    <string name="bookmark_added">Bookmark added</string>
+    <string name="bookmark_list_empty">No bookmarks yet. "Add bookmark" in the reader menu saves the place you are at.</string>
+    <string name="bookmark_rename">Rename</string>
+    <string name="bookmark_delete">Delete bookmark</string>
+    <string name="bookmark_deleted">Bookmark deleted</string>
+    <string name="jump_back_message">Jumped to %1$d%%</string>
+    <string name="jump_back_action">Back to where you were</string>
     <string name="reader_menu_close_book">Close book</string>
     <string name="reader_menu_progress">Show progress</string>
     <string name="reader_menu_progress_details">The character count and percentage at the bottom of the page. The page reloads.</string>

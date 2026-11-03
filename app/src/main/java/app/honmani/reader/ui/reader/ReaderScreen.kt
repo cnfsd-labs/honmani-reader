@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,7 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.withFrameNanos
+import app.honmani.reader.data.library.BookText
+import app.honmani.reader.data.library.BookmarkEntity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -169,6 +175,18 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val scope = rememberCoroutineScope()
     var searchShown by rememberSaveable { mutableStateOf(false) }
     var openTtuId by rememberSaveable { mutableStateOf<Long?>(null) }
+    // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
+    var bookmarksShown by rememberSaveable { mutableStateOf(false) }
+    var bookmarkDraft by remember { mutableStateOf<BookmarkDraft?>(null) }
+    val jumpSnackbar = remember { SnackbarHostState() }
+    val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
+    val bookHash by produceState<String?>(null, openTtuId) {
+        value = openTtuId?.let { container.bookDao.findByTtuId(it)?.contentHash }
+    }
+    val bookmarks by remember(bookHash) {
+        bookHash?.let { container.bookmarkDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(emptyList())
+    LaunchedEffect(atLibrary, openTtuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -450,12 +468,62 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             )
         }
         val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
+        // The book's text, only while the menu, the bookmark list or a new bookmark needs it (the slider, names, the page's spot).
+        val textWanted = !atLibrary && (menuOpen || bookmarksShown || bookmarkDraft != null)
+        val bookText by produceState<BookText?>(null, openTtuId, textWanted) {
+            val id = openTtuId
+            value = if (textWanted && id != null) container.searchableBook(id) else null
+        }
+        val jumpMessage = { percent: Int -> context.getString(R.string.jump_back_message, percent) }
+        val backLabel = stringResource(R.string.jump_back_action)
+        val defaultName = { percent: Int -> context.getString(R.string.bookmark_default_name, percent) }
         if (menuOpen && !atLibrary) {
             val syncState by container.koSyncStatus.state.collectAsStateWithLifecycle()
             val syncFailure = syncState.failureFor(openTtuId)
+            val place by produceState<MenuPlace?>(null, bookText) {
+                val id = openTtuId
+                val text = bookText
+                value = if (id == null || text == null) null else {
+                    val characters = try {
+                        viewModel.ttuLibrary.bookmark(id).first
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                    MenuPlace(characters ?: 0L, text.total)
+                }
+            }
             ReaderMenuSheet(
                 showProgress = appSettings.showProgress,
                 syncFailure = syncFailure?.let { syncFailureReason(it) },
+                place = place,
+                onJump = { characters ->
+                    val id = openTtuId
+                    val text = bookText
+                    if (id != null && text != null) {
+                        viewModel.closeMenu()
+                        val spot = text.around(characters.toInt())
+                        jumper.jump(
+                            id, characters, text.total.toLong(), spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
+                            jumpMessage(BookPlace.percent(characters, text.total.toLong())), backLabel,
+                        )
+                    }
+                },
+                onAddBookmark = {
+                    val text = bookText
+                    val here = place
+                    if (text != null && here != null) {
+                        viewModel.closeMenu()
+                        val name = BookPlace.defaultName(text.around(here.characters.toInt())?.after.orEmpty())
+                            ?: defaultName(BookPlace.percent(here.characters, here.total.toLong()))
+                        bookmarkDraft = BookmarkDraft(here.characters, here.total.toLong(), name)
+                    }
+                },
+                onBookmarks = {
+                    viewModel.closeMenu()
+                    bookmarksShown = true
+                },
                 onContents = {
                     viewModel.closeMenu()
                     viewModel.ttuLibrary.openContents()
@@ -483,21 +551,58 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDismiss = viewModel::closeMenu,
             )
         }
+        bookmarkDraft?.let { draft ->
+            val added = stringResource(R.string.bookmark_added)
+            BookmarkNameDialog(
+                title = stringResource(R.string.bookmark_dialog_title),
+                initial = draft.name,
+                onSave = { name ->
+                    bookmarkDraft = null
+                    val hash = bookHash
+                    if (hash != null) {
+                        scope.launch {
+                            container.bookmarkDao.put(
+                                BookmarkEntity(contentHash = hash, name = name, characters = draft.characters, total = draft.total, createdAt = System.currentTimeMillis()),
+                            )
+                            jumpSnackbar.currentSnackbarData?.dismiss()
+                            jumpSnackbar.showSnackbar(added)
+                        }
+                    }
+                },
+                onDismiss = { bookmarkDraft = null },
+            )
+        }
+        if (bookmarksShown && !atLibrary) {
+            BookmarksSheet(
+                bookmarks = bookmarks,
+                onOpen = { bookmark ->
+                    bookmarksShown = false
+                    val id = openTtuId
+                    if (id != null) {
+                        val text = bookText
+                        val spot = text?.around(bookmark.characters.toInt())
+                        jumper.jump(
+                            id, bookmark.characters, bookmark.total, spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
+                            jumpMessage(bookmark.percent), backLabel,
+                        )
+                    }
+                },
+                onRename = { bookmark, name -> scope.launch { container.bookmarkDao.rename(bookmark.id, name) } },
+                onDelete = { bookmark -> scope.launch { container.bookmarkDao.delete(bookmark.id) } },
+                onUndoDelete = { bookmark -> scope.launch { container.bookmarkDao.put(bookmark) } },
+                onDismiss = { bookmarksShown = false },
+            )
+        }
         val searchedBook = openTtuId
         if (searchShown && searchedBook != null && !atLibrary) {
             BookSearchScreen(
                 loadText = { container.searchableBook(searchedBook) },
                 onOpenHit = { hit, total ->
                     searchShown = false
-                    scope.launch {
-                        viewModel.ttuLibrary.openHit(
-                            ttuId = searchedBook,
-                            characters = hit.characters.toLong(),
-                            progress = if (total == 0) 0.0 else hit.characters.toDouble() / total,
-                            before = hit.hint,
-                            match = hit.match,
-                        )
-                    }
+                    jumper.jump(
+                        searchedBook, hit.characters.toLong(), total.toLong(), hit.hint, hit.match, null,
+                        context.getString(R.string.jump_back_message, hit.percent), backLabel,
+                    )
                 },
                 onClose = { searchShown = false },
             )
@@ -520,6 +625,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             // On top of everything; closing it reloads the reader if anything changed.
             ReaderSettingsScreen(onClose = { readerSettings = false })
         }
+        SnackbarHost(jumpSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 

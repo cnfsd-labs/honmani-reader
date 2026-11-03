@@ -168,6 +168,8 @@ class LibraryViewModel(
     private val recordFinished: suspend (FinishedBookEntity) -> Unit = {},
     /** Deletes a book's reading statistics (its reading days, by book id) and its finished record (by content hash). */
     private val forgetStatistics: suspend (bookId: Long, contentHash: String) -> Unit = { _, _ -> },
+    /** Deletes the reader's named bookmarks in a removed book (by content hash). */
+    private val forgetBookmarks: suspend (contentHash: String) -> Unit = {},
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -458,6 +460,7 @@ class LibraryViewModel(
                 recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
             }
             dao.delete(book.id)
+            forgetBookmarks(book.contentHash)
             // A book from a catalogue stays removed: automatic imports skip it from now on.
             book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
                 dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
@@ -528,6 +531,7 @@ class LibraryViewModel(
                         container.readingDao.deleteBook(bookId)
                         container.finishedBookDao.forget(hash)
                     },
+                    forgetBookmarks = container.bookmarkDao::deleteForBook,
                     forgetDerivedData = { hash ->
                         container.difficultyStore.forget(hash)
                         container.restoredBooks.forgetPosition(hash)

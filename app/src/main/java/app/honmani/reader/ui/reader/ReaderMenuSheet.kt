@@ -4,6 +4,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import java.text.NumberFormat
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -39,6 +49,12 @@ fun ReaderMenuSheet(
     showProgress: Boolean,
     /** Why the last progress sync for this book failed ("server unreachable"); null when it did not. */
     syncFailure: String? = null,
+    /** The reading position and the book's length in characters; null while the book is read for the slider. */
+    place: MenuPlace? = null,
+    /** The slider was let go at this many characters. */
+    onJump: (Long) -> Unit = {},
+    onAddBookmark: () -> Unit = {},
+    onBookmarks: () -> Unit = {},
     onContents: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -49,7 +65,7 @@ fun ReaderMenuSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-        Column(modifier = Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
+        Column(modifier = Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
             syncFailure?.let {
                 Text(
                     stringResource(R.string.reader_menu_sync_failed, it),
@@ -58,6 +74,20 @@ fun ReaderMenuSheet(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
             }
+            PlaceSlider(place, onJump)
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_bookmark_add), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_add_bookmark)) },
+                colors = colors,
+                modifier = Modifier.clickable(enabled = place != null, onClick = onAddBookmark),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_bookmark), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_bookmarks)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onBookmarks),
+            )
+            HorizontalDivider()
             ListItem(
                 leadingContent = { Icon(Icons.Filled.Menu, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_contents)) },
@@ -98,5 +128,36 @@ fun ReaderMenuSheet(
                 modifier = Modifier.clickable(onClick = onCloseBook),
             )
         }
+    }
+}
+
+/** Where the reader is and how long the book is, in ttu's characters. */
+data class MenuPlace(val characters: Long, val total: Int)
+
+/** A slider over the whole book with its label; letting go jumps there. */
+@Composable
+private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
+    val total = place?.total ?: 0
+    var fraction by remember(place) { mutableFloatStateOf(place?.let { BookPlace.fraction(it.characters, it.total) } ?: 0f) }
+    val characters = BookPlace.charactersAt(fraction, total)
+    val numbers = NumberFormat.getIntegerInstance()
+    val label = stringResource(R.string.reader_menu_slider)
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text(
+            if (place == null) label else stringResource(
+                R.string.reader_menu_slider_label,
+                BookPlace.percent(characters, total.toLong()),
+                numbers.format(characters),
+                numbers.format(total),
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Slider(
+            value = fraction,
+            onValueChange = { fraction = it },
+            onValueChangeFinished = { onJump(BookPlace.charactersAt(fraction, total)) },
+            enabled = place != null && total > 0,
+            modifier = Modifier.semantics { contentDescription = label },
+        )
     }
 }

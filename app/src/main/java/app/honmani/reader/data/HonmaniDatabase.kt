@@ -22,6 +22,8 @@ import app.honmani.reader.data.dictionary.TermDao
 import app.honmani.reader.data.dictionary.TermEntity
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.BookmarkDao
+import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogDao
 import app.honmani.reader.data.opds.OpdsCatalogEntity
@@ -49,6 +51,7 @@ import app.honmani.reader.data.words.WordLookupEntity
         TermMetaEntity::class,
         KanjiEntity::class,
         BookEntity::class,
+        BookmarkEntity::class,
         WordEntity::class,
         WordLookupEntity::class,
         LookupEventEntity::class,
@@ -77,6 +80,8 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun kanjiDao(): KanjiDao
 
     abstract fun bookDao(): BookDao
+
+    abstract fun bookmarkDao(): BookmarkDao
 
     abstract fun wordDao(): WordDao
 

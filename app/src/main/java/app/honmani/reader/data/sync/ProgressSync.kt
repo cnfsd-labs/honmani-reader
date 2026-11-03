@@ -222,6 +222,18 @@ class ProgressSync(
         return PulledPosition(document.percent(characters), device)
     }
 
+    /**
+     * The reader jumped to [characters] of book [ttuId] (slider, bookmark, search hit, the way
+     * back): ttu saves the page that holds it as soon as the book reloads. That first save is
+     * where the reader looked, not reading, so it isn't sent: the server keeps the place the
+     * reader came from (the furthest one, as far as this phone knows) until a page is turned
+     * there. Without it a glance at the end of the book, or at the start, would replace the
+     * server's position, and the other device would ask about a backward jump nobody read to.
+     */
+    fun onJump(ttuId: Long, characters: Long) {
+        synchronized(synced) { pulledTo[ttuId] = characters }
+    }
+
     /** ttu saved a reading position (a page turn); sent after [pushDelayMs], with later ones. */
     fun onPosition(ttuId: Long, characters: Long) {
         if (settings.account.value == null) return
