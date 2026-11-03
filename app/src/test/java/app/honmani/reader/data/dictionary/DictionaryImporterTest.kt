@@ -4,7 +4,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.dictionary.yomitan.InvalidDictionaryException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -263,5 +269,86 @@ class DictionaryImporterTest {
 
         assertEquals("2026.10", dictionary.revision)
         assertEquals(listOf(dictionary), database.dictionaryDao().observeReady().first())
+    }
+
+    /** [count] terms "w<first>".."w<first+count-1>" with sequence = the number, as one term bank. */
+    private fun bank(first: Int, count: Int) =
+        (first until first + count).joinToString(",", "[", "]") { """["w$it","r$it","","",$it,["gloss $it"],$it,""]""" }
+
+    @Test
+    fun rowsKeepFileOrder_acrossManyBanksAndChunks() = runTest {
+        // More banks than readers run at once; bank 10 sorts after bank 9; bank 3 has more than one chunk.
+        val sizes = mapOf(1 to 3, 2 to 1, 3 to 5_001, 4 to 2, 5 to 4, 6 to 1, 7 to 3, 8 to 2, 9 to 2, 10 to 3)
+        var first = 0
+        val files = mutableMapOf("index.json" to index())
+        for ((n, size) in sizes) {
+            files["term_bank_$n.json"] = bank(first, size)
+            first += size
+        }
+
+        val dictionary = importer.import(writeZip(temp.root, files))
+
+        assertEquals(first, dictionary.termCount)
+        val terms = database.termDao().allForDictionary(dictionary.id)
+        assertEquals((0 until first).map { "w$it" }, terms.map { it.expression })
+        val preset = database.termDao().glossaryPreset(dictionary.id)
+        assertEquals(listOf("[\"gloss 0\"]", "[\"gloss 1\"]"), listOf(0, 1).map { GlossaryPacker.unpack(terms[it].glossary, preset) })
+        assertEquals("""["gloss ${first - 1}"]""", GlossaryPacker.unpack(terms.last().glossary, preset))
+    }
+
+    @Test
+    fun theFirstErrorInFileOrderIsReported_andNothingIsLeft() = runTest {
+        val files = mutableMapOf("index.json" to index())
+        for (n in 1..8) files["term_bank_$n.json"] = bank(n * 10, 3)
+        files["term_bank_7.json"] = """[["x","","","",0,["a"]]]"""
+        files["term_bank_4.json"] = """[["y","","","",0,["a"]]]"""
+
+        try {
+            importer.import(writeZip(temp.root, files))
+            fail("expected InvalidDictionaryException")
+        } catch (e: InvalidDictionaryException) {
+            assertEquals("term_bank_4.json, entry 1: expected 8 fields, found 6", e.message)
+        }
+
+        assertNull(database.dictionaryDao().findByTitle("Test Dictionary"))
+        for (table in listOf("dictionary", "term", "tag", "glossary_preset")) {
+            val rows = database.query("SELECT COUNT(*) FROM $table", null).use { it.moveToFirst(); it.getInt(0) }
+            assertEquals(table, 0, rows)
+        }
+    }
+
+    @Test
+    fun anEmptyFirstBankIsSkippedWhenChoosingThePreset() = runTest {
+        val files = mapOf(
+            "index.json" to index(),
+            "term_bank_1.json" to "[]",
+            "term_bank_2.json" to bank(0, 3),
+            "term_bank_3.json" to bank(3, 3),
+        )
+
+        val dictionary = importer.import(writeZip(temp.root, files))
+
+        val terms = database.termDao().allForDictionary(dictionary.id)
+        assertEquals((0 until 6).map { "w$it" }, terms.map { it.expression })
+        val expected = GlossaryPacker.preset((0 until 3).map { """["gloss $it"]""" })
+        assertTrue(expected.contentEquals(database.termDao().glossaryPreset(dictionary.id)))
+    }
+
+    @Test
+    fun aCancelledImportLeavesNothingBehind() = runTest {
+        val files = mutableMapOf("index.json" to index())
+        for (n in 1..12) files["term_bank_$n.json"] = bank(n * 6_000, 6_000)
+        val zip = writeZip(temp.root, files)
+
+        val job = launch(Dispatchers.Default) { importer.import(zip) }
+        // Cancel as soon as something has been written, so the cancel lands mid-import.
+        withContext(Dispatchers.Default) { withTimeout(60_000) {
+            while (database.query("SELECT COUNT(*) FROM term", null).use { it.moveToFirst(); it.getInt(0) } == 0) delay(5)
+        } }
+        job.cancelAndJoin()
+
+        assertNull(database.dictionaryDao().findByTitle("Test Dictionary"))
+        assertEquals(0, database.query("SELECT COUNT(*) FROM term", null).use { it.moveToFirst(); it.getInt(0) })
+        assertEquals(0, database.query("SELECT COUNT(*) FROM dictionary", null).use { it.moveToFirst(); it.getInt(0) })
     }
 }
