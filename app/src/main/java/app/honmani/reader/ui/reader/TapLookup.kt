@@ -36,6 +36,9 @@ sealed interface BridgeMessage {
     /** A tap on the footer along the bottom of the page: open the reader's bottom menu (`assets/honmani/reader-menu.js`). */
     data object OpenMenu : BridgeMessage
 
+    /** A long swipe up on the page opens the same menu (`reader-menu.js`), unless the lookup panel is open. */
+    data object OpenMenuBySwipe : BridgeMessage
+
     /** ttu's settings are drawn on screen (`assets/honmani/book-shown.js`). */
     data object SettingsShown : BridgeMessage
 
@@ -84,6 +87,7 @@ sealed interface BridgeMessage {
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
                 "reader.menu" -> OpenMenu.takeIf { compact == OPEN_MENU_MESSAGE }
+                "reader.menuSwipe" -> OpenMenuBySwipe.takeIf { compact == OPEN_MENU_SWIPE_MESSAGE }
                 else -> if (type.startsWith("library.")) LibraryMessage.parse(message)?.let(::Library) else null
             }
         }
@@ -189,6 +193,7 @@ sealed interface BridgeMessage {
         private const val SETTINGS_SHOWN_MESSAGE = """{"type":"pageShown","path":"/settings"}"""
         private const val OPEN_SETTINGS_MESSAGE = """{"type":"reader.settings"}"""
         private const val OPEN_MENU_MESSAGE = """{"type":"reader.menu"}"""
+        private const val OPEN_MENU_SWIPE_MESSAGE = """{"type":"reader.menuSwipe"}"""
         private const val ACTIVITY_MESSAGE = """{"type":"reader.activity"}"""
     }
 }

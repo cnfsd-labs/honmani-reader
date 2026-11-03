@@ -165,7 +165,7 @@ fun ReaderWebView(
     onPage: (ttuId: Long, characters: Long, progress: Float?) -> Unit = { _, _, _ -> },
     /** The Settings entry in the reader's top bar: Honmani's reader settings, not ttu's page. */
     onOpenSettings: () -> Unit = {},
-    /** A tap on the footer along the bottom of the page: the app shows its reader menu. */
+    /** A tap on the footer along the bottom of the page, or a long swipe up: the app shows its reader menu. */
     onOpenMenu: () -> Unit = {},
     /** Each item asks to leave the open book, as back does (to the book list). */
     closeRequests: Flow<Unit> = emptyFlow(),
@@ -309,6 +309,8 @@ fun ReaderWebView(
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()
                             BridgeMessage.OpenMenu -> currentOnOpenMenu()
+                            // A swipe on the page behind an open lookup panel does nothing.
+                            BridgeMessage.OpenMenuBySwipe -> if (!currentPanelOpen) currentOnOpenMenu()
                             is BridgeMessage.Background -> currentOnBackground(message.color)
                             is BridgeMessage.Marks -> {
                                 val generation = marksGeneration.get()

@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 
 /**
- * The reader's bottom menu, opened by a tap on the footer of the page (`reader-menu.js`): the
+ * The reader's bottom menu, opened by a tap on the footer of the page or a long swipe up anywhere on it (`reader-menu.js`): the
  * table of contents, the search in the book, Honmani's reader settings, the words of this session, leaving the book and
  * the progress counter.
  */

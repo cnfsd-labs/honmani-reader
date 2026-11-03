@@ -130,6 +130,8 @@ class TapLookupTest {
         assertEquals(BridgeMessage.OpenSettings, BridgeMessage.parse("""{"type":"reader.settings"}"""))
         assertEquals(BridgeMessage.OpenMenu, BridgeMessage.parse("""{"type":"reader.menu"}"""))
         assertNull(BridgeMessage.parse("""{"type":"reader.menu","extra":1}"""))
+        assertEquals(BridgeMessage.OpenMenuBySwipe, BridgeMessage.parse("""{"type":"reader.menuSwipe"}"""))
+        assertNull(BridgeMessage.parse("""{"type":"reader.menuSwipe","extra":1}"""))
         assertEquals(BridgeMessage.SettingsShown, BridgeMessage.parse("""{"type":"pageShown","path":"/settings"}"""))
         assertNull(BridgeMessage.parse("""{"type":"pageShown","path":"/manage"}"""))
         assertEquals(BridgeMessage.Position(3, 1_200), BridgeMessage.parse("""{"type":"reader.position","id":3,"characters":1200}"""))

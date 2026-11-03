@@ -230,6 +230,12 @@ book list). A tap on the text still looks a word up. The tap on the bottom edge 
 progress counter. Check that the strip is easy to hit with the gesture bar and that page turns at
 the left and right edges still work.
 
+A long swipe up (about a quarter of the screen, mostly straight) from anywhere on the page opens the
+same menu. Check: paged mode, horizontal and vertical text: it opens; a short swipe up, a diagonal
+swipe and a normal page-turn swipe do not; with the lookup panel open a swipe does nothing; in
+continuous mode with horizontal text a swipe up scrolls the book and the menu stays closed (vertical
+text in continuous mode opens it); a long press on text still looks up and a tap still behaves as before.
+
 ## Search in the book
 
 Reader menu, Search in book: type a word that occurs several times. The list shows each match in
