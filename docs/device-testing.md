@@ -224,7 +224,7 @@ export the same day holds just the minutes read since ("Export everything again"
 ## Reader bottom menu
 
 In a book, tap the bottom edge of the page (the thin strip under the text). A sheet opens with
-Contents (ttu's table of contents opens), Search in book, Reader settings, Words from this session, Show progress
+Contents (ttu's table of contents opens), a reading slider, Add bookmark, Bookmarks, Search in book, Reader settings, Words from this session, Show progress
 (a switch; the page reloads and the counter appears or disappears) and Close book (back to the
 book list). A tap on the text still looks a word up. The tap on the bottom edge no longer hides the
 progress counter. Check that the strip is easy to hit with the gesture bar and that page turns at
@@ -244,6 +244,22 @@ of the text matched. Tap a later match: the book opens there and the match is ma
 moment (also when it is further down a long paragraph, in vertical and horizontal text, paginated
 and continuous). Back from the search returns to the page you were on. Check a search in a long book
 for speed and that the keyboard does not cover the list.
+
+## Bookmarks and the reading slider
+
+Reader menu, at the top: a slider with a live label ("42% · 10,350 / 24,847"), then Add bookmark and
+Bookmarks. Check, in paged and continuous mode, vertical and horizontal text, EPUB and TXT:
+- Drag the slider: the label follows the finger and nothing moves until you let go; then the book
+  reloads at that place and a "Jumped to N%" message offers "Back to where you were", which returns to
+  the exact page you were on.
+- Add bookmark: the name is prefilled from the first characters at the place and can be edited; the
+  place is the page you were on. Bookmarks lists them in reading order with name and %; a tap jumps,
+  the pencil renames, the bin deletes and Undo brings it back. Removing the book removes its bookmarks.
+- Backup, then restore on a fresh install with the same book: the bookmarks are there; restoring twice
+  adds nothing.
+- With progress sync on (EPUB): after a slider or bookmark jump nothing is sent to the server until a
+  page is turned there; the other device is not asked about a backward jump.
+- A long press and a tap on text still look a word up after a jump.
 
 ## Known limitations (no need to report)
 

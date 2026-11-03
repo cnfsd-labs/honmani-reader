@@ -10,6 +10,9 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   pages turn with a tap, a swipe or the volume buttons
 - Search in the open book (reader menu): every match with its surroundings and place in the book; a tap opens
   the book there and marks it
+- Named bookmarks (reader menu): save as many places as you like per book, jump to one from a list, rename
+  or delete it (Undo); a slider over the whole book shows the place as % and characters and jumps when
+  you let go. After a jump, "Back to where you were" returns. Bookmarks are in the backup
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap; tap a Japanese
   word inside a definition or example sentence to look it up in turn (Back steps out, nothing counted)
 - Marks in the book on the words you are learning or have not met yet, and a list of the words
