@@ -156,8 +156,10 @@ Android's WebView draws no underlines in highlights). Check one word on a light 
 turn the switch off and open the book again: Learning tint. After the word is answered in a review (not
 due any more) it gets the Learning tint back.
 
-Book sheet, after some reading in graded books: "You know about N% of its words; about M are new
-to you", higher for easy books; "Words to learn before reading" lists them, most used first.
+Book sheet of a graded book: "You know N% of its words; M are new to you". N counts only words that
+are Known in your own word list (the ones the book text marks Known), so a new user sees 0%; words in
+Learning are not known and not counted as new. Mark a word Known in Words and N rises; "Words to
+learn before reading" lists the M new words, most used first. The difficulty and the cover badge do not change.
 
 ## Dictionary search
 
@@ -195,7 +197,7 @@ the badge and tint ignore it; looking such a word up in a book after it is overd
 Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it
 due; closing the book shows how many due words you passed. Book sheet → "Words to learn before reading" →
 "Learn n words": they come with their sentences from the book, the ones used soonest first.
-Words already in Learning are ticked and greyed ("In Learning"); "Top 20" picks the next ones. At the largest font size the answer buttons
+Words already in Learning are not listed; "Top 20" ticks the 20 most used. At the largest font size the answer buttons
 and the menu stay usable. Progress shows reviews today, review time, retention and words in review;
 Progress → Statistics → "Export for Refold (CSV)" offers a file to share. It holds only reading that
 was not exported before, today's so far included; Refold adds every imported row up, so a second

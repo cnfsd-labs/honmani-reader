@@ -582,37 +582,28 @@ class AppContainer(context: Context) {
         ).knowledge.shareIn(applicationScope, SharingStarted.WhileSubscribed(5_000), replay = 1)
     }
 
-    /**
-     * How much of a graded book's words the reader knows, once their vocabulary is estimated
-     * (the skill's vocabulary part); null before.
-     */
+    /** How much of a graded book's words the reader knows now (see [BookCoverage]); null if it isn't graded. */
     fun bookCoverage(contentHash: String): Flow<BookCoverage?> =
-        bookWordsFlow(contentHash) { words, knowledge, vocabulary -> BookCoverage.of(words, knowledge, vocabulary) }
+        bookWordsFlow(contentHash) { words, knowledge -> BookCoverage.of(words, knowledge) }
 
-    /** The graded book's words the reader does not know yet, most used first (see [UnknownWords]). */
+    /** The graded book's words the reader neither knows nor is learning, most used first (see [UnknownWords]). */
     fun unknownWords(contentHash: String): Flow<UnknownWords?> =
-        bookWordsFlow(contentHash, assumedVocabulary = UnknownWords.BEGINNER) { words, knowledge, vocabulary ->
-            UnknownWords.of(words, knowledge, vocabulary)
-        }
+        bookWordsFlow(contentHash) { words, knowledge -> UnknownWords.of(words, knowledge) }
 
-    /** [assumedVocabulary]: the vocabulary taken before the reader's is estimated; null: nothing until then. */
     private fun <T : Any> bookWordsFlow(
         contentHash: String,
-        assumedVocabulary: Int? = null,
-        compute: (BookWords, WordKnowledge, Int) -> T?,
+        compute: (BookWords, WordKnowledge) -> T?,
     ): Flow<T?> {
         var words: Pair<StoredDifficulty, BookWords?>? = null
         return combine(
             wordKnowledge,
-            skillTracker.estimate.map { it.vocabulary?.estimate?.words }.distinctUntilChanged(),
             difficultyStore.grades.map { it[contentHash] }.distinctUntilChanged(),
-        ) { knowledge, estimated, grade ->
-            val vocabulary = estimated ?: assumedVocabulary
-            if (vocabulary == null || grade == null || grade.difficulty.score <= 0) return@combine null
+        ) { knowledge, grade ->
+            if (grade == null || grade.difficulty.score <= 0) return@combine null
             // The book's words only change when it is graded again.
             val bookWords = words?.takeIf { it.first == grade }?.second
                 ?: difficultyStore.words(contentHash).also { words = grade to it }
-            bookWords?.let { compute(it, knowledge, vocabulary) }
+            bookWords?.let { compute(it, knowledge) }
         }.flowOn(Dispatchers.Default)
     }
 
