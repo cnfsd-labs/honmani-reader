@@ -102,6 +102,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         val summary = container.backup.restore(backup)
         container.appearanceSettings.reload()
         container.readingGoalSettings.reload()
+        container.readingTimeSettings.reload()
         container.ankiSettings.reload()
         container.reviewSettings.reload()
         val ttu = container.ttuLibrary

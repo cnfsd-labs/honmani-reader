@@ -58,6 +58,8 @@
     <string name="settings_examples">Example sentences</string>
     <string name="settings_examples_details">Shows sentences that use the looked-up word in the lookup panel. Needs a one-time download.</string>
     <string name="settings_examples_credit">Tatoeba, CC BY 2.0 FR</string>
+    <string name="settings_count_lookup_time">Count time while a lookup is open</string>
+    <string name="settings_count_lookup_time_details">Off: the reading timer pauses while the lookup panel is open and carries on when you close it.</string>
     <string name="examples_download_title">Download example sentences, %1$s?</string>
     <string name="examples_download_message">The Japanese sentences with English translations come from Tatoeba and are downloaded once from GitHub. You can delete them again here.</string>
     <string name="examples_downloading">Downloading… %1$d%%</string>

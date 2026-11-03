@@ -136,6 +136,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             tracker.setForeground(false)
         }
     }
+    // With "Count time while a lookup is open" off, the timer pauses while the panel is open
+    // (its touches are native: the book sees no activity).
+    val countDuringLookup by container.readingTimeSettings.countDuringLookup.collectAsStateWithLifecycle()
+    LaunchedEffect(countDuringLookup) { tracker.setCountLookupTime(countDuringLookup) }
+    LaunchedEffect(panel != null) { tracker.setLookupOpen(panel != null) }
     LaunchedEffect(atLibrary) {
         tracker.setVisible(!atLibrary)
         // Back at the library: the position reached goes to the sync server now.

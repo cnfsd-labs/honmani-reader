@@ -63,6 +63,60 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun timeCountsWhileALookupIsOpenByDefault() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        minutes(1)
+        tracker.setLookupOpen(true)
+        minutes(2)
+        tracker.setLookupOpen(false)
+        minutes(1)
+        tracker.setBook(null)
+        advanceUntilIdle()
+
+        assertEquals(4 * 60L, store.seconds[7L to DAY])
+    }
+
+    @Test
+    fun timePausesWhileALookupIsOpenIfChosen() = runTest {
+        val tracker = tracker()
+        tracker.setCountLookupTime(false)
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        minutes(1)
+        tracker.setLookupOpen(true)
+        minutes(2)
+        tracker.onActivity() // a touch behind the panel doesn't restart it
+        minutes(1)
+        tracker.setLookupOpen(false)
+        minutes(1)
+        tracker.setBook(null)
+        advanceUntilIdle()
+
+        assertEquals(2 * 60L, store.seconds[7L to DAY])
+    }
+
+    @Test
+    fun switchingTheSettingOnWhileALookupIsOpenResumesCounting() = runTest {
+        val tracker = tracker()
+        tracker.setCountLookupTime(false)
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        tracker.setLookupOpen(true)
+        minutes(2)
+        tracker.setCountLookupTime(true)
+        minutes(1)
+        tracker.setBook(null)
+        advanceUntilIdle()
+
+        assertEquals(60L, store.seconds[7L to DAY])
+    }
+
+    @Test
     fun aLongStretchWithoutActivityCountsFiveMinutes() = runTest {
         val tracker = tracker()
         tracker.setForeground(true)

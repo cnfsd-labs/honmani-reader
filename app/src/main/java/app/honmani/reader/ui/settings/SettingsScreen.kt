@@ -155,6 +155,7 @@ fun SettingsScreen(
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
         goal = { ReadingGoalSection() },
+        readingTime = { ReadingTimeSection() },
         examples = { ExampleSentencesSection() },
     )
 }
@@ -188,6 +189,7 @@ private fun SettingsContent(
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
     goal: @Composable () -> Unit = {},
+    readingTime: @Composable () -> Unit = {},
     examples: @Composable () -> Unit = {},
 ) {
     var showingSamples by rememberSaveable { mutableStateOf(false) }
@@ -263,6 +265,7 @@ private fun SettingsContent(
             }
             item { examples() }
             item { goal() }
+            item { readingTime() }
             item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.settings_sample_books)) },

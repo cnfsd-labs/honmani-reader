@@ -27,9 +27,9 @@ interface ReadingStore {
  * Counts reading time and characters read, per book and day.
  *
  * **Time** counts while a book is open, the reader shows it (not the library or tabs) and the
- * app is in front. A stretch without any activity in the book (touch, page turn, lookup: see
- * `reading-activity.js`) counts for at most [IDLE_MS], so a phone left on the table doesn't
- * keep counting.
+ * app is in front (and, if the user chose so, no lookup panel is open). A stretch without any
+ * activity in the book (touch, page turn, lookup: see `reading-activity.js`) counts for at most [IDLE_MS], so a phone left on the
+ * table doesn't keep counting.
  *
  * **Characters** come from ttu's bookmark, which holds the characters read up to the reading
  * position and is saved on every page turn (`reading-activity.js` reports each one). Turning
@@ -59,6 +59,8 @@ class ReadingTracker(
     private var book: Long? = null
     private var visible = false
     private var foreground = false
+    private var lookupOpen = false
+    private var countLookupTime = true
 
     /** Start of the time not counted yet, while active. */
     private var mark: Long? = null
@@ -83,6 +85,15 @@ class ReadingTracker(
 
     /** Whether the app is in front. */
     fun setForeground(value: Boolean) = change { foreground = value }
+
+    /** Whether the lookup panel is open (its touches are native: the book gets no activity). */
+    fun setLookupOpen(value: Boolean) = change { lookupOpen = value }
+
+    /**
+     * Whether time counts while the lookup panel is open (the default). Off: the timer pauses
+     * when the panel opens and carries on when it closes.
+     */
+    fun setCountLookupTime(value: Boolean) = change { countLookupTime = value }
 
     /** The reader touched or scrolled the book. */
     fun onActivity() {
@@ -205,7 +216,7 @@ class ReadingTracker(
         if (stopped) flush()
     }
 
-    private fun active() = book != null && visible && foreground
+    private fun active() = book != null && visible && foreground && (countLookupTime || !lookupOpen)
 
     /** Counts the time since [mark], at most [IDLE_MS]; under [lock]. */
     private fun count(now: Long) {

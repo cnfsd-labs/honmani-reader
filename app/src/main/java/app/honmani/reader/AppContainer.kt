@@ -58,6 +58,7 @@ import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
+import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.RefoldExportSettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
@@ -162,6 +163,9 @@ class AppContainer(context: Context) {
 
     /** The daily reading goal (Settings; shown in the statistics). */
     val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }
+
+    /** Whether reading time counts while the lookup panel is open (Settings → Reading). */
+    val readingTimeSettings: ReadingTimeSettings by lazy { ReadingTimeSettings(settingsPreferences) }
 
     /** Where the Refold export left off (Progress). */
     val refoldExportSettings: RefoldExportSettings by lazy { RefoldExportSettings(settingsPreferences) }

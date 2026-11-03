@@ -15,6 +15,7 @@ import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
+import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -393,6 +394,7 @@ class Backup(
             ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
+            ReadingTimeSettings.KEY_COUNT_DURING_LOOKUP to BackupValue.BOOLEAN,
             AnkiSettings.KEY_AUDIO to BackupValue.STRING,
             AnkiSettings.KEY_SENTENCE_SPEED to BackupValue.STRING,
             AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,
