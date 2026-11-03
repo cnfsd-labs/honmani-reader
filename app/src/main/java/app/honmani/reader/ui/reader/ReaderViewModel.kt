@@ -55,6 +55,8 @@ sealed interface LookupPanelState {
         val inAnki: Set<String> = emptySet(),
         /** Words starred in the word list, as [WordRepository.key]s. */
         val starred: Set<String> = emptySet(),
+        /** Words ignored ("Ignore word"), as [WordRepository.key]s. */
+        val ignored: Set<String> = emptySet(),
         /** Words in the word list, as [WordRepository.key]s; only a search ([LookupOrigin.SEARCH]) asks. */
         val saved: Set<String> = emptySet(),
         /** Words whose card is being made right now, as [WordRepository.key]s. */
@@ -115,6 +117,10 @@ class ReaderViewModel(
     private val starredAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
     /** Stars or unstars the saved word (expression, reading). */
     private val saveStar: suspend (expression: String, reading: String, starred: Boolean) -> Unit = { _, _, _ -> },
+    /** Which of these words (expression, reading) are ignored, as [WordRepository.key]s. */
+    private val ignoredAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
+    /** Ignores or un-ignores the saved word (expression, reading). */
+    private val saveIgnored: suspend (expression: String, reading: String, ignored: Boolean) -> Unit = { _, _, _ -> },
     /** The kanji dictionaries' entries for the kanji in a text; see [app.honmani.reader.lookup.DictionaryLookup.kanji]. */
     private val lookupKanji: suspend (String) -> Map<String, KanjiInfo> = { emptyMap() },
     /** Says a word (its reading); returns why it couldn't. See [app.honmani.reader.anki.WordAudio]. */
@@ -297,8 +303,9 @@ class ReaderViewModel(
             val groups = (_panel.value as? LookupPanelState.Results)?.takeIf { it.tap == tap }?.groups ?: return@launch
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
+            val ignored = ignoredWords(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, kanji = kanji) }
         }
     }
 
@@ -343,12 +350,13 @@ class ReaderViewModel(
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
-            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), kanji = emptyMap()) }
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), kanji = emptyMap()) }
             _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
+            val ignored = ignoredWords(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, kanji = kanji) }
         }
     }
 
@@ -403,9 +411,10 @@ class ReaderViewModel(
     private suspend fun refreshMarks(tap: TapLookup, groups: List<LookupGroup>) {
         val inAnki = wordsInAnki(groups)
         val starred = starredWords(groups)
+        val ignored = ignoredWords(groups)
         val saved = savedWords(groups)
         val kanji = kanjiOf(groups)
-        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, saved = saved, kanji = kanji) }
+        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, saved = saved, kanji = kanji) }
     }
 
     /** "+ Learn" in a search: saves [group] to the word list (origin [LookupOrigin.SEARCH]). */
@@ -438,6 +447,7 @@ class ReaderViewModel(
                     groups = groups,
                     inAnki = wordsInAnki(groups),
                     starred = emptySet(),
+                    ignored = emptySet(),
                     addingToAnki = emptySet(),
                     previous = current,
                     kanji = kanjiOf(groups),
@@ -525,6 +535,39 @@ class ReaderViewModel(
             } catch (e: Exception) {
                 log("Starring a word failed: $e")
                 updateResults(tap) { it.copy(starred = if (starred) it.starred - key else it.starred + key) }
+            }
+        }
+    }
+
+    private suspend fun ignoredWords(groups: List<LookupGroup>): Set<String> = try {
+        ignoredAmong(groups.map { it.expression to it.reading })
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log("Checking ignored words failed: $e")
+        emptySet()
+    }
+
+    /**
+     * Ignores or un-ignores [group] of the tapped text. The word is saved first if this lookup
+     * hasn't (only the best match of a tap is), like starring it.
+     */
+    fun setIgnored(group: LookupGroup, ignored: Boolean) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        updateResults(tap) { it.copy(ignored = if (ignored) it.ignored + key else it.ignored - key) }
+        keep(key)
+        viewModelScope.launch {
+            try {
+                if (state.previous == null) record(tap, group).join()
+                saveIgnored(group.expression, group.reading, ignored)
+                if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Ignoring a word failed: $e")
+                updateResults(tap) { it.copy(ignored = if (ignored) it.ignored - key else it.ignored + key) }
             }
         }
     }
@@ -718,6 +761,10 @@ class ReaderViewModel(
                     starredAmong = { container.wordRepository.starredAmong(it) },
                     saveStar = { expression, reading, starred ->
                         container.wordRepository.setStarred(expression, reading, starred)
+                    },
+                    ignoredAmong = { container.wordRepository.ignoredAmong(it) },
+                    saveIgnored = { expression, reading, ignored ->
+                        container.wordRepository.setIgnored(expression, reading, ignored)
                     },
                     lookupKanji = { lookup.kanji(it) },
                     say = { container.wordAudio.play(it) },

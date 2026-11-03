@@ -25,6 +25,11 @@ data class WordEntity(
     val gloss: String,
     val status: WordStatus = WordStatus.LEARNING,
     val starred: Boolean = false,
+    /**
+     * "Ignore word": a name or a wrong split of the book's text. It stays saved (with its status,
+     * so un-ignoring restores it) but is left out of marks, lists, review and every count.
+     */
+    val ignored: Boolean = false,
     @ColumnInfo(name = "lookup_count") val lookupCount: Int,
     @ColumnInfo(name = "first_looked_up_at") val firstLookedUpAt: Long,
     @ColumnInfo(name = "last_looked_up_at") val lastLookedUpAt: Long,

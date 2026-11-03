@@ -278,4 +278,26 @@ class WordRepositoryTest {
         assertEquals(null, session.start)
         assertTrue(session.words.isEmpty())
     }
+
+    @Test
+    fun ignoredWordsLeaveTheListsAndCounts_butStayFindable() = runTest {
+        repository.record(lookup("猫"))
+        repository.record(lookup("犬"))
+        val cat = repository.find("猫", "よみ")!!
+        assertEquals(2, learning().size)
+
+        repository.setIgnored(cat.id, true)
+
+        assertEquals(listOf("犬"), learning().map { it.expression })
+        assertEquals(listOf("猫"), repository.ignored.first().map { it.expression })
+        assertEquals(listOf("猫", "犬").sorted(), repository.every.first().map { it.expression }.sorted())
+        assertEquals(setOf(WordRepository.key("猫", "よみ")), repository.ignoredAmong(listOf("猫" to "よみ", "犬" to "よみ")))
+        assertEquals(true, repository.find("猫", "よみ")!!.ignored)
+
+        // Only a saved word can be ignored by its text; unsaving it again brings it back.
+        repository.setIgnored("鼬", "よみ", true)
+        assertEquals(null, repository.find("鼬", "よみ"))
+        repository.setIgnored("猫", "よみ", false)
+        assertEquals(2, learning().size)
+    }
 }

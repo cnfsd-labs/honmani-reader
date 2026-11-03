@@ -335,4 +335,28 @@ class ReviewRepositoryTest {
         now = due // 04:00: the 4th has begun
         assertEquals(1, shifted.dueCount())
     }
+
+    @Test
+    fun anIgnoredWordsCardLeavesTheQueue_andComesBackWhenNotIgnored() = runTest {
+        val a = word("一")
+        val b = word("二")
+        val c = word("三")
+        repository.record(a, Grade.GOOD)
+        repository.record(b, Grade.GOOD)
+        repository.introduce(c)
+        now += 3 * day
+        assertEquals(2, repository.dueCount())
+        assertEquals(listOf(c), repository.newCards(10).map { it.word.id })
+
+        database.wordDao().setIgnored(a, true)
+        database.wordDao().setIgnored(c, true)
+        assertEquals(listOf(b), repository.dueCards(10).map { it.word.id })
+        assertEquals(1, repository.dueCount())
+        assertEquals(setOf("二"), repository.dueExpressions(ReviewLimit.NO_LIMIT))
+        assertEquals(emptyList<Long>(), repository.newCards(10).map { it.word.id })
+        assertEquals(emptyList<Long>(), repository.introduceNew(5).map { it.word.id })
+
+        database.wordDao().setIgnored(a, false)
+        assertEquals(setOf(a, b), repository.dueCards(10).map { it.word.id }.toSet())
+    }
 }

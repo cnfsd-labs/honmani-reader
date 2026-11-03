@@ -229,6 +229,13 @@
     </plurals>
     <string name="action_star_word">Star</string>
     <string name="action_unstar_word">Remove star</string>
+    <string name="action_ignore_word">Ignore word</string>
+    <string name="action_unignore_word">Stop ignoring</string>
+    <string name="ignored_words_open">Ignored words</string>
+    <string name="ignored_words_title">Ignored words</string>
+    <string name="ignored_words_hint">Ignored words get no marks in books and are left out of counts and review. Lookups still work.</string>
+    <string name="ignored_words_empty">No ignored words. Ignore a name or a wrong split from the lookup panel (\u22EE) or a word in this list.</string>
+    <string name="word_ignored">%1$s ignored</string>
     <string name="action_mark_learned">Mark as learned</string>
     <string name="action_mark_learning">Move back to “Looking up”</string>
     <string name="action_undo">Undo</string>

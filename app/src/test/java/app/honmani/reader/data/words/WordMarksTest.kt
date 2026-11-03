@@ -208,4 +208,22 @@ class WordMarksTest {
             WordMarks.of(text, segmenter, learning, WordMarksMode.OFF, sentences = true),
         )
     }
+
+    @Test
+    fun anIgnoredWordHasNoMark_whateverItsState() {
+        val ignored = WordKnowledge(
+            read = mapOf("猫" to ReadWord(900, 3), "食べる" to ReadWord(187, 2)),
+            progress = emptyMap(),
+            learning = emptySet(),
+            ignored = setOf("食べる", "鼬"),
+        )
+        val text = "私は猫鼬を食べた"
+        fun marks(mode: WordMarksMode) =
+            WordMarks.of(text, segmenter, ignored, mode, knownWords = true).map { text.substring(it.start, it.start + it.length) to it.kind }
+
+        // 私, は and を are new; 鼬 and 食べた are ignored, so they are not marked.
+        assertEquals(listOf("私" to WordMark.Kind.NEW, "は" to WordMark.Kind.NEW, "を" to WordMark.Kind.NEW), marks(WordMarksMode.NEW))
+        assertEquals(true, ignored.isIgnored("鼬"))
+        assertEquals(false, ignored.isKnown("食べる"))
+    }
 }

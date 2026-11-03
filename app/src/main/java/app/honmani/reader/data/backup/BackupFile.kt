@@ -128,6 +128,7 @@ data class BackupWord(
     val gloss: String,
     val status: String,
     val starred: Boolean = false,
+    val ignored: Boolean = false,
     val lookupCount: Int,
     val firstLookedUpAt: Long,
     val lastLookedUpAt: Long,

@@ -134,6 +134,8 @@ sealed interface WordChange {
 
     data class Learned(val id: Long, override val expression: String) : WordChange
 
+    data class Ignored(val id: Long, override val expression: String) : WordChange
+
     data class Deleted(val deleted: DeletedWord) : WordChange {
         override val expression: String get() = deleted.word.expression
     }
@@ -316,6 +318,21 @@ class WordsViewModel(
         }
     }
 
+    /** The ignored words, for the sheet "Ignored words". */
+    val ignoredWords: StateFlow<List<WordEntity>> = repository.ignored
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun ignore(word: WordEntity) {
+        viewModelScope.launch {
+            repository.setIgnored(word.id, true)
+            _changes.send(WordChange.Ignored(word.id, word.expression))
+        }
+    }
+
+    fun unignore(id: Long) {
+        viewModelScope.launch { repository.setIgnored(id, false) }
+    }
+
     fun markLearning(id: Long) {
         viewModelScope.launch { repository.markLearning(id) }
     }
@@ -479,6 +496,7 @@ class WordsViewModel(
         viewModelScope.launch {
             when (change) {
                 is WordChange.Learned -> repository.markLearning(change.id)
+                is WordChange.Ignored -> repository.setIgnored(change.id, false)
                 is WordChange.Deleted -> repository.restore(change.deleted)
             }
         }

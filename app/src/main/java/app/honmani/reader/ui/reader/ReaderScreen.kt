@@ -302,6 +302,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onClose = viewModel::dismiss,
                     onAddToAnki = { group -> anki.whenReady { viewModel.addToAnki(group) } },
                     onSetStarred = viewModel::setStarred,
+                onSetIgnored = viewModel::setIgnored,
                     onEditLookup = { openInDictionary(context, it) },
                     onListen = viewModel::listen,
                     onLookupWord = viewModel::lookupWord,

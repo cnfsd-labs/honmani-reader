@@ -574,4 +574,29 @@ class BackupTest {
         assertEquals(0, summary.catalogsAdded)
         assertTrue(new.database.backupDao().catalogs().isEmpty())
     }
+
+    @Test
+    fun anIgnoredWordComesBackIgnored_andAnOldBackupWithoutTheFieldRestoresNotIgnored() = runTest {
+        val old = Phone("old")
+        old.words.record(lookup("猫", null))
+        old.words.record(lookup("犬", null))
+        old.words.setIgnored("猫", "よみ", true)
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        assertEquals(mapOf("猫" to true, "犬" to false), backup.words.associate { it.expression to it.ignored })
+
+        val new = Phone("new")
+        new.backup.restore(backup)
+        assertEquals(true, new.words.find("猫", "よみ")!!.ignored)
+        assertEquals(false, new.words.find("犬", "よみ")!!.ignored)
+
+        // Restoring on a phone that ignored it meanwhile (or not) keeps the ignoring.
+        val other = Phone("other")
+        other.words.record(lookup("猫", null))
+        other.backup.restore(backup)
+        assertEquals(true, other.words.find("猫", "よみ")!!.ignored)
+
+        val without = Phone("without")
+        without.backup.restore(backup.copy(words = backup.words.map { it.copy(ignored = false) }))
+        assertEquals(false, without.words.find("猫", "よみ")!!.ignored)
+    }
 }

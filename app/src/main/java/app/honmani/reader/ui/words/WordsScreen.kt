@@ -164,6 +164,7 @@ fun WordsScreen(
         when (it) {
             is WordChange.Learned -> stringResource(R.string.word_moved_to_learned, it.expression)
             is WordChange.Deleted -> stringResource(R.string.word_deleted, it.expression)
+            is WordChange.Ignored -> stringResource(R.string.word_ignored, it.expression)
         }
     }
     val undoLabel = stringResource(R.string.action_undo)
@@ -261,6 +262,11 @@ fun WordsScreen(
 
     var showSession by remember { mutableStateOf(false) }
     if (showSession) SessionSheet(uiState.session, onDismiss = { showSession = false })
+    var showIgnored by remember { mutableStateOf(false) }
+    if (showIgnored) {
+        val ignored by viewModel.ignoredWords.collectAsStateWithLifecycle()
+        IgnoredSheet(ignored, onUnignore = viewModel::unignore, onDismiss = { showIgnored = false })
+    }
 
     // The dictionary search: results while typing, the last searches when the field is empty.
     val searchQuery by search.query.collectAsStateWithLifecycle()
@@ -345,6 +351,8 @@ fun WordsScreen(
         onMarkLearned = viewModel::markLearned,
         onMarkLearning = viewModel::markLearning,
         onDelete = viewModel::delete,
+        onIgnore = viewModel::ignore,
+        onShowIgnored = { showIgnored = true },
         onAddToAnki = { word, lookup -> anki.whenReady { viewModel.addToAnki(word, lookup) } },
         onAddAllToAnki = {
             if (uiState.notInAnki > ADD_ALL_WITHOUT_ASKING) confirmAddAll = true else anki.whenReady(viewModel::addAllToAnki)
@@ -379,6 +387,7 @@ fun WordsScreen(
                 onOpenDictionaries = searchPanel::dismiss,
                 onAddToAnki = { group -> anki.whenReady { searchPanel.addToAnki(group) } },
                 onSetStarred = searchPanel::setStarred,
+                onSetIgnored = searchPanel::setIgnored,
                 onListen = searchPanel::listen,
                 onLookupWord = searchPanel::lookupWord,
                 onShowKanji = searchPanel::showKanji,
@@ -410,10 +419,12 @@ private fun WordsContent(
     onMarkLearned: (WordEntity) -> Unit,
     onMarkLearning: (id: Long) -> Unit,
     onDelete: (id: Long) -> Unit,
+    onIgnore: (WordEntity) -> Unit = {},
     onAddToAnki: (WordEntity, WordLookupEntity?) -> Unit,
     onAddAllToAnki: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
+    onShowIgnored: () -> Unit = {},
     onQuery: (String) -> Unit = {},
     scrollToTop: Int = 0,
     onExportCsv: () -> Unit = {},
@@ -476,6 +487,7 @@ private fun WordsContent(
                     val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
                     WordsMenu(
                         onShowSession = onShowSession,
+                        onShowIgnored = onShowIgnored,
                         onExport = onExport,
                         onExportPackage = onExportPackage,
                         onExportCsv = onExportCsv,
@@ -538,6 +550,7 @@ private fun WordsContent(
                     onMarkLearned = onMarkLearned,
                     onMarkLearning = onMarkLearning,
                     onDelete = onDelete,
+                    onIgnore = onIgnore,
                     onAddToAnki = onAddToAnki,
                     onAddAllToAnki = onAddAllToAnki,
                     onCheckAnki = onCheckAnki,
@@ -566,6 +579,7 @@ private fun WordList(
     onMarkLearned: (WordEntity) -> Unit,
     onMarkLearning: (id: Long) -> Unit,
     onDelete: (id: Long) -> Unit,
+    onIgnore: (WordEntity) -> Unit = {},
     onAddToAnki: (WordEntity, WordLookupEntity?) -> Unit,
     onAddAllToAnki: () -> Unit,
     onCheckAnki: () -> Unit = {},
@@ -645,6 +659,7 @@ private fun WordList(
                     onMarkLearned = { onMarkLearned(word) },
                     onMarkLearning = { onMarkLearning(word.id) },
                     onDelete = { onDelete(word.id) },
+                    onIgnore = { onIgnore(word) },
                     onAddToAnki = { lookup -> onAddToAnki(word, lookup) },
                     adding = word.id in uiState.addingToAnki,
                 )
@@ -771,6 +786,7 @@ private fun MemoryRing(memory: Float) {
 @Composable
 private fun WordsMenu(
     onShowSession: () -> Unit,
+    onShowIgnored: () -> Unit,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
     onExportCsv: () -> Unit,
@@ -794,6 +810,18 @@ private fun WordsMenu(
                 onClick = {
                     open = false
                     onShowSession()
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.ignored_words_open), style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_hidden), contentDescription = null) },
+                colors = MenuDefaults.itemColors(leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                onClick = {
+                    open = false
+                    onShowIgnored()
                 },
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
@@ -895,6 +923,7 @@ private fun WordRow(
     onDelete: () -> Unit,
     onAddToAnki: (WordLookupEntity?) -> Unit,
     adding: Boolean = false,
+    onIgnore: () -> Unit = {},
 ) {
     val highlight = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1016,6 +1045,10 @@ private fun WordRow(
                     modifier = Modifier.padding(top = 6.dp),
                 )
             }
+        }
+        if (expanded) {
+            // Names and wrong splits: no marks, no counts, no review (see WordEntity.ignored).
+            TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore_word)) }
         }
     }
 }

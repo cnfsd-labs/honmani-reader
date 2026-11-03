@@ -28,7 +28,7 @@ interface ReviewDao {
     /** Words in review under Honmani's own scheduler, the only ones reading can move. */
     @Query(
         "SELECT w.id AS id, w.expression AS expression FROM review_card c JOIN word w ON w.id = c.word_id " +
-            "WHERE c.state = 'REVIEW' AND w.scheduler = 'HONMANI'",
+            "WHERE c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND w.ignored = 0",
     )
     suspend fun reviewWords(): List<ReviewWord>
 
@@ -80,7 +80,7 @@ interface ReviewDao {
     /** Introduced cards not reviewed yet, in the order they were introduced. */
     @Transaction
     @Query(
-        "SELECT c.* FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'NEW' AND w.scheduler = 'HONMANI' " +
+        "SELECT c.* FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'NEW' AND w.scheduler = 'HONMANI' AND w.ignored = 0 " +
             "AND (c.buried_until IS NULL OR c.buried_until <= :now) ORDER BY c.added_at, c.word_id LIMIT :limit",
     )
     suspend fun newCards(now: Long, limit: Int): List<CardWithWord>
@@ -101,7 +101,7 @@ interface ReviewDao {
     @Transaction
     @Query(
         "SELECT c.* FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'REVIEW' AND w.scheduler = 'HONMANI' " +
-            "AND w.status = 'LEARNING' AND c.due >= :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
+            "AND w.ignored = 0 AND w.status = 'LEARNING' AND c.due >= :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
             "ORDER BY c.due, c.word_id",
     )
     suspend fun notDueLearningCards(cutoff: Long, now: Long): List<CardWithWord>
@@ -111,7 +111,7 @@ interface ReviewDao {
 
     /** Introduced, not yet reviewed and not buried at [now]. */
     @Query(
-        "SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'NEW' AND w.scheduler = 'HONMANI' " +
+        "SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE c.state = 'NEW' AND w.scheduler = 'HONMANI' AND w.ignored = 0 " +
             "AND (c.buried_until IS NULL OR c.buried_until <= :now)",
     )
     fun observeNewCardCount(now: Long): Flow<Int>
@@ -150,8 +150,8 @@ interface ReviewDao {
 
 /** Due: in review, Honmani's own, due before the cutoff, not buried, and not retired (stability under [ReviewRules.RETIRE_AFTER_DAYS]). */
 private const val DUE =
-    "c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND c.due < :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
+    "c.state = 'REVIEW' AND w.scheduler = 'HONMANI' AND w.ignored = 0 AND c.due < :cutoff AND (c.buried_until IS NULL OR c.buried_until <= :now) " +
         "AND c.stability < ${ReviewRules.RETIRE_AFTER_DAYS}"
 
 private const val UNINTRODUCED =
-    "w.status = 'LEARNING' AND w.scheduler = 'HONMANI' AND NOT EXISTS (SELECT 1 FROM review_card c WHERE c.word_id = w.id)"
+    "w.ignored = 0 AND w.status = 'LEARNING' AND w.scheduler = 'HONMANI' AND NOT EXISTS (SELECT 1 FROM review_card c WHERE c.word_id = w.id)"

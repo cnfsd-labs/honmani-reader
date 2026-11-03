@@ -48,6 +48,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.IconToggleButton
@@ -75,9 +76,12 @@ import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -138,6 +142,8 @@ fun LookupPanel(
     onAddToAnki: (LookupGroup) -> Unit = {},
     /** The star of a word: star it (true) or remove the star. Words reached from a reference have no star. */
     onSetStarred: (LookupGroup, Boolean) -> Unit = { _, _ -> },
+    /** "Ignore word" in a word's overflow menu: ignore it (true) or stop ignoring it. */
+    onSetIgnored: (LookupGroup, Boolean) -> Unit = { _, _ -> },
     /** Opens the search screen with a text filled in, when nothing was found; null shows no such button. */
     onEditLookup: ((String) -> Unit)? = null,
     /** The listen button of a word: say it. */
@@ -410,6 +416,12 @@ fun LookupPanel(
                             } else {
                                 null
                             },
+                            ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
+                            onSetIgnored = if (state.previous == null) {
+                                { onSetIgnored(group, it) }
+                            } else {
+                                null
+                            },
                             onListen = { onListen(group) },
                             onLookupWord = onLookupWord,
                             onLearn = if (onLearn != null && state.previous == null) {
@@ -584,6 +596,8 @@ private fun LookupGroupItem(
     starred: Boolean,
     onSetStarred: ((Boolean) -> Unit)?,
     onLookupWord: (String) -> Unit,
+    ignored: Boolean = false,
+    onSetIgnored: ((Boolean) -> Unit)? = null,
     onListen: () -> Unit = {},
     onLearn: (() -> Unit)? = null,
     saved: Boolean = false,
@@ -639,6 +653,28 @@ private fun LookupGroupItem(
                         ),
                         tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+            if (onSetIgnored != null) {
+                // Unobtrusive: names and wrong splits only, in an overflow menu.
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menu = true }) {
+                        Icon(
+                            Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.action_more_options),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(if (ignored) R.string.action_unignore_word else R.string.action_ignore_word)) },
+                            onClick = {
+                                menu = false
+                                onSetIgnored(!ignored)
+                            },
+                        )
+                    }
                 }
             }
         }

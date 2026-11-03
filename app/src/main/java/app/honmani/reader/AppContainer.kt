@@ -591,7 +591,7 @@ class AppContainer(context: Context) {
             books = bookDao.observeAll(),
             stretches = readStretches.stretches,
             grades = difficultyStore.grades,
-            words = wordRepository.all,
+            words = wordRepository.every,
             bookWords = difficultyStore::words,
             store = wordProgressStore,
             variants = { spellingVariants() },

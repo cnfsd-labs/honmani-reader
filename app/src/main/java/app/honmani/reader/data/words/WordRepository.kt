@@ -61,8 +61,14 @@ class WordRepository(
     val starred = dao.observeStarred()
     val learned = dao.observeLearned()
 
-    /** Every saved word, being learned or learned. */
+    /** Every saved word that is not ignored, being learned or learned. */
     val all: Flow<List<WordEntity>> = dao.observeAll()
+
+    /** Every saved word including the ignored ones (for [WordKnowledgeTracker], which leaves them out of its sets). */
+    val every: Flow<List<WordEntity>> = dao.observeEvery()
+
+    /** The ignored words ("Ignore word"), by written form. */
+    val ignored: Flow<List<WordEntity>> = dao.observeIgnored()
 
     /** The words of the latest reading session, see [ReadingSession]. */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -263,6 +269,19 @@ class WordRepository(
     suspend fun setStarred(expression: String, reading: String, starred: Boolean) {
         dao.find(expression, reading)?.let { dao.setStarred(it.id, starred) }
     }
+
+    suspend fun setIgnored(id: Long, ignored: Boolean) = dao.setIgnored(id, ignored)
+
+    /** Ignores or un-ignores a saved word by its written form and reading; nothing if it isn't saved. */
+    suspend fun setIgnored(expression: String, reading: String, ignored: Boolean) {
+        dao.find(expression, reading)?.let { dao.setIgnored(it.id, ignored) }
+    }
+
+    /** Which of these words (expression, reading) are ignored, as [key]s. */
+    suspend fun ignoredAmong(words: Collection<Pair<String, String>>): Set<String> =
+        words.filter { (expression, reading) -> dao.find(expression, reading)?.ignored == true }
+            .map { (expression, reading) -> key(expression, reading) }
+            .toSet()
 
     /** Which of these words (expression, reading) are starred, as [key]s. */
     suspend fun starredAmong(words: Collection<Pair<String, String>>): Set<String> =

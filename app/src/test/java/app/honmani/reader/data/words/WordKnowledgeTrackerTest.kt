@@ -157,4 +157,34 @@ class WordKnowledgeTrackerTest {
         job.cancel()
         assertEquals(2, seen.size)
     }
+
+    @Test
+    fun anIgnoredWordIsNeitherLearningNorKnown_andComesBackWhenNotIgnoredAnymore() = runBlocking {
+        val store = store()
+        val flow = MutableStateFlow(listOf(word("よくわかった。", 2, 5)))
+        val tracker = WordKnowledgeTracker(
+            books = flowOf(listOf(book)),
+            stretches = flowOf(mapOf("h" to intArrayOf(0, BookWords.POSITIONS))),
+            grades = flowOf(mapOf("h" to grade)),
+            words = flow,
+            bookWords = { bookWords },
+            store = store,
+            variants = { SpellingVariants.EMPTY },
+            context = Dispatchers.Unconfined,
+            settleMillis = 0,
+        )
+        assertEquals(true, tracker.knowledge.first().isKnown("分かる"))
+
+        flow.value = listOf(word("よくわかった。", 2, 5).copy(ignored = true))
+        val ignored = tracker.knowledge.first { it.isIgnored("分かる") }
+        assertEquals(false, ignored.isKnown("分かる"))
+        assertEquals(false, ignored.isLearning("分かる"))
+        assertEquals(null, ignored.progress[1])
+
+        // Not ignored anymore: the progress kept in the store brings the state back.
+        flow.value = listOf(word("よくわかった。", 2, 5))
+        val back = tracker.knowledge.first { !it.isIgnored("分かる") }
+        assertEquals(true, back.isKnown("分かる"))
+        assertEquals(12, back.progress[1]?.reads)
+    }
 }

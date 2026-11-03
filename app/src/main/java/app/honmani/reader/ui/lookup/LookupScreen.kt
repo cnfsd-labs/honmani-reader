@@ -161,6 +161,7 @@ fun LookupScreen(
                     onClose = onDone,
                     onAddToAnki = { group -> anki.whenReady { viewModel.addToAnki(group) } },
                     onSetStarred = viewModel::setStarred,
+                onSetIgnored = viewModel::setIgnored,
                     onListen = viewModel::listen,
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,

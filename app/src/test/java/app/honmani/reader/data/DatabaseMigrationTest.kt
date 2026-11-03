@@ -30,9 +30,9 @@ class DatabaseMigrationTest {
     fun aVersionOneDatabaseOpensWithTheCurrentCode_andKeepsItsData() = runTest {
         helper.createDatabase(TEST_DB, 1).use { db ->
             db.execSQL(
-                "INSERT INTO word (expression, reading, gloss, status, starred, lookup_count, first_looked_up_at, " +
+                "INSERT INTO word (expression, reading, gloss, status, starred, ignored, lookup_count, first_looked_up_at, " +
                     "last_looked_up_at, rank_key, last_sentence, last_surface_start, last_surface_end) " +
-                    "VALUES ('猫', 'ねこ', 'cat', 'LEARNING', 1, 3, 1000, 2000, 1.5, '猫がいる。', 0, 1)",
+                    "VALUES ('猫', 'ねこ', 'cat', 'LEARNING', 1, 0, 3, 1000, 2000, 1.5, '猫がいる。', 0, 1)",
             )
             db.execSQL("INSERT INTO lookup_event (looked_up_at, book_id) VALUES (2000, NULL)")
         }

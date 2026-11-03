@@ -161,6 +161,13 @@ are Known in your own word list (the ones the book text marks Known), so a new u
 Learning are not known and not counted as new. Mark a word Known in Words and N rises; "Words to
 learn before reading" lists the M new words, most used first. The difficulty and the cover badge do not change.
 
+Ignore word: in the lookup panel, ⋮ beside the star → "Ignore word" (the panel stays; the word shows
+"Stop ignoring"); in Words, expand a row → "Ignore word" (snackbar with Undo). An ignored word has no
+tint in the book (neither Learning nor grey "+ New"), is out of Words → Learning/Learned/All, its card
+is out of the review queue, and it is not in the book sheet's N%, M or "Words to learn". Words ⋮ →
+"Ignored words" lists them; "Stop ignoring" brings back its earlier state (Learning, Known, card). A
+lookup of it still works. Backup and restore keep it.
+
 ## Dictionary search
 
 Words → "Search dictionaries": results appear while you type. Try 食べる, たべる, taberu, neko and

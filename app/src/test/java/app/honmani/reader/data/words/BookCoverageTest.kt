@@ -66,4 +66,19 @@ class BookCoverageTest {
         assertEquals(BookCoverage.of(book, state)!!.newWords, UnknownWords.of(book, state).total)
         assertEquals(emptyList<UnknownWord>(), UnknownWords.of(book, knowledge(known = setOf("猫", "鼬"), learning = setOf("行く"))).words)
     }
+
+    @Test
+    fun ignoredWordsLeaveBothSidesOfTheCoverage_andTheNewWords() {
+        // 猫 ignored (6 uses): of the other 4 uses only 行く (3) is known; 鼬 is the one new word.
+        val state = WordKnowledge(
+            read = emptyMap(),
+            progress = emptyMap(),
+            learning = emptySet(),
+            known = setOf("行く"),
+            ignored = setOf("猫"),
+        )
+
+        assertEquals(BookCoverage(0.75f, newWords = 1), BookCoverage.of(book, state))
+        assertEquals(UnknownWords(listOf(UnknownWord("鼬", 1)), 1), UnknownWords.of(book, state))
+    }
 }

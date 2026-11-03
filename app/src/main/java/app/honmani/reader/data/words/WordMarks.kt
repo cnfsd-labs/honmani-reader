@@ -89,6 +89,8 @@ object WordMarks {
             }
             // Names and other text no dictionary knows stay unmarked.
             if (token.rank == Token.UNKNOWN) continue
+            // Ignored words (names, wrong splits) get no mark at all.
+            if (knowledge.isIgnored(token.key)) continue
             val kind = when {
                 isDue(token.key, due, knowledge) -> WordMark.Kind.DUE
                 tint && knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
@@ -127,7 +129,7 @@ object WordMarks {
             if (form != null) {
                 unknown += token.start
                 formEnd = token.start + form.length
-            } else if (token.rank != Token.UNKNOWN && token.rank > GRAMMAR_RANK_LIMIT &&
+            } else if (token.rank != Token.UNKNOWN && token.rank > GRAMMAR_RANK_LIMIT && !knowledge.isIgnored(token.key) &&
                 (knowledge.isLearning(token.key) || !knowledge.hasRead(token.key))
             ) {
                 unknown += token.start

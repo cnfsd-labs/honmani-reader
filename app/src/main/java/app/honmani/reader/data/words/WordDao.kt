@@ -9,18 +9,32 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface WordDao {
     /** Words being learned, highest score first. */
-    @Query("SELECT * FROM word WHERE status = 'LEARNING' ORDER BY rank_key DESC, id DESC")
+    @Query("SELECT * FROM word WHERE status = 'LEARNING' AND ignored = 0 ORDER BY rank_key DESC, id DESC")
     fun observeLearning(): Flow<List<WordEntity>>
 
-    @Query("SELECT * FROM word WHERE starred = 1 ORDER BY rank_key DESC, id DESC")
+    @Query("SELECT * FROM word WHERE starred = 1 AND ignored = 0 ORDER BY rank_key DESC, id DESC")
     fun observeStarred(): Flow<List<WordEntity>>
 
-    @Query("SELECT * FROM word WHERE status = 'LEARNED' ORDER BY expression, reading")
+    @Query("SELECT * FROM word WHERE status = 'LEARNED' AND ignored = 0 ORDER BY expression, reading")
     fun observeLearned(): Flow<List<WordEntity>>
 
-    /** Every word, learning ones first: one query, so a word moving between the two lists is never in both. */
-    @Query("SELECT * FROM word ORDER BY status = 'LEARNED', CASE WHEN status = 'LEARNED' THEN expression END, CASE WHEN status = 'LEARNED' THEN reading END, rank_key DESC, id DESC")
+    /** Every word that is not ignored, learning ones first: one query, so a word moving between the two lists is never in both. */
+    @Query("SELECT * FROM word WHERE ignored = 0 ORDER BY status = 'LEARNED', CASE WHEN status = 'LEARNED' THEN expression END, CASE WHEN status = 'LEARNED' THEN reading END, rank_key DESC, id DESC")
     fun observeAll(): Flow<List<WordEntity>>
+
+    /** Every word including the ignored ones, to work out [WordKnowledge]. */
+    @Query("SELECT * FROM word")
+    fun observeEvery(): Flow<List<WordEntity>>
+
+    /** The ignored words, by written form. */
+    @Query("SELECT * FROM word WHERE ignored = 1 ORDER BY expression, reading")
+    fun observeIgnored(): Flow<List<WordEntity>>
+
+    @Query("SELECT COUNT(*) FROM word WHERE ignored = 1")
+    fun countIgnored(): Flow<Int>
+
+    @Query("UPDATE word SET ignored = :ignored WHERE id = :id")
+    suspend fun setIgnored(id: Long, ignored: Boolean)
 
     /**
      * Words suggested for Anki: being learned, not in Anki yet, and looked up more than once
@@ -32,13 +46,13 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM word WHERE $SUGGESTED")
     fun countSuggested(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM word WHERE status = 'LEARNING'")
+    @Query("SELECT COUNT(*) FROM word WHERE status = 'LEARNING' AND ignored = 0")
     fun countLearning(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM word WHERE starred = 1")
+    @Query("SELECT COUNT(*) FROM word WHERE starred = 1 AND ignored = 0")
     fun countStarred(): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM word WHERE status = 'LEARNED'")
+    @Query("SELECT COUNT(*) FROM word WHERE status = 'LEARNED' AND ignored = 0")
     fun countLearned(): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM word WHERE anki_note_id IS NOT NULL")
@@ -53,7 +67,7 @@ interface WordDao {
     fun observeLookupTimes(limit: Int): Flow<List<Long>>
 
     /** Words looked up at [from] or later, the latest first. */
-    @Query("SELECT * FROM word WHERE last_looked_up_at >= :from ORDER BY last_looked_up_at DESC, id DESC")
+    @Query("SELECT * FROM word WHERE last_looked_up_at >= :from AND ignored = 0 ORDER BY last_looked_up_at DESC, id DESC")
     fun observeLookedUpSince(from: Long): Flow<List<WordEntity>>
 
     /** Lookups since [from] (epoch milliseconds). */
@@ -138,4 +152,4 @@ interface WordDao {
     suspend fun pruneLookups(wordId: Long, keep: Int)
 }
 
-private const val SUGGESTED = "status = 'LEARNING' AND anki_note_id IS NULL AND lookup_count >= 2"
+private const val SUGGESTED = "ignored = 0 AND status = 'LEARNING' AND anki_note_id IS NULL AND lookup_count >= 2"

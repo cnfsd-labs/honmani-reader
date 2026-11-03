@@ -4,7 +4,7 @@ import app.honmani.reader.data.difficulty.BookWords
 
 /**
  * How much of a book's text the reader really knows: the share of its running words (names left
- * out, as in grading) that [WordKnowledge.isKnown], the same state that marks a word Known in the
+ * out, as in grading, and ignored words) that [WordKnowledge.isKnown], the same state that marks a word Known in the
  * text, and how many distinct words are neither known nor in Learning. Not an estimate: a new
  * reader knows 0%, and words in Learning are not known yet.
  */
@@ -16,8 +16,10 @@ data class BookCoverage(val known: Float, val newWords: Int) {
             var newWords = 0
             for (i in 0 until words.size) {
                 val uses = words.positions[i].size
-                all += uses
                 val key = words.keys[i]
+                // Ignored words (names, wrong splits) count neither as known nor as text to know.
+                if (knowledge.isIgnored(key)) continue
+                all += uses
                 if (knowledge.isKnown(key)) known += uses else if (!knowledge.isLearning(key)) newWords++
             }
             if (all == 0L) return null
@@ -43,7 +45,7 @@ data class UnknownWords(val words: List<UnknownWord>, val total: Int) {
             val unknown = ArrayList<Int>()
             for (i in 0 until words.size) {
                 val key = words.keys[i]
-                if (!knowledge.isKnown(key) && !knowledge.isLearning(key)) unknown += i
+                if (!knowledge.isKnown(key) && !knowledge.isLearning(key) && !knowledge.isIgnored(key)) unknown += i
             }
             // Most used first; of equally used words the more common one (a lower rank) first.
             val top = unknown

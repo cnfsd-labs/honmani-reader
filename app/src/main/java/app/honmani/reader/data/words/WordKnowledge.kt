@@ -43,7 +43,15 @@ class WordKnowledge(
     val variants: SpellingVariants = SpellingVariants.EMPTY,
     /** Dictionary forms of looked-up words that are known now ([WordProgress.KNOWN] steps). */
     val known: Set<String> = emptySet(),
+    /**
+     * Dictionary forms of ignored words ("Ignore word": names, wrong splits). They are in none of
+     * the other sets, and are neither marked nor counted by anything built on this.
+     */
+    val ignored: Set<String> = emptySet(),
 ) {
+    /** Whether [key], or another spelling of it, is ignored. */
+    fun isIgnored(key: String): Boolean = ignored.isNotEmpty() && (key in ignored || variants.of(key).any { it in ignored })
+
     /** Whether [key], or another spelling of it, was read. */
     fun hasRead(key: String): Boolean = key in read || variants.of(key).any { it in read }
 
@@ -55,7 +63,7 @@ class WordKnowledge(
      * reading [WordProgress.KNOWN] times, and not being learned now.
      */
     fun isKnown(key: String): Boolean {
-        if (isLearning(key)) return false
+        if (isLearning(key) || isIgnored(key)) return false
         val spellings = variants.of(key) + key
         return spellings.any { it in known || (read[it]?.reads ?: 0) >= WordProgress.KNOWN }
     }
@@ -78,14 +86,16 @@ class WordKnowledge(
      * estimate counts it: not being learned, and met in reading or within the reader's
      * [vocabulary] (a frequency rank, `VocabularyEstimate.words`).
      */
-    fun knows(key: String, rank: Int, vocabulary: Int): Boolean = !isLearning(key) && (hasRead(key) || rank <= vocabulary)
+    fun knows(key: String, rank: Int, vocabulary: Int): Boolean = !isLearning(key) && !isIgnored(key) && (hasRead(key) || rank <= vocabulary)
 
     /**
      * Words known from reading alone (never looked up in any spelling), with how often each was
      * read, most read first.
      */
     fun knownByReading(lookedUp: Set<String>): List<Pair<String, Int>> =
-        read.filter { (key, word) -> word.reads >= WordProgress.KNOWN && key !in lookedUp && variants.of(key).none { it in lookedUp } }
+        read.filter { (key, word) ->
+            word.reads >= WordProgress.KNOWN && key !in lookedUp && variants.of(key).none { it in lookedUp } && !isIgnored(key)
+        }
             .map { (key, word) -> key to word.reads }
             .sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
 
@@ -210,7 +220,7 @@ class WordKnowledgeTracker(
         for (i in a.indices) {
             val x = a[i]
             val y = b[i]
-            if (x.id != y.id || x.expression != y.expression || x.reading != y.reading || x.status != y.status ||
+            if (x.id != y.id || x.expression != y.expression || x.reading != y.reading || x.status != y.status || x.ignored != y.ignored ||
                 x.lookupCount != y.lookupCount || x.lastSentence != y.lastSentence ||
                 x.lastSurfaceStart != y.lastSurfaceStart || x.lastSurfaceEnd != y.lastSurfaceEnd
             ) return false
@@ -250,15 +260,22 @@ class WordKnowledgeTracker(
         if (updated != previous) store.save(updated, loaded)
         progress = updated
         generation = loaded
-        val notKnown = words.filter { (updated[it.id]?.steps ?: 0) < WordProgress.KNOWN }
+        // Ignored words keep their progress (un-ignoring restores it) but are in none of the sets.
+        val ignoredWords = words.filter { it.ignored }
+        // Another saved word written the same (other reading) that is not ignored keeps the form in play.
+        val kept = words.filter { !it.ignored }.mapTo(HashSet()) { it.expression }
+        val ignored = ignoredWords.mapNotNullTo(HashSet()) { word -> word.expression.takeIf { it !in kept } }
+        val ignoredIds = ignoredWords.mapTo(HashSet()) { it.id }
+        val shown = if (ignoredIds.isEmpty()) updated else updated.filterKeys { it !in ignoredIds }
+        val notKnown = words.filter { !it.ignored && (updated[it.id]?.steps ?: 0) < WordProgress.KNOWN }
         val learning = notKnown.mapTo(HashSet()) { it.expression }
         val forms = notKnown.mapNotNullTo(HashSet()) { word ->
             word.lastSentence.takeIf { 0 <= word.lastSurfaceStart && word.lastSurfaceStart < word.lastSurfaceEnd && word.lastSurfaceEnd <= it.length }
                 ?.substring(word.lastSurfaceStart, word.lastSurfaceEnd)
                 ?.takeIf { it.isNotBlank() }
         }
-        val known = words.filter { (updated[it.id]?.steps ?: 0) >= WordProgress.KNOWN }.mapTo(HashSet()) { it.expression }
-        return WordKnowledge(read, updated, learning, shares, forms, spellings, known)
+        val known = words.filter { !it.ignored && (updated[it.id]?.steps ?: 0) >= WordProgress.KNOWN }.mapTo(HashSet()) { it.expression }
+        return WordKnowledge(read, shown, learning, shares, forms, spellings, known, ignored)
     }
 
     /**
