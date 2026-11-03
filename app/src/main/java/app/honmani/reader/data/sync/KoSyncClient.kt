@@ -53,7 +53,13 @@ data class RemoteProgress(
     val timestamp: Long?,
 )
 
-class KoSyncException(val reason: Reason, message: String, cause: Throwable? = null) : IOException(message, cause) {
+class KoSyncException(
+    val reason: Reason,
+    message: String,
+    cause: Throwable? = null,
+    /** The HTTP status the server answered, if it did. */
+    val status: Int? = null,
+) : IOException(message, cause) {
     enum class Reason {
         /** Wrong user name or password. */
         UNAUTHORIZED,
@@ -236,6 +242,7 @@ class KoSyncClient(
     private fun unexpected(status: Int) = KoSyncException(
         if (status == 404 || status in 300..399) KoSyncException.Reason.NETWORK else KoSyncException.Reason.SERVER,
         "The server answered $status",
+        status = status,
     )
 
     @Serializable

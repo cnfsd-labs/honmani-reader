@@ -135,6 +135,12 @@ Honmani offline, open the book in KOReader at its older place and close it, reco
 book in Honmani: it asks "Where to continue?"; "Stay at …" keeps Honmani's page and KOReader
 offers it next time, "Go to …" jumps back.
 
+Sync status: with sync signed in, Settings → Reading progress sync shows "Last synced … ago"
+(or "Not synced yet"). Turn the server off (or leave the network) and turn a page or open a
+book: Settings says "Last attempt failed …: server unreachable" (other reasons: wrong login,
+HTTP status), and in that book the reader menu (tap the bottom strip) starts with "Progress sync
+failed: …"; other books show no hint. When the server is back, the next sync clears both.
+
 ## Word marks and known words
 
 Reader settings → Mark words. "Learning" (the default): look up a word, turn a page or two and

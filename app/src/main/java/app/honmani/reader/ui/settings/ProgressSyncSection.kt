@@ -42,15 +42,33 @@ fun ProgressSyncSection() {
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val settings = container.koSyncSettings
     val account by settings.account.collectAsStateWithLifecycle()
+    val status by container.koSyncStatus.state.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf(false) }
 
     ListItem(
         headlineContent = { Text(stringResource(R.string.sync_title)) },
         supportingContent = {
-            Text(
-                account?.let { stringResource(R.string.sync_signed_in, it.username, it.server) }
-                    ?: stringResource(R.string.sync_off),
-            )
+            Column {
+                Text(
+                    account?.let { stringResource(R.string.sync_signed_in, it.username, it.server) }
+                        ?: stringResource(R.string.sync_off),
+                )
+                if (account != null) {
+                    val failure = status.failure
+                    val ok = status.lastSuccessAt
+                    if (failure != null) {
+                        Text(
+                            stringResource(R.string.sync_status_failed, syncAgo(failure.at), syncFailureReason(failure)),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                    if (ok != null) {
+                        Text(stringResource(R.string.sync_status_ok, syncAgo(ok)))
+                    } else if (failure == null) {
+                        Text(stringResource(R.string.sync_status_never))
+                    }
+                }
+            }
         },
         modifier = Modifier.clickable { editing = true },
     )
@@ -65,6 +83,7 @@ fun ProgressSyncSection() {
             dismissButton = {
                 TextButton(onClick = {
                     settings.signOut()
+                    container.koSyncStatus.clear()
                     editing = false
                 }) { Text(stringResource(R.string.sync_sign_out)) }
             },

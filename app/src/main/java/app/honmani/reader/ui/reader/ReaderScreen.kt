@@ -68,6 +68,7 @@ import app.honmani.reader.ui.progress.ProgressTab
 import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
 import app.honmani.reader.ui.settings.SettingsScreen
+import app.honmani.reader.ui.settings.syncFailureReason
 import app.honmani.reader.ui.words.SessionSheet
 import app.honmani.reader.ui.words.WordsScreen
 import app.honmani.reader.ui.words.openInDictionary
@@ -450,8 +451,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
         val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
         if (menuOpen && !atLibrary) {
+            val syncState by container.koSyncStatus.state.collectAsStateWithLifecycle()
+            val syncFailure = syncState.failureFor(openTtuId)
             ReaderMenuSheet(
                 showProgress = appSettings.showProgress,
+                syncFailure = syncFailure?.let { syncFailureReason(it) },
                 onContents = {
                     viewModel.closeMenu()
                     viewModel.ttuLibrary.openContents()

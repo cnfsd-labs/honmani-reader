@@ -35,6 +35,7 @@ class ProgressSyncTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var database: HonmaniDatabase
     private lateinit var settings: KoSyncSettings
+    private lateinit var status: KoSyncStatus
     private lateinit var sync: ProgressSync
     private lateinit var book: BookEntity
     private lateinit var document: String
@@ -59,6 +60,7 @@ class ProgressSyncTest {
         book = database.bookDao().find(id)!!
         settings = KoSyncSettings(context.getSharedPreferences("sync-test", Context.MODE_PRIVATE), PlainCipher)
         settings.signIn(KoSyncAccount(server.url, "reader", KoSyncAccount.userKey("secret")))
+        status = KoSyncStatus(context.getSharedPreferences("sync-status-test", Context.MODE_PRIVATE)) { clock }
         unsentFile = File(folder.root, "sync-unsent.json")
         sync = newSync(books)
     }
@@ -79,6 +81,7 @@ class ProgressSyncTest {
         unsent = UnsentPositions(unsentFile),
         pushDelayMs = 50,
         now = { clock },
+        status = status,
     )
 
     @After
@@ -210,6 +213,48 @@ class ProgressSyncTest {
 
         assertEquals("/body/DocFragment[1]/body/div[1]/p[2]/text()[2].1", waitForProgress()["progress"]!!.jsonPrimitive.content)
         waitFor { !unsentFile.exists() }
+    }
+
+    @Test
+    fun theStatusKeepsTheLastFailure_untilTheNextSuccess() = runBlocking {
+        assertNull(status.state.value.failure)
+
+        server.down = true
+        assertNull(pull(local = 7, savedAtMs = 1_000_000))
+        val failure = status.state.value.failure!!
+        assertEquals(SyncFailure.Kind.SERVER, failure.reason)
+        assertEquals(5L, failure.ttuId)
+        assertEquals(clock, failure.at)
+        assertNull(status.state.value.lastSuccessAt)
+
+        clock += 60_000
+        server.down = false
+        pull(local = 7, savedAtMs = 1_000_000)
+        assertNull(status.state.value.failure)
+        assertEquals(clock, status.state.value.lastSuccessAt)
+    }
+
+    @Test
+    fun aFailedPushIsRecordedAndASentPositionClearsIt() = runBlocking {
+        server.down = true
+        sync.onPosition(5, 12)
+        sync.flush()
+        waitFor { status.state.value.failure != null }
+        assertEquals(5L, status.state.value.failure!!.ttuId)
+
+        server.down = false
+        sync.resend()
+        waitForProgress()
+        waitFor { status.state.value.failure == null && status.state.value.lastSuccessAt != null }
+    }
+
+    @Test
+    fun signingOutForgetsTheStatus() {
+        status.succeeded()
+        // Let the sync start watching the account.
+        Thread.sleep(300)
+        settings.signOut()
+        waitFor { status.state.value.lastSuccessAt == null }
     }
 
     @Test

@@ -74,6 +74,7 @@ import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.sync.EpubPositions
 import app.honmani.reader.data.sync.KoSyncClient
 import app.honmani.reader.data.sync.KoSyncSettings
+import app.honmani.reader.data.sync.KoSyncStatus
 import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.sync.UnsentPositions
@@ -253,6 +254,8 @@ class AppContainer(context: Context) {
 
     val koSyncSettings: KoSyncSettings by lazy { KoSyncSettings(devicePreferences, credentialCipher) }
 
+    val koSyncStatus: KoSyncStatus by lazy { KoSyncStatus(devicePreferences) }
+
     /**
      * Over plain http, logins wait for the server to ask, per network, and never go on a
      * hotspot with a login page (see [LoginGate]).
@@ -274,6 +277,7 @@ class AppContainer(context: Context) {
             scope = applicationScope,
             device = "Honmani (${Build.MODEL})",
             unsent = UnsentPositions(File(appContext.filesDir, "sync-unsent.json")),
+            status = koSyncStatus,
         ).also { sync ->
             // Pages read without a connection go out when there is one again, or now.
             networkWatch.onAvailable(sync::resend)

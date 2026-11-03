@@ -62,6 +62,8 @@ class ProgressSync(
     private val pushDelayMs: Long = PUSH_DELAY_MS,
     private val pullTimeoutMs: Long = PULL_TIMEOUT_MS,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Records the last success and failure for Settings and the reader menu. */
+    private val status: KoSyncStatus? = null,
 ) {
     private class Document(val id: String, val positions: EpubPositions) {
         val total get() = positions.total.coerceAtLeast(1)
@@ -106,7 +108,10 @@ class ProgressSync(
         // account drops them.
         scope.launch {
             if (settings.account.value == null) unsent.clear() else unsent.all()
-            settings.account.map { it?.server to it?.username }.distinctUntilChanged().drop(1).collect { unsent.clear() }
+            settings.account.map { it?.server to it?.username }.distinctUntilChanged().drop(1).collect {
+                unsent.clear()
+                status?.clear()
+            }
         }
     }
 
@@ -132,6 +137,7 @@ class ProgressSync(
             withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
         } catch (e: IOException) {
             Log.i(TAG, "No progress sync for this book: ${e.message}")
+            status?.failed(e, ttuId)
             null
         } finally {
             lookup.cancel()
@@ -176,6 +182,7 @@ class ProgressSync(
     ): Found {
         val document = document(book) ?: return Found.None
         val remote = client.progress(account, document.id)
+        status?.succeeded()
         val (local, savedAt) = bookmark()
         local?.let { synchronized(synced) { synced[ttuId] = it } }
         if (remote == null || remote.deviceId == settings.deviceId) return Found.None
@@ -307,6 +314,7 @@ class ProgressSync(
                 send(account, position)
             } catch (e: IOException) {
                 Log.i(TAG, "Progress not sent, kept for later: ${e.message}")
+                status?.failed(e, position.ttuId)
                 return
             }
         }
@@ -314,6 +322,7 @@ class ProgressSync(
 
     private suspend fun send(account: KoSyncAccount, position: UnsentPosition) {
         val remote = client.progress(account, position.document)
+        status?.succeeded()
         val remoteAt = remote?.timestamp?.let { it * 1000 }
         if (remote != null && remote.deviceId != settings.deviceId && remoteAt != null && remoteAt > position.readAt) {
             // Another device saved a position after this one was read.
@@ -331,6 +340,7 @@ class ProgressSync(
             return
         }
         client.update(account, position.document, position.progress, position.percentage, device, settings.deviceId)
+        status?.succeeded()
         unsent.remove(position)
         synchronized(synced) { synced[position.ttuId] = position.characters }
     }

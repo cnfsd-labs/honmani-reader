@@ -16,6 +16,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -36,6 +37,8 @@ import app.honmani.reader.R
 @Composable
 fun ReaderMenuSheet(
     showProgress: Boolean,
+    /** Why the last progress sync for this book failed ("server unreachable"); null when it did not. */
+    syncFailure: String? = null,
     onContents: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -47,6 +50,14 @@ fun ReaderMenuSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         Column(modifier = Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
+            syncFailure?.let {
+                Text(
+                    stringResource(R.string.reader_menu_sync_failed, it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             ListItem(
                 leadingContent = { Icon(Icons.Filled.Menu, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_contents)) },
