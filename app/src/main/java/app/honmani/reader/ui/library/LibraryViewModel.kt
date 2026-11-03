@@ -21,6 +21,8 @@ import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.SampleBook
 import app.honmani.reader.data.opds.AutoImportStatus
+import app.honmani.reader.data.stats.FinishedBookEntity
+import app.honmani.reader.data.stats.FinishedBooks
 import app.honmani.reader.data.sync.SyncQuestion
 import app.honmani.reader.lookup.Romaji
 import app.honmani.reader.lookup.TextReading
@@ -162,6 +164,10 @@ class LibraryViewModel(
      * it), by content hash; the statistics, lookups and saved words stay. Off the main thread.
      */
     private val forgetDerivedData: (String) -> Unit = {},
+    /** Keeps a finished book that is removed, so the "books finished" counts don't drop. */
+    private val recordFinished: suspend (FinishedBookEntity) -> Unit = {},
+    /** Deletes a book's reading statistics (its reading days, by book id) and its finished record (by content hash). */
+    private val forgetStatistics: suspend (bookId: Long, contentHash: String) -> Unit = { _, _ -> },
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -432,7 +438,11 @@ class LibraryViewModel(
         }
     }
 
-    fun remove(id: Long) {
+    /**
+     * Removes a book. Its reading time, characters and the finished count stay in the statistics,
+     * unless [deleteStatistics]: then its reading days and finished record go too.
+     */
+    fun remove(id: Long, deleteStatistics: Boolean = false) {
         viewModelScope.launch {
             val book = dao.find(id) ?: return@launch
             book.ttuId?.let { ttuId ->
@@ -441,6 +451,11 @@ class LibraryViewModel(
                 } catch (_: TtuLibraryException) {
                     // The reader keeps an orphaned copy; harmless, and gone if it is reset.
                 }
+            }
+            if (deleteStatistics) {
+                forgetStatistics(book.id, book.contentHash)
+            } else if (FinishedBooks.isFinished(book)) {
+                recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
             }
             dao.delete(book.id)
             // A book from a catalogue stays removed: automatic imports skip it from now on.
@@ -507,6 +522,11 @@ class LibraryViewModel(
                                 ?: throw IOException("Cannot write $uri")
                             out.use { output -> file.inputStream().use { it.copyTo(output) } }
                         }
+                    },
+                    recordFinished = container.finishedBookDao::record,
+                    forgetStatistics = { bookId, hash ->
+                        container.readingDao.deleteBook(bookId)
+                        container.finishedBookDao.forget(hash)
                     },
                     forgetDerivedData = { hash ->
                         container.difficultyStore.forget(hash)

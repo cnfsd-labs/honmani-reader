@@ -33,6 +33,10 @@ interface ReadingDao {
         for (mark in marks) markRefoldExported(mark.bookId, mark.day, mark.seconds)
     }
 
+    /** Forgets all reading of a book (removed from the library with its statistics). */
+    @Query("DELETE FROM reading_day WHERE book_id = :bookId")
+    suspend fun deleteBook(bookId: Long)
+
     @Query("SELECT * FROM reading_day ORDER BY day")
     fun observeAll(): Flow<List<ReadingDayEntity>>
 

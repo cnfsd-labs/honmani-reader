@@ -29,6 +29,8 @@ import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewDao
 import app.honmani.reader.data.review.ReviewLogEntity
+import app.honmani.reader.data.stats.FinishedBookDao
+import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDao
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.WordDao
@@ -53,6 +55,7 @@ import app.honmani.reader.data.words.WordLookupEntity
         OpdsCatalogEntity::class,
         RemovedBookEntity::class,
         ReadingDayEntity::class,
+        FinishedBookEntity::class,
         GlossaryPresetEntity::class,
         ReviewCardEntity::class,
         ReviewLogEntity::class,
@@ -80,6 +83,8 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun opdsCatalogDao(): OpdsCatalogDao
 
     abstract fun readingDao(): ReadingDao
+
+    abstract fun finishedBookDao(): FinishedBookDao
 
     abstract fun reviewDao(): ReviewDao
 

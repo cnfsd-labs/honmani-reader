@@ -11,6 +11,7 @@ import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
+import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.WordEntity
@@ -66,6 +67,15 @@ interface BackupDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertRemovedBooks(removed: List<RemovedBookEntity>)
+
+    @Query("SELECT * FROM finished_book ORDER BY content_hash")
+    suspend fun finishedBooks(): List<FinishedBookEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertFinishedBooks(books: List<FinishedBookEntity>)
+
+    @Query("UPDATE finished_book SET finished_at = :finishedAt WHERE content_hash = :contentHash AND finished_at IS NULL")
+    suspend fun setFinishedDateIfUnknown(contentHash: String, finishedAt: Long)
 
     @Query("SELECT * FROM opds_catalog ORDER BY added_at, id")
     suspend fun catalogs(): List<OpdsCatalogEntity>

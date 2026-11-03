@@ -1,6 +1,9 @@
 package app.honmani.reader.ui.stats
 
 import app.honmani.reader.data.export.RefoldExport
+import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.WordCounts
@@ -47,6 +50,8 @@ class StatisticsViewModelTest {
 
     private fun viewModel(
         days: List<ReadingDayEntity> = emptyList(),
+        books: List<BookEntity> = emptyList(),
+        recorded: List<FinishedBookEntity> = emptyList(),
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
         goalMinutes: Int? = null,
         writeRefoldFile: suspend (String, String) -> String = { name, _ -> name },
@@ -54,7 +59,8 @@ class StatisticsViewModelTest {
     ) = StatisticsViewModel(
         days = flowOf(days),
         bookDays = { flowOf(emptyList()) },
-        books = flowOf(emptyList()),
+        books = flowOf(books),
+        recordedFinished = flowOf(recorded),
         lookups = { from -> lookupTimes.map { times -> times.count { from == null || it >= from } } },
         bookLookups = { flowOf(0) },
         words = flowOf(WordCounts()),
@@ -68,6 +74,31 @@ class StatisticsViewModelTest {
     )
 
     private fun millis(date: LocalDate, hour: Int) = date.atTime(hour, 0).atZone(zone).toInstant().toEpochMilli()
+
+    @Test
+    fun booksFinishedCountsRemovedBooksToo_butNotTwice() = runTest {
+        fun book(hash: String, finishedAt: Long?, progress: Float = 0f) =
+            BookEntity(contentHash = hash, title = hash, format = BookFormat.EPUB, fileName = "$hash.epub", addedAt = 0, finishedAt = finishedAt, progress = progress)
+        val viewModel = viewModel(
+            books = listOf(book("a", millis(today, 9)), book("b", null, progress = 1f)),
+            // "a" was removed and added again; "c" and "d" are gone, "d" long ago.
+            recorded = listOf(
+                FinishedBookEntity("a", "a", millis(today.minusDays(3), 9)),
+                FinishedBookEntity("c", "c", millis(today.minusDays(2), 9)),
+                FinishedBookEntity("d", "d", millis(today.minusDays(40), 9)),
+            ),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+
+        suspend fun finished(period: StatsPeriod): Int {
+            viewModel.setPeriod(period)
+            return viewModel.uiState.filterNotNull().first { it.summary.period == period }.booksFinished
+        }
+
+        assertEquals(4, finished(StatsPeriod.ALL))
+        assertEquals(2, finished(StatsPeriod.WEEK))
+        assertEquals(0, finished(StatsPeriod.TODAY))
+    }
 
     @Test
     fun theGoalShowsOnlyWhileItIsOn() = runTest {

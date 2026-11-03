@@ -3,6 +3,9 @@ package app.honmani.reader.ui.progress
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.stats.FinishedBookEntity
+import app.honmani.reader.data.stats.MilestoneKind
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
 import java.time.LocalDate
@@ -42,15 +45,34 @@ class ProgressViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun viewModel() = ProgressViewModel(
+    private fun viewModel(
+        books: List<BookEntity> = emptyList(),
+        recorded: List<FinishedBookEntity> = emptyList(),
+    ) = ProgressViewModel(
         days = days,
-        books = flowOf(emptyList<BookEntity>()),
+        books = flowOf(books),
+        recordedFinished = flowOf(recorded),
         wordsLearned = flowOf(0),
         ankiCards = flowOf(0),
         store = store,
         today = { today },
         zone = { ZoneId.of("Asia/Tokyo") },
     )
+
+    @Test
+    fun removedFinishedBooksStillCountTowardsTheBookMilestones() = runTest {
+        val kept = BookEntity(contentHash = "a", title = "a", format = BookFormat.EPUB, fileName = "a.epub", addedAt = 0, finishedAt = 1L)
+        val alone = viewModel(books = listOf(kept))
+        val withRemoved = viewModel(books = listOf(kept), recorded = listOf(FinishedBookEntity("a", "a", 1L), FinishedBookEntity("b", "b", 2L)))
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { alone.uiState.collect {} }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { withRemoved.uiState.collect {} }
+
+        fun finished(vm: ProgressViewModel) = vm.uiState.value!!.milestones.first { it.kind == MilestoneKind.BOOKS }.current
+
+        // "a" is in the library and recorded: once. "b" was removed.
+        assertEquals(1L, finished(alone))
+        assertEquals(2L, finished(withRemoved))
+    }
 
     @Test
     fun onlyMilestonesReachedAfterTheFirstLookAreNews() = runTest {

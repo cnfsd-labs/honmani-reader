@@ -10,6 +10,8 @@ import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.review.ReviewSummary
 import app.honmani.reader.data.stats.DayTotal
+import app.honmani.reader.data.stats.FinishedBookEntity
+import app.honmani.reader.data.stats.FinishedBooks
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.Progression
@@ -59,6 +61,7 @@ private data class Library(
     val grades: Map<String, StoredDifficulty>,
     val skill: SkillEstimate,
     val reviews: ReviewSummary,
+    val recorded: List<FinishedBookEntity>,
 )
 
 data class FittingBook(val id: Long, val title: String, val difficulty: Int)
@@ -76,16 +79,18 @@ class ProgressViewModel(
     /** The skill; by default from speed alone (no words read). */
     private val skill: Flow<SkillEstimate> = SkillTracker(days, books, grades, flowOf(WordKnowledge.EMPTY), today = today).estimate,
     private val reviews: Flow<ReviewSummary> = flowOf(ReviewSummary()),
+    /** Finished books removed from the library; they still count as finished. */
+    private val recordedFinished: Flow<List<FinishedBookEntity>> = flowOf(emptyList()),
 ) : ViewModel() {
-    private val library = combine(books, grades, skill, reviews, ::Library)
+    private val library = combine(books, grades, skill, reviews, recordedFinished, ::Library)
 
     val uiState: StateFlow<ProgressUiState?> =
-        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews), learned, anki, seen ->
+        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews, recorded), learned, anki, seen ->
             val today = today()
             val zone = zone()
             val data = ProgressionData(
                 days = rows.map { DayTotal(LocalDate.parse(it.day), it.seconds, it.characters) },
-                finished = books.filter { it.finishedAt != null || it.progress >= 1f }.map { book ->
+                finished = FinishedBooks.merge(books, recorded).map { book ->
                     book.finishedAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
                 },
                 wordsLearned = learned,
@@ -138,6 +143,7 @@ class ProgressViewModel(
                         knowledge.progress.values.count { it.steps >= WordProgress.KNOWN }
                     },
                     ankiCards = container.wordRepository.ankiCards,
+                    recordedFinished = container.finishedBookDao.observeAll(),
                     store = container.milestoneStore,
                     grades = container.difficultyStore.grades,
                     skill = container.skillTracker.estimate,

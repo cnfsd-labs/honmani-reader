@@ -124,7 +124,8 @@
     <string name="library_reset_failed">The progress of “%1$s” could not be reset. Try again in a moment.</string>
     <string name="action_remove">Remove</string>
     <string name="remove_book_title">Remove “%1$s”?</string>
-    <string name="remove_book_message">The book and your reading position are deleted from Honmani. The file you added it from stays on your phone.</string>
+    <string name="remove_book_message">The book and your reading position are deleted from Honmani. The file you added it from stays on your phone. Your reading time, words and statistics stay.</string>
+    <string name="remove_book_statistics">Also delete this book’s reading statistics</string>
 
     <string name="add_book_files">Files on this phone</string>
     <string name="add_book_files_details">EPUB or text files (Aozora Bunko)</string>

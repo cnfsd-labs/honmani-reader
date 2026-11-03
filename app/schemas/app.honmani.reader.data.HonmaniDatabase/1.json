@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "56d16a7baa479457a863c886e4c675e9",
+    "identityHash": "10618ed7f5cc7cdc749619e6becc49bf",
     "entities": [
       {
         "tableName": "dictionary",
@@ -1015,6 +1015,35 @@
         ]
       },
       {
+        "tableName": "finished_book",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`content_hash` TEXT NOT NULL, `title` TEXT NOT NULL, `finished_at` INTEGER, PRIMARY KEY(`content_hash`))",
+        "fields": [
+          {
+            "fieldPath": "contentHash",
+            "columnName": "content_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "finishedAt",
+            "columnName": "finished_at",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "content_hash"
+          ]
+        }
+      },
+      {
         "tableName": "glossary_preset",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`dictionary_id` INTEGER NOT NULL, `preset` BLOB NOT NULL, PRIMARY KEY(`dictionary_id`), FOREIGN KEY(`dictionary_id`) REFERENCES `dictionary`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
@@ -1274,7 +1303,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '56d16a7baa479457a863c886e4c675e9')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '10618ed7f5cc7cdc749619e6becc49bf')"
     ]
   }
 }

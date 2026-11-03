@@ -47,6 +47,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -59,6 +60,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -331,7 +333,8 @@ private fun LibraryContent(
     autoImport: AutoImportStatus? = null,
     onAdd: () -> Unit,
     onOpen: (id: Long) -> Unit,
-    onRemove: (id: Long) -> Unit,
+    /** Removes a book; its reading statistics too if the flag is set. */
+    onRemove: (id: Long, deleteStatistics: Boolean) -> Unit,
     onResetProgress: (id: Long) -> Unit,
     onMarkFinished: (id: Long) -> Unit,
     onFilter: (ReadingStatus?) -> Unit,
@@ -552,14 +555,31 @@ private fun LibraryContent(
     }
 
     pendingRemove?.let { book ->
+        var deleteStatistics by remember(book.id) { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { pendingRemove = null },
             title = { Text(stringResource(R.string.remove_book_title, book.title)) },
-            text = { Text(stringResource(R.string.remove_book_message)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.remove_book_message))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .toggleable(deleteStatistics, role = Role.Checkbox) { deleteStatistics = it },
+                    ) {
+                        Checkbox(checked = deleteStatistics, onCheckedChange = null)
+                        Text(
+                            stringResource(R.string.remove_book_statistics),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onRemove(book.id)
+                        onRemove(book.id, deleteStatistics)
                         pendingRemove = null
                         // Removing deletes the book's files: no undo, a confirmation only.
                         if (removedMessage != null) scope.launch { snackbarHostState.showSnackbar(removedMessage) }
@@ -1145,7 +1165,7 @@ private fun LibraryPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onAdd = {},
             onOpen = {},
-            onRemove = {},
+            onRemove = { _, _ -> },
             onResetProgress = {},
             onMarkFinished = {},
             onFilter = {},
@@ -1164,7 +1184,7 @@ private fun EmptyLibraryPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onAdd = {},
             onOpen = {},
-            onRemove = {},
+            onRemove = { _, _ -> },
             onResetProgress = {},
             onMarkFinished = {},
             onFilter = {},

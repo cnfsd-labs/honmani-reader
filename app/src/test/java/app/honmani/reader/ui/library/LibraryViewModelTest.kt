@@ -6,6 +6,7 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
+import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.TestBooks
 import app.honmani.reader.ui.reader.LibraryMessage
@@ -336,6 +337,50 @@ class LibraryViewModelTest {
         val remove = page.commands.single { it.first == "remove" }.second
         assertEquals(book.ttuId, remove["ttuId"]!!.jsonPrimitive.long)
         assertNull(dao.find(book.id))
+    }
+
+    private fun viewModelRecording(
+        recorded: MutableList<FinishedBookEntity>,
+        forgotten: MutableList<Pair<Long, String>>,
+    ) = LibraryViewModel(
+        dao = dao,
+        importer = importer,
+        ttu = ttu,
+        openFile = { uri -> files[uri.lastPathSegment]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) } },
+        now = { 42L },
+        recordFinished = { recorded += it },
+        forgetStatistics = { id, hash -> forgotten += id to hash },
+    )
+
+    @Test
+    fun removingAFinishedBookRecordsItForTheStatistics_anUnfinishedOneDoesNot() = runBlocking {
+        val recorded = mutableListOf<FinishedBookEntity>()
+        viewModel = viewModelRecording(recorded, mutableListOf())
+        val finished = addAndWait("neko.epub", TestBooks.epub())
+        val reading = addAndWait("botchan.epub", TestBooks.epub(title = "坊っちゃん", author = "夏目漱石"))
+        dao.setFinished(finished.id, 1_234L)
+
+        viewModel.remove(reading.id)
+        eventually { (dao.find(reading.id) == null).takeIf { it } }
+        viewModel.remove(finished.id)
+        eventually { (dao.find(finished.id) == null).takeIf { it } }
+
+        assertEquals(listOf(FinishedBookEntity(finished.contentHash, finished.title, 1_234L)), recorded)
+    }
+
+    @Test
+    fun removingABookWithItsStatisticsDeletesThemInsteadOfRecordingIt() = runBlocking {
+        val recorded = mutableListOf<FinishedBookEntity>()
+        val forgotten = mutableListOf<Pair<Long, String>>()
+        viewModel = viewModelRecording(recorded, forgotten)
+        val book = addAndWait("neko.epub", TestBooks.epub())
+        dao.setFinished(book.id, 1_234L)
+
+        viewModel.remove(book.id, deleteStatistics = true)
+        eventually { (dao.find(book.id) == null).takeIf { it } }
+
+        assertEquals(emptyList<FinishedBookEntity>(), recorded)
+        assertEquals(listOf(book.id to book.contentHash), forgotten)
     }
 
     @Test

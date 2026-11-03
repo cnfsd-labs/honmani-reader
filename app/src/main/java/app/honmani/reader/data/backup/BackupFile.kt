@@ -45,6 +45,8 @@ data class BackupFile(
     /** Catalogue books the reader removed, so automatic imports don't bring them back. */
     val removedBooks: List<BackupRemovedBook> = emptyList(),
     val readingDays: List<BackupReadingDay> = emptyList(),
+    /** Finished books removed from the library, so the finished counts keep them. */
+    val finishedBooks: List<BackupFinishedBook> = emptyList(),
     val lookupEvents: List<BackupLookupEvent> = emptyList(),
     val words: List<BackupWord> = emptyList(),
     /** Book servers, without their passwords. */
@@ -100,6 +102,10 @@ data class BackupBookDetails(
 
 @Serializable
 data class BackupRemovedBook(val source: String, val sourceId: String, val removedAt: Long)
+
+/** A finished book no longer in the library, by content hash. */
+@Serializable
+data class BackupFinishedBook(val hash: String, val title: String, val finishedAt: Long? = null)
 
 @Serializable
 data class BackupReadingDay(

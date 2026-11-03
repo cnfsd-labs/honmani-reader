@@ -11,6 +11,9 @@ import app.honmani.reader.data.difficulty.GradingState
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.stats.BookReading
+import app.honmani.reader.data.stats.FinishedBook
+import app.honmani.reader.data.stats.FinishedBookEntity
+import app.honmani.reader.data.stats.FinishedBooks
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.GoalProgress
 import app.honmani.reader.data.stats.ReadingGoal
@@ -115,6 +118,8 @@ class StatisticsViewModel(
     private val markRefoldExported: suspend (List<RefoldExport.Mark>) -> Unit = {},
     /** Writes the Refold file where it can be shared and returns its content URI. */
     private val writeRefoldFile: suspend (name: String, text: String) -> String = { name, _ -> name },
+    /** Finished books removed from the library; they still count as finished. */
+    private val recordedFinished: Flow<List<FinishedBookEntity>> = flowOf(emptyList()),
 ) : ViewModel() {
     /** What the Refold export dialog tells: the day of the last export and the rows a new one would hold. */
     data class RefoldInfo(val lastExport: LocalDate?, val newRows: Int)
@@ -158,16 +163,20 @@ class StatisticsViewModel(
             lookups(from).map { Triple(period, today, it) }
         }
 
+    /** The library, and its finished books together with the recorded ones of books removed since. */
+    private val libraryBooks: Flow<Pair<List<BookEntity>, List<FinishedBook>>> =
+        combine(books, recordedFinished) { books, recorded -> books to FinishedBooks.merge(books, recorded) }
+
     val uiState: StateFlow<StatisticsUiState?> =
-        combine(days, books, periodLookups, words, goalMinutes) { days, books, (period, today, lookups), words, goalMinutes ->
+        combine(days, libraryBooks, periodLookups, words, goalMinutes) { days, (books, finished), (period, today, lookups), words, goalMinutes ->
             val zone = zone()
             val from = firstDay(period, today)
             fun inPeriod(millis: Long) = from == null || !Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().isBefore(from)
             StatisticsUiState(
                 summary = ReadingStats.period(days, today, period),
-                booksFinished = books.count { book ->
+                booksFinished = finished.count { book ->
                     val finishedAt = book.finishedAt
-                    if (finishedAt != null) inPeriod(finishedAt) else from == null && book.progress >= 1f
+                    if (finishedAt != null) inPeriod(finishedAt) else from == null
                 },
                 lookups = lookups,
                 words = words,
@@ -308,6 +317,7 @@ class StatisticsViewModel(
                     setLastRefoldExport = container.refoldExportSettings::setLastExport,
                     markRefoldExported = container.readingDao::markRefoldExported,
                     writeRefoldFile = { name, text -> writeShareFile(application, "refold", name, text) },
+                    recordedFinished = container.finishedBookDao.observeAll(),
                 )
             }
         }

@@ -15,6 +15,7 @@ import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordLookupEntity
 import java.time.ZoneId
 import app.honmani.reader.data.opds.OpdsCatalogEntity
+import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookedUpWord
@@ -300,6 +301,24 @@ class BackupTest {
         val again = phone.backup.restore(backup)
         assertEquals(0, again.wordsAdded)
         assertEquals(5, phone.logs().size)
+    }
+
+    @Test
+    fun finishedBooksRemovedFromTheLibraryComeBackOnceAndKeepTheirDate() = runTest {
+        val old = Phone("old")
+        old.database.finishedBookDao().record(FinishedBookEntity("gone", "Gone", 5_000))
+        old.database.finishedBookDao().record(FinishedBookEntity("both", "Both", null))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+        new.database.finishedBookDao().record(FinishedBookEntity("both", "Both", 7_000))
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(
+            listOf(FinishedBookEntity("both", "Both", 7_000), FinishedBookEntity("gone", "Gone", 5_000)),
+            new.database.backupDao().finishedBooks(),
+        )
     }
 
     @Test

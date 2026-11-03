@@ -65,6 +65,7 @@ import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.ReadingStore
+import app.honmani.reader.data.stats.FinishedBookDao
 import app.honmani.reader.data.stats.ReadingTracker
 import app.honmani.reader.data.stats.SkillTracker
 import app.honmani.reader.data.sync.EpubPositions
@@ -338,6 +339,9 @@ class AppContainer(context: Context) {
     val ttuLibrary = TtuLibrary()
 
     val readingDao: ReadingDao by lazy { database.readingDao() }
+
+    /** Finished books removed from the library, kept for the "books finished" counts. */
+    val finishedBookDao: FinishedBookDao by lazy { database.finishedBookDao() }
 
     val milestoneStore: MilestoneStore by lazy { MilestoneStore(devicePreferences) }
 
