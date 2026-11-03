@@ -201,6 +201,31 @@ class TtuLibraryTest {
     }
 
     @Test
+    fun openHit_savesTheBookmarkThenReloadsThePageToMarkTheHit() = runTest {
+        library.attach(page)
+        val opening = async { library.openHit(5, 1234, 0.25, "吾輩は", "猫") }
+        runCurrent()
+
+        assertTrue(page.scripts.last().startsWith("window.honmaniLibrary && honmaniLibrary.setBookmark("))
+        val arguments = page.lastArguments()
+        assertEquals(5L, arguments["ttuId"]!!.jsonPrimitive.long)
+        assertEquals(1234L, arguments["characters"]!!.jsonPrimitive.long)
+        library.onMessage(LibraryMessage.BookmarkSet(page.lastRequestId()))
+        opening.await()
+
+        assertTrue(page.scripts.last().startsWith("window.honmaniSearch ? honmaniSearch.reload("))
+        val hit = Json.parseToJsonElement(page.scripts.last().substringAfter("honmaniSearch.reload(").substringBefore(") :")).jsonObject
+        assertEquals("吾輩は", hit["before"]!!.jsonPrimitive.content)
+        assertEquals("猫", hit["match"]!!.jsonPrimitive.content)
+        // The page being replaced gets no further commands.
+        val next = async { library.open(5) }
+        runCurrent()
+        assertTrue(page.scripts.none { it.contains("honmaniLibrary.open(") })
+        library.attach(FakePage())
+        next.await()
+    }
+
+    @Test
     fun afterAReload_commandsWaitForTheNewPage() = runTest {
         library.attach(page)
         library.reload()

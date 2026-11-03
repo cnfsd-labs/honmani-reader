@@ -39,6 +39,7 @@ import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookImporter
+import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.NetworkWatch
 import app.honmani.reader.data.opds.KeystoreCredentialCipher
@@ -432,6 +433,21 @@ class AppContainer(context: Context) {
             // Stored as UTF-8 (see TextEncoding).
             BookFormat.TXT -> if (file.exists()) sequenceOf(RubyText(file.readText())) else null
         }
+    }
+
+    /**
+     * A book's text for the in-book search (see [BookText]), read off the main thread; null if
+     * the library has no such book or its file can't be read.
+     */
+    suspend fun searchableBook(ttuId: Long): BookText? = withContext(Dispatchers.IO) {
+        val book = bookDao.findByTtuId(ttuId) ?: return@withContext null
+        val file = bookImporter.bookFile(book)
+        val documents = when (book.format) {
+            BookFormat.EPUB -> EpubPositions.texts(file, withoutParentheses = true)?.map { it.text }
+            // Stored as UTF-8 (see TextEncoding).
+            BookFormat.TXT -> if (file.exists()) listOf(file.readText()) else null
+        }
+        documents?.let(::BookText)
     }
 
     /**

@@ -30,6 +30,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -76,6 +77,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /**
  * The app's home: the library, words, dictionaries and settings tabs, and ッツ Ebook Reader with
@@ -162,6 +164,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var readerSettings by rememberSaveable { mutableStateOf(false) }
     // The words of this reading session, from the reader's bottom menu.
     var sessionShown by rememberSaveable { mutableStateOf(false) }
+    // The search in the open book, from the reader's bottom menu; ttu's id of the book.
+    val scope = rememberCoroutineScope()
+    var searchShown by rememberSaveable { mutableStateOf(false) }
+    var openTtuId by rememberSaveable { mutableStateOf<Long?>(null) }
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -247,6 +253,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 ttuLibrary = viewModel.ttuLibrary,
                 booksDir = viewModel.booksDir,
                 onBookChanged = {
+                    openTtuId = it
                     viewModel.onBookChanged(it)
                     tracker.setBook(it)
                 },
@@ -448,6 +455,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     viewModel.closeMenu()
                     viewModel.ttuLibrary.openContents()
                 },
+                onSearch = {
+                    viewModel.closeMenu()
+                    searchShown = true
+                },
                 onSettings = {
                     viewModel.closeMenu()
                     readerSettings = true
@@ -465,6 +476,25 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     viewModel.ttuLibrary.reload()
                 },
                 onDismiss = viewModel::closeMenu,
+            )
+        }
+        val searchedBook = openTtuId
+        if (searchShown && searchedBook != null && !atLibrary) {
+            BookSearchScreen(
+                loadText = { container.searchableBook(searchedBook) },
+                onOpenHit = { hit, total ->
+                    searchShown = false
+                    scope.launch {
+                        viewModel.ttuLibrary.openHit(
+                            ttuId = searchedBook,
+                            characters = hit.characters.toLong(),
+                            progress = if (total == 0) 0.0 else hit.characters.toDouble() / total,
+                            before = hit.hint,
+                            match = hit.match,
+                        )
+                    }
+                },
+                onClose = { searchShown = false },
             )
         }
         if (sessionShown) {

@@ -206,11 +206,20 @@ export the same day holds just the minutes read since ("Export everything again"
 ## Reader bottom menu
 
 In a book, tap the bottom edge of the page (the thin strip under the text). A sheet opens with
-Contents (ttu's table of contents opens), Reader settings, Words from this session, Show progress
+Contents (ttu's table of contents opens), Search in book, Reader settings, Words from this session, Show progress
 (a switch; the page reloads and the counter appears or disappears) and Close book (back to the
 book list). A tap on the text still looks a word up. The tap on the bottom edge no longer hides the
 progress counter. Check that the strip is easy to hit with the gesture bar and that page turns at
 the left and right edges still work.
+
+## Search in the book
+
+Reader menu, Search in book: type a word that occurs several times. The list shows each match in
+bold with the text around it and its place in the book (%), in reading order; furigana is not part
+of the text matched. Tap a later match: the book opens there and the match is marked yellow for a
+moment (also when it is further down a long paragraph, in vertical and horizontal text, paginated
+and continuous). Back from the search returns to the page you were on. Check a search in a long book
+for speed and that the keyboard does not cover the list.
 
 ## Known limitations (no need to report)
 

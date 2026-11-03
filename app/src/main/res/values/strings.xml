@@ -280,6 +280,16 @@
     <string name="network_purpose_voice">Google voice</string>
     <string name="reader_menu_contents">Contents</string>
     <string name="reader_menu_settings">Reader settings</string>
+    <string name="reader_menu_search">Search in book</string>
+    <string name="book_search_hint">Search in this book</string>
+    <string name="book_search_none">Nothing found.</string>
+    <string name="book_search_unavailable">This book can\'t be searched.</string>
+    <string name="book_search_more">Showing the first %1$d matches. Type more to narrow it down.</string>
+    <string name="book_search_position">%1$d%%</string>
+    <plurals name="book_search_count">
+        <item quantity="one">%1$d match</item>
+        <item quantity="other">%1$d matches</item>
+    </plurals>
     <string name="reader_menu_close_book">Close book</string>
     <string name="reader_menu_progress">Show progress</string>
     <string name="reader_menu_progress_details">The character count and percentage at the bottom of the page. The page reloads.</string>

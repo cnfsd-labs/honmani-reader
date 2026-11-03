@@ -163,9 +163,10 @@ class EpubPositions private constructor(
         /**
          * The text ttu shows, one per spine document in reading order, with the characters that
          * have furigana marked and a line break after each paragraph. Ruby readings are left out,
-         * so 漢字 with furigana stays one word. Null if it is not a readable EPUB.
+         * so 漢字 with furigana stays one word; with [withoutParentheses] the fallback parentheses
+         * (`rp`) are left out too. Null if it is not a readable EPUB.
          */
-        fun texts(file: File): List<RubyText>? = try {
+        fun texts(file: File, withoutParentheses: Boolean = false): List<RubyText>? = try {
             ZipFile(file).use { zip ->
                 val spine = spineOf(zip)
                 if (spine.isEmpty()) return null
@@ -178,7 +179,7 @@ class EpubPositions private constructor(
                             if (child.isText) {
                                 if (inRuby) ruby.set(text.length, text.length + child.text!!.length)
                                 text.append(child.text)
-                            } else if (!skipped(child)) {
+                            } else if (!skipped(child) && !(withoutParentheses && child.name == "rp")) {
                                 visit(child, inRuby || child.name == "ruby")
                                 // A paragraph ends a sentence even without 。 (「そうか」 on a line of its own).
                                 if (child.name in BLOCKS) text.append('\n')

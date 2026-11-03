@@ -169,6 +169,23 @@ class TtuLibrary(
         page.value?.evaluate("window.honmaniReaderMenu && honmaniReaderMenu.openContents();")
     }
 
+    /**
+     * Opens the book at a search hit (`book-search.js`): saves the hit's reading position as
+     * ttu's bookmark and reloads the page, where ttu restores it in either reading mode. After
+     * the reload the page marks the hit for a moment, found by the letters [before] it and the
+     * [match] itself. The page counts as gone at once, as with [reload].
+     */
+    suspend fun openHit(ttuId: Long, characters: Long, progress: Double, before: String, match: String) {
+        setBookmark(ttuId, characters, progress)
+        val current = page.value ?: return
+        detach()
+        val hit = Json.encodeToString(buildJsonObject {
+            put("before", before)
+            put("match", match)
+        })
+        current.evaluate("window.honmaniSearch ? honmaniSearch.reload($hit) : location.reload();")
+    }
+
     /** The app's accent colours (`#rrggbb`), for ttu's settings; kept for later pages. */
     fun setAccent(accent: String, onAccent: String) {
         accentScript = "window.honmaniSetAccent && honmaniSetAccent(${JsonPrimitive(accent)}, ${JsonPrimitive(onAccent)});"

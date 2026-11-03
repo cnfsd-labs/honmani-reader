@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -28,7 +29,7 @@ import app.honmani.reader.R
 
 /**
  * The reader's bottom menu, opened by a tap on the footer of the page (`reader-menu.js`): the
- * table of contents, Honmani's reader settings, the words of this session, leaving the book and
+ * table of contents, the search in the book, Honmani's reader settings, the words of this session, leaving the book and
  * the progress counter.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +37,7 @@ import app.honmani.reader.R
 fun ReaderMenuSheet(
     showProgress: Boolean,
     onContents: () -> Unit,
+    onSearch: () -> Unit,
     onSettings: () -> Unit,
     onSessionWords: () -> Unit,
     onCloseBook: () -> Unit,
@@ -50,6 +52,12 @@ fun ReaderMenuSheet(
                 headlineContent = { Text(stringResource(R.string.reader_menu_contents)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onContents),
+            )
+            ListItem(
+                leadingContent = { Icon(Icons.Filled.Search, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_search)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onSearch),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },

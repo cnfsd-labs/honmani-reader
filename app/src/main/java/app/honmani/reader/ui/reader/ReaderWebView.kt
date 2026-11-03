@@ -109,6 +109,7 @@ private val DOCUMENT_START_SCRIPTS = listOf(
     "honmani/reader-menu.js",
     "honmani/chapter-end.js",
     "honmani/word-marks.js",
+    "honmani/book-search.js",
 )
 
 /**

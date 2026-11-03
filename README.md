@@ -8,6 +8,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   Yomitan dictionary
 - EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts;
   pages turn with a tap, a swipe or the volume buttons
+- Search in the open book (reader menu): every match with its surroundings and place in the book; a tap opens
+  the book there and marks it
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap
 - Marks in the book on the words you are learning or have not met yet, and a list of the words
   a book holds that you do not know
