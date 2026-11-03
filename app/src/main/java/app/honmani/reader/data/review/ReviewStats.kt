@@ -54,8 +54,8 @@ object ReviewStats {
         return reviews.count { it.grade != Grade.AGAIN.value }.toDouble() / reviews.size to reviews.size
     }
 
-    fun summary(logs: List<ReviewLogEntity>, cardsInReview: Int, anyCard: Boolean, newToday: Int, now: Long, zone: ZoneId): ReviewSummary {
-        val dayStart = ReviewRules.startOfDay(now, zone)
+    fun summary(logs: List<ReviewLogEntity>, cardsInReview: Int, anyCard: Boolean, newToday: Int, now: Long, zone: ZoneId, startHour: Int = 0): ReviewSummary {
+        val dayStart = ReviewRules.startOfDay(now, zone, startHour = startHour)
         val retention = retention(logs, now - RETENTION_DAYS * ReviewRules.DAY_MS)
         return ReviewSummary(
             today = logs.count { it.at >= dayStart },

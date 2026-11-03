@@ -1,14 +1,15 @@
 package app.honmani.reader.data.review
 
+import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordScheduler
-import java.time.Instant
 import java.time.ZoneId
 
 /**
  * When reading and lookups count as evidence about a word's memory, and how a grade changes a
  * card. Pure functions of the card and the clock, so the rules are testable at any time and zone.
- * Days are local calendar days of [ZoneId], so a day is 23 or 25 hours long when the clock changes.
+ * Days are local calendar days of [ZoneId] starting at `startHour` (Settings → "Day starts at",
+ * see [DayClock]; 0 is midnight), so a day is 23 or 25 hours long when the clock changes.
  *
  * Evidence: reading a due-ish word without looking it up is a pass with a small gain (Hard);
  * looking it up in the reader is a lapse (Again). Both only touch cards of Honmani's own
@@ -48,6 +49,7 @@ object ReviewRules {
         zone: ZoneId,
         real: Boolean,
         inSession: Boolean = false,
+        startHour: Int = 0,
     ): ReviewCardEntity {
         val reviewed = card.stability > 0 && card.lastReviewAt != null
         val memory = if (reviewed) {
@@ -60,9 +62,9 @@ object ReviewRules {
             Fsrs.first(grade)
         }
         val due = if (grade == Grade.AGAIN) {
-            if (inSession) now + AGAIN_DELAY_MS else startOfDay(now, zone, 1)
+            if (inSession) now + AGAIN_DELAY_MS else startOfDay(now, zone, 1, startHour)
         } else {
-            startOfDay(now, zone, Fsrs.interval(memory.stability))
+            startOfDay(now, zone, Fsrs.interval(memory.stability), startHour)
         }
         return card.copy(
             state = if (card.state == ReviewState.SUSPENDED) card.state else ReviewState.REVIEW,
@@ -83,29 +85,29 @@ object ReviewRules {
      * Reading [card]'s word in a book without a lookup: the card after a Hard, or null if it
      * doesn't count. [readToday]: a read was already counted for the word on this local day.
      */
-    fun onRead(card: ReviewCardEntity, scheduler: WordScheduler, now: Long, zone: ZoneId, readToday: Boolean): ReviewCardEntity? {
+    fun onRead(card: ReviewCardEntity, scheduler: WordScheduler, now: Long, zone: ZoneId, readToday: Boolean, startHour: Int = 0): ReviewCardEntity? {
         if (!active(card, scheduler, now)) return null
         if (card.passedReviews < 1 || readToday) return null
         if (retrievability(card, now) > DUE_ISH) return null
-        return grade(card, Grade.HARD, now, zone, real = false)
+        return grade(card, Grade.HARD, now, zone, real = false, startHour = startHour)
     }
 
     /**
      * A lookup of [card]'s word: the card after an Again (due tomorrow), or null if it doesn't
      * count: not from the reader, not due-ish, added within a day, or already lapsed today.
      */
-    fun onLookup(card: ReviewCardEntity, scheduler: WordScheduler, origin: LookupOrigin, now: Long, zone: ZoneId): ReviewCardEntity? {
+    fun onLookup(card: ReviewCardEntity, scheduler: WordScheduler, origin: LookupOrigin, now: Long, zone: ZoneId, startHour: Int = 0): ReviewCardEntity? {
         if (origin != LookupOrigin.READER || !active(card, scheduler, now)) return null
         if (now - card.addedAt <= DAY_MS) return null
         if (retrievability(card, now) > DUE_ISH) return null
-        if (lapsedToday(card, now, zone)) return null
-        return grade(card, Grade.AGAIN, now, zone, real = false)
+        if (lapsedToday(card, now, zone, startHour)) return null
+        return grade(card, Grade.AGAIN, now, zone, real = false, startHour = startHour)
     }
 
     /** Whether a lookup already counted as a lapse today (the latest grading was an Again today). */
-    fun lapsedToday(card: ReviewCardEntity, now: Long, zone: ZoneId): Boolean {
+    fun lapsedToday(card: ReviewCardEntity, now: Long, zone: ZoneId, startHour: Int = 0): Boolean {
         val last = card.lastReviewAt ?: return false
-        return card.lastGrade == Grade.AGAIN.value && localDay(last, zone) == localDay(now, zone)
+        return card.lastGrade == Grade.AGAIN.value && localDay(last, zone, startHour) == localDay(now, zone, startHour)
     }
 
     /** In review, Honmani's own, and not buried: the only cards evidence reaches. */
@@ -132,15 +134,14 @@ object ReviewRules {
             card.lastGrade != Grade.AGAIN.value
 
     /** The next local midnight after [now]. */
-    fun buryUntil(now: Long, zone: ZoneId): Long = startOfDay(now, zone, 1)
+    fun buryUntil(now: Long, zone: ZoneId, startHour: Int = 0): Long = startOfDay(now, zone, 1, startHour)
 
-    fun localDay(time: Long, zone: ZoneId): Long = Instant.ofEpochMilli(time).atZone(zone).toLocalDate().toEpochDay()
+    fun localDay(time: Long, zone: ZoneId, startHour: Int = 0): Long = DayClock.date(time, zone, startHour).toEpochDay()
 
-    /** Midnight of the local day [plusDays] after the day of [time]. */
-    fun startOfDay(time: Long, zone: ZoneId, plusDays: Int = 0): Long =
-        Instant.ofEpochMilli(time).atZone(zone).toLocalDate().plusDays(plusDays.toLong())
-            .atStartOfDay(zone).toInstant().toEpochMilli()
+    /** The start (midnight, or [startHour]) of the local day [plusDays] after the day of [time]. */
+    fun startOfDay(time: Long, zone: ZoneId, plusDays: Int = 0, startHour: Int = 0): Long =
+        DayClock.startOfDay(time, zone, startHour, plusDays)
 
     /** Due the same day or earlier than the end of the local day of [now]. */
-    fun dueCutoff(now: Long, zone: ZoneId): Long = startOfDay(now, zone, 1)
+    fun dueCutoff(now: Long, zone: ZoneId, startHour: Int = 0): Long = startOfDay(now, zone, 1, startHour)
 }

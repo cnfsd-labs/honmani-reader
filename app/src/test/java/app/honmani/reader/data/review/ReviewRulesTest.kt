@@ -212,4 +212,28 @@ class ReviewRulesTest {
     fun dueTodayMeansBeforeTheNextLocalMidnight() {
         assertEquals(at(LocalDateTime.of(2026, 5, 2, 0, 0)), ReviewRules.dueCutoff(t0, zone))
     }
+
+    @Test
+    fun aDayStartingAt4RunsFrom0400To0400() {
+        val night = at(LocalDateTime.of(2026, 5, 2, 3, 0))
+        val morning = at(LocalDateTime.of(2026, 5, 2, 4, 0))
+        // At 03:00 it is still the 1st: due until 04:00 today, the day started at 04:00 yesterday.
+        assertEquals(at(LocalDateTime.of(2026, 5, 2, 4, 0)), ReviewRules.dueCutoff(night, zone, 4))
+        assertEquals(at(LocalDateTime.of(2026, 5, 1, 4, 0)), ReviewRules.startOfDay(night, zone, startHour = 4))
+        assertEquals(at(LocalDateTime.of(2026, 5, 3, 4, 0)), ReviewRules.dueCutoff(morning, zone, 4))
+        assertEquals(ReviewRules.localDay(at(LocalDateTime.of(2026, 5, 1, 23, 0)), zone, 4), ReviewRules.localDay(night, zone, 4))
+        assertEquals(ReviewRules.localDay(night, zone, 4) + 1, ReviewRules.localDay(morning, zone, 4))
+        // The default is midnight, as before.
+        assertEquals(at(LocalDateTime.of(2026, 5, 3, 0, 0)), ReviewRules.dueCutoff(night, zone))
+    }
+
+    @Test
+    fun aLapseAt0200AndALookupAt0330CountAsTheSameDayWithAStartOf4() {
+        val reviewed = at(LocalDateTime.of(2026, 5, 2, 2, 0))
+        val lapsed = card(lastReviewAt = reviewed, lastGrade = Grade.AGAIN.value)
+        assertTrue(ReviewRules.lapsedToday(lapsed, at(LocalDateTime.of(2026, 5, 2, 3, 30)), zone, 4))
+        assertFalse(ReviewRules.lapsedToday(lapsed, at(LocalDateTime.of(2026, 5, 2, 4, 30)), zone, 4))
+        // At midnight the same two moments are already the same day too, the 4:30 one as well.
+        assertTrue(ReviewRules.lapsedToday(lapsed, at(LocalDateTime.of(2026, 5, 2, 4, 30)), zone))
+    }
 }

@@ -31,6 +31,8 @@ class ReviewRepository(
     private val database: HonmaniDatabase,
     private val now: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** The hour a day starts at ([app.honmani.reader.data.time.DayClock]); 0 is midnight. */
+    private val startHour: () -> Int = { 0 },
     /** How relevant a word (by how it is written) is to the book being read ([Relevance]); null without one. */
     private val relevance: suspend () -> ((String) -> Double)? = { null },
 ) {
@@ -38,7 +40,7 @@ class ReviewRepository(
     private val words = database.wordDao()
 
     /**
-     * Cards due today (before the next local midnight), not buried, cut to [perDay] reviews a
+     * Cards due today (before the start of the next day), not buried, cut to [perDay] reviews a
      * day ([ReviewLimit]), most overdue first. Observed when subscribed: re-subscribe after midnight.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -47,8 +49,8 @@ class ReviewRepository(
             val time = now()
             emitAll(
                 combine(
-                    dao.observeDueWords(ReviewRules.dueCutoff(time, zone()), time),
-                    dao.observeReviewedSince(ReviewRules.startOfDay(time, zone())),
+                    dao.observeDueWords(ReviewRules.dueCutoff(time, zone(), startHour()), time),
+                    dao.observeReviewedSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())),
                 ) { due, done -> ReviewLimit.apply(due, { it.id }, limit, done) },
             )
         }
@@ -57,24 +59,24 @@ class ReviewRepository(
     /** The words with a card due today within the limit, once. */
     suspend fun dueToday(perDay: Int): List<ReviewWord> {
         val time = now()
-        val due = dao.dueWords(ReviewRules.dueCutoff(time, zone()), time)
-        return ReviewLimit.apply(due, { it.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(time, zone())))
+        val due = dao.dueWords(ReviewRules.dueCutoff(time, zone(), startHour()), time)
+        return ReviewLimit.apply(due, { it.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())))
     }
 
     /** How the words due today are written (the book marks them). */
     suspend fun dueExpressions(perDay: Int): Set<String> = dueToday(perDay).mapTo(HashSet()) { it.expression }
 
-    suspend fun dueCount(): Int = now().let { dao.dueCount(ReviewRules.dueCutoff(it, zone()), it) }
+    suspend fun dueCount(): Int = now().let { dao.dueCount(ReviewRules.dueCutoff(it, zone(), startHour()), it) }
 
     /** Due cards, most overdue first. A card graded Again in a session comes back after 10 minutes: ask again then. */
     suspend fun dueCards(limit: Int): List<CardWithWord> =
-        now().let { dao.dueCards(ReviewRules.dueCutoff(it, zone()), it, limit) }
+        now().let { dao.dueCards(ReviewRules.dueCutoff(it, zone(), startHour()), it, limit) }
 
     /** The due cards a session starts with: [dueCards] cut to [perDay] reviews a day ([ReviewLimit]). */
     suspend fun dueCardsToday(perDay: Int): List<CardWithWord> {
         val all = dueCards(Int.MAX_VALUE)
         if (perDay == ReviewLimit.NO_LIMIT) return all
-        return ReviewLimit.apply(all, { it.word.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(now(), zone())))
+        return ReviewLimit.apply(all, { it.word.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(now(), zone(), startHour = startHour())))
     }
 
     /** Cards introduced but never reviewed, oldest first. */
@@ -93,7 +95,7 @@ class ReviewRepository(
                 combine(
                     dao.observeNewCardCount(time),
                     dao.observeUnintroducedCount(),
-                    dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone())),
+                    dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())),
                 ) { existing, fresh, done -> minOf(maxOf(limit - done, 0), existing + fresh) },
             )
         }
@@ -128,7 +130,7 @@ class ReviewRepository(
 
     /** Cards of Learning words that are not due today, soonest due first: a scope's early reviews. */
     suspend fun notDueLearningCards(): List<CardWithWord> =
-        now().let { dao.notDueLearningCards(ReviewRules.dueCutoff(it, zone()), it) }
+        now().let { dao.notDueLearningCards(ReviewRules.dueCutoff(it, zone(), startHour()), it) }
 
     /** Puts a card back as it was (takes back a bury, a suspension or a change of memory). */
     suspend fun restore(card: ReviewCardEntity) {
@@ -136,9 +138,9 @@ class ReviewRepository(
     }
 
     /** Reviews done since the start of today, and new words among them. */
-    suspend fun reviewsToday(): Int = dao.reviewsSince(ReviewRules.startOfDay(now(), zone()))
+    suspend fun reviewsToday(): Int = dao.reviewsSince(ReviewRules.startOfDay(now(), zone(), startHour = startHour()))
 
-    suspend fun newWordsToday(): Int = dao.firstReviewsSince(ReviewRules.startOfDay(now(), zone()))
+    suspend fun newWordsToday(): Int = dao.firstReviewsSince(ReviewRules.startOfDay(now(), zone(), startHour = startHour()))
 
     suspend fun card(wordId: Long): ReviewCardEntity? = dao.find(wordId)
 
@@ -148,10 +150,10 @@ class ReviewRepository(
         return combine(
             dao.observeLogsSince(time - (ReviewStats.RETENTION_DAYS + 1) * ReviewRules.DAY_MS),
             dao.observeAll(),
-            dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone())),
+            dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())),
         ) { logs, cards, firstReviews ->
             ReviewStats.summary(
-                logs, cards.count { it.state == ReviewState.REVIEW }, cards.isNotEmpty(), firstReviews, now(), zone(),
+                logs, cards.count { it.state == ReviewState.REVIEW }, cards.isNotEmpty(), firstReviews, now(), zone(), startHour(),
             )
         }
     }
@@ -177,7 +179,7 @@ class ReviewRepository(
         val time = now()
         val before = dao.find(wordId) ?: ReviewCardEntity(wordId = wordId, due = time, addedAt = time)
         if (before.state == ReviewState.SUSPENDED) return@withTransaction null
-        val after = ReviewRules.grade(before, grade, time, zone(), real = true, inSession = inSession)
+        val after = ReviewRules.grade(before, grade, time, zone(), real = true, inSession = inSession, startHour = startHour())
         dao.upsert(after)
         val elapsed = before.lastReviewAt?.let { (time - it) / ReviewRules.DAY_MS.toDouble() } ?: 0.0
         val logId = dao.insertLog(ReviewLogEntity(wordId = wordId, at = time, grade = grade.value, elapsedDays = elapsed))
@@ -191,7 +193,7 @@ class ReviewRepository(
     }
 
     /** Hides a card until tomorrow (the next local midnight). */
-    suspend fun bury(wordId: Long) = change(wordId) { it.copy(buriedUntil = ReviewRules.buryUntil(now(), zone())) }
+    suspend fun bury(wordId: Long) = change(wordId) { it.copy(buriedUntil = ReviewRules.buryUntil(now(), zone(), startHour())) }
 
     /** "Don't review": the card keeps its memory but leaves the queue and ignores reading. */
     suspend fun suspend(wordId: Long) = change(wordId) { it.copy(state = ReviewState.SUSPENDED) }
@@ -218,7 +220,7 @@ class ReviewRepository(
                 state = ReviewState.REVIEW,
                 stability = stability,
                 difficulty = if (card.difficulty > 0) card.difficulty else 5.0,
-                due = ReviewRules.startOfDay(time, zone(), Fsrs.interval(stability)),
+                due = ReviewRules.startOfDay(time, zone(), Fsrs.interval(stability), startHour()),
                 passedReviews = maxOf(card.passedReviews, 1),
                 reviewStability = stability,
                 lastGrade = Grade.GOOD.value,
@@ -244,11 +246,11 @@ class ReviewRepository(
      */
     suspend fun onRead(wordIds: Collection<Long>): List<Long> = database.withTransaction {
         val time = now()
-        val day = ReviewRules.localDay(time, zone())
+        val day = ReviewRules.localDay(time, zone(), startHour())
         wordIds.filter { id ->
             val card = dao.find(id) ?: return@filter false
             val word = words.find(id) ?: return@filter false
-            val after = ReviewRules.onRead(card, word.scheduler, time, zone(), readToday = dao.readsOn(id, day) > 0)
+            val after = ReviewRules.onRead(card, word.scheduler, time, zone(), readToday = dao.readsOn(id, day) > 0, startHour = startHour())
             // The read is counted only when it moved a card, so a read before the card was due-ish
             // doesn't use up the day.
             if (after == null) return@filter false
@@ -289,7 +291,7 @@ class ReviewRepository(
     private suspend fun lapse(wordId: Long, origin: LookupOrigin): ReviewCardEntity? = database.withTransaction {
         val card = dao.find(wordId) ?: return@withTransaction null
         val word = words.find(wordId) ?: return@withTransaction null
-        val after = ReviewRules.onLookup(card, word.scheduler, origin, now(), zone()) ?: return@withTransaction null
+        val after = ReviewRules.onLookup(card, word.scheduler, origin, now(), zone(), startHour()) ?: return@withTransaction null
         dao.upsert(after)
         card
     }

@@ -28,6 +28,7 @@ import app.honmani.reader.data.export.RefoldExport
 import app.honmani.reader.data.export.writeShareFile
 import app.honmani.reader.data.export.writeTextDocument
 import app.honmani.reader.data.stats.DayTotal
+import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.diagnostics.logWarning
 import java.time.Instant
 import java.time.LocalDate
@@ -105,10 +106,12 @@ class StatisticsViewModel(
     private val prepareBook: suspend (contentHash: String, keys: List<String>) -> Int = { _, _ -> 0 },
     /** The daily reading goal in minutes; null while it is off. */
     private val goalMinutes: Flow<Int?> = flowOf(null),
-    private val today: () -> LocalDate = LocalDate::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
-    /** The current time; only used to wait for local midnight. */
+    /** The hour a day starts at ([DayClock]); 0 is midnight. */
+    private val startHour: () -> Int = { 0 },
+    /** The current time; also used to wait for the next day to start. */
     private val now: () -> Instant = Instant::now,
+    private val today: () -> LocalDate = { DayClock(zone, startHour, { now().toEpochMilli() }).today() },
     /** Writes text to a document the reader picked (a content URI). */
     private val writeDocument: suspend (uri: String, text: String) -> Unit = { _, _ -> },
     /** The day of the last Refold export; null before the first one. */
@@ -146,20 +149,21 @@ class StatisticsViewModel(
     private val _period = MutableStateFlow(StatsPeriod.TODAY)
     val period: StateFlow<StatsPeriod> = _period.asStateFlow()
 
-    /** Today's date, again at each local midnight, so a screen left open moves on to the new day. */
+    private val dayClock = DayClock(zone, startHour, { now().toEpochMilli() })
+
+    /** Today's date, again when the next day starts, so a screen left open moves on to the new day. */
     private val day: Flow<LocalDate> = flow {
         while (true) {
             emit(today())
-            val zone = zone()
-            val next = now().atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant()
-            delay((next.toEpochMilli() - now().toEpochMilli()).coerceAtLeast(1_000L))
+            val next = dayClock.startOfDay(now().toEpochMilli(), 1)
+            delay((next - now().toEpochMilli()).coerceAtLeast(1_000L))
         }
     }.distinctUntilChanged()
 
     /** The period and the day it is counted on, with the period's lookups, counted in the database. */
     private val periodLookups: Flow<Triple<StatsPeriod, LocalDate, Int>> =
         combine(_period, day) { period, today -> period to today }.flatMapLatest { (period, today) ->
-            val from = firstDay(period, today)?.atStartOfDay(zone())?.toInstant()?.toEpochMilli()
+            val from = firstDay(period, today)?.let(dayClock::start)
             lookups(from).map { Triple(period, today, it) }
         }
 
@@ -169,9 +173,8 @@ class StatisticsViewModel(
 
     val uiState: StateFlow<StatisticsUiState?> =
         combine(days, libraryBooks, periodLookups, words, goalMinutes) { days, (books, finished), (period, today, lookups), words, goalMinutes ->
-            val zone = zone()
             val from = firstDay(period, today)
-            fun inPeriod(millis: Long) = from == null || !Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().isBefore(from)
+            fun inPeriod(millis: Long) = from == null || !dayClock.date(millis).isBefore(from)
             StatisticsUiState(
                 summary = ReadingStats.period(days, today, period),
                 booksFinished = finished.count { book ->
@@ -229,7 +232,7 @@ class StatisticsViewModel(
                 if (file.rows == 0) {
                     RefoldEvent.NoReading
                 } else {
-                    val today = RefoldExport.today(now(), zone())
+                    val today = RefoldExport.today(now(), zone(), startHour())
                     val name = "honmani-refold-$today.csv"
                     val uri = writeRefoldFile(name, file.csv)
                     // The share sheet reports nothing back: the export counts as done once it is offered.
@@ -312,6 +315,7 @@ class StatisticsViewModel(
                     unknownWords = container::unknownWords,
                     prepareBook = { hash, keys -> container.bookDao.findByHash(hash)?.let { container.prepareBook(it, keys) } ?: 0 },
                     goalMinutes = container.readingGoalSettings.goalMinutes,
+                    startHour = { container.daySettings.startHour.value },
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                     lastRefoldExport = { container.refoldExportSettings.lastExport },
                     setLastRefoldExport = container.refoldExportSettings::setLastExport,

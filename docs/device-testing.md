@@ -187,7 +187,9 @@ Settings → Flashcards → "Reviews per day" (50 / 100 default / 200 / No limit
 other 20 carry over to tomorrow. A card answered today counts, so after 30 answers 70 are left (new
 words count against "New words a day" instead); an Again comes back today whatever the limit. The
 chips other than Due ignore the limit. Switching to 200 or No limit shows all 120 again. The
-due tint in the book follows the same cards. At the largest font size the chips wrap, none is cut.
+due tint in the book follows the same cards. Settings → Reading → "Day starts at" (Midnight default, 1 am … 6 am): with 4 am chosen,
+reading and reviews at 02:00 count for the day before (statistics, goal, streak, "New words a day", reviews today, what is due); the
+setting applies from the moment it is changed, days already recorded keep their date. At the largest font size the chips wrap, none is cut.
 A card whose memory has reached a year (stability 365 days or more) leaves the queue for good: it is never due,
 the badge and tint ignore it; looking such a word up in a book after it is overdue lapses it and it comes back the next day.
 Reading counts too: a due word read in a book moves later (once a day), a lookup in the book makes it

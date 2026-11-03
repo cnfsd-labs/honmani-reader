@@ -23,9 +23,9 @@ import app.honmani.reader.data.stats.Skill
 import app.honmani.reader.data.stats.SkillEstimate
 import app.honmani.reader.data.stats.SkillTracker
 import app.honmani.reader.data.stats.StatsPeriod
+import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.words.WordKnowledge
 import app.honmani.reader.data.words.WordProgress
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
@@ -52,7 +52,7 @@ data class ProgressUiState(
     val fitting: List<FittingBook> = emptyList(),
     /** Seconds read per day, all books together, for the year calendar. */
     val calendar: Map<LocalDate, Long> = emptyMap(),
-    val today: LocalDate = LocalDate.now(),
+    val today: LocalDate = DayClock().today(),
     val reviews: ReviewSummary = ReviewSummary(),
 )
 
@@ -74,8 +74,10 @@ class ProgressViewModel(
     private val store: MilestoneStore,
     /** Book grades by content hash. */
     private val grades: Flow<Map<String, StoredDifficulty>> = flowOf(emptyMap()),
-    private val today: () -> LocalDate = LocalDate::now,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** The hour a day starts at ([DayClock]); 0 is midnight. */
+    private val startHour: () -> Int = { 0 },
+    private val today: () -> LocalDate = { DayClock(zone, startHour).today() },
     /** The skill; by default from speed alone (no words read). */
     private val skill: Flow<SkillEstimate> = SkillTracker(days, books, grades, flowOf(WordKnowledge.EMPTY), today = today).estimate,
     private val reviews: Flow<ReviewSummary> = flowOf(ReviewSummary()),
@@ -87,11 +89,11 @@ class ProgressViewModel(
     val uiState: StateFlow<ProgressUiState?> =
         combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews, recorded), learned, anki, seen ->
             val today = today()
-            val zone = zone()
+            val dayClock = DayClock(zone, startHour)
             val data = ProgressionData(
                 days = rows.map { DayTotal(LocalDate.parse(it.day), it.seconds, it.characters) },
                 finished = FinishedBooks.merge(books, recorded).map { book ->
-                    book.finishedAt?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+                    book.finishedAt?.let(dayClock::date)
                 },
                 wordsLearned = learned,
                 ankiCards = anki,
@@ -147,6 +149,7 @@ class ProgressViewModel(
                     store = container.milestoneStore,
                     grades = container.difficultyStore.grades,
                     skill = container.skillTracker.estimate,
+                    startHour = { container.daySettings.startHour.value },
                     reviews = container.reviewRepository.observeSummary(),
                 )
             }

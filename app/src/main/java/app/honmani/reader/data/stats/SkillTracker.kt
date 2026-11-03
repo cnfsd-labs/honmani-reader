@@ -3,6 +3,7 @@ package app.honmani.reader.data.stats
 import app.honmani.reader.data.difficulty.Difficulty
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.words.WordKnowledge
 import java.time.LocalDate
 import kotlinx.coroutines.flow.Flow
@@ -22,7 +23,8 @@ class SkillTracker(
     knowledge: Flow<WordKnowledge>,
     /** Difficulty of books from a restored backup that aren't back in the library yet, by their ids. */
     restored: Flow<Map<Long, Int>> = flowOf(emptyMap()),
-    private val today: () -> LocalDate = LocalDate::now,
+    /** Today's day, by the reader's day start ([DayClock]). */
+    private val today: () -> LocalDate = { DayClock().today() },
 ) {
     val estimate: Flow<SkillEstimate> = combine(days, books, grades, knowledge, restored) { rows, books, grades, knowledge, restored ->
         val graded = books.mapNotNull { book ->

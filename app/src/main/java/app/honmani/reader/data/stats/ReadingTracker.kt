@@ -1,6 +1,6 @@
 package app.honmani.reader.data.stats
 
-import java.time.Instant
+import app.honmani.reader.data.time.DayClock
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
@@ -51,8 +51,11 @@ class ReadingTracker(
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** The hour a day starts at ([DayClock]); 0 is midnight. */
+    private val startHour: () -> Int = { 0 },
     private val log: (String) -> Unit = {},
 ) {
+    private val dayClock = DayClock(zone, startHour, clock)
     private val lock = Any()
     private val writes = Mutex()
 
@@ -224,15 +227,15 @@ class ReadingTracker(
         val book = book ?: return
         val millis = (now - from).coerceIn(0L, IDLE_MS)
         if (millis == 0L) return
-        // The stretch ran from the mark; the part before local midnight belongs to the day before.
+        // The stretch ran from the mark; the part before the next day starts belongs to the day before.
         val end = from + millis
         val startDay = date(from)
-        val midnight = startDay.plusDays(1).atStartOfDay(zone()).toInstant().toEpochMilli()
-        if (end <= midnight) {
+        val nextStart = dayClock.startOfDay(from, 1)
+        if (end <= nextStart) {
             countOn(book, startDay.toString(), millis)
         } else {
-            countOn(book, startDay.toString(), midnight - from)
-            countOn(book, date(end).toString(), end - midnight)
+            countOn(book, startDay.toString(), nextStart - from)
+            countOn(book, date(end).toString(), end - nextStart)
         }
     }
 
@@ -266,7 +269,7 @@ class ReadingTracker(
         if (due) flush()
     }
 
-    private fun date(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(zone()).toLocalDate()
+    private fun date(millis: Long): LocalDate = dayClock.date(millis)
 
     private fun day(millis: Long): String = date(millis).toString()
 

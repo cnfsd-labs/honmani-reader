@@ -20,7 +20,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   (Forgot / Got it), a memory model (FSRS) that also counts the words you read in books, new words
   ordered by the book you are reading, a daily limit on reviews (50, 100, 200 or none), words due today tinted in the book, cards known for a year retired from the queue, and a book's words
   learned before you read it (book sheet)
-- Reading statistics (time, characters, speed), a reading level and milestones; the reading time per day and
+- Reading statistics (time, characters, speed), a reading level and milestones, a day that can start
+  later than midnight (Settings → Day starts at, for night readers); the reading time per day and
   book can be exported as a CSV file for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download

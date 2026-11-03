@@ -60,6 +60,7 @@ import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.RefoldExportSettings
+import app.honmani.reader.data.settings.DaySettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
@@ -68,6 +69,7 @@ import app.honmani.reader.data.stats.ReadingStore
 import app.honmani.reader.data.stats.FinishedBookDao
 import app.honmani.reader.data.stats.ReadingTracker
 import app.honmani.reader.data.stats.SkillTracker
+import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.sync.EpubPositions
 import app.honmani.reader.data.sync.KoSyncClient
 import app.honmani.reader.data.sync.KoSyncSettings
@@ -174,6 +176,12 @@ class AppContainer(context: Context) {
     /** New cards a day, the card front and the days to "known" (Settings → Flashcards). */
     val reviewSettings: ReviewSettings by lazy { ReviewSettings(settingsPreferences) }
 
+    /** Settings → "Day starts at": when a reading and review day begins. */
+    val daySettings: DaySettings by lazy { DaySettings(settingsPreferences) }
+
+    /** Which day a moment belongs to, by [daySettings]; every reading and review day comes from here. */
+    val dayClock: DayClock by lazy { DayClock(startHour = { daySettings.startHour.value }) }
+
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
 
@@ -201,7 +209,7 @@ class AppContainer(context: Context) {
 
     val wordRepository: WordRepository by lazy { WordRepository(database) }
 
-    val reviewRepository: ReviewRepository by lazy { ReviewRepository(database, relevance = ::openBookRelevance) }
+    val reviewRepository: ReviewRepository by lazy { ReviewRepository(database, startHour = { daySettings.startHour.value }, relevance = ::openBookRelevance) }
 
     /** The book being read: the last one opened, unless finished or hidden. */
     private suspend fun openBook(): BookEntity? =
@@ -367,7 +375,7 @@ class AppContainer(context: Context) {
                 passReadWords(book.contentHash, from, to)
             }
         }
-        ReadingTracker(store, applicationScope, log = { Log.i("Honmani.stats", it) }).also { tracker ->
+        ReadingTracker(store, applicationScope, startHour = { daySettings.startHour.value }, log = { Log.i("Honmani.stats", it) }).also { tracker ->
             applicationScope.launch {
                 ttuLibrary.progress.collect { books ->
                     tracker.onPositions(books.mapNotNull { book -> book.characters?.let { book.id to it } }.toMap())
@@ -616,6 +624,7 @@ class AppContainer(context: Context) {
             grades = difficultyStore.grades,
             knowledge = wordKnowledge,
             restored = restoredBooks.scores,
+            today = dayClock::today,
         )
     }
 

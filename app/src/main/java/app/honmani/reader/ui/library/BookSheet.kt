@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
@@ -66,6 +67,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.difficulty.BookDifficulty
 import app.honmani.reader.data.difficulty.GradingState
@@ -76,8 +78,6 @@ import app.honmani.reader.ui.stats.BookStatistics
 import app.honmani.reader.ui.stats.StatisticsViewModel
 import app.honmani.reader.ui.stats.duration
 import app.honmani.reader.ui.stats.number
-import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.roundToInt
@@ -472,6 +472,7 @@ private fun FitLabel(fit: BookFit) {
 @Composable
 private fun Statistics(stats: BookStatistics) {
     val reading = stats.reading
+    val context = LocalContext.current
     Column(
         modifier = Modifier.padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -512,10 +513,11 @@ private fun Statistics(stats: BookStatistics) {
             )
         }
         val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+        val dayClock = remember { (context.applicationContext as HonmaniApplication).container.dayClock }
         val dates = listOfNotNull(
             reading.firstDay?.let { stringResource(R.string.book_first_read, it.format(dateFormat)) },
             stats.finishedAt?.let {
-                val day = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
+                val day = dayClock.date(it)
                 stringResource(R.string.book_finished_on, day.format(dateFormat))
             },
         )

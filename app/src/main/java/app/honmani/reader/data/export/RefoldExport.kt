@@ -1,6 +1,7 @@
 package app.honmani.reader.data.export
 
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.time.DayClock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -60,8 +61,8 @@ object RefoldExport {
 
     private class Row(val entity: ReadingDayEntity, val date: LocalDate, val nickname: String, val seconds: Long)
 
-    /** The reader's today in [zone] at [now]: the day that is not finished yet. */
-    fun today(now: Instant, zone: ZoneId): LocalDate = now.atZone(zone).toLocalDate()
+    /** The reader's today in [zone] at [now] (days start at [startHour], see [DayClock]): the day that is not finished yet. */
+    fun today(now: Instant, zone: ZoneId, startHour: Int = 0): LocalDate = DayClock.date(now.toEpochMilli(), zone, startHour)
 
     private fun nickname(title: String?): String = title?.trim()?.replace(Regex("\\s+"), " ").orEmpty().ifEmpty { FALLBACK_NICKNAME }
 }

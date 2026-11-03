@@ -155,6 +155,7 @@ fun SettingsScreen(
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
         goal = { ReadingGoalSection() },
+        dayStart = { DayStartSection() },
         readingTime = { ReadingTimeSection() },
         examples = { ExampleSentencesSection() },
     )
@@ -189,6 +190,7 @@ private fun SettingsContent(
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
     goal: @Composable () -> Unit = {},
+    dayStart: @Composable () -> Unit = {},
     readingTime: @Composable () -> Unit = {},
     examples: @Composable () -> Unit = {},
 ) {
@@ -265,6 +267,7 @@ private fun SettingsContent(
             }
             item { examples() }
             item { goal() }
+            item { dayStart() }
             item { readingTime() }
             item {
                 ListItem(

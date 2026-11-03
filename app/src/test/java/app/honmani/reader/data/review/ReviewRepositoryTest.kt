@@ -297,4 +297,42 @@ class ReviewRepositoryTest {
         assertNull(repository.card(id))
         assertEquals(1, database.reviewDao().reviewsSince(0))
     }
+
+    @Test
+    fun theDailyCountsAndLimitRollOverAtTheDayStartHour() = runTest {
+        val shifted = ReviewRepository(database, now = { now }, zone = { zone }, startHour = { 4 })
+        val plain = ReviewRepository(database, now = { now }, zone = { zone })
+        val id = word("猫")
+        shifted.introduce(id)
+        now = LocalDateTime.of(2026, 5, 1, 23, 0).atZone(zone).toInstant().toEpochMilli()
+        shifted.record(id, Grade.GOOD)
+        assertEquals(1, shifted.newWordsToday())
+        assertEquals(1, shifted.reviewsToday())
+
+        // 03:00 the next morning: still the same day with a start of 4, a new one at midnight.
+        now = LocalDateTime.of(2026, 5, 2, 3, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(1, shifted.newWordsToday())
+        assertEquals(1, shifted.reviewsToday())
+        assertEquals(0, plain.newWordsToday())
+        assertEquals(0, plain.reviewsToday())
+
+        now = LocalDateTime.of(2026, 5, 2, 4, 0).atZone(zone).toInstant().toEpochMilli()
+        assertEquals(0, shifted.newWordsToday())
+        assertEquals(0, shifted.reviewsToday())
+    }
+
+    @Test
+    fun cardsBecomeDueAtTheDayStartHour() = runTest {
+        val shifted = ReviewRepository(database, now = { now }, zone = { zone }, startHour = { 4 })
+        val id = word("猫")
+        shifted.introduce(id)
+        shifted.record(id, Grade.GOOD) // 12:00 on the 1st: due three days on, at 04:00
+        val due = shifted.card(id)!!.due
+        assertEquals(LocalDateTime.of(2026, 5, 4, 4, 0).atZone(zone).toInstant().toEpochMilli(), due)
+
+        now = due - 60_000L // 03:59 on the 4th: still the 3rd
+        assertEquals(0, shifted.dueCount())
+        now = due // 04:00: the 4th has begun
+        assertEquals(1, shifted.dueCount())
+    }
 }

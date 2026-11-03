@@ -36,7 +36,10 @@ class ReadingTrackerTest {
     private val store = FakeStore()
     private var now = DAY_START
 
-    private fun TestScope.tracker() = ReadingTracker(store, this, clock = { now }, zone = { ZoneOffset.UTC })
+    private var startHour = 0
+
+    private fun TestScope.tracker() =
+        ReadingTracker(store, this, clock = { now }, zone = { ZoneOffset.UTC }, startHour = { startHour })
 
     private fun minutes(count: Int) {
         now += count * 60_000L
@@ -340,7 +343,58 @@ class ReadingTrackerTest {
         assertEquals(750L, store.characters[7L to NEXT_DAY])
     }
 
+    @Test
+    fun withADayStartOf4_readingAt0200CountsForThePreviousDay() = runTest {
+        startHour = 4
+        val tracker = tracker()
+        store.positions[7] = 1_000
+        now = DAY_START - 6 * 60 * 60_000L // 02:00 on the 17th
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        minutes(3)
+        tracker.onPage(7, 1_500, null)
+        tracker.setVisible(false)
+        advanceUntilIdle()
+
+        assertEquals(180L, store.seconds[7L to PREVIOUS_DAY])
+        assertEquals(500L, store.characters[7L to PREVIOUS_DAY])
+        assertEquals(null, store.seconds[7L to DAY])
+    }
+
+    @Test
+    fun withADayStartOf4_aStretchIsSplitAt0400NotAtMidnight() = runTest {
+        startHour = 4
+        val tracker = tracker()
+        now = DAY_START - 4 * 60 * 60_000L - 60_000L // 03:59 on the 17th
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        now += 4 * 60_000L // 04:03
+        tracker.setVisible(false)
+        advanceUntilIdle()
+
+        assertEquals(60L, store.seconds[7L to PREVIOUS_DAY])
+        assertEquals(180L, store.seconds[7L to DAY])
+    }
+
+    @Test
+    fun withTheDefaultDayStart_readingAt0200CountsForTheCalendarDay() = runTest {
+        val tracker = tracker()
+        now = DAY_START - 6 * 60 * 60_000L // 02:00 on the 17th
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        minutes(3)
+        tracker.setVisible(false)
+        advanceUntilIdle()
+
+        assertEquals(180L, store.seconds[7L to DAY])
+    }
+
     private companion object {
+        const val PREVIOUS_DAY = "2026-10-16"
+
         /** 2026-10-17 08:00 UTC. */
         const val DAY_START = 1_792_224_000_000L
         const val DAY = "2026-10-17"

@@ -14,6 +14,7 @@ import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.AppearanceSettings
+import app.honmani.reader.data.settings.DaySettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
@@ -399,6 +400,7 @@ class Backup(
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,
             ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
+            DaySettings.KEY_START_HOUR to BackupValue.INT,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
             ReadingTimeSettings.KEY_COUNT_DURING_LOOKUP to BackupValue.BOOLEAN,
