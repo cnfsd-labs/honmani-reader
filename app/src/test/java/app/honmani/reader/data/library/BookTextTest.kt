@@ -137,4 +137,12 @@ class BookTextTest {
         assertEquals(text.around(0), text.around(-4))
         assertEquals(null, book().around(0))
     }
+
+    @Test
+    fun aroundPageStart_takesTheTextFromInsideThePage_andStaysInTheBook() {
+        val text = book("あいうえおかきくけこさしすせそたちつてと")
+
+        assertEquals("けこさしすせ", text.aroundPageStart(0)!!.match)
+        assertEquals(text.around(text.total), text.aroundPageStart(text.total))
+    }
 }

@@ -104,6 +104,26 @@ test('markOnScreen finds nothing for text that is not on screen', async ({ page 
   expect(await page.evaluate(() => window.honmaniSearch.markOnScreen({ before: '', match: '第1章1段落' }))).toBe(true);
 });
 
+test('a hit that never shows leaves the reader on the page ttu opened, not pages further on', async ({ page }) => {
+  await setUp(page, { viewMode: 'paginated', writingMode: 'horizontal-tb' });
+  await page.goto(`${server.url}/manage`);
+  const book = await call(page, 'ensure', { ttuId: null, ttuTitle: null, url: '/honmani-books/search.epub', fileName: 'search.epub' });
+  await page.goto(`${server.url}/b?id=${book.id}`);
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 10_000 });
+
+  const place = letters(chapters[0].join('') + chapters[1].slice(0, 39).join(''));
+  await call(page, 'setBookmark', { ttuId: book.id, characters: place, progress: place / TOTAL });
+  await page.evaluate(() => {
+    window.__marked = false;
+    window.honmaniSearch.reload({ before: '', match: 'この本にない言葉' });
+  });
+  await page.waitForFunction(() => window.__marked === undefined, undefined, { timeout: 10_000 });
+  await expect(page.getByText('第2章40段落')).toBeInViewport({ timeout: 10_000 });
+  // After the settling time, the turns forward and the turns back.
+  await page.waitForTimeout(3_000);
+  await expect(page.getByText('第2章40段落')).toBeInViewport();
+});
+
 test('a jump without text just reloads at the bookmark, with nothing marked and no pages turned', async ({ page }) => {
   await setUp(page, { viewMode: 'paginated', writingMode: 'horizontal-tb' });
   await page.goto(`${server.url}/manage`);

@@ -142,18 +142,38 @@
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  /** The letters on screen now, to tell whether a page turn did anything. */
+  function pageText() {
+    const root = document.querySelector(BOOK_ROOT_SELECTOR);
+    const seen = root && screenText(root);
+    return seen ? seen.text : '';
+  }
+
+  /** ttu's paginated reader turns pages on these keys in both writing modes (as keep-position.js). */
+  async function turnPage(code) {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+    await nextFrame();
+    await nextFrame();
+  }
+
   /**
    * ttu opens a paginated book at the page where the *paragraph* of the bookmark starts, so a hit
-   * late in a long paragraph is a page or more further on: turn pages until it shows.
+   * late in a long paragraph is a page or more further on: turn pages until it shows. A hit that
+   * doesn't show (its letters run over a page break, or the counts differ) must not leave the
+   * reader pages further on, so the turns are taken back.
    */
   async function turnToHit(hit) {
-    for (let turn = 0; turn < MAX_TURNS; turn++) {
-      // ttu's paginated reader turns pages on ArrowDown in both writing modes (as keep-position.js).
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true }));
-      await nextFrame();
-      await nextFrame();
+    let turns = 0;
+    let shown = pageText();
+    while (turns < MAX_TURNS) {
+      await turnPage('ArrowDown');
+      const now = pageText();
+      if (now === shown) break; // The end of the book.
+      shown = now;
+      turns++;
       if (markOnScreen(hit)) return true;
     }
+    for (; turns > 0; turns--) await turnPage('ArrowUp');
     return false;
   }
 

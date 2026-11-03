@@ -44,7 +44,7 @@ class PlaceJumper(
             } catch (_: Exception) {
                 null
             } ?: 0L
-            val fromSpot = text?.around(from.toInt())
+            val fromSpot = text?.aroundPageStart(from.toInt())
             try {
                 sync.onJump(ttuId, characters)
                 ttu.openHit(ttuId, characters, fraction(characters, total), before, match)

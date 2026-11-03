@@ -103,6 +103,13 @@ class BookText(private val documents: List<String>) {
         return Around(text.substring(lineStart(text, at), at), text.substring(at, lineEnd(text, at)))
     }
 
+    /**
+     * The text for finding the page that starts at [characters] (a saved reading position): a
+     * little way in, as the letters right at the start can run over the page break and never
+     * show in one piece.
+     */
+    fun aroundPageStart(characters: Int): Around? = around(characters + PAGE_START_SLACK)
+
     private fun lineStart(text: String, at: Int): Int {
         var start = maxOf(text.lastIndexOf('\n', at - 1) + 1, at - CONTEXT)
         // Not half a surrogate pair.
@@ -123,6 +130,9 @@ class BookText(private val documents: List<String>) {
 
         /** The context letters the reader matches on its page to mark the hit. */
         const val HINT = 6
+
+        /** How far into a page its text is taken from, see [aroundPageStart]. */
+        const val PAGE_START_SLACK = 8
 
         /** A search of a very common letter stops here; the list stays quick. */
         const val MAX_HITS = 300

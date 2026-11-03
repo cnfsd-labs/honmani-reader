@@ -580,7 +580,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     val id = openTtuId
                     if (id != null) {
                         val text = bookText
-                        val spot = text?.around(bookmark.characters.toInt())
+                        val spot = text?.aroundPageStart(bookmark.characters.toInt())
                         jumper.jump(
                             id, bookmark.characters, bookmark.total, spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
                             jumpMessage(bookmark.percent), backLabel,
