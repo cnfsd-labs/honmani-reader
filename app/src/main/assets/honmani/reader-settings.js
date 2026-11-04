@@ -55,6 +55,7 @@
     'honmaniMarkDue',
     'honmaniImmersive',
     'honmaniEInk',
+    'honmaniCustomCss',
   ];
   const USER_FONTS = 'userfonts';
   const FONT_PATH = '/honmani-fonts/';

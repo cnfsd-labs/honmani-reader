@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * reader-style.js on the real ッツ Ebook Reader build, served with the app's Content-Security-Policy:
- * e-ink mode (honmaniEInk).
+ * e-ink mode (honmaniEInk) and the reader's own CSS for the book (honmaniCustomCss).
  *
  * Needs the ttu build produced by `./gradlew :app:buildTtu` (or set TTU_DIR).
  */
@@ -169,5 +169,104 @@ test.describe('e-ink mode', () => {
     await page.goto(`${server.url}/manage`);
     expect(await page.locator('#honmani-eink-style').count()).toBe(1);
     expect(await style(page, 'body', 'backgroundColor')).not.toBe('rgb(255, 255, 255)');
+  });
+});
+
+test.describe('custom CSS', () => {
+  test('empty by default: no style element', async ({ page }) => {
+    await setUp(page);
+    await openBook(page);
+    expect(await page.locator('#honmani-custom-css').count()).toBe(0);
+    for (const empty of ['', '   \n\t ']) {
+      await reloadWith(page, { honmaniCustomCss: empty });
+      expect(await page.locator('#honmani-custom-css').count()).toBe(0);
+    }
+  });
+
+  test('applies to the book only, under the page\'s CSP', async ({ page }) => {
+    await setUp(page);
+    await openBook(page);
+    const before = await style(page, '.book-content p', 'lineHeight');
+    await page.evaluate(() => {
+      const outside = document.createElement('p');
+      outside.id = 'outside';
+      outside.textContent = 'menu';
+      document.body.appendChild(outside);
+    });
+    const outsideBefore = await style(page, '#outside', 'lineHeight');
+
+    await reloadWith(page, { honmaniCustomCss: 'p { line-height: 3; color: rgb(1, 2, 3) }\n@media (min-width: 1px) { ruby { color: rgb(4, 5, 6) } }' });
+    await page.evaluate(() => {
+      const outside = document.createElement('p');
+      outside.id = 'outside';
+      outside.textContent = 'menu';
+      document.body.appendChild(outside);
+    });
+    expect(await page.locator('#honmani-custom-css').count()).toBe(1);
+    const fontSize = parseFloat(await style(page, '.book-content p', 'fontSize'));
+    expect(parseFloat(await style(page, '.book-content p', 'lineHeight'))).toBeCloseTo(fontSize * 3, 0);
+    expect(await style(page, '.book-content p', 'lineHeight')).not.toBe(before);
+    expect(await style(page, '.book-content p', 'color')).toBe('rgb(1, 2, 3)');
+    expect(await style(page, '.book-content ruby', 'color')).toBe('rgb(4, 5, 6)');
+    // Outside the book (ttu's own elements, a paragraph added next to it) nothing changes.
+    expect(await style(page, '#outside', 'lineHeight')).toBe(outsideBefore);
+    expect(await style(page, '#outside', 'color')).not.toBe('rgb(1, 2, 3)');
+    // The page still carries the app's CSP, which has no style-src.
+    const policy = await page.evaluate(() => fetch(location.href).then((r) => r.headers.get('content-security-policy')));
+    expect(policy).not.toContain('style-src');
+  });
+
+  test('the stylesheet comes after ttu\'s, so a rule of equal weight wins', async ({ page }) => {
+    await setUp(page, { honmaniCustomCss: 'p { margin-left: 7px }' });
+    await openBook(page);
+    const last = await page.evaluate(() => {
+      const style = document.getElementById('honmani-custom-css');
+      // ttu's own (the <head>'s styles and links, and Svelte's styles in the body) all come before it.
+      const own = Array.from(document.querySelectorAll('style, link[rel=stylesheet]')).filter((e) => e !== style && e.parentNode !== document.documentElement);
+      return own.length > 0 && own.every((e) => e.compareDocumentPosition(style) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    expect(last).toBe(true);
+  });
+
+  for (const [name, css, rejected] of [
+    ['a stray closing brace that would end the scope', 'p { color: red } } body { display: none } .x { color: blue', true],
+    ['an @import', '@import url("https://example.com/x.css"); body { display: none }', false],
+  ]) {
+    test(`cannot leave the book: ${name}`, async ({ page }) => {
+      await setUp(page, { honmaniCustomCss: css });
+      await openBook(page);
+      expect(await style(page, 'body', 'display')).not.toBe('none');
+      // Rejected as a whole, or applied inside the book only.
+      if (rejected) expect(await page.locator('#honmani-custom-css').count()).toBe(0);
+      expect(await page.evaluate(() => document.querySelectorAll('.book-content p').length)).toBeGreaterThan(0);
+    });
+  }
+
+  test('too long (over 20 KB) is not used', async ({ page }) => {
+    await setUp(page, { honmaniCustomCss: `p { line-height: 3 } /* ${'x'.repeat(20 * 1024)} */` });
+    await openBook(page);
+    expect(await page.locator('#honmani-custom-css').count()).toBe(0);
+  });
+
+  test('a CSS mistake leaves the page usable (broken syntax, unclosed block)', async ({ page }) => {
+    await setUp(page, { honmaniCustomCss: 'p { color: ;;; { ' });
+    await openBook(page);
+    expect(await style(page, 'body', 'display')).not.toBe('none');
+    await expect(page.locator('.book-content p').first()).toBeVisible();
+  });
+
+  test('a tap on a word still looks it up with custom CSS on', async ({ page }) => {
+    await setUp(page, { honmaniCustomCss: 'p { line-height: 3 }' });
+    await openBook(page);
+    const point = await page.evaluate(() => {
+      const node = document.querySelector('.book-content p').lastChild;
+      const range = document.createRange();
+      range.setStart(node, 2);
+      range.setEnd(node, 3);
+      const rect = range.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await page.mouse.click(point.x, point.y);
+    expect((await page.evaluate(() => window.__messages)).map((m) => m.type)).toContain('lookup');
   });
 });

@@ -65,6 +65,15 @@ and the lookup mark as flat greys (the lookup mark black with white text); the l
 a tap on a word. The library keeps its colours. Turning the switch off brings the earlier theme back
 exactly (`localStorage.theme` is the same before, during and after; the Auto theme still follows the system).
 
+Custom CSS (Reader settings, "Custom CSS", empty by default): the row opens a multi-line field with a byte
+counter (at most 20 KB), Save, Clear and Cancel; mismatched braces or quotes and too much text show an
+error and Save stays off. With `p { line-height: 3 }` saved, the book's paragraphs get the new line height
+(`getComputedStyle(document.querySelector('.book-content p')).lineHeight` over the DevTools socket) and
+ttu's menu and the footer do not; the reading position stays the same after the reload; a word still opens
+the lookup panel. Empty means no `<style id="honmani-custom-css">` in the page at all. Broken CSS never
+makes the book unusable: the reader settings screen is native and Clear removes it. A `url()` in the CSS
+makes no network request (checked on the 7 Pro with a local server behind `adb reverse`: background, content, border-image and @font-face url() all stayed silent).
+
 Pictures: in a book with a picture (a cover page or an illustration, horizontal and vertical), a tap on
 it opens it full screen on black, with the cover and a big photo both readable; pinch and double tap zoom
 in (a second double tap goes back to fit), a drag moves it only as far as its edges, and Back or the

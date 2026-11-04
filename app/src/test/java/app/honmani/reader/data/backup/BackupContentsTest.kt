@@ -101,4 +101,16 @@ class BackupContentsTest {
         assertEquals(mapOf("honmaniEInk" to "1"), ReaderSettingsCheck.valid(mapOf("honmaniEInk" to "1")))
         assertEquals(emptyMap<String, String>(), ReaderSettingsCheck.valid(mapOf("honmaniEInk" to "yes")))
     }
+
+    @Test
+    fun customCssSurvivesARestore_withinItsCap() {
+        val css = "p { line-height: 3 }"
+        assertEquals(mapOf("honmaniCustomCss" to css), ReaderSettingsCheck.valid(mapOf("honmaniCustomCss" to css)))
+        // An empty value is valid: it clears the phone's CSS.
+        assertEquals(mapOf("honmaniCustomCss" to ""), ReaderSettingsCheck.valid(mapOf("honmaniCustomCss" to "")))
+        assertEquals(emptyMap<String, String>(), ReaderSettingsCheck.valid(mapOf("honmaniCustomCss" to "a".repeat(20 * 1024 + 1))))
+        // The cap counts bytes, not characters: 7000 Japanese characters are 21000 bytes.
+        assertEquals(emptyMap<String, String>(), ReaderSettingsCheck.valid(mapOf("honmaniCustomCss" to "あ".repeat(7000))))
+        assertEquals(emptyMap<String, String>(), ReaderSettingsCheck.valid(mapOf("honmaniCustomCss" to "p {\u0000}")))
+    }
 }

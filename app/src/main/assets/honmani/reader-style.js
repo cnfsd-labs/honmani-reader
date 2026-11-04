@@ -1,14 +1,25 @@
 /*
- * Honmani's reader looks that go beyond ttu's settings, injected at document start. The switch is
+ * Honmani's reader looks that go beyond ttu's settings, injected at document start. Both are
  * read from localStorage when the page loads (Honmani's reader settings reload the page when
- * their screen closes), and writes one <style> element, or none while it is off:
+ * their screen closes), and each writes one <style> element, or none while it is off:
  *
  * "honmaniEInk" = "1" (off by default): for e-ink screens. On a book page (the rules apply while
- * the page has `.book-content`, so the library keeps its colours) there are no CSS transitions or animations, no text or box shadows, plain black text on white (ttu's theme in
+ * the page has `.book-content`, so the library keeps its colours) there are no CSS transitions or
+ * animations, no text or box shadows, plain black text on white (ttu's theme in
  * localStorage is not touched, so turning the mode off brings the theme back as it was), and the
  * marks in the text (word marks, the lookup mark, search hits) are greys as solid backgrounds
  * instead of colours. The WebView paints no text-decoration in ::highlight(), so the marks differ
  * by background alone. word-marks.js reads the switch too, to show its marks without a fade.
+ *
+ * "honmaniCustomCss": the reader's own CSS for the book text (empty by default; the app caps it at
+ * 20 KB). It is wrapped in a rule for the book's root element, `.book-content { ... }` (CSS
+ * nesting), so a selector like `p` reaches only paragraphs of the book and never ttu's menus or
+ * Honmani's overlays; `html` or `body` selectors match nothing, and of the at-rules only
+ * conditional ones such as @media nest. The text is not used when the wrapper would not stay one
+ * rule (a stray `}` that could end it early), when the WebView does not know nesting, or when it
+ * is too long. The page's Content-Security-Policy has no style-src, so the inline style applies;
+ * url() loads nothing: measured on the 7 Pro, a local server saw no request for url() in a
+ * background, content, border-image or @font-face, nor for a plain Image() (the WebView blocks them).
  */
 (() => {
   'use strict';
@@ -17,8 +28,12 @@
   window.__honmaniReaderStyle = true;
 
   const EINK_KEY = 'honmaniEInk';
+  const CSS_KEY = 'honmaniCustomCss';
   const BOOK_ROOT_SELECTOR = '.book-content';
+  /** The most CSS (UTF-8 bytes) the reader's own style may have; the app's field has the same cap. */
+  const MAX_CUSTOM_CSS_BYTES = 20 * 1024;
   const EINK_STYLE_ID = 'honmani-eink-style';
+  const CUSTOM_STYLE_ID = 'honmani-custom-css';
 
   const H = 'html:has(.book-content)';
   const EINK_CSS = `
@@ -44,6 +59,25 @@
     }
   }
 
+  function utf8Length(text) {
+    return new TextEncoder().encode(text).length;
+  }
+
+  /** The reader's CSS scoped to the book's root, or null if there is none or it cannot be used safely. */
+  function scopedCss(css) {
+    if (typeof css !== 'string' || css.trim() === '' || utf8Length(css) > MAX_CUSTOM_CSS_BYTES) return null;
+    if (!window.CSS || !CSS.supports('selector(&)')) return null;
+    const wrapped = `${BOOK_ROOT_SELECTOR} {\n${css}\n}`;
+    try {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(wrapped);
+      // Anything that ended the wrapper early shows as a second rule.
+      return sheet.cssRules.length === 1 ? wrapped : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function addStyle(id, css) {
     const style = document.createElement('style');
     style.id = id;
@@ -54,6 +88,13 @@
 
   function start() {
     if (read(EINK_KEY) === '1') addStyle(EINK_STYLE_ID, EINK_CSS);
+
+    const css = scopedCss(read(CSS_KEY));
+    if (css !== null) {
+      const style = addStyle(CUSTOM_STYLE_ID, css);
+      // After ttu's own stylesheets, which all sit before the end of <body>, so equal rules lose.
+      document.addEventListener('DOMContentLoaded', () => document.body && document.body.appendChild(style), { once: true });
+    }
   }
 
   if (document.documentElement) {

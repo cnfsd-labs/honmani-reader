@@ -912,6 +912,15 @@
     <string name="reader_settings_immersive_details">Hide the status and navigation bars while a book is open; swipe from the screen edge to show them for a moment</string>
     <string name="reader_settings_eink">E-ink mode</string>
     <string name="reader_settings_eink_details">Black on white in the book, with no animations or shadows and grey word marks; your theme comes back when you turn it off</string>
+    <string name="reader_settings_custom_css">Custom CSS</string>
+    <string name="reader_settings_custom_css_off">Off. Your own style rules for the book text</string>
+    <string name="reader_settings_custom_css_on">On (%1$d bytes)</string>
+    <string name="reader_settings_custom_css_help">Style rules for the book text only, such as p { line-height: 2 }. They apply the next time the book opens. Leave it empty for no changes.</string>
+    <string name="reader_settings_custom_css_count">%1$d of %2$d bytes</string>
+    <string name="reader_settings_custom_css_too_long">Too long: it is not used. At most %1$d KB.</string>
+    <string name="reader_settings_custom_css_unbalanced">The brackets or quotes do not match: this is not used.</string>
+    <string name="reader_settings_custom_css_save">Save</string>
+    <string name="reader_settings_custom_css_clear">Clear</string>
     <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
     <string name="reader_settings_edge_taps_details">A tap at the left or right edge turns the page instead of looking up; paginated mode only</string>
     <string name="reader_settings_edge_zone">Width of the page edges</string>

@@ -77,6 +77,8 @@ data class ReaderSettings(
     val immersive: Boolean = false,
     /** E-ink mode: black on white, no motion, no shadows and grey marks in the book (`reader-style.js`); off by default. */
     val eInk: Boolean = false,
+    /** The reader's own CSS for the book text, empty by default (`reader-style.js`, at most [CustomCss.MAX_BYTES] bytes). */
+    val customCss: String = "",
 ) {
     /** Whether the system bars are hidden now: only with a book on screen, never over the library, other tabs or the reader settings. */
     fun hidesBars(atLibrary: Boolean, settingsOpen: Boolean): Boolean = immersive && !atLibrary && !settingsOpen
@@ -105,6 +107,7 @@ data class ReaderSettings(
         put(MARK_DUE, flag(markDue))
         put(IMMERSIVE, flag(immersive))
         put(EINK, flag(eInk))
+        put(CUSTOM_CSS, customCss)
     }
 
     companion object {
@@ -136,6 +139,7 @@ data class ReaderSettings(
         private const val MARK_DUE = "honmaniMarkDue"
         private const val IMMERSIVE = "honmaniImmersive"
         private const val EINK = "honmaniEInk"
+        private const val CUSTOM_CSS = "honmaniCustomCss"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -174,6 +178,7 @@ data class ReaderSettings(
                 markDue = flag(MARK_DUE, defaults.markDue),
                 immersive = flag(IMMERSIVE, defaults.immersive),
                 eInk = flag(EINK, defaults.eInk),
+                customCss = values[CUSTOM_CSS]?.takeIf { CustomCss.fits(it) } ?: defaults.customCss,
             )
         }
     }

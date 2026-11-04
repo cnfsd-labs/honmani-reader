@@ -1,5 +1,6 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.data.settings.CustomCss
 import app.honmani.reader.data.settings.EdgeZone
 import app.honmani.reader.data.words.WordMarksMode
 import java.net.URI
@@ -57,6 +58,7 @@ object ReaderSettingsCheck {
         "viewMode" -> value == "paginated" || value == "continuous"
         in flags -> value == "0" || value == "1"
         "honmaniWordMarks" -> WordMarksMode.entries.any { it.storage == value }
+        "honmaniCustomCss" -> CustomCss.fits(value)
         "honmaniEdgeZone" -> EdgeZone.entries.any { it.storage == value }
         else -> false
     }

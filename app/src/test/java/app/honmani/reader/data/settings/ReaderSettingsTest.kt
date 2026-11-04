@@ -111,4 +111,15 @@ class ReaderSettingsTest {
         assertEquals("1", settings.toStorage()["honmaniEInk"])
         assertEquals(settings, ReaderSettings.fromStorage(settings.toStorage()))
     }
+
+    @Test
+    fun customCssIsEmptyByDefault_andRoundTrips() {
+        assertEquals("", ReaderSettings.fromStorage(emptyMap()).customCss)
+        assertEquals("", ReaderSettings().toStorage()["honmaniCustomCss"])
+        val settings = ReaderSettings(customCss = "p { line-height: 3 }\n.x { color: #333 }")
+        assertEquals(settings, ReaderSettings.fromStorage(settings.toStorage()))
+        // A stored value over the cap is not taken (the page would not use it either).
+        val tooLong = "a".repeat(CustomCss.MAX_BYTES + 1)
+        assertEquals("", ReaderSettings.fromStorage(mapOf("honmaniCustomCss" to tooLong)).customCss)
+    }
 }
