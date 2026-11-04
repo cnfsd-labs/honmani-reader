@@ -248,6 +248,8 @@ class AnkiSyncTest {
         override fun addNoteType(name: String, fields: List<String>, cardName: String, front: String, back: String, css: String) =
             noteType(name)
 
+        override fun addField(noteType: Long, name: String) = true
+
         override fun cardFront(noteType: Long): String? = null
 
         override fun setCard(noteType: Long, cardName: String, front: String, back: String) = true

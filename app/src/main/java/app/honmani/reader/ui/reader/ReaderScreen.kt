@@ -142,6 +142,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // Reading time counts while a book is on screen and the app is in front.
     val tracker = remember { container.readingTracker }
     val showPreviousSentence by container.appearanceSettings.showPreviousSentence.collectAsStateWithLifecycle()
+    val sentenceEnds by container.ankiSettings.sentenceEnds.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -326,7 +327,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 marks = { texts, mode, knownWords, sentences, dueMarks, isStale ->
                     container.wordMarker.mark(texts, mode, knownWords, sentences, dueMarks, isStale)
                 },
-                marksKey = learning?.let { it to dueWords },
+                marksKey = learning?.let { Triple(it, dueWords, sentenceEnds) },
+                sentenceEnds = sentenceEnds,
                 highlightsMessage = { bookId ->
                     container.bookDao.findByTtuId(bookId)?.let { book ->
                         container.sectionStarts(book)?.let { sections ->

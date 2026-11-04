@@ -19,10 +19,10 @@ class AnkiTextFileTest {
     fun headersThenOneQuotedLinePerCard() {
         val lines = AnkiTextFile.text(listOf(card, card), deck = "Deck\tname").lines()
 
-        // Deck and tags as columns (9 and 10, counted from 1): Anki creates a missing deck from a
+        // Deck and tags as columns (10 and 11, counted from 1): Anki creates a missing deck from a
         // deck column but ignores a "#deck:" header naming one.
         assertEquals(
-            listOf("#separator:tab", "#html:true", "#notetype:Honmani", "#deck column:9", "#tags column:10"),
+            listOf("#separator:tab", "#html:true", "#notetype:Honmani", "#deck column:10", "#tags column:11"),
             lines.take(5),
         )
         assertEquals(

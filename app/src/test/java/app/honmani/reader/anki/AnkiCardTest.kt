@@ -83,7 +83,7 @@ class AnkiCardTest {
         val fields = SentenceCard.fields(content, wordAudio = "[sound:w.mp3]", sentenceAudio = "[sound:s.mp3]")
 
         assertEquals(SentenceCard.FIELDS.size, fields.size)
-        assertEquals(listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio"), SentenceCard.FIELDS)
+        assertEquals(listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio", "FuriganaPlain"), SentenceCard.FIELDS)
         assertEquals("取り扱う", fields[0])
         assertEquals("とりあつかう", fields[1])
         assertEquals("<ol><li>to handle; to deal with</li><li>to treat</li></ol>", fields[2])
@@ -102,6 +102,26 @@ class AnkiCardTest {
         assertEquals("取り扱う", SentenceCard.fields(content.copy(sentence = ""))[3])
         assertEquals("取り扱う", SentenceCard.fields(content.copy(sentence = "  "))[3])
         assertEquals("すごい", SentenceCard.fields(content.copy(expression = "すごい", reading = ""))[1])
+    }
+
+    @Test
+    fun plainFurigana_isAnkisNotation_withASpaceBeforeEveryReadingAfterTheStart() {
+        assertEquals("取[と]り 扱[あつか]う", AnkiCard.plainFurigana("取り扱う", "とりあつかう"))
+        assertEquals("漢字[かんじ]", AnkiCard.plainFurigana("漢字", "かんじ"))
+        assertEquals("お 茶[ちゃ]", AnkiCard.plainFurigana("お茶", "おちゃ"))
+        assertEquals("すごい", AnkiCard.plainFurigana("すごい", "すごい"))
+        assertEquals("A&amp;B[えーあんどびー]", AnkiCard.plainFurigana("A&B", "えーあんどびー"))
+    }
+
+    @Test
+    fun bothNoteTypesEndWithThePlainFurigana() {
+        for (model in listOf(AnkiCard.MODEL, SentenceCard.MODEL)) {
+            assertEquals(AnkiCard.PLAIN_FURIGANA, model.fields.last())
+            assertEquals(listOf(AnkiCard.PLAIN_FURIGANA), model.addedFields)
+            val fields = model.build(content, "", "")
+            assertEquals(model.fields.size, fields.size)
+            assertEquals("取[と]り 扱[あつか]う", fields.last())
+        }
     }
 
     @Test

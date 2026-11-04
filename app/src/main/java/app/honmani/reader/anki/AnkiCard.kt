@@ -31,7 +31,9 @@ data class WordDetails(
 /**
  * An Anki note type Honmani makes: its name, fields and card template, and how a [CardContent]
  * fills it. [id] and [guidPrefix] are the fixed ids of the `.apkg` ([AnkiPackage]); [required]
- * are the field indexes a card needs one of.
+ * are the field indexes a card needs one of. [addedFields] came after the note type's first
+ * version: they stand last in [fields], and a note type in AnkiDroid that lacks them gains them
+ * ([AnkiExporter]) instead of being replaced by a second one.
  */
 class NoteModel(
     val name: String,
@@ -43,6 +45,7 @@ class NoteModel(
     val back: String,
     val css: String,
     val required: List<Int>,
+    val addedFields: List<String> = emptyList(),
     val build: (content: CardContent, wordAudio: String, sentenceAudio: String) -> List<String>,
 )
 
@@ -71,9 +74,13 @@ object AnkiCard {
     const val DECK = "Honmani"
     const val TAG = "honmani"
 
+    /** The field with the word in Anki's own furigana notation, for `{{furigana:FuriganaPlain}}`. */
+    const val PLAIN_FURIGANA = "FuriganaPlain"
+
     /** Field names; the first is the sort field and duplicate key, as usual in Anki. */
     val FIELDS = listOf(
         "Word", "Reading", "Furigana", "Meaning", "Sentence", "Book", "WordAudio", "SentenceAudio", "Pitch", "Frequency",
+        PLAIN_FURIGANA,
     )
 
     const val CARD_NAME = "Reading"
@@ -119,6 +126,7 @@ object AnkiCard {
         back = BACK,
         css = CSS,
         required = listOf(0),
+        addedFields = listOf(PLAIN_FURIGANA),
         build = { content, wordAudio, sentenceAudio -> fields(content, wordAudio, sentenceAudio) },
     )
 
@@ -136,6 +144,7 @@ object AnkiCard {
             sentenceAudio,
             PitchAccent.html(reading, content.pitches),
             escape(content.frequency.orEmpty()),
+            plainFurigana(content.expression, reading),
         )
     }
 
@@ -149,6 +158,23 @@ object AnkiCard {
                 "<ruby>${escape(segment.text)}<rt>${escape(ruby)}</rt></ruby>"
             }
         }
+
+    /**
+     * 取り扱う read とりあつかう as `取[と]り 扱[あつか]う`, Anki's notation. A reading belongs to the
+     * text back to the last space, so each one after the start needs a space before its kanji; the
+     * `furigana:` filter drops those spaces.
+     */
+    fun plainFurigana(expression: String, reading: String): String = buildString {
+        for (segment in Furigana.segments(expression, reading)) {
+            val ruby = segment.ruby
+            if (ruby == null || ruby == segment.text) {
+                append(escape(segment.text))
+            } else {
+                if (isNotEmpty()) append(' ')
+                append(escape(segment.text)).append('[').append(escape(ruby)).append(']')
+            }
+        }
+    }
 
     /** One sense as plain text, several as a numbered list. */
     fun meaning(senses: List<List<String>>): String {
@@ -228,7 +254,7 @@ object SentenceCard {
     const val NOTE_TYPE = "Honmani Sentence"
 
     /** The first two fields are the word and its reading, as in [AnkiCard]: they identify the card. */
-    val FIELDS = listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio")
+    val FIELDS = listOf("Word", "Reading", "Meaning", "Sentence", "WordAudio", "SentenceAudio", AnkiCard.PLAIN_FURIGANA)
 
     const val FRONT = """<div class="sentence">{{Sentence}}</div>
 {{SentenceAudio}}"""
@@ -265,6 +291,7 @@ object SentenceCard {
         css = CSS,
         // The sentence field is never empty (see [sentence]); it is what the front shows.
         required = listOf(3),
+        addedFields = listOf(AnkiCard.PLAIN_FURIGANA),
         build = { content, wordAudio, sentenceAudio -> fields(content, wordAudio, sentenceAudio) },
     )
 
@@ -277,6 +304,7 @@ object SentenceCard {
             sentence(content),
             wordAudio,
             sentenceAudio,
+            AnkiCard.plainFurigana(content.expression, reading),
         )
     }
 

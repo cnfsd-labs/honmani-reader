@@ -46,6 +46,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import app.honmani.reader.MainActivity
 import app.honmani.reader.HonmaniApplication
+import app.honmani.reader.data.words.Sentences
 import app.honmani.reader.data.words.WordMark
 import app.honmani.reader.data.words.WordMarksMode
 import app.honmani.reader.diagnostics.ReaderDiagnostics
@@ -187,6 +188,8 @@ fun ReaderWebView(
     panelOpen: Boolean = false,
     /** A long press looks the text up and deselects it, so Android's Copy toolbar is not shown. */
     hideSelectionToolbar: Boolean = false,
+    /** The characters that end a sentence, for the page's sentences (`tap-bridge.js`). */
+    sentenceEnds: String = Sentences.DEFAULT_ENDS,
     /** The page's highlights message for a book (the ttu id), or null when it has none to draw. */
     highlightsMessage: suspend (Long) -> String? = { null },
     /** Changes when the book's highlights do, so the page gets them again. */
@@ -291,6 +294,11 @@ fun ReaderWebView(
         }
     }
 
+    val currentSentenceEnds by rememberUpdatedState(sentenceEnds)
+    LaunchedEffect(sentenceEnds) {
+        webViewRef.view?.let { sendSentenceEnds(it, sentenceEnds) }
+    }
+
     // The page draws highlights as the app saves them: pushed again for the book it last asked about.
     LaunchedEffect(highlightsKey) {
         val bookId = webViewRef.highlightsBookId ?: return@LaunchedEffect
@@ -313,6 +321,7 @@ fun ReaderWebView(
                     onRenderProcessGone = { renderer++ },
                     // Only over a book: ttu's own pages keep their text fields' Paste and Select all.
                     hideSelectionToolbar = { currentHideToolbar && inBook },
+                    sentenceEnds = { currentSentenceEnds },
                     onMessage = { message, replyProxy ->
                         webViewRef.replyProxy = replyProxy
                         when (message) {
@@ -489,6 +498,7 @@ private fun createReaderWebView(
     onShowFileChooser: (ValueCallback<Array<Uri>>, allowsMultiple: Boolean) -> Unit,
     onRenderProcessGone: () -> Unit,
     hideSelectionToolbar: () -> Boolean,
+    sentenceEnds: () -> String,
 ): WebView {
     val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
     WebView.setWebContentsDebuggingEnabled(debuggable)
@@ -518,7 +528,7 @@ private fun createReaderWebView(
         // requests are not network loads), and nothing else may load.
         settings.blockNetworkLoads = true
 
-        webViewClient = ReaderWebViewClient(assetLoader, diagnostics, ttuLibrary, onPathChanged, onRenderProcessGone)
+        webViewClient = ReaderWebViewClient(assetLoader, diagnostics, ttuLibrary, onPathChanged, onRenderProcessGone, sentenceEnds)
         webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(message: ConsoleMessage): Boolean {
                 diagnostics.log(
@@ -564,6 +574,11 @@ private fun createReaderWebView(
 
         loadUrl(START_URL)
     }
+}
+
+/** Tells the page what ends a sentence; every page load needs it again. */
+private fun sendSentenceEnds(view: WebView, ends: String) {
+    view.evaluateJavascript("window.honmaniSentenceEnds = ${JsonPrimitive(ends)};", null)
 }
 
 /** Sends PageDown (next) or PageUp to the page, as a keyboard would. */
@@ -613,6 +628,7 @@ private class ReaderWebViewClient(
     private val ttuLibrary: TtuLibrary,
     private val onPathChanged: (path: String, ttuBookId: Long?) -> Unit,
     private val onRenderProcessGone: () -> Unit,
+    private val sentenceEnds: () -> String,
 ) : WebViewClient() {
     /** Counts route changes, so [goBack] can tell whether a history step happened. */
     var routeChanges = 0
@@ -623,6 +639,7 @@ private class ReaderWebViewClient(
     }
 
     override fun onPageFinished(view: WebView, url: String?) {
+        sendSentenceEnds(view, sentenceEnds())
         ttuLibrary.attach(
             object : TtuPage {
                 override fun evaluate(script: String) = onMainThread { view.evaluateJavascript(script, null) }

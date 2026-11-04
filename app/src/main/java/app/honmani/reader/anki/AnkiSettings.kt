@@ -1,6 +1,7 @@
 package app.honmani.reader.anki
 
 import android.content.SharedPreferences
+import app.honmani.reader.data.words.Sentences
 import app.honmani.reader.data.opds.CredentialCipher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +77,11 @@ class AnkiSettings(
     /** Which note type new cards and the package use ([CardStyle.HONMANI] unless changed). */
     val cardStyle: StateFlow<CardStyle> = _cardStyle.asStateFlow()
 
+    private val _sentenceEnds = MutableStateFlow(Sentences.cleanEnds(preferences.getString(KEY_SENTENCE_ENDS, null)))
+
+    /** The characters that end a sentence on cards, in highlights and in the sentence tint ([Sentences]). */
+    val sentenceEnds: StateFlow<String> = _sentenceEnds.asStateFlow()
+
     private val _hasGoogleKey = MutableStateFlow(devicePreferences.contains(KEY_GOOGLE_KEY))
     val hasGoogleKey: StateFlow<Boolean> = _hasGoogleKey.asStateFlow()
 
@@ -105,6 +111,13 @@ class AnkiSettings(
     fun setCardStyle(style: CardStyle) {
         _cardStyle.value = style
         preferences.edit().putString(KEY_CARD_STYLE, style.name).apply()
+    }
+
+    /** Nothing usable in [ends] goes back to [Sentences.DEFAULT_ENDS]. */
+    fun setSentenceEnds(ends: String) {
+        val clean = Sentences.cleanEnds(ends)
+        _sentenceEnds.value = clean
+        preferences.edit().putString(KEY_SENTENCE_ENDS, clean).apply()
     }
 
     /** A blank name goes back to the "Honmani" deck. */
@@ -149,6 +162,7 @@ class AnkiSettings(
         _googleVoice.value = preferences.getString(KEY_GOOGLE_VOICE, null)
         _deck.value = preferences.getString(KEY_DECK, null) ?: AnkiCard.DECK
         _cardStyle.value = CardStyle.fromName(preferences.getString(KEY_CARD_STYLE, null))
+        _sentenceEnds.value = Sentences.cleanEnds(preferences.getString(KEY_SENTENCE_ENDS, null))
     }
 
     /** The note type whose card template Honmani has checked (see [AnkiExporter]). */
@@ -182,6 +196,7 @@ class AnkiSettings(
         const val KEY_KNOWN_OFFERED = "anki_known_offered"
         const val KEY_DECK = "anki_deck"
         const val KEY_CARD_STYLE = "anki_card_style"
+        const val KEY_SENTENCE_ENDS = "anki_sentence_ends"
         // "v2": the note type got Pitch and Frequency fields; an id kept from before is not it.
         const val KEY_NOTE_TYPE = "anki_note_type_v2"
         const val KEY_SENTENCE_NOTE_TYPE = "anki_sentence_note_type"

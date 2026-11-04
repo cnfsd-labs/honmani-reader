@@ -19,6 +19,8 @@ class WordMarker(
     private val knowledge: suspend () -> WordKnowledge,
     /** Dictionary forms of the words whose review cards are due today. */
     private val due: suspend () -> Set<String> = { emptySet() },
+    /** The characters that end a sentence ([Sentences]). */
+    private val sentenceEnds: () -> String = { Sentences.DEFAULT_ENDS },
 ) {
     private val lock = Mutex()
     private var segmenter: Pair<String, Segmenter>? = null
@@ -42,7 +44,8 @@ class WordMarker(
                 ?: Segmenter(lexicon(wanted)).also { segmenter = wanted.signature to it }
             val known = knowledge()
             val dueWords = if (dueMarks) due() else emptySet()
-            texts.map { WordMarks.of(it, split, known, mode, knownWords, sentences, dueWords) }
+            val ends = sentenceEnds()
+            texts.map { WordMarks.of(it, split, known, mode, knownWords, sentences, dueWords, ends) }
         }
     }
 }

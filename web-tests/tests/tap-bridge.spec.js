@@ -130,6 +130,17 @@ test('sentence includes closing quote and stops at the paragraph', async ({ page
   expect(message.sentenceOffset).toBe(0);
 });
 
+test('the app can change what ends a sentence', async ({ page }) => {
+  await page.evaluate(() => {
+    window.honmaniSentenceEnds = 'は';
+  });
+  await tapChar(page, '#v1', '名');
+
+  const [message] = await messages(page);
+  expect(message.sentence).toBe('猫である。名前は');
+  expect(message.sentenceOffset).toBe(5);
+});
+
 test('sends the sentence before the tapped one, within the paragraph', async ({ page }) => {
   await tapChar(page, '#v1', '名');
   await tapChar(page, '#h4', '風');

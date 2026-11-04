@@ -39,6 +39,19 @@ class AnkiSettingsTest {
     }
 
     @Test
+    fun sentenceEnds_keepTheDefaultUntilChanged_andGoBackToItWhenBlank() {
+        val settings = AnkiSettings(choices, plainCipher, device)
+        assertEquals("。！？!?…", settings.sentenceEnds.value)
+
+        settings.setSentenceEnds("。 。♪")
+        assertEquals("。♪", settings.sentenceEnds.value)
+        assertEquals("。♪", AnkiSettings(choices, plainCipher, device).sentenceEnds.value)
+
+        settings.setSentenceEnds("  ")
+        assertEquals("。！？!?…", settings.sentenceEnds.value)
+    }
+
+    @Test
     fun aRestoredBackupHasTheChoicesButNoKey() {
         AnkiSettings(choices, plainCipher, device).apply {
             setDeck("Japanese")

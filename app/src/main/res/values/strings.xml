@@ -372,6 +372,10 @@
     <string name="card_style_details">Honmani: the word, then the sentence with the word marked, with furigana, pitch and meanings on the back. Sentence: the whole sentence on the front; the word, its reading and meaning on the back.</string>
     <string name="card_style_honmani">Honmani</string>
     <string name="card_style_sentence">Sentence</string>
+    <string name="sentence_ends">Sentence ends</string>
+    <string name="sentence_ends_details">The characters that end a sentence on new cards, in sentence highlights and in the sentence tint. A line break always does.</string>
+    <string name="sentence_ends_save">Save</string>
+    <string name="sentence_ends_default">Default</string>
     <string name="anki_already">%1$s is already in Anki</string>
     <string name="anki_not_installed">Adding cards needs AnkiDroid. Install it from Google Play, open it once, then try again.</string>
     <string name="anki_no_permission">Honmani needs permission to add cards to AnkiDroid.</string>

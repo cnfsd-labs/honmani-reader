@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +56,7 @@ import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCard
 import app.honmani.reader.anki.CardAudio
 import app.honmani.reader.anki.CardStyle
+import app.honmani.reader.data.words.Sentences
 import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
@@ -123,6 +126,7 @@ private fun AnkiSettingsContent() {
     val deck by settings.deck.collectAsStateWithLifecycle()
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
     val cardStyle by settings.cardStyle.collectAsStateWithLifecycle()
+    val sentenceEnds by settings.sentenceEnds.collectAsStateWithLifecycle()
     val anki = rememberAnkiAccess()
     val knownFromAnki = rememberKnownFromAnki()
     val scope = rememberCoroutineScope()
@@ -210,6 +214,7 @@ private fun AnkiSettingsContent() {
             onSelect = settings::setDeck,
         )
         CardStylePicker(cardStyle, onSelect = settings::setCardStyle)
+        SentenceEndsRow(sentenceEnds, onChange = settings::setSentenceEnds)
         ListItem(
             headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
             supportingContent = { Text(stringResource(R.string.anki_known_summary)) },
@@ -376,6 +381,46 @@ private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) 
                 )
             }
         }
+    }
+}
+
+/** The characters that end a sentence; a tap opens a field with Save, Default and Cancel. */
+@Composable
+private fun SentenceEndsRow(ends: String, onChange: (String) -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.sentence_ends)) },
+        supportingContent = { Text(ends) },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        var draft by rememberSaveable { mutableStateOf(ends) }
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.sentence_ends)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.sentence_ends_details), style = MaterialTheme.typography.bodySmall)
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onChange(draft); open = false }) { Text(stringResource(R.string.sentence_ends_save)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { onChange(Sentences.DEFAULT_ENDS); open = false }) {
+                        Text(stringResource(R.string.sentence_ends_default))
+                    }
+                    TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) }
+                }
+            },
+        )
     }
 }
 

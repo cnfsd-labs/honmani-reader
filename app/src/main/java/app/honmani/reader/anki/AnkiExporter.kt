@@ -162,6 +162,7 @@ class AnkiExporter(
         val style = settings.cardStyle.value
         val model = style.model
         val noteType = noteType(style) ?: return AnkiResult.Refused
+        val fieldCount = fieldCount(noteType, model)
         val deck = anki.deck(settings.deck.value) ?: return AnkiResult.Refused
         val plain = model.build(content, "", "")
         anki.findNote(noteType, plain[0], plain[1])?.let { existing ->
@@ -187,7 +188,7 @@ class AnkiExporter(
                     audioProblem = e.problem
                 }
             }
-            val fields = model.build(content, wordAudio, sentenceAudio)
+            val fields = model.build(content, wordAudio, sentenceAudio).take(fieldCount)
             val noteId = anki.addNote(noteType, deck, fields, setOf(AnkiCard.TAG)) ?: return AnkiResult.Refused
             markInAnki(content, noteId, deferred)
             return AnkiResult.Added(noteId, audioProblem)
@@ -212,7 +213,7 @@ class AnkiExporter(
     private fun noteType(style: CardStyle): Long? {
         val model = style.model
         val id = settings.noteTypeId(style)?.takeIf { anki.noteTypeExists(it) }
-            ?: anki.findNoteType(model.name, model.fields)
+            ?: anki.findNoteType(model)
             ?: anki.addNoteType(
                 name = model.name,
                 fields = model.fields,
@@ -225,6 +226,25 @@ class AnkiExporter(
         settings.setNoteTypeId(style, id)
         checkCard(id, model)
         return id
+    }
+
+    /**
+     * How many of [model]'s fields [noteType] takes, after giving it the [NoteModel.addedFields] it
+     * lacks. An AnkiDroid that refuses one still gets the card, without that field.
+     */
+    private fun fieldCount(noteType: Long, model: NoteModel): Int {
+        val present = anki.fieldNames(noteType)
+        if (present.isEmpty()) return model.fields.size
+        val missing = model.addedFields.filter { it !in present }
+        val added = missing.takeWhile { name ->
+            try {
+                anki.addField(noteType, name)
+            } catch (e: Exception) {
+                logWarning("Honmani.anki", "AnkiDroid did not add the field $name", e)
+                false
+            }
+        }
+        return model.fields.size - (missing.size - added.size)
     }
 
     /**

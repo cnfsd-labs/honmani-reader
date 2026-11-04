@@ -59,6 +59,8 @@ object WordMarks {
         sentences: Boolean = false,
         /** Dictionary forms of the words whose review cards are due today; they get a [WordMark.Kind.DUE] mark. */
         due: Set<String> = emptySet(),
+        /** The characters that end a sentence for [sentences]. */
+        sentenceEnds: String = Sentences.DEFAULT_ENDS,
     ): List<WordMark> {
         val tint = mode != WordMarksMode.OFF
         if (!tint && !knownWords && !sentences && due.isEmpty()) return emptyList()
@@ -101,7 +103,7 @@ object WordMarks {
             // Also for a word marked learned in Words and never read: it is new and known at once.
             if (knownWords && knowledge.isKnown(token.key)) marks += WordMark(token.start, token.length, WordMark.Kind.KNOWN)
         }
-        if (sentences) marks += oneUnknownSentences(text, tokens, knowledge)
+        if (sentences) marks += oneUnknownSentences(text, tokens, knowledge, sentenceEnds)
         return marks
     }
 
@@ -119,7 +121,7 @@ object WordMarks {
      * reading or being learned (a form looked up counts as written). Grammar words and text no
      * dictionary knows (names) are not counted.
      */
-    private fun oneUnknownSentences(text: String, tokens: List<Token>, knowledge: WordKnowledge): List<WordMark> {
+    private fun oneUnknownSentences(text: String, tokens: List<Token>, knowledge: WordKnowledge, sentenceEnds: String): List<WordMark> {
         val ends = tokens.mapTo(HashSet()) { it.start + it.length }
         val unknown = ArrayList<Int>()
         var formEnd = 0
@@ -137,7 +139,7 @@ object WordMarks {
         }
         val found = ArrayList<WordMark>()
         var next = 0
-        for (sentence in Sentences.of(text)) {
+        for (sentence in Sentences.of(text, sentenceEnds)) {
             while (next < unknown.size && unknown[next] < sentence.first) next++
             var count = 0
             while (next + count < unknown.size && unknown[next + count] < sentence.last + 1) count++

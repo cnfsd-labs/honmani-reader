@@ -77,7 +77,8 @@
   /** Stands for a gaiji picture in the text (isGaiji): no word runs across it. */
   const GAIJI = '\uFFFC';
   const NOT_WORD_START = /^[\p{P}\p{S}]/u;
-  const SENTENCE_END = '。！？!?…\n';
+  /** `Sentences.DEFAULT_ENDS` in the app is the same; `window.honmaniSentenceEnds` is the reader's choice. */
+  const DEFAULT_SENTENCE_ENDS = '。！？!?…';
   const CLOSING_QUOTES = '」』）〉》】"\'';
   const OPENING_BRACKETS = '「『（(〈《【〔［｛“‘〝"\'';
   const HIGHLIGHT_NAME = 'honmani-lookup';
@@ -214,13 +215,17 @@
     return Array.from(text).slice(0, count).join('');
   }
 
+  function isSentenceEnd(character) {
+    return character === '\n' || (window.honmaniSentenceEnds || DEFAULT_SENTENCE_ENDS).includes(character);
+  }
+
   /** Where the sentence holding `position` starts and ends in `text`, closing quotes included. */
   function sentenceBounds(text, position) {
     let start = position;
-    while (start > 0 && !SENTENCE_END.includes(text[start - 1])) start--;
+    while (start > 0 && !isSentenceEnd(text[start - 1])) start--;
     let end = position;
-    while (end < text.length && !SENTENCE_END.includes(text[end])) end++;
-    while (end < text.length && SENTENCE_END.includes(text[end])) end++;
+    while (end < text.length && !isSentenceEnd(text[end])) end++;
+    while (end < text.length && isSentenceEnd(text[end])) end++;
     while (end < text.length && CLOSING_QUOTES.includes(text[end])) end++;
     return { start, end };
   }
@@ -253,8 +258,8 @@
     while (end > 0 && /\s/.test(text[end - 1])) end--;
     let begin = end;
     // Past its own ending and closing quotes, then back to the start of that sentence.
-    while (begin > 0 && (SENTENCE_END.includes(text[begin - 1]) || CLOSING_QUOTES.includes(text[begin - 1]))) begin--;
-    while (begin > 0 && !SENTENCE_END.includes(text[begin - 1])) begin--;
+    while (begin > 0 && (isSentenceEnd(text[begin - 1]) || CLOSING_QUOTES.includes(text[begin - 1]))) begin--;
+    while (begin > 0 && !isSentenceEnd(text[begin - 1])) begin--;
     if (end - begin > MAX_PREVIOUS_SENTENCE_LENGTH) {
       begin = end - MAX_PREVIOUS_SENTENCE_LENGTH;
       // Not in the middle of a surrogate pair.

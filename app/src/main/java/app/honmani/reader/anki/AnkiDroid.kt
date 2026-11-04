@@ -33,6 +33,9 @@ interface AnkiApi {
         css: String,
     ): Long?
 
+    /** Adds a field at the end of [noteType]; its notes get it empty. False if AnkiDroid refused. */
+    fun addField(noteType: Long, name: String): Boolean
+
     /** The front template of the note type's first card type, if it can be read. */
     fun cardFront(noteType: Long): String?
 
@@ -62,6 +65,10 @@ interface AnkiApi {
     /** The field names of [noteType], in order. */
     fun fieldNames(noteType: Long): List<String>
 }
+
+/** Honmani's note type for [model], also one made before its [NoteModel.addedFields]. */
+fun AnkiApi.findNoteType(model: NoteModel): Long? =
+    findNoteType(model.name, model.fields) ?: findNoteType(model.name, model.fields - model.addedFields.toSet())
 
 /**
  * Talks to AnkiDroid through its content provider (AnkiDroid's documented "FlashCardsContract").
@@ -120,6 +127,11 @@ class AnkiDroid(context: Context) : AnkiApi {
         val id = uri.lastPathSegment?.toLongOrNull() ?: return null
         setCard(id, cardName, front, back)
         return id
+    }
+
+    override fun addField(noteType: Long, name: String): Boolean {
+        val uri = Uri.withAppendedPath(Uri.withAppendedPath(MODELS, noteType.toString()), "fields")
+        return resolver.insert(uri, ContentValues().apply { put(FIELD_NAME, name) }) != null
     }
 
     override fun cardFront(noteType: Long): String? =
@@ -267,6 +279,7 @@ class AnkiDroid(context: Context) : AnkiApi {
         private const val CHECKSUM = "csum"
         private const val MODEL_NAME = "name"
         private const val MODEL_FIELD_NAMES = "field_names"
+        private const val FIELD_NAME = "field_name"
         private const val MODEL_NUM_CARDS = "num_cards"
         private const val MODEL_CSS = "css"
         private const val MODEL_SORT_FIELD = "sort_field_index"

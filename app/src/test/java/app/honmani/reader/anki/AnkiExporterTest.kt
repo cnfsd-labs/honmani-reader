@@ -77,6 +77,42 @@ class AnkiExporterTest {
     }
 
     @Test
+    fun aNoteTypeFromBeforeThePlainFurigana_gainsTheField_notASecondNoteType() = runBlocking {
+        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
+
+        exporter.add(savedWord())
+
+        assertEquals(0, anki.noteTypesAdded)
+        assertEquals(AnkiCard.FIELDS, anki.fieldsOf[old])
+        val note = anki.notes.single()
+        assertEquals(old, note.noteType)
+        assertEquals("名前[なまえ]", note.fields.last())
+        assertEquals(AnkiCard.FIELDS.size, note.fields.size)
+    }
+
+    @Test
+    fun aRememberedNoteTypeFromBefore_gainsTheFieldToo() = runBlocking {
+        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
+        settings.setNoteTypeId(CardStyle.HONMANI, old)
+
+        exporter.add(savedWord())
+
+        assertEquals(AnkiCard.FIELDS, anki.fieldsOf[old])
+    }
+
+    @Test
+    fun anAnkiDroidRefusingTheField_stillGetsTheCard() = runBlocking {
+        val oldFields = AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA
+        anki.oldNoteType(AnkiCard.NOTE_TYPE, oldFields)
+        anki.refuseFields = true
+
+        val result = exporter.add(savedWord())
+
+        assertTrue(result is AnkiResult.Added)
+        assertEquals(oldFields.size, anki.notes.single().fields.size)
+    }
+
+    @Test
     fun addsACardWithSentenceMeaningsAndAudio_andRemembersIt() = runBlocking {
         val word = savedWord()
 
@@ -185,11 +221,12 @@ class AnkiExporterTest {
         val text = exporter.textFile(listOf(savedWord()))
 
         val lines = text.lines()
-        assertEquals("#deck column:9", lines[3])
-        assertEquals("#columns:Word\tReading\tFurigana\tMeaning\tSentence\tBook\tPitch\tFrequency\tDeck\tTags", lines[5])
+        assertEquals("#deck column:10", lines[3])
+        assertEquals("#columns:Word\tReading\tFurigana\tMeaning\tSentence\tBook\tPitch\tFrequency\tFuriganaPlain\tDeck\tTags", lines[5])
         val fields = lines[6].split('\t')
-        assertEquals(10, fields.size)
-        assertEquals("\"Honmani\"", fields[8])
+        assertEquals(11, fields.size)
+        assertEquals("\"名前[なまえ]\"", fields[8])
+        assertEquals("\"Honmani\"", fields[9])
         assertEquals("\"名前\"", fields[0])
         assertEquals("\"<b>名前</b>はまだ無い。\"", fields[4])
         assertEquals(emptyList<String>(), voice.spoken)
@@ -428,8 +465,25 @@ class AnkiExporterTest {
 
         override fun noteTypeExists(id: Long) = id in noteTypes
 
+        /** Field names of the note types made with some; the others answer for any fields. */
+        val fieldsOf = mutableMapOf<Long, List<String>>()
+        var refuseFields = false
+
+        fun oldNoteType(name: String, fields: List<String>): Long {
+            val id = 1000L + noteTypes.size
+            noteTypes[id] = name
+            fieldsOf[id] = fields
+            return id
+        }
+
         override fun findNoteType(name: String, fields: List<String>) =
-            noteTypes.entries.firstOrNull { it.value == name }?.key
+            noteTypes.entries.firstOrNull { it.value == name && fieldsOf[it.key].let { have -> have == null || have == fields } }?.key
+
+        override fun addField(noteType: Long, name: String): Boolean {
+            if (refuseFields) return false
+            fieldsOf[noteType] = fieldsOf.getValue(noteType) + name
+            return true
+        }
 
         override fun addNoteType(
             name: String,
@@ -480,7 +534,7 @@ class AnkiExporterTest {
 
         override fun deckNotes(deck: String): List<AnkiNote>? = null
 
-        override fun fieldNames(noteType: Long): List<String> = emptyList()
+        override fun fieldNames(noteType: Long): List<String> = fieldsOf[noteType].orEmpty()
 
         override fun addSound(file: File, preferredName: String): String {
             check(file.isFile)

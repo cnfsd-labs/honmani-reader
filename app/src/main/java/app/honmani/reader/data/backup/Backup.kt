@@ -441,6 +441,7 @@ class Backup(
             AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,
             AnkiSettings.KEY_DECK to BackupValue.STRING,
             AnkiSettings.KEY_CARD_STYLE to BackupValue.STRING,
+            AnkiSettings.KEY_SENTENCE_ENDS to BackupValue.STRING,
         )
 
         fun typed(value: Any?): BackupValue? = when (value) {

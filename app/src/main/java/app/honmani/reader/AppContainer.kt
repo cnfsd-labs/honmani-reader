@@ -486,7 +486,9 @@ class AppContainer(context: Context) {
         val sentences = withContext(Dispatchers.Default) {
             val chapters = bookTexts(book)?.map { it.text }?.toList() ?: return@withContext emptyMap()
             val segmenter = Segmenter(lexicon)
-            BookSentences.find(chapters, words, keys, Relevance.step(book.progress)) { text, onToken -> segmenter.segment(text, onToken) }
+            BookSentences.find(chapters, words, keys, Relevance.step(book.progress), ankiSettings.sentenceEnds.value) { text, onToken ->
+                segmenter.segment(text, onToken)
+            }
         }
         var added = 0
         for (key in keys) {
@@ -564,6 +566,7 @@ class AppContainer(context: Context) {
             lexicon = { lexicon(it) },
             knowledge = { wordKnowledge.first() },
             due = { reviewRepository.dueExpressions(reviewSettings.reviewsPerDay.value) },
+            sentenceEnds = { ankiSettings.sentenceEnds.value },
         )
     }
 

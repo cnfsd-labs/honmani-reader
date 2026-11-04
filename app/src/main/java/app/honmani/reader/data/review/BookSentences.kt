@@ -28,6 +28,7 @@ object BookSentences {
         words: BookWords,
         keys: Collection<String>,
         step: Int,
+        sentenceEnds: String = Sentences.DEFAULT_ENDS,
         segment: (String, (Token) -> Unit) -> Unit,
     ): Map<String, FoundSentence> {
         val length = chapters.sumOf { it.length.toLong() }.coerceAtLeast(1)
@@ -55,7 +56,7 @@ object BookSentences {
                     if (current == null || distance < kotlin.math.abs(offset + current.start - at)) best[token.key] = token
                 }
                 if (best.isNotEmpty()) {
-                    val sentences = Sentences.of(chapter)
+                    val sentences = Sentences.of(chapter, sentenceEnds)
                     for ((key, token) in best) {
                         val range = sentences.firstOrNull { token.start in it } ?: continue
                         found[key] = cut(chapter, range, token.start, token.start + token.length)

@@ -17,6 +17,19 @@ class SentencesTest {
     }
 
     @Test
+    fun theReadersEnds_replaceTheDefault_andALineBreakStillEnds() {
+        val text = "行く♪来る。次\n終わり"
+        assertEquals(listOf("行く♪", "来る。次", "終わり"), Sentences.of(text, "♪").map { text.substring(it) })
+    }
+
+    @Test
+    fun cleanEnds_dropsWhiteSpaceRepeatsAndHalfCharacters_blankIsTheDefault() {
+        assertEquals("。♪", Sentences.cleanEnds(" 。\n。♪😀"))
+        assertEquals(Sentences.DEFAULT_ENDS, Sentences.cleanEnds(" \n"))
+        assertEquals(Sentences.DEFAULT_ENDS, Sentences.cleanEnds(null))
+    }
+
+    @Test
     fun emptyTextHasNoSentences() {
         assertEquals(emptyList<String>(), split(""))
         assertEquals(emptyList<String>(), split(" \n"))
