@@ -83,6 +83,7 @@ import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
+import app.honmani.reader.readaloud.AudiobookStore
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.ReadStretchStore
@@ -428,6 +429,9 @@ class AppContainer(context: Context) {
 
     /** Book difficulty, kept per book in app storage (a cache; see [BookGrader]). */
     val difficultyStore: DifficultyStore by lazy { DifficultyStore(File(appContext.filesDir, "difficulty")) }
+
+    /** Each book's audiobook pairing and the subtitle matching, on this phone only (reader menu → Audiobook). */
+    val audiobookStore: AudiobookStore by lazy { AudiobookStore(devicePreferences, File(appContext.filesDir, "audiobook")) }
 
     val bookGrader: BookGrader by lazy {
         BookGrader(

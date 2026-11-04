@@ -597,6 +597,7 @@ class LibraryViewModel(
                     forgetHighlights = container.highlightDao::deleteForBook,
                     forgetDerivedData = { hash ->
                         container.difficultyStore.forget(hash)
+                        container.audiobookStore.forget(hash)
                         container.restoredBooks.forgetPosition(hash)
                     },
                     syncPosition = { book, ttuId, ask ->
