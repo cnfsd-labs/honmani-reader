@@ -348,7 +348,11 @@
   }
 
   function seek(message) {
-    if (!session) return;
+    if (!session) {
+      // The page was reloaded since (a font change): the app starts again from the page.
+      post({ type: 'readAloud.lost', gen: message.gen });
+      return;
+    }
     const record = session.records.get(message.index);
     if (!record || !record.run.tokens[0].isConnected || !record.run.tokens[record.run.tokens.length - 1].isConnected) {
       post({ type: 'readAloud.lost', gen: message.gen });
@@ -364,14 +368,20 @@
   }
 
   function more(message) {
-    if (!session) return;
+    if (!session) {
+      post({ type: 'readAloud.lost', gen: message.gen });
+      return;
+    }
     session.gen = message.gen;
     reply(message.count);
   }
 
   /** The text of the page's section changed: the first text node is another one. */
   async function advance(message) {
-    if (!session) return;
+    if (!session) {
+      post({ type: 'readAloud.lost', gen: message.gen });
+      return;
+    }
     session.gen = message.gen;
     const gen = message.gen;
     const root = rootElement();
