@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -119,7 +123,12 @@ fun BookSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val maxHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() } * MAX_HEIGHT_FRACTION
+    // The sheet adds the navigation bar's height under its content: leave room for both bars, or a long
+    // sheet (a large font, a long folder name) grows past the screen and its last button hides behind them.
+    val screenHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
+    val bars = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val maxHeight = minOf(screenHeight * MAX_HEIGHT_FRACTION, screenHeight - bars)
     val closeDistance = with(density) { CLOSE_DISTANCE.toPx() }
     // How far the sheet is pulled down, following the finger.
     var pull by remember { mutableFloatStateOf(0f) }
