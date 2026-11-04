@@ -70,4 +70,14 @@ class AudiobookStoreTest {
         store.pair("abc", "content://a", byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + "字幕".toByteArray(Charsets.UTF_16LE))
         assertEquals("字幕", store.subtitles("abc"))
     }
+
+    @Test
+    fun theSpeedIsKeptAndOnlyKnownSpeedsComeBack() {
+        val store = store()
+        assertEquals(1f, store.rate(), 0f)
+        store.saveRate(1.25f)
+        assertEquals(1.25f, store().rate(), 0f)
+        store.saveRate(3.3f)
+        assertEquals(1f, store().rate(), 0f)
+    }
 }

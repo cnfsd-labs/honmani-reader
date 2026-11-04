@@ -83,6 +83,7 @@ import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
+import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
@@ -432,6 +433,7 @@ class AppContainer(context: Context) {
 
     /** Each book's audiobook pairing and the subtitle matching, on this phone only (reader menu → Audiobook). */
     val audiobookStore: AudiobookStore by lazy { AudiobookStore(devicePreferences, File(appContext.filesDir, "audiobook")) }
+    val audiobookLoader: AudiobookLoader by lazy { AudiobookLoader(audiobookStore) }
 
     val bookGrader: BookGrader by lazy {
         BookGrader(

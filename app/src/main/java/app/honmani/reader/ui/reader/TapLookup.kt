@@ -78,6 +78,9 @@ sealed interface BridgeMessage {
     /** Read aloud asked for text that is no longer in the page. */
     data class ReadAloudLost(val gen: Int) : BridgeMessage
 
+    /** The audiobook's passage could not be brought on screen by turning pages (`assets/honmani/audiobook.js`). */
+    data class AudiobookLost(val gen: Int) : BridgeMessage
+
     /** A paragraph's text without furigana, and the page's id for it. */
     @Serializable
     data class MarksBlock(val id: Long = 0, val text: String = "")
@@ -106,6 +109,7 @@ sealed interface BridgeMessage {
                 "highlights.request" -> parseHighlightsRequest(message, obj)
                 "readAloud.sentences" -> parseReadAloudSentences(message, obj)
                 "readAloud.lost" -> parseReadAloudLost(message, obj)
+                "audiobook.lost" -> parseAudiobookLost(message, obj)
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
@@ -221,6 +225,12 @@ sealed interface BridgeMessage {
             if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
             val envelope = decode<ReadAloudLostEnvelope>(obj) ?: return null
             return if (envelope.gen >= 0) ReadAloudLost(envelope.gen) else null
+        }
+
+        private fun parseAudiobookLost(message: String, obj: JsonObject): AudiobookLost? {
+            if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
+            val envelope = decode<ReadAloudLostEnvelope>(obj) ?: return null
+            return if (envelope.gen >= 0) AudiobookLost(envelope.gen) else null
         }
 
         @Serializable

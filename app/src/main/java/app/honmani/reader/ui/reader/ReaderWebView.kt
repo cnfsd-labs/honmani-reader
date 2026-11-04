@@ -197,9 +197,9 @@ fun ReaderWebView(
     highlightsMessage: suspend (Long) -> String? = { null },
     /** Changes when the book's highlights do, so the page gets them again. */
     highlightsKey: Any? = null,
-    /** Messages for read aloud's half of the page (`read-aloud.js`), as JSON, in order. */
+    /** Messages for read aloud's and the audiobook's half of the page (`read-aloud.js`, `audiobook.js`), as JSON, in order. */
     readAloudMessages: Flow<String> = emptyFlow(),
-    /** The page's answers for read aloud: [BridgeMessage.ReadAloudSentences] and [BridgeMessage.ReadAloudLost]. */
+    /** The page's answers for read aloud and the audiobook: [BridgeMessage.ReadAloudSentences], [BridgeMessage.ReadAloudLost] and [BridgeMessage.AudiobookLost]. */
     onReadAloud: (BridgeMessage) -> Unit = {},
     /** A book was laid out on screen (also after the page was loaded again, such as for a font change). */
     onBookShown: () -> Unit = {},
@@ -356,7 +356,7 @@ fun ReaderWebView(
                             }
                             BridgeMessage.SettingsShown ->
                                 if (uncover[0] != null) uncoverAfter(UNCOVER_SETTLE_MS)
-                            is BridgeMessage.ReadAloudSentences, is BridgeMessage.ReadAloudLost -> currentOnReadAloud(message)
+                            is BridgeMessage.ReadAloudSentences, is BridgeMessage.ReadAloudLost, is BridgeMessage.AudiobookLost -> currentOnReadAloud(message)
                             BridgeMessage.Activity -> currentOnActivity()
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()

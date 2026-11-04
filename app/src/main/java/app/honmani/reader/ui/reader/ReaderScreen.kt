@@ -9,12 +9,20 @@ import android.provider.Settings
 import android.util.Log
 import android.view.WindowManager
 import app.honmani.reader.data.settings.ReadAloudSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import app.honmani.reader.readaloud.AudiobookPhase
+import app.honmani.reader.readaloud.AudiobookProblem
+import androidx.compose.runtime.SideEffect
 import app.honmani.reader.readaloud.LiveVoice
 import app.honmani.reader.readaloud.ReadAloudController
 import app.honmani.reader.readaloud.ReadAloudPhase
 import app.honmani.reader.readaloud.SpokenSentence
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.delay
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -173,7 +181,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val tracker = remember { container.readingTracker }
     val showPreviousSentence by container.appearanceSettings.showPreviousSentence.collectAsStateWithLifecycle()
     val sentenceEnds by container.ankiSettings.sentenceEnds.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val readAloudMessages = remember { Channel<String>(Channel.UNLIMITED) }
+    val audiobookMessages = remember { Channel<String>(Channel.UNLIMITED) }
+    val pageMessages = remember { merge(readAloudMessages.receiveAsFlow(), audiobookMessages.receiveAsFlow()) }
     val readAloud = remember {
         // The spoken text is only logged by a debug build.
         val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -187,15 +198,37 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         )
     }
     val readAloudState by readAloud.state.collectAsStateWithLifecycle()
+    // The audiobook: the same bar and the same marks on the page, but the book follows a recording.
+    val audiobook = remember {
+        val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        AudiobookSession(
+            context = context,
+            container = container,
+            scope = scope,
+            toPage = { audiobookMessages.trySend(it) },
+            onPlaying = tracker::onActivity,
+            log = { if (debuggable) Log.i("Audiobook", it) },
+        )
+    }
+    val audiobookState by audiobook.controller.state.collectAsStateWithLifecycle()
     // The engine, the focus and the queue go with the reader.
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
+    DisposableEffect(audiobook) { onDispose { audiobook.close() } }
+    // About five times a second while the audio plays, the page is told which subtitle is heard.
+    LaunchedEffect(audiobookState.running) {
+        while (audiobookState.running) {
+            audiobook.controller.tick()
+            delay(AUDIOBOOK_TICK_MS)
+        }
+    }
     // The screen stays on while the book is read aloud, and not a moment longer.
     val rootView = LocalView.current
     // The window flag, not View.keepScreenOn: that one is only passed on at the next frame, which
     // a stopped or still screen never draws.
-    DisposableEffect(rootView, readAloudState.running) {
+    val keepScreenOn = readAloudState.running || audiobookState.running
+    DisposableEffect(rootView, keepScreenOn) {
         val window = rootView.context.findActivity()?.window
-        if (readAloudState.running) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -203,6 +236,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 readAloud.appStopped()
+                audiobook.controller.appStopped()
                 // The state collection is stopped too, so the flag is cleared here, not by the effect.
                 context.findActivity()?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
@@ -229,9 +263,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         // The panel's word audio never talks over the reader's voice: it ends before that goes on.
         if (panel == null) container.wordAudio.stop()
         readAloud.panelChanged(panel != null)
+        audiobook.controller.panelChanged(panel != null)
     }
     LaunchedEffect(atLibrary) {
-        if (atLibrary) readAloud.close()
+        if (atLibrary) {
+            readAloud.close()
+            audiobook.close()
+        }
         tracker.setVisible(!atLibrary)
         // Back at the library: the position reached goes to the sync server now.
         if (atLibrary) container.progressSync.flush()
@@ -253,7 +291,6 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The words of this reading session, from the reader's bottom menu.
     var sessionShown by rememberSaveable { mutableStateOf(false) }
     // The search in the open book, from the reader's bottom menu; ttu's id of the book.
-    val scope = rememberCoroutineScope()
     var searchShown by rememberSaveable { mutableStateOf(false) }
     var openTtuId by rememberSaveable { mutableStateOf<Long?>(null) }
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
@@ -277,6 +314,62 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         value = openTtuId?.let { id -> container.bookDao.findByTtuId(id)?.let { container.sectionStarts(it)?.total } }
     }
     LaunchedEffect(atLibrary, openTtuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
+    // A passage the audiobook can't reach by turning pages: the book opens there, like a jump.
+    SideEffect {
+        audiobook.navigate = { span ->
+            val id = openTtuId
+            if (id != null) {
+                scope.launch {
+                    val text = container.searchableBook(id)
+                    val total = text?.total ?: container.bookDao.findByTtuId(id)?.let { container.sectionStarts(it)?.total } ?: return@launch
+                    val spot = text?.aroundPageStart(span.start)
+                    jumper.jump(
+                        id, span.start.toLong(), total.toLong(), spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
+                        resources.getString(R.string.jump_back_message, BookPlace.percent(span.start.toLong(), total.toLong())),
+                        resources.getString(R.string.jump_back_action),
+                    )
+                }
+            }
+        }
+    }
+    // The audiobook's files, chosen with Android's own picker: the audio first, then its subtitles.
+    var audiobookStep by rememberSaveable { mutableStateOf<AudiobookStep?>(null) }
+    var pickedAudio by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var pairingVersion by remember { mutableIntStateOf(0) }
+    val audiobookPaired = remember(bookHash, pairingVersion) { bookHash?.let { container.audiobookStore.pairing(it) } != null }
+    val subtitlesUnreadable = stringResource(R.string.audiobook_subtitles_unreadable)
+    val audiobookRemoved = stringResource(R.string.audiobook_removed)
+    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            audiobook.keepAccess(uri)
+            pickedAudio = uri
+            audiobookStep = AudiobookStep.SUBTITLES
+        }
+    }
+    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val audio = pickedAudio
+        val hash = bookHash
+        val id = openTtuId
+        pickedAudio = null
+        if (audio != null && hash != null) {
+            if (uri == null || id == null) {
+                audiobook.discard(hash, audio)
+            } else {
+                scope.launch {
+                    audiobook.close()
+                    readAloud.close()
+                    if (audiobook.pair(hash, audio, uri)) {
+                        pairingVersion++
+                        audiobook.start(id)
+                    } else {
+                        audiobook.discard(hash, audio)
+                        jumpSnackbar.currentSnackbarData?.dismiss()
+                        jumpSnackbar.showSnackbar(subtitlesUnreadable)
+                    }
+                }
+            }
+        }
+    }
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
@@ -356,8 +449,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The room the read-aloud bar takes: the book lays itself out above it, since a bar over the
     // page would cut the end off every column of vertical text.
     val readAloudBarShown = readAloudState.phase != ReadAloudPhase.OFF && !atLibrary
+    val audiobookBarShown = audiobookState.phase != AudiobookPhase.OFF && !atLibrary
     var readAloudBarHeight by remember { mutableStateOf(0.dp) }
-    val bookBottom = if (readAloudBarShown) readAloudBarHeight else 0.dp
+    val bookBottom = if (readAloudBarShown || audiobookBarShown) readAloudBarHeight else 0.dp
     val density = LocalDensity.current
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -410,16 +504,20 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 highlightsKey = highlights,
-                readAloudMessages = readAloudMessages.receiveAsFlow(),
+                readAloudMessages = pageMessages,
                 onReadAloud = { message ->
                     when (message) {
                         is BridgeMessage.ReadAloudSentences ->
                             readAloud.onSentences(message.gen, message.items.map { SpokenSentence(it.i, it.text) }, message.end)
                         is BridgeMessage.ReadAloudLost -> readAloud.onLost(message.gen)
+                        is BridgeMessage.AudiobookLost -> audiobook.controller.onLost(message.gen)
                         else -> Unit
                     }
                 },
-                onBookShown = readAloud::pageReloaded,
+                onBookShown = {
+                    readAloud.pageReloaded()
+                    audiobook.controller.pageReloaded()
+                },
                 volumeKeysTurnPages = appSettings.volumeKeys,
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,
@@ -450,6 +548,36 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     },
                     messageAction = if (readAloudState.phase == ReadAloudPhase.PROBLEM) stringResource(R.string.read_aloud_voice_settings) else null,
                     onMessageAction = { openVoiceSettings(context) },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
+                )
+            }
+            if (audiobookBarShown) {
+                val problem = audiobookState.problem
+                val audiobookPhase = audiobookState.phase
+                val needsFiles = audiobookPhase == AudiobookPhase.PROBLEM && problem != AudiobookProblem.BOOK_UNSUPPORTED
+                ReadAloudBar(
+                    playing = audiobookState.running,
+                    rate = audiobookState.rate,
+                    onPlayPause = audiobook.controller::togglePlay,
+                    onPrevious = audiobook.controller::previous,
+                    onNext = audiobook.controller::next,
+                    onSpeed = { audiobook.controller.setRate(ReadAloudSettings.nextRate(audiobookState.rate)) },
+                    onClose = audiobook::close,
+                    message = when {
+                        audiobookPhase == AudiobookPhase.PROBLEM && problem != null ->
+                            stringResource(R.string.audiobook_problem, stringResource(problem.label()))
+                        audiobookPhase == AudiobookPhase.LOADING -> stringResource(R.string.audiobook_loading)
+                        audiobookPhase == AudiobookPhase.ENDED -> stringResource(R.string.audiobook_ended)
+                        audiobookState.doubtful -> stringResource(R.string.audiobook_doubtful, audiobookState.matched, audiobookState.total)
+                        else -> null
+                    },
+                    messageAction = if (needsFiles) stringResource(R.string.audiobook_change) else null,
+                    onMessageAction = { audiobookStep = AudiobookStep.INTRO },
+                    previousDescription = stringResource(R.string.audiobook_previous),
+                    nextDescription = stringResource(R.string.audiobook_next),
+                    closeDescription = stringResource(R.string.audiobook_close),
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
@@ -748,7 +876,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onReadAloud = {
                     viewModel.closeMenu()
+                    // One voice at a time: the recording stops when the phone starts reading.
+                    audiobook.close()
                     readAloud.start()
+                },
+                audiobookPaired = audiobookPaired,
+                onAudiobook = {
+                    viewModel.closeMenu()
+                    audiobookStep = if (audiobookPaired) AudiobookStep.MANAGE else AudiobookStep.INTRO
                 },
                 onSettings = {
                     viewModel.closeMenu()
@@ -767,6 +902,46 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     viewModel.ttuLibrary.reload()
                 },
                 onDismiss = viewModel::closeMenu,
+            )
+        }
+        audiobookStep?.let { step ->
+            AudiobookDialog(
+                step = step,
+                onChooseAudio = {
+                    audiobookStep = null
+                    audioPicker.launch(arrayOf("audio/*", "application/ogg"))
+                },
+                onChooseSubtitles = {
+                    audiobookStep = null
+                    subtitlePicker.launch(arrayOf("*/*"))
+                },
+                onPlay = {
+                    audiobookStep = null
+                    val id = openTtuId
+                    if (id != null) {
+                        readAloud.close()
+                        if (audiobookState.phase == AudiobookPhase.PAUSED || audiobookState.phase == AudiobookPhase.ENDED) {
+                            audiobook.controller.play()
+                        } else if (audiobookState.phase != AudiobookPhase.PLAYING) {
+                            audiobook.start(id)
+                        }
+                    }
+                },
+                onChange = { audiobookStep = AudiobookStep.INTRO },
+                onRemove = {
+                    audiobookStep = null
+                    val hash = bookHash
+                    if (hash != null) {
+                        scope.launch {
+                            audiobook.close()
+                            audiobook.remove(hash)
+                            pairingVersion++
+                            jumpSnackbar.currentSnackbarData?.dismiss()
+                            jumpSnackbar.showSnackbar(audiobookRemoved)
+                        }
+                    }
+                },
+                onDismiss = { audiobookStep = null },
             )
         }
         bookmarkDraft?.let { draft ->
@@ -928,5 +1103,8 @@ private val bookInsets: WindowInsets
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"
+
+/** How often the audiobook checks where the audio is, in milliseconds. */
+private const val AUDIOBOOK_TICK_MS = 200L
 
 /** The panel leaves most of the page visible. */

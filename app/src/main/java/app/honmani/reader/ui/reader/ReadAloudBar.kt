@@ -53,6 +53,9 @@ fun ReadAloudBar(
     message: String? = null,
     messageAction: String? = null,
     onMessageAction: () -> Unit = {},
+    previousDescription: String = stringResource(R.string.read_aloud_previous),
+    nextDescription: String = stringResource(R.string.read_aloud_next),
+    closeDescription: String = stringResource(R.string.read_aloud_close),
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -80,7 +83,7 @@ fun ReadAloudBar(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             ) {
                 IconButton(onClick = onPrevious) {
-                    Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = stringResource(R.string.read_aloud_previous))
+                    Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = previousDescription)
                 }
                 IconButton(onClick = onPlayPause) {
                     if (playing) {
@@ -90,7 +93,7 @@ fun ReadAloudBar(
                     }
                 }
                 IconButton(onClick = onNext) {
-                    Icon(painterResource(R.drawable.ic_skip_next), contentDescription = stringResource(R.string.read_aloud_next))
+                    Icon(painterResource(R.drawable.ic_skip_next), contentDescription = nextDescription)
                 }
                 val shown = stringResource(R.string.read_aloud_speed_label, RATE_FORMAT.format(rate))
                 val described = stringResource(R.string.read_aloud_speed, shown)
@@ -109,7 +112,7 @@ fun ReadAloudBar(
                     }
                 }
                 IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.read_aloud_close))
+                    Icon(Icons.Filled.Close, contentDescription = closeDescription)
                 }
             }
         }

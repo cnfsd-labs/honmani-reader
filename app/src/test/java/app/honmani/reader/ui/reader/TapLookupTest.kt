@@ -89,6 +89,13 @@ class TapLookupTest {
     }
 
     @Test
+    fun audiobookLost_needsAGeneration() {
+        assertEquals(BridgeMessage.AudiobookLost(3), BridgeMessage.parse("""{"type":"audiobook.lost","gen":3}"""))
+        assertNull(BridgeMessage.parse("""{"type":"audiobook.lost"}"""))
+        assertNull(BridgeMessage.parse("""{"type":"audiobook.lost","gen":-1}"""))
+    }
+
+    @Test
     fun parse_ignoresUnknownFields() {
         val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"rect":{}}"""
 
