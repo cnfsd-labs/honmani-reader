@@ -13,6 +13,9 @@ import java.util.zip.ZipFile
 /** Text with the characters that have furigana (ruby) over them. */
 class RubyText(val text: String, val ruby: BitSet = BitSet())
 
+/** Where each of ttu's sections (`ttu-<idref>`) begins in the book, and the characters in all of it. */
+class SectionStarts(val starts: Map<String, Int>, val total: Int)
+
 /**
  * Reading positions in an EPUB, translated between KOReader and ッツ Ebook Reader (ttu):
  * - KOReader saves an XPointer into its CREngine DOM, where each spine document is a
@@ -201,8 +204,58 @@ class EpubPositions private constructor(
 
         private fun ZipFile.text(name: String): String? = getEntry(name)?.let { decodeText(getInputStream(it).use { input -> input.readBytesAtMost(MAX_DOCUMENT_BYTES) }) }
 
+        /**
+         * Where each spine document begins in the book, for ttu's section ids (`ttu-<idref>`),
+         * in ttu's counting with a gaiji picture as one character (the page counts them the same
+         * way, `highlights.js`), and the characters in the whole book. Null if it is not a
+         * readable EPUB.
+         */
+        fun sectionStarts(file: File): SectionStarts? = try {
+            ZipFile(file).use { zip ->
+                val entries = spineEntries(zip)
+                if (entries.isEmpty()) return null
+                var total = 0
+                val starts = LinkedHashMap<String, Int>()
+                for ((id, name) in entries) {
+                    starts.putIfAbsent("ttu-$id", total)
+                    val text = try {
+                        zip.text(name)
+                    } catch (e: TooLargeException) {
+                        return null
+                    }
+                    val body = text?.let { bodyOf(Xhtml.parse(it)) } ?: continue
+                    total += countWithGaiji(body)
+                }
+                SectionStarts(starts, total)
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+
+        /** The characters ttu counts in [body]: text, and a gaiji picture as one. */
+        private fun countWithGaiji(body: XNode): Int {
+            var n = 0
+            fun visit(node: XNode) {
+                for (child in node.children) {
+                    when {
+                        child.isText -> n += count(child.text!!)
+                        skipped(child) -> {}
+                        child.name == "img" && child.attributes["class"]?.contains("gaiji") == true -> n++
+                        else -> visit(child)
+                    }
+                }
+            }
+            visit(body)
+            return n
+        }
+
         /** The spine's documents in reading order, as paths in the zip; empty if there is none. */
-        private fun spineOf(zip: ZipFile): List<String> {
+        private fun spineOf(zip: ZipFile): List<String> = spineEntries(zip).map { it.second }
+
+        /** The spine's documents in reading order: the itemref's idref and the path in the zip. */
+        private fun spineEntries(zip: ZipFile): List<Pair<String, String>> {
             val container = zip.text("META-INF/container.xml")?.let(Xhtml::parse) ?: return emptyList()
             val opfPath = container.find("rootfile")?.attributes?.get("full-path") ?: return emptyList()
             val opf = zip.text(opfPath)?.let(Xhtml::parse) ?: return emptyList()
@@ -212,7 +265,10 @@ class EpubPositions private constructor(
                 val href = item.attributes["href"] ?: return@mapNotNull null
                 id to resolve(base, href)
             }.toMap()
-            return opf.findAll("itemref").mapNotNull { manifest[it.attributes["idref"]] }.filter { zip.getEntry(it) != null }
+            return opf.findAll("itemref").mapNotNull { ref ->
+                val id = ref.attributes["idref"] ?: return@mapNotNull null
+                manifest[id]?.let { id to it }
+            }.filter { zip.getEntry(it.second) != null }
         }
 
         private fun bodyOf(document: XNode): XNode = document.find("body") ?: document

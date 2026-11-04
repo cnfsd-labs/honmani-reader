@@ -85,6 +85,38 @@ class EpubPositionsTest {
     }
 
     @Test
+    fun sectionsBeginWhereTtuCountsThem() {
+        val sections = EpubPositions.sectionStarts(testEpub(folder.newFile("sections.epub")))!!
+        // c1 holds 14 characters (the reading ま and the entity space are not counted), c2 the other 17.
+        assertEquals(mapOf("ttu-c1" to 0, "ttu-c2" to 14), sections.starts)
+        assertEquals(31, sections.total)
+    }
+
+    @Test
+    fun aGaijiPictureIsOneCharacterInASectionStart_andHiddenTextIsNone() {
+        val file = folder.newFile("gaiji.epub")
+        java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+            val entries = mapOf(
+                "META-INF/container.xml" to """<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>""",
+                "content.opf" to """<package><manifest><item id="a" href="a.xhtml"/><item id="b" href="b.xhtml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/></spine></package>""",
+                "a.xhtml" to """<html><body><p>東<img class="gaiji" src="g.png"/>京<span hidden="">隠れ</span><span aria-hidden="true">隠</span><img src="cover.png"/></p></body></html>""",
+                "b.xhtml" to """<html><body><p>本</p></body></html>""",
+            )
+            for ((name, text) in entries) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(text.toByteArray())
+                zip.closeEntry()
+            }
+        }
+
+        val sections = EpubPositions.sectionStarts(file)!!
+
+        assertEquals(mapOf("ttu-a" to 0, "ttu-b" to 3), sections.starts)
+        assertEquals(4, sections.total)
+        assertNull(EpubPositions.sectionStarts(folder.newFile("not.epub")))
+    }
+
+    @Test
     fun notAnEpubGivesNull() {
         assertNull(EpubPositions.read(folder.newFile("empty.epub").apply { writeText("not a zip") }))
         assertNull(EpubPositions.texts(folder.root.resolve("empty.epub")))
