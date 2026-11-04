@@ -58,6 +58,13 @@ for a moment. The page keeps its size and position (ttu's counter and the bookma
 switch or the bars change, also after rotating); the reader menu, the lookup panel, the volume buttons
 and Back work as before, and the bars are hidden again after leaving the app and coming back.
 
+Pictures: in a book with a picture (a cover page or an illustration, horizontal and vertical), a tap on
+it opens it full screen on black, with the cover and a big photo both readable; pinch and double tap zoom
+in (a second double tap goes back to fit), a drag moves it only as far as its edges, and Back or the
+close button (TalkBack: "Close picture") return to the same page. A tap on text beside the picture still
+opens the lookup, a tap on the picture never turns a page (also with edge taps on) or opens a lookup, and
+a tiny inline picture (a character's) and a picture in a link do nothing new.
+
 Edge taps (Reader settings, off by default): with the switch on, a tap in the outer 15 % at the left or
 right of a paginated page turns it (vertical text: left = next, right = previous; horizontal: the
 reverse); with the panel open the first edge tap only closes it; a tap on a link, the footer or the top

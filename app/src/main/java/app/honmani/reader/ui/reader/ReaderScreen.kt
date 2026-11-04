@@ -127,6 +127,8 @@ fun ReaderScreen(
 private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val panel by viewModel.panel.collectAsStateWithLifecycle()
     var atLibrary by remember { mutableStateOf(true) }
+    // A picture of the book open in the zoom viewer (a tap on it).
+    var picture by remember { mutableStateOf<ByteArray?>(null) }
     var tab by rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -296,6 +298,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     readerSettings = true
                 },
                 onOpenMenu = viewModel::openMenu,
+                onImage = {
+                    viewModel.dismiss()
+                    picture = it
+                },
                 closeRequests = viewModel.closeRequests,
                 onAtLibraryChanged = {
                     atLibrary = it
@@ -354,7 +360,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
+            val viewing = picture
+            if (viewing != null && !atLibrary) {
+                PictureViewer(viewing, onClose = { picture = null })
+            }
         }
+        // A picture belongs to the book it was in.
+        LaunchedEffect(atLibrary) { if (atLibrary) picture = null }
         if (atLibrary && !onboardingDone) {
             if (onboardingChecked) {
                 OnboardingScreen(
@@ -697,7 +709,7 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 /** The room the reader keeps clear: the system bars (shown or hidden), the display cutout and the keyboard. */
-private val readerInsets: WindowInsets
+internal val readerInsets: WindowInsets
     @OptIn(ExperimentalLayoutApi::class)
     @Composable get() = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
 

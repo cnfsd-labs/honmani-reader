@@ -21,6 +21,9 @@ sealed interface BridgeMessage {
 
     data class Library(val message: LibraryMessage) : BridgeMessage
 
+    /** A tap on a picture in the book: its [bytes] (PNG, JPEG, WebP or GIF) for the zoom viewer (`assets/honmani/tap-bridge.js`). */
+    class Image(val bytes: ByteArray) : BridgeMessage
+
     /** An opened book is laid out and on screen (`assets/honmani/book-shown.js`). */
     data class BookShown(val id: Long) : BridgeMessage
 
@@ -71,13 +74,16 @@ sealed interface BridgeMessage {
          * is read once and picks the parser; each kind has its own length cap.
          */
         fun parse(message: String?): BridgeMessage? {
-            if (message == null || message.length > MAX_MESSAGE_LENGTH) return null
+            if (message == null) return null
+            // Only a picture is longer than the usual cap, and the page writes its type first.
+            if (message.length > MAX_MESSAGE_LENGTH && !(message.length <= MAX_IMAGE_LENGTH && message.startsWith(IMAGE_PREFIX))) return null
             val obj = parseObject(message) ?: return null
             val type = (obj["type"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
             val compact by lazy { message.replace(" ", "") }
             return when (type) {
                 "lookup" -> TapLookup.parse(message)?.let(::Lookup)
                 "turnPage" -> parseTurnPage(obj)
+                "image" -> parseImage(obj)
                 "dismiss" -> Dismiss.takeIf { compact == DISMISS_MESSAGE }
                 "bookShown" -> parseBookShown(message, obj)
                 "reader.position" -> parsePosition(message, obj)
@@ -125,6 +131,11 @@ sealed interface BridgeMessage {
                     else -> null
                 }
             }
+
+        private fun parseImage(obj: JsonObject): Image? {
+            val data = (obj["data"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+            return PictureData.decode(data)?.let(::Image)
+        }
 
         private fun parseBookShown(message: String, obj: JsonObject): BookShown? {
             if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
@@ -181,6 +192,9 @@ sealed interface BridgeMessage {
 
         /** Largest of the per-kind caps (library messages); anything longer is dropped unread. */
         private const val MAX_MESSAGE_LENGTH = 1_000_000
+
+        /** A picture's data URL is up to 3,000,000 characters (`MAX_PICTURE_DATA` in `tap-bridge.js`). */
+        private const val MAX_IMAGE_LENGTH = 3_100_000
         private const val MAX_BOOK_SHOWN_LENGTH = 200
         private const val MAX_POSITION_LENGTH = 200
         private const val MAX_BACKGROUND_LENGTH = 200
@@ -189,6 +203,7 @@ sealed interface BridgeMessage {
         private const val MAX_MARKS_LENGTH = 64_000
         private const val MAX_MARKS_BLOCKS = 500
         private const val MAX_MARKS_TEXT = 8_000
+        private const val IMAGE_PREFIX = """{"type":"image","""
         private const val DISMISS_MESSAGE = """{"type":"dismiss"}"""
         private const val SETTINGS_SHOWN_MESSAGE = """{"type":"pageShown","path":"/settings"}"""
         private const val OPEN_SETTINGS_MESSAGE = """{"type":"reader.settings"}"""

@@ -60,6 +60,14 @@
   const MAX_SENTENCE_LENGTH = 400;
   const MAX_PREVIOUS_SENTENCE_LENGTH = 200;
   const BOOK_ROOT_SELECTOR = '.book-content';
+  /** Pictures shorter and narrower than this (CSS px) are inline characters, not pictures to zoom. */
+  const MIN_PICTURE_SIZE = 48;
+  const PASS_THROUGH_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+  const MAX_PICTURE_BYTES = 2000000;
+  /** Longest message to the app, in characters; the app's cap is the same (MAX_IMAGE_LENGTH). */
+  const MAX_PICTURE_DATA = 3000000;
+  /** Longest side of a redrawn picture, tried in turn until the message fits. */
+  const PICTURE_SIDES = [2400, 1600, 1000];
   const { isSkipped, blockAncestor, isGaiji, textData } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   /** Stands for a gaiji picture in the text (isGaiji): no word runs across it. */
@@ -575,10 +583,103 @@
     selectionTimer = setTimeout(lookupSelection, SELECTION_SETTLE);
   });
 
+  /**
+   * The picture a tap landed on, for the zoom viewer: an <img> or an SVG <image> in the book (a
+   * cover page is one too). Not ttu's gaiji, not a picture in a link (the link wins), and not a
+   * tiny inline one (a character's picture, an emoji).
+   */
+  function pictureAt(target) {
+    if (target.closest(BOOK_ROOT_SELECTOR) === null) return null;
+    let picture = target.closest('img, image');
+    if (!picture) {
+      const svg = target.closest('svg');
+      picture = svg && svg.querySelector('image');
+    }
+    if (!picture || isGaiji(picture) || picture.closest('a[href]') !== null) return null;
+    const box = (picture.closest('svg') || picture).getBoundingClientRect();
+    return Math.max(box.width, box.height) < MIN_PICTURE_SIZE ? null : picture;
+  }
+
+  let pictureBusy = false;
+
+  function readAsDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  /** The picture drawn on a canvas no longer than `side`, as a JPEG on white (transparent areas stay readable). */
+  function reencode(src, side) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        const width = image.naturalWidth || side;
+        const height = image.naturalHeight || side;
+        const scale = Math.min(1, side / Math.max(width, height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+        const context = canvas.getContext('2d');
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      image.onerror = () => reject(new Error('picture not decodable'));
+      image.src = src;
+    });
+  }
+
+  /**
+   * Sends the picture's bytes to the app as a data URL: the page's Content-Security-Policy lets
+   * it read its own blob: pictures but nothing else, so the app cannot fetch them itself. A
+   * small PNG, JPEG, WebP or GIF goes through as it is; anything else, or a big file, is drawn
+   * on a canvas first (SVG pictures too), at most MAX_PICTURE_SIDE long.
+   */
+  async function sendPicture(picture) {
+    if (pictureBusy) return;
+    pictureBusy = true;
+    try {
+      const src = picture instanceof SVGElement
+        ? (picture.href && picture.href.baseVal) || picture.getAttribute('xlink:href') || ''
+        : picture.currentSrc || picture.src;
+      if (!src) return;
+      let data = null;
+      try {
+        const blob = await (await fetch(src)).blob();
+        if (blob.size <= MAX_PICTURE_BYTES && PASS_THROUGH_TYPES.includes(blob.type)) {
+          data = await readAsDataUrl(blob);
+        }
+      } catch (error) {
+        data = null;
+      }
+      for (let i = 0; i < PICTURE_SIDES.length && (data === null || data.length > MAX_PICTURE_DATA); i++) {
+        data = await reencode(src, PICTURE_SIDES[i]);
+      }
+      if (data !== null && data.length <= MAX_PICTURE_DATA) post({ type: 'image', data });
+    } catch (error) {
+      // A picture the page cannot read: the tap does nothing.
+    } finally {
+      pictureBusy = false;
+    }
+  }
+
   function onTap(x, y, target, arrived, via) {
     if (!(target instanceof Element)) return;
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed) return;
+
+    // Before the edge taps and the lookup: a tap on a picture only opens the viewer.
+    const picture = pictureAt(target);
+    if (picture) {
+      clearHighlight();
+      tapNumber++;
+      sendPicture(picture);
+      return;
+    }
 
     const next = edgeTurn(x, target);
     if (next !== null) {

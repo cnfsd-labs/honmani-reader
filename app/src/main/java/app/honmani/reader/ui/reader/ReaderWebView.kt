@@ -167,6 +167,8 @@ fun ReaderWebView(
     onOpenSettings: () -> Unit = {},
     /** A tap on the footer along the bottom of the page, or a long swipe up: the app shows its reader menu. */
     onOpenMenu: () -> Unit = {},
+    /** A tap on a picture in the book: its bytes (PNG, JPEG, WebP or GIF) for the zoom viewer. */
+    onImage: (ByteArray) -> Unit = {},
     /** Each item asks to leave the open book, as back does (to the book list). */
     closeRequests: Flow<Unit> = emptyFlow(),
     /** The book page's background colour (ARGB) changed, for the bars around the reader. */
@@ -192,6 +194,7 @@ fun ReaderWebView(
     val currentOnPage by rememberUpdatedState(onPage)
     val currentOnOpenSettings by rememberUpdatedState(onOpenSettings)
     val currentOnOpenMenu by rememberUpdatedState(onOpenMenu)
+    val currentOnImage by rememberUpdatedState(onImage)
     val currentOnBackground by rememberUpdatedState(onBackground)
     val currentPanelOpen by rememberUpdatedState(panelOpen)
     val currentHideToolbar by rememberUpdatedState(hideSelectionToolbar)
@@ -309,6 +312,7 @@ fun ReaderWebView(
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()
                             BridgeMessage.OpenMenu -> currentOnOpenMenu()
+                            is BridgeMessage.Image -> currentOnImage(message.bytes)
                             // A swipe on the page behind an open lookup panel does nothing.
                             BridgeMessage.OpenMenuBySwipe -> if (!currentPanelOpen) currentOnOpenMenu()
                             is BridgeMessage.Background -> currentOnBackground(message.color)

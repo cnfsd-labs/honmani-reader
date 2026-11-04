@@ -753,3 +753,103 @@ test.describe('edge taps (honmaniEdgeTaps)', () => {
     expect((await messages(page)).map((m) => m.type)).toEqual(['lookup']);
   });
 });
+
+test.describe('pictures (zoom viewer)', () => {
+  /**
+   * Adds pictures to the horizontal book, as ttu shows them: blob: URLs in <img> and in SVG
+   * <image>. `big` fills the width of the page (edge taps would turn the page there).
+   */
+  async function addPictures(page) {
+    await page.evaluate(async () => {
+      const png = (width, height, color) =>
+        new Promise((resolve) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext('2d');
+          context.fillStyle = color;
+          context.fillRect(0, 0, width, height);
+          canvas.toBlob((blob) => resolve(URL.createObjectURL(blob)), 'image/png');
+        });
+      const root = document.querySelector('#horizontal');
+      const html = (id, markup) => root.insertAdjacentHTML('beforeend', `<div id="${id}">${markup}</div>`);
+      html('big', `<img src="${await png(600, 300, '#c00')}" style="width:100%;display:block">`);
+      html('small', `<p>字<img src="${await png(8, 8, '#00c')}" style="width:20px;height:20px">字</p>`);
+      html('gaiji', `<p>字<img class="gaiji" src="${await png(300, 300, '#0c0')}" style="width:100px;height:100px">字</p>`);
+      html('linked', `<a href="#x"><img src="${await png(300, 300, '#0cc')}" style="width:200px;display:block"></a>`);
+      html('cover', `<svg viewBox="0 0 300 400" style="width:100%;display:block"><image width="300" height="400" href="${await png(300, 400, '#cc0')}"/></svg>`);
+    });
+  }
+
+  const center = (page, selector) =>
+    page.evaluate((selector) => {
+      const element = document.querySelector(selector);
+      element.scrollIntoView({ block: 'center' });
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    }, selector);
+
+  const edgeOn = (page) => page.evaluate(() => window.localStorage.setItem('honmaniEdgeTaps', '1'));
+
+  test('a tap on a picture posts its bytes, and never a lookup or a page turn', async ({ page }) => {
+    await addPictures(page);
+    await edgeOn(page);
+    const { y } = await center(page, '#big img');
+    // The left edge of the picture is also the edge-tap zone.
+    await page.mouse.click(4, y);
+    await expect.poll(async () => (await messages(page)).length).toBe(1);
+    const [message] = await messages(page);
+    expect(message.type).toBe('image');
+    expect(message.data).toMatch(/^data:image\/png;base64,[A-Za-z0-9+/]+=*$/);
+  });
+
+  test('a picture in SVG (a cover page) opens the viewer too', async ({ page }) => {
+    await addPictures(page);
+    const { x, y } = await center(page, '#cover svg');
+    await page.mouse.click(x, y);
+    await expect.poll(async () => (await messages(page)).length).toBe(1);
+    expect((await messages(page))[0].type).toBe('image');
+  });
+
+  test('a picture too big to send as it is comes as a smaller JPEG', async ({ page }) => {
+    await page.evaluate(async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 3000;
+      canvas.height = 2000;
+      const context = canvas.getContext('2d');
+      // Noise does not compress: the PNG is far over the limit for sending as it is.
+      const noise = context.createImageData(3000, 2000);
+      for (let i = 0; i < noise.data.length; i++) noise.data[i] = i % 4 === 3 ? 255 : Math.floor(Math.random() * 256);
+      context.putImageData(noise, 0, 0);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      document.querySelector('#horizontal').insertAdjacentHTML(
+        'beforeend',
+        `<img id="huge" src="${URL.createObjectURL(blob)}" style="width:100%;display:block">`,
+      );
+    });
+    const { x, y } = await center(page, '#huge');
+    await page.mouse.click(x, y);
+    await expect.poll(async () => (await messages(page)).length, { timeout: 30000 }).toBe(1);
+    const [message] = await messages(page);
+    expect(message.type).toBe('image');
+    expect(message.data.startsWith('data:image/jpeg;base64,')).toBe(true);
+    expect(message.data.length).toBeLessThanOrEqual(3000000);
+  });
+
+  test('tiny inline pictures, gaiji and pictures in links do not open the viewer', async ({ page }) => {
+    await addPictures(page);
+    for (const selector of ['#small img', '#gaiji img', '#linked img']) {
+      const { x, y } = await center(page, selector);
+      await page.mouse.click(x, y);
+    }
+    await page.waitForTimeout(300);
+    expect((await messages(page)).filter((m) => m.type === 'image')).toEqual([]);
+  });
+
+  test('text beside a picture still looks up', async ({ page }) => {
+    await addPictures(page);
+    await center(page, '#small p');
+    await tapChar(page, '#small p', '字');
+    expect((await messages(page)).map((m) => m.type)).toEqual(['lookup']);
+  });
+});
