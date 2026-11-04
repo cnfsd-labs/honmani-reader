@@ -257,7 +257,7 @@ export the same day holds just the minutes read since ("Export everything again"
 ## Reader bottom menu
 
 In a book, tap the bottom edge of the page (the thin strip under the text). A sheet opens with
-Contents (ttu's table of contents opens), a reading slider, Add bookmark, Bookmarks, Search in book, Reader settings, Words from this session, Show progress
+Contents (ttu's table of contents opens), a reading slider, Add bookmark, Bookmarks, Highlights, Search in book, Reader settings, Words from this session, Show progress
 (a switch; the page reloads and the counter appears or disappears) and Close book (back to the
 book list). A tap on the text still looks a word up. The tap on the bottom edge no longer hides the
 progress counter. Check that the strip is easy to hit with the gesture bar and that page turns at
@@ -293,6 +293,25 @@ Bookmarks. Check, in paged and continuous mode, vertical and horizontal text, EP
 - With progress sync on (EPUB): after a slider or bookmark jump nothing is sent to the server until a
   page is turned there; the other device is not asked about a backward jump.
 - A long press and a tap on text still look a word up after a jump.
+
+## Highlights
+
+Needs an EPUB and "Look up selected text" on (Reader settings). Check on light, dark, sepia and black
+themes, vertical and horizontal text, paged and continuous mode, with and without furigana:
+- Long press a word, drag the handles over more text (also across paragraphs): the lookup panel
+  shows "Highlight" with four colours; one tap saves, closes the panel and shows "Highlight saved" with
+  Undo. The text is drawn in that colour at once, readable on every theme.
+- Close and reopen the book, change the font size, rotate: the highlight stays on the same text.
+- Tap inside a highlight: the word lookup opens as always, with the colours (the current one ticked)
+  and "Remove highlight"; another colour changes it, Remove deletes it and offers Undo.
+- Reader menu, Highlights: the passage, a colour dot and the place; a tap jumps there ("Back to where
+  you were" returns), the bin removes with Undo. Removing the book removes its highlights.
+- Backup, then restore on a fresh install with the same book: the highlights are there.
+- Selection lookup off: no new highlights can be made, existing ones are still drawn, listed and
+  removable. A TXT book offers no Highlight.
+- E-ink mode: four solid greys, lighter than the lookup mark. Where a word mark (also solid grey)
+  covers a highlight the highlight is hidden; the greys are close to the word-mark greys.
+- A word mark, the lookup mark and a search hit lie over a highlight, they do not hide the whole text.
 
 ## Known limitations (no need to report)
 
