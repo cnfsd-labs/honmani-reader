@@ -914,6 +914,8 @@ test.describe('pictures (zoom viewer)', () => {
         'beforeend',
         `<img id="huge" src="${URL.createObjectURL(blob)}" style="width:100%;display:block">`,
       );
+      // Until it is decoded the picture has no height, and the click below would miss it.
+      await document.querySelector('#huge').decode();
     });
     const { x, y } = await center(page, '#huge');
     await page.mouse.click(x, y);
