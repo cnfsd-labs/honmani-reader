@@ -124,7 +124,8 @@ for (const viewMode of ['paginated', 'continuous']) {
         }
         const item = queue.shift();
         await speak(page, item.i);
-        expect(await markedText(page)).toEqual([item.text]);
+        // The old mark can still be on screen for a moment while the new one is drawn: wait for the text.
+        await expect.poll(() => markedText(page), { timeout: 10_000 }).toEqual([item.text]);
         spoken.push(item.text);
       }
       expect(spoken[39]).toBe(sentence(1, 39));
