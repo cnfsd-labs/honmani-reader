@@ -21,6 +21,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -64,7 +65,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -350,6 +353,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     BarIcons(background = frame)
     ImmersiveBars(hidden = appSettings.hidesBars(atLibrary, readerSettings))
 
+    // The room the read-aloud bar takes: the book lays itself out above it, since a bar over the
+    // page would cut the end off every column of vertical text.
+    val readAloudBarShown = readAloudState.phase != ReadAloudPhase.OFF && !atLibrary
+    var readAloudBarHeight by remember { mutableStateOf(0.dp) }
+    val bookBottom = if (readAloudBarShown) readAloudBarHeight else 0.dp
+    val density = LocalDensity.current
+
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize().then(frame?.let { Modifier.background(it) } ?: Modifier)) {
             ReaderWebView(
@@ -415,11 +425,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 panelOpen = panel != null,
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(bottom = bookBottom)
+                    .consumeWindowInsets(PaddingValues(bottom = bookBottom))
                     // In immersive mode a book fills the screen, also under bars a swipe shows for
                     // a moment: its size doesn't follow them, so they never reflow the page.
                     .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
-            if (readAloudState.phase != ReadAloudPhase.OFF && !atLibrary) {
+            if (readAloudBarShown) {
                 val problem = readAloudState.problem
                 val ended = readAloudState.phase == ReadAloudPhase.ENDED
                 ReadAloudBar(
@@ -438,7 +450,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     },
                     messageAction = if (readAloudState.phase == ReadAloudPhase.PROBLEM) stringResource(R.string.read_aloud_voice_settings) else null,
                     onMessageAction = { openVoiceSettings(context) },
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
                 )
             }
             val state = panel
