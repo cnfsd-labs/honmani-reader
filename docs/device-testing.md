@@ -240,7 +240,10 @@ strokes" and as checkboxes). Handwriting is the keyboard's job (Gboard's Japanes
 Add a few words to Learning (look them up in a book). The next day Words shows "Review · n due" and
 the Words icon a badge. Start: the front shows the sentence with the word marked, a tap shows the
 answer, Forgot / Got it (or swipe left/right) moves on, Undo takes the last answer back. ⋮ offers
-Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Look up, Open in book (the
+Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Add note / Edit note (up to 500
+characters, several lines; on the back of the card only, under the meaning; saving it empty removes it; it stays
+when the word is looked up again, removed and taken back, or restored from a backup; Words shows it when a word is
+opened), Look up, Open in book (the
 book opens at the sentence; Back returns to Words), Not a word and Remove. Back mid-session keeps the
 answers given. Chips other than Due (This book, A book…, Starred, All learning) review words early.
 Settings → Flashcards → "Reviews per day" (50 / 100 default / 200 / No limit): with 120 cards due and

@@ -140,6 +140,7 @@ class Backup(
                 lastSurfaceStart = word.lastSurfaceStart,
                 lastSurfaceEnd = word.lastSurfaceEnd,
                 lastBookTitle = word.lastBookTitle,
+                note = word.note,
                 progress = progress[word.id]?.let { BackupWordStep(it.steps, it.reads, it.lookups, it.learned, it.kana) },
                 lookups = lookups[word.id].orEmpty().map { lookup ->
                     BackupWordLookup(
@@ -544,6 +545,7 @@ class Backup(
             lastSurfaceStart = word.lastSurfaceStart,
             lastSurfaceEnd = word.lastSurfaceEnd,
             lastBookTitle = word.lastBookTitle,
+            note = word.note.take(WordRepository.MAX_NOTE_LENGTH),
         )
 
         /**
@@ -560,6 +562,7 @@ class Backup(
             }
             return word.copy(
                 gloss = word.gloss.ifEmpty { backup.gloss },
+                note = word.note.ifEmpty { backup.note.take(WordRepository.MAX_NOTE_LENGTH) },
                 status = status,
                 starred = word.starred || backup.starred,
                 ignored = word.ignored || backup.ignored,

@@ -413,6 +413,58 @@ class BackupTest {
     }
 
     @Test
+    fun aNoteGoesThroughABackupToANewPhone_andAnOldBackupWithoutOneLoads() = runTest {
+        val old = oldPhone()
+        old.words.setNote(old.words.find("猫", "よみ")!!.id, "hint\nひんと")
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        assertEquals("hint\nひんと", backup.words.single { it.expression == "猫" }.note)
+        assertEquals("", backup.words.single { it.expression == "犬" }.note)
+
+        val new = Phone("new")
+        new.backup.restore(backup)
+        assertEquals("hint\nひんと", new.words.find("猫", "よみ")!!.note)
+        assertEquals("", new.words.find("犬", "よみ")!!.note)
+
+        // A file made before notes existed has no "note" at all.
+        val json = """{"format":"honmani-backup","version":1,"exportedAt":1,"words":[{"expression":"鳥","reading":"とり","gloss":"bird",""" +
+            """"status":"LEARNING","lookupCount":1,"firstLookedUpAt":1,"lastLookedUpAt":1,"rankKey":1.0,"lastSentence":"",""" +
+            """"lastSurfaceStart":0,"lastSurfaceEnd":0}]}"""
+        val bytes = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry(BackupCodec.ENTRY))
+                zip.write(json.toByteArray())
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        val loaded = BackupCodec.read(ByteArrayInputStream(bytes))
+        assertEquals("", loaded.words.single().note)
+        Phone("other").also {
+            it.backup.restore(loaded)
+            assertEquals("", it.words.find("鳥", "とり")!!.note)
+        }
+    }
+
+    @Test
+    fun restoringABackupKeepsANoteThePhoneHas_andFillsAnEmptyOne() = runTest {
+        val old = oldPhone()
+        old.words.setNote(old.words.find("猫", "よみ")!!.id, "from backup")
+        val withNote = throughFile(old.backup.export(readerSettings = null))
+        val withoutNote = withNote.copy(words = withNote.words.map { it.copy(note = "") })
+
+        val phone = Phone("new")
+        phone.words.record(lookup("猫", null))
+        // An empty note takes the backup's.
+        phone.backup.restore(withNote)
+        assertEquals("from backup", phone.words.find("猫", "よみ")!!.note)
+        // The phone's own note is kept against a different one and against an old backup without any.
+        phone.words.setNote(phone.words.find("猫", "よみ")!!.id, "mine")
+        phone.backup.restore(withNote)
+        assertEquals("mine", phone.words.find("猫", "よみ")!!.note)
+        phone.backup.restore(withoutNote)
+        assertEquals("mine", phone.words.find("猫", "よみ")!!.note)
+    }
+
+    @Test
     fun aRemovedWordsLogIsNotLoggedTwiceWhenItsRestored() = runTest {
         val phone = reviewingPhone()
         val backup = throughFile(phone.backup.export(readerSettings = null))

@@ -149,6 +149,8 @@ data class BackupWord(
     val lastSurfaceStart: Int,
     val lastSurfaceEnd: Int,
     val lastBookTitle: String? = null,
+    /** The reader's note on the word; older backups have none. */
+    val note: String = "",
     /**
      * Older backups carry the AnkiDroid note id; it is neither written nor restored now: it is
      * only valid in the AnkiDroid it was made in, and on another phone it would show "in Anki"

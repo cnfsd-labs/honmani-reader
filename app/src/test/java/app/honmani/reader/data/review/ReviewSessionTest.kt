@@ -325,6 +325,45 @@ class ReviewSessionTest {
     }
 
     @Test
+    fun aNoteIsSetEditedAndClearedOnTheCardOnScreen() = runTest {
+        dueWord("猫")
+        val session = session()
+        val id = session.current!!.word.id
+        assertEquals("", session.current!!.word.note)
+        session.editNote("ねこ\nneko  ")
+        assertEquals("ねこ\nneko", session.current!!.word.note)
+        assertEquals("ねこ\nneko", words.find(id)!!.note)
+        session.editNote("changed")
+        assertEquals("changed", words.find(id)!!.note)
+        session.editNote("   ")
+        assertEquals("", session.current!!.word.note)
+        assertEquals("", words.find(id)!!.note)
+        // The meaning is not touched.
+        assertEquals("g", words.find(id)!!.gloss)
+    }
+
+    @Test
+    fun aNoteIsCutAtTheLimit() = runTest {
+        dueWord("猫")
+        val session = session()
+        session.editNote("あ".repeat(WordRepository.MAX_NOTE_LENGTH + 50))
+        assertEquals(WordRepository.MAX_NOTE_LENGTH, session.current!!.word.note.length)
+    }
+
+    @Test
+    fun aNoteComesBackWithTheWordWhenRemovingIsTakenBack() = runTest {
+        dueWord("猫")
+        val session = session()
+        val id = session.current!!.word.id
+        session.editNote("hint")
+        assertTrue(session.removeWord())
+        assertNull(words.find(id))
+        session.undo()
+        assertEquals("hint", words.find(id)!!.note)
+        assertEquals("hint", session.current!!.word.note)
+    }
+
+    @Test
     fun aSessionWithNothingDueIsEmpty() = runTest {
         val session = session(newPerDay = 0)
         assertNull(session.current)

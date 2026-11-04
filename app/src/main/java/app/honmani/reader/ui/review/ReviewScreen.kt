@@ -82,6 +82,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewSentence
+import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.reader.LookupPanel
@@ -219,6 +220,7 @@ private fun ReviewTopBar(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
+    var editingNote by remember { mutableStateOf(false) }
     val card = state.card
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
@@ -251,6 +253,9 @@ private fun ReviewTopBar(
                         MenuItem(R.string.review_suspend, close, viewModel::suspend)
                         MenuItem(R.string.review_now, close, viewModel::reviewNow)
                         MenuItem(R.string.review_edit_meaning, close) { editing = true }
+                        MenuItem(if (card.note.isEmpty()) R.string.review_add_note else R.string.review_edit_note, close) {
+                            editingNote = true
+                        }
                         MenuItem(R.string.action_lookup_word, close) { onLookUp(card) }
                         val bookId = card.sentence?.bookId
                         if (bookId != null) MenuItem(R.string.review_open_in_book, close) { onOpenBook(bookId) }
@@ -281,6 +286,31 @@ private fun ReviewTopBar(
                 }) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+    if (editingNote && card != null) {
+        var text by remember(card.wordId) { mutableStateOf(card.note) }
+        AlertDialog(
+            onDismissRequest = { editingNote = false },
+            title = { Text(stringResource(R.string.review_note_title, card.expression)) },
+            text = {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.take(WordRepository.MAX_NOTE_LENGTH) },
+                    label = { Text(stringResource(R.string.review_note_label)) },
+                    supportingText = { Text("${text.length}/${WordRepository.MAX_NOTE_LENGTH}") },
+                    minLines = 3,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    editingNote = false
+                    viewModel.editNote(text)
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { editingNote = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -315,7 +345,12 @@ private fun CardFace(
     val gotItNow by rememberUpdatedState(onGotIt)
     val frontText = sentence?.text ?: card.expression
     val description = if (revealed) {
-        stringResource(R.string.review_card_back, frontText, card.reading, card.gloss.ifBlank { stringResource(R.string.review_no_meaning) })
+        val meaning = card.gloss.ifBlank { stringResource(R.string.review_no_meaning) }
+        if (card.note.isEmpty()) {
+            stringResource(R.string.review_card_back, frontText, card.reading, meaning)
+        } else {
+            stringResource(R.string.review_card_back_note, frontText, card.reading, meaning, card.note)
+        }
     } else {
         stringResource(R.string.review_card_front, frontText)
     }
@@ -412,6 +447,20 @@ private fun CardFace(
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                     )
+                    if (card.note.isNotEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            stringResource(R.string.review_note_label),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            card.note,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                     val title = card.sentence?.bookTitle
                     if (!title.isNullOrBlank()) {
                         Spacer(Modifier.height(12.dp))

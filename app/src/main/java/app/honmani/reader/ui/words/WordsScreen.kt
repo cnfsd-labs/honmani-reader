@@ -997,6 +997,13 @@ private fun WordRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                if (expanded && word.note.isNotEmpty()) {
+                    Text(
+                        text = stringResource(R.string.word_note_line, word.note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = muted,
+                    )
+                }
                 if (expanded && lookups.isNotEmpty()) {
                     for (lookup in lookups) {
                         Row(verticalAlignment = Alignment.CenterVertically) {

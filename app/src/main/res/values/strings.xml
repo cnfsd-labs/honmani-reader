@@ -647,6 +647,7 @@
     <string name="review_got_it">Got it</string>
     <string name="review_card_front">Card %1$s. Tap to show the answer.</string>
     <string name="review_card_back">Card %1$s, reading %2$s, meaning %3$s.</string>
+    <string name="review_card_back_note">Card %1$s, reading %2$s, meaning %3$s, note %4$s.</string>
     <string name="review_swipe_hint">Swipe left: forgot. Swipe right: got it.</string>
     <string name="review_new_label">New</string>
     <string name="review_no_meaning">No meaning saved. Look it up or edit the meaning.</string>
@@ -660,6 +661,11 @@
     <string name="review_suspend">Don\'t review</string>
     <string name="review_now">Review now</string>
     <string name="review_edit_meaning">Edit meaning</string>
+    <string name="review_add_note">Add note</string>
+    <string name="review_edit_note">Edit note</string>
+    <string name="review_note_title">Note on %1$s</string>
+    <string name="review_note_label">Note</string>
+    <string name="word_note_line">Note: %1$s</string>
     <string name="review_open_in_book">Open in book</string>
     <string name="review_not_a_word">Not a word</string>
     <string name="review_remove">Remove</string>

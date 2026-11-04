@@ -44,6 +44,8 @@ data class WordEntity(
     @ColumnInfo(name = "anki_note_id") val ankiNoteId: Long? = null,
     /** Who schedules reviews of this word; Anki words never enter Honmani's review queue. */
     @ColumnInfo(defaultValue = "'HONMANI'") val scheduler: WordScheduler = WordScheduler.HONMANI,
+    /** The reader's own hint or mnemonic, shown on the back of the review card; empty if none. */
+    @ColumnInfo(defaultValue = "''") val note: String = "",
 )
 
 enum class WordScheduler {

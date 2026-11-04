@@ -34,6 +34,8 @@ data class ReviewCardUi(
     val expression: String,
     val reading: String,
     val gloss: String,
+    /** The reader's note, shown on the back only; empty if none. */
+    val note: String = "",
     val sentence: ReviewSentence?,
     val isNew: Boolean,
 )
@@ -106,6 +108,8 @@ class ReviewViewModel(
 
     fun editMeaning(gloss: String) = act(keepRevealed = true) { it.editMeaning(gloss) }
 
+    fun editNote(note: String) = act(keepRevealed = true) { it.editNote(note) }
+
     fun undo() = act { it.undo() }
 
     /** The book of the current card's sentence, if it has one. */
@@ -132,6 +136,7 @@ class ReviewViewModel(
                 expression = it.word.expression,
                 reading = it.word.reading,
                 gloss = it.word.gloss,
+                note = it.word.note,
                 sentence = ReviewSentences.pick(it.word, lookups, it.card.reps),
                 isNew = it.card.state == ReviewState.NEW,
             )

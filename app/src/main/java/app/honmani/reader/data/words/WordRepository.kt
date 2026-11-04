@@ -263,6 +263,9 @@ class WordRepository(
     /** Replaces the meaning kept for the word list and review (a lookup with a meaning of its own overwrites it). */
     suspend fun setGloss(id: Long, gloss: String) = dao.setGloss(id, gloss.take(MAX_GLOSS_LENGTH))
 
+    /** Sets the reader's note on the word; blank removes it. Lookups never touch it. */
+    suspend fun setNote(id: Long, note: String) = dao.setNote(id, note.trim().take(MAX_NOTE_LENGTH))
+
     suspend fun setStarred(id: Long, starred: Boolean) = dao.setStarred(id, starred)
 
     /** Stars or unstars a saved word by its written form and reading; nothing if it isn't saved. */
@@ -319,5 +322,8 @@ class WordRepository(
         const val REPEAT_WINDOW_MS = 60L * 60 * 1000
         private const val MAX_SENTENCE_LENGTH = 400
         private const val MAX_GLOSS_LENGTH = 200
+
+        /** Longest note on a word; the review dialog stops typing here. */
+        const val MAX_NOTE_LENGTH = 500
     }
 }

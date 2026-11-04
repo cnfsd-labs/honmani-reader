@@ -69,6 +69,39 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun aNoteSurvivesLookingTheWordUpAgainAndTakingThatBack() = runTest {
+        repository.record(lookup("猫", sentence = "猫がいる。"))
+        val id = learning().single().id
+        repository.setNote(id, "  hint\nひんと ")
+        assertEquals("hint\nひんと", repository.find(id)!!.note)
+
+        now += 60_000
+        val undo = repository.record(lookup("猫", sentence = "猫が鳴く。", bookTitle = "猫"))!!
+        assertEquals("hint\nひんと", repository.find(id)!!.note)
+        repository.undo(undo)
+        assertEquals("hint\nひんと", repository.find(id)!!.note)
+
+        repository.markLearned(id)
+        repository.setStarred(id, true)
+        repository.setIgnored(id, true)
+        repository.setGloss(id, "cat")
+        assertEquals("hint\nひんと", repository.find(id)!!.note)
+
+        repository.setNote(id, "")
+        assertEquals("", repository.find(id)!!.note)
+    }
+
+    @Test
+    fun aDeletedWordComesBackWithItsNote() = runTest {
+        repository.record(lookup("猫"))
+        val id = learning().single().id
+        repository.setNote(id, "hint")
+        val deleted = repository.delete(id)!!
+        repository.restore(deleted)
+        assertEquals("hint", repository.find("猫", "よみ")!!.note)
+    }
+
+    @Test
     fun aFirstLookupAddsTheWordWithItsSentence() = runTest {
         repository.record(lookup("食べる", sentence = "猫が食べました。", surface = "食べました", surfaceStart = 2, bookTitle = "猫"))
 
