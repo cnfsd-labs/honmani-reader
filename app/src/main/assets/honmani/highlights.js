@@ -15,7 +15,9 @@
  * Page to app: `highlights.request` when a book page is up (the app answers with `highlights`).
  * App to page: `highlights` { sections: [[id, start]...], items: [{ id, start, end, color }] }.
  * For the other scripts, `window.honmaniHighlights`: `measure(range)` (the position and text of a
- * selection), `idAt(node, offset)` (the highlight under a point) and `count(text)`.
+ * selection), `idAt(node, offset)` (the highlight under a point), `count(text)` and
+ * `rangeAt(start, end)` (the Range over those book positions if their section is in the page,
+ * else which way the page must turn to reach it: `{ range }`, `{ direction: 1 | -1 }` or `{}`).
  *
  * Drawing priority is -3: below the word marks (-1, -2) and the lookup mark and search hits (0),
  * so those stay on top and show through the translucent colour. Under e-ink mode (reader-style.js)
@@ -193,6 +195,26 @@
     const alpha = darkPage() ? 0.45 : 0.28;
     const css = NAMES.map((name, i) => `::highlight(${name}) { background-color: rgba(${RGB[i]}, ${alpha}); }`).join('\n');
     if (style.textContent !== css) style.textContent = css;
+  }
+
+  /**
+   * The Range over the book positions [start, end) when the section that holds `start` is in the
+   * page ({ range }); else { direction } (1: the section is after those in the page, -1: before);
+   * {} when the book's sections are unknown or the text is not there.
+   */
+  function rangeAt(start, end) {
+    const roots = sectionRoots();
+    if (roots.length === 0 || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return {};
+    for (const { element, start: from } of roots) {
+      const next = sectionStarts.find((other) => other > from);
+      if (start < from || (next !== undefined && start >= next)) continue;
+      const index = indexOf(element);
+      const last = Math.min(end - from, index.total);
+      if (start - from >= index.total || last <= start - from) return {};
+      const range = rangeOf(index, start - from, last);
+      return range ? { range } : {};
+    }
+    return { direction: start >= Math.max(...roots.map((r) => r.start)) ? 1 : -1 };
   }
 
   /** Draws the items that lie in the sections now in the page. */
@@ -373,7 +395,7 @@
     }
   }
 
-  window.honmaniHighlights = { measure, idAt, count, NAMES };
+  window.honmaniHighlights = { measure, idAt, count, rangeAt, NAMES };
 
   listen();
   const check = () => {
