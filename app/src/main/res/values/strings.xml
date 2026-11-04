@@ -910,6 +910,8 @@
     <string name="reader_settings_volume_keys_details">Volume down for the next page, volume up for the previous one</string>
     <string name="reader_settings_immersive">Immersive mode</string>
     <string name="reader_settings_immersive_details">Hide the status and navigation bars while a book is open; swipe from the screen edge to show them for a moment</string>
+    <string name="reader_settings_eink">E-ink mode</string>
+    <string name="reader_settings_eink_details">Black on white in the book, with no animations or shadows and grey word marks; your theme comes back when you turn it off</string>
     <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
     <string name="reader_settings_edge_taps_details">A tap at the left or right edge turns the page instead of looking up; paginated mode only</string>
     <string name="reader_settings_edge_zone">Width of the page edges</string>

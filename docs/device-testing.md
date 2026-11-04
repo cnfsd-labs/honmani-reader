@@ -58,6 +58,13 @@ for a moment, over the page. The book fills the screen, and its position doesn't
 bookmark stay the same when the bars show, when the switch changes, after rotating and on reopening); the reader menu, the lookup panel, the volume buttons
 and Back work as before, and the bars are hidden again after leaving the app and coming back.
 
+E-ink mode (Reader settings, off by default): with the switch on, a book page is black on white whatever
+the theme (check `getComputedStyle(document.body).backgroundColor` and the colour of `.book-content`
+through the DevTools socket), has no animations, transitions or shadows, and shows the word marks
+and the lookup mark as flat greys (the lookup mark black with white text); the lookup panel still opens for
+a tap on a word. The library keeps its colours. Turning the switch off brings the earlier theme back
+exactly (`localStorage.theme` is the same before, during and after; the Auto theme still follows the system).
+
 Pictures: in a book with a picture (a cover page or an illustration, horizontal and vertical), a tap on
 it opens it full screen on black, with the cover and a big photo both readable; pinch and double tap zoom
 in (a second double tap goes back to fit), a drag moves it only as far as its edges, and Back or the

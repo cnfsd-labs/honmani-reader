@@ -95,4 +95,10 @@ class BackupContentsTest {
             ReaderSettingsCheck.valid(mapOf("honmaniEdgeZone" to "enormous", "honmaniEdgeForward" to "0")),
         )
     }
+
+    @Test
+    fun eInkModeSurvivesARestore() {
+        assertEquals(mapOf("honmaniEInk" to "1"), ReaderSettingsCheck.valid(mapOf("honmaniEInk" to "1")))
+        assertEquals(emptyMap<String, String>(), ReaderSettingsCheck.valid(mapOf("honmaniEInk" to "yes")))
+    }
 }

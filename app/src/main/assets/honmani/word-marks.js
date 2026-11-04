@@ -223,7 +223,13 @@
     return false;
   }
 
+  /** The system asks for less motion, or e-ink mode is on (`reader-style.js`): marks appear at once. */
   function reducedMotion() {
+    try {
+      if (window.localStorage.getItem('honmaniEInk') === '1') return true;
+    } catch (error) {
+      // No storage: only the system setting counts.
+    }
     return !!window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 

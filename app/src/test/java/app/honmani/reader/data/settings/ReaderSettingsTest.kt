@@ -38,11 +38,12 @@ class ReaderSettingsTest {
                 "honmaniHideKnownFurigana" to "1",
                 "honmaniTintOneUnknown" to "1",
                 "honmaniImmersive" to "1",
+                "honmaniEInk" to "1",
             ),
         )
 
         assertEquals(
-            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, edgeZone = EdgeZone.WIDE, edgeForward = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true, immersive = true),
+            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, edgeZone = EdgeZone.WIDE, edgeForward = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true, immersive = true, eInk = true),
             settings,
         )
     }
@@ -83,6 +84,8 @@ class ReaderSettingsTest {
         // Immersive mode is off unless the reader turned it on; it hides the bars over a book only.
         assertEquals("0", stored["honmaniImmersive"])
         assertFalse(ReaderSettings.fromStorage(emptyMap()).immersive)
+        assertEquals("0", stored["honmaniEInk"])
+        assertFalse(ReaderSettings.fromStorage(emptyMap()).eInk)
         val immersive = ReaderSettings(immersive = true)
         assertTrue(immersive.hidesBars(atLibrary = false, settingsOpen = false))
         assertFalse(immersive.hidesBars(atLibrary = true, settingsOpen = false))
@@ -99,6 +102,13 @@ class ReaderSettingsTest {
     @Test
     fun edgeTapOptionsRoundTrip() {
         val settings = ReaderSettings(edgeTaps = true, edgeZone = EdgeZone.NARROW, edgeForward = true)
+        assertEquals(settings, ReaderSettings.fromStorage(settings.toStorage()))
+    }
+
+    @Test
+    fun eInkModeRoundTrips() {
+        val settings = ReaderSettings(eInk = true)
+        assertEquals("1", settings.toStorage()["honmaniEInk"])
         assertEquals(settings, ReaderSettings.fromStorage(settings.toStorage()))
     }
 }

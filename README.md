@@ -8,7 +8,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   Yomitan dictionary
 - EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts;
   pages turn with a tap, a swipe or the volume buttons; an optional immersive mode hides the status and
-  navigation bars while a book is open; a tap on a picture in a book (a cover too) opens it full screen
+  navigation bars while a book is open; an optional e-ink mode (black on white, no animations, grey marks); a tap on a picture in a book (a cover too) opens it full screen
   with pinch zoom, double-tap zoom and panning
 - Search in the open book (reader menu): every match with its surroundings and place in the book; a tap opens
   the book there and marks it
