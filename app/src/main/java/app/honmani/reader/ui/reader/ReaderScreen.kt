@@ -45,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -121,6 +122,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var atLibrary by remember { mutableStateOf(true) }
     var tab by rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
     val context = LocalContext.current
+    val resources = LocalResources.current
     val shareTitle = stringResource(R.string.action_share_diagnostics)
     val anki = rememberAnkiAccess()
     val container = remember { (context.applicationContext as HonmaniApplication).container }
@@ -474,9 +476,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             val id = openTtuId
             value = if (textWanted && id != null) container.searchableBook(id) else null
         }
-        val jumpMessage = { percent: Int -> context.getString(R.string.jump_back_message, percent) }
+        val jumpMessage = { percent: Int -> resources.getString(R.string.jump_back_message, percent) }
         val backLabel = stringResource(R.string.jump_back_action)
-        val defaultName = { percent: Int -> context.getString(R.string.bookmark_default_name, percent) }
+        val defaultName = { percent: Int -> resources.getString(R.string.bookmark_default_name, percent) }
         if (menuOpen && !atLibrary) {
             val syncState by container.koSyncStatus.state.collectAsStateWithLifecycle()
             val syncFailure = syncState.failureFor(openTtuId)
@@ -601,7 +603,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     searchShown = false
                     jumper.jump(
                         searchedBook, hit.characters.toLong(), total.toLong(), hit.hint, hit.match, null,
-                        context.getString(R.string.jump_back_message, hit.percent), backLabel,
+                        resources.getString(R.string.jump_back_message, hit.percent), backLabel,
                     )
                 },
                 onClose = { searchShown = false },
