@@ -55,6 +55,7 @@ fun ReaderMenuSheet(
     onJump: (Long) -> Unit = {},
     onAddBookmark: () -> Unit = {},
     onBookmarks: () -> Unit = {},
+    onHighlights: () -> Unit = {},
     onContents: () -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -86,6 +87,12 @@ fun ReaderMenuSheet(
                 headlineContent = { Text(stringResource(R.string.reader_menu_bookmarks)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onBookmarks),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_highlight), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_highlights)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onHighlights),
             )
             HorizontalDivider()
             ListItem(

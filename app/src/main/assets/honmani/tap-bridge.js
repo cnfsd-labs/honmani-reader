@@ -25,7 +25,9 @@
  * Selected book text (a long press) is looked up in the same message, with "selection": true,
  * once the selection has settled, and then deselected: "text" is the selection, up to
  * SCAN_LENGTH characters. localStorage
- * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns it off.
+ * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns it off. A selection message also
+ * carries "highlight": { start, end, text }, the whole selection as a place in the book
+ * (highlights.js), and a tap inside a highlight carries "highlightId": its id.
  *
  * Furigana (<rt>, <rp>) is not part of the scanned text; a tap on furigana scans from the start
  * of the base text it reads. Scanning stops at the end of the
@@ -338,7 +340,11 @@
 
     const hit = rubyBaseOf(target) || charAt(x, y);
     if (!hit || !root.contains(hit.node)) return null;
-    return lookupFrom(root, hit.node, hit.index, Infinity);
+    const message = lookupFrom(root, hit.node, hit.index, Infinity);
+    // A tap inside a highlight (highlights.js) names it, so the panel can recolour or remove it.
+    const highlighted = message && window.honmaniHighlights ? window.honmaniHighlights.idAt(hit.node, hit.index) : null;
+    if (highlighted !== null) message.highlightId = highlighted;
+    return message;
   }
 
   /**
@@ -592,6 +598,9 @@
     lastSelected = selected;
     clearHighlight();
     message.selection = true;
+    // The whole selection as a place in the book (not the capped lookup text), for a highlight.
+    const measured = window.honmaniHighlights ? window.honmaniHighlights.measure(range) : null;
+    if (measured) message.highlight = measured;
     post(message);
     selection.removeAllRanges();
   }

@@ -310,6 +310,18 @@
     <string name="bookmark_rename">Rename</string>
     <string name="bookmark_delete">Delete bookmark</string>
     <string name="bookmark_deleted">Bookmark deleted</string>
+    <string name="reader_menu_highlights">Highlights</string>
+    <string name="highlight_add">Highlight</string>
+    <string name="highlight_change">Colour</string>
+    <string name="highlight_yellow">Yellow</string>
+    <string name="highlight_green">Green</string>
+    <string name="highlight_blue">Blue</string>
+    <string name="highlight_pink">Pink</string>
+    <string name="highlight_remove">Remove highlight</string>
+    <string name="highlight_saved">Highlight saved</string>
+    <string name="highlight_removed">Highlight removed</string>
+    <string name="highlight_list_empty">No highlights yet. Select text with a long press, then pick a colour in the lookup panel.</string>
+    <string name="highlight_delete">Delete highlight</string>
     <string name="jump_back_message">Jumped to %1$d%%</string>
     <string name="jump_back_action">Back to where you were</string>
     <string name="reader_menu_close_book">Close book</string>
@@ -936,7 +948,7 @@
     <string name="reader_settings_mark_due">Mark words due for review</string>
     <string name="reader_settings_mark_due_details">Words whose flashcard is due today get an amber tint in the book (blue if your accent colour is amber or yellow). Takes effect when the book is opened again.</string>
     <string name="reader_settings_selection_lookup">Look up selected text</string>
-    <string name="reader_settings_selection_lookup_details">Select text with a long press to look it up; copying still works</string>
+    <string name="reader_settings_selection_lookup_details">Select text with a long press to look it up or to highlight it; copying still works. Highlights you made stay when this is off, but new ones need it</string>
     <string name="reader_settings_all">All ッツ reader settings</string>
     <string name="reader_settings_all_details">Margins, more themes and fonts, page layout, everything else</string>
     <string name="reader_settings_applied">Changes apply when you go back.</string>

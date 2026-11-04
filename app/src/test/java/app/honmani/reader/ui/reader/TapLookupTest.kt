@@ -26,6 +26,43 @@ class TapLookupTest {
     }
 
     @Test
+    fun parse_readsTheWholeSelection_forAHighlight() {
+        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"start":3,"end":9,"text":"猫である。名前"}}"""
+
+        assertEquals(SelectedPassage(3, 9, "猫である。名前"), TapLookup.parse(message)?.selected)
+        assertNull(TapLookup.parse(message.replace(""","selection":true""", ""))?.selected)
+    }
+
+    @Test
+    fun parse_dropsAnImpossibleSelection_butKeepsTheLookup() {
+        fun selected(highlight: String) =
+            TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":$highlight}""")
+
+        assertNull(selected("""{"start":5,"end":5,"text":"猫"}""")?.selected)
+        assertNull(selected("""{"start":-1,"end":5,"text":"猫"}""")?.selected)
+        assertNull(selected("""{"start":1,"end":5,"text":" "}""")?.selected)
+        assertEquals("猫", selected("""{"start":5,"end":2,"text":"猫"}""")?.text)
+        assertEquals(200, selected("""{"start":1,"end":500,"text":"${"あ".repeat(300)}"}""")?.selected?.text?.length)
+    }
+
+    @Test
+    fun parse_readsTheHighlightUnderATap_notUnderASelection() {
+        val tap = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"highlightId":42}"""
+
+        assertEquals(42L, TapLookup.parse(tap)?.highlightId)
+        assertNull(TapLookup.parse(tap.replace("42", "0"))?.highlightId)
+        assertNull(TapLookup.parse(tap.replace("}", ""","selection":true}"""))?.highlightId)
+    }
+
+    @Test
+    fun highlightsRequest_needsABookId() {
+        assertEquals(BridgeMessage.HighlightsRequest(7), BridgeMessage.parse("""{"type":"highlights.request","bookId":7}"""))
+        assertNull(BridgeMessage.parse("""{"type":"highlights.request","bookId":0}"""))
+        assertNull(BridgeMessage.parse("""{"type":"highlights.request"}"""))
+        assertNull(BridgeMessage.parse("""{"type":"highlights.request","bookId":"x"}"""))
+    }
+
+    @Test
     fun parse_ignoresUnknownFields() {
         val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"rect":{}}"""
 

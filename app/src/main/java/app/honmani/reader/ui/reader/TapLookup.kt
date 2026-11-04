@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
 import app.honmani.reader.data.words.WordMarksMode
 import app.honmani.reader.lookup.RubySpan
 import kotlinx.serialization.Serializable
@@ -64,6 +65,9 @@ sealed interface BridgeMessage {
         val dueMarks: Boolean = false,
     ) : BridgeMessage
 
+    /** The book page is up and wants its saved highlights (`assets/honmani/highlights.js`). */
+    data class HighlightsRequest(val bookId: Long) : BridgeMessage
+
     /** A paragraph's text without furigana, and the page's id for it. */
     @Serializable
     data class MarksBlock(val id: Long = 0, val text: String = "")
@@ -89,6 +93,7 @@ sealed interface BridgeMessage {
                 "reader.position" -> parsePosition(message, obj)
                 "reader.background" -> parseBackground(message, obj)
                 "marks.request" -> parseMarks(message, obj)
+                "highlights.request" -> parseHighlightsRequest(message, obj)
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
@@ -172,6 +177,15 @@ sealed interface BridgeMessage {
         }
 
         @Serializable
+        private data class HighlightsRequestEnvelope(val type: String = "", val bookId: Long = 0)
+
+        private fun parseHighlightsRequest(message: String, obj: JsonObject): HighlightsRequest? {
+            if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
+            val envelope = decode<HighlightsRequestEnvelope>(obj) ?: return null
+            return if (envelope.bookId > 0) HighlightsRequest(envelope.bookId) else null
+        }
+
+        @Serializable
         private data class MarksEnvelope(
             val type: String = "",
             val requestId: Long = 0,
@@ -213,6 +227,9 @@ sealed interface BridgeMessage {
     }
 }
 
+/** What a long press selected, counted in ttu characters from the start of the book. */
+data class SelectedPassage(val start: Long, val end: Long, val text: String)
+
 /** A tap on book text, as reported by `assets/honmani/tap-bridge.js`. */
 data class TapLookup(
     /** Up to 20 characters starting at the tapped one; the lookup scans prefixes of this. */
@@ -229,6 +246,10 @@ data class TapLookup(
     val previousSentence: String = "",
     /** The text was chosen by a long press (Android's own selection tools are hidden), not a tap. */
     val bySelection: Boolean = false,
+    /** The whole selection (not only [text]), in the book's characters, for saving a highlight; null for a tap. */
+    val selected: SelectedPassage? = null,
+    /** A tap on a character inside this saved highlight (`highlight.id`), else null. */
+    val highlightId: Long? = null,
 ) {
     companion object {
         // Generous bounds; the bridge sends at most 20 code points and 400 sentence chars.
@@ -258,6 +279,9 @@ data class TapLookup(
                 tapNumber = envelope.tap.coerceAtLeast(0),
                 previousSentence = envelope.previousSentence,
                 bySelection = envelope.selection,
+                selected = envelope.highlight?.let { SelectedPassage(it.start, it.end, it.text.take(HIGHLIGHT_TEXT_MAX)) }
+                    ?.takeIf { envelope.selection && it.start >= 0 && it.end > it.start && it.text.isNotBlank() },
+                highlightId = envelope.highlightId?.takeIf { it > 0 && !envelope.selection },
             )
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
@@ -289,7 +313,12 @@ data class TapLookup(
         val tap: Int = 0,
         val previousSentence: String = "",
         val selection: Boolean = false,
+        val highlight: HighlightEnvelope? = null,
+        val highlightId: Long? = null,
     )
+
+    @Serializable
+    private data class HighlightEnvelope(val start: Long = 0, val end: Long = 0, val text: String = "")
 
     @Serializable
     private data class RubyEnvelope(val start: Int, val end: Int, val reading: String)

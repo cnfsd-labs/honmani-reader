@@ -23,8 +23,10 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +45,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.withFrameNanos
 import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.library.BookmarkEntity
+import app.honmani.reader.data.library.HighlightEntity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -195,6 +198,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val bookmarks by remember(bookHash) {
         bookHash?.let { container.bookmarkDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(emptyList())
+    // Highlights: the list (reader menu), and the book's section table the page needs to draw them
+    // and the lookup panel to save one (null for a book that is not an EPUB: no highlighting there).
+    var highlightsShown by rememberSaveable { mutableStateOf(false) }
+    val highlights by remember(bookHash) {
+        bookHash?.let { container.highlightDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(emptyList())
+    val sectionsTotal by produceState<Int?>(null, openTtuId) {
+        value = openTtuId?.let { id -> container.bookDao.findByTtuId(id)?.let { container.sectionStarts(it)?.total } }
+    }
     LaunchedEffect(atLibrary, openTtuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
     // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
     var dictionariesShown by rememberSaveable { mutableStateOf(false) }
@@ -313,6 +325,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     container.wordMarker.mark(texts, mode, knownWords, sentences, dueMarks, isStale)
                 },
                 marksKey = learning?.let { it to dueWords },
+                highlightsMessage = { bookId ->
+                    container.bookDao.findByTtuId(bookId)?.let { book ->
+                        container.sectionStarts(book)?.let { sections ->
+                            highlightsMessage(bookId, sections, container.highlightDao.observe(book.contentHash).first())
+                        }
+                    }
+                },
+                highlightsKey = highlights,
                 volumeKeysTurnPages = appSettings.volumeKeys,
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,
@@ -323,6 +343,57 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
             val state = panel
+            // What the lookup panel offers for highlighting: the colours of a new selection (when
+            // selection lookup is on), or of the highlight a tap landed on, with "Remove highlight".
+            val savedMessage = stringResource(R.string.highlight_saved)
+            val removedMessage = stringResource(R.string.highlight_removed)
+            val undoLabel = stringResource(R.string.action_undo)
+            fun highlightControls(tap: TapLookup): HighlightControls? {
+                val existing = tap.highlightId?.let { id -> highlights.firstOrNull { it.id == id } }
+                if (existing != null) {
+                    return HighlightControls(
+                        current = existing.color,
+                        onPick = { color -> scope.launch { container.highlightDao.setColor(existing.id, color) } },
+                        onRemove = {
+                            viewModel.dismiss()
+                            scope.launch {
+                                container.highlightDao.delete(existing.id)
+                                jumpSnackbar.currentSnackbarData?.dismiss()
+                                val result = jumpSnackbar.showSnackbar(removedMessage, undoLabel, duration = SnackbarDuration.Long)
+                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.put(existing)
+                            }
+                        },
+                    )
+                }
+                val passage = tap.selected
+                val hash = bookHash
+                val total = sectionsTotal
+                if (!tap.bySelection || passage == null || hash == null || total == null || !appSettings.selectionLookup) return null
+                return HighlightControls(
+                    current = null,
+                    onPick = { color ->
+                        viewModel.dismiss()
+                        scope.launch {
+                            val same = highlights.firstOrNull { it.start == passage.start && it.end == passage.end }
+                            jumpSnackbar.currentSnackbarData?.dismiss()
+                            if (same != null) {
+                                container.highlightDao.setColor(same.id, color)
+                                jumpSnackbar.showSnackbar(savedMessage)
+                            } else {
+                                val id = container.highlightDao.put(
+                                    HighlightEntity(
+                                        contentHash = hash, start = passage.start, end = passage.end, color = color,
+                                        text = passage.text, total = total.toLong(), createdAt = System.currentTimeMillis(),
+                                    ),
+                                )
+                                val result = jumpSnackbar.showSnackbar(savedMessage, undoLabel, duration = SnackbarDuration.Long)
+                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.delete(id)
+                            }
+                        }
+                    },
+                    onRemove = null,
+                )
+            }
             val countedTap by viewModel.countedTap.collectAsStateWithLifecycle()
             if (state != null && !atLibrary) {
                 // The frame after this state was first composed: it has been drawn (for the log).
@@ -354,6 +425,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         dictionariesShown = true
                         viewModel.ttuLibrary.show(LIBRARY_PATH)
                     },
+                    highlight = highlightControls(state.tap),
                     availableHeight = maxHeight,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
@@ -491,7 +563,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
         val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
         // The book's text, only while the menu, the bookmark list or a new bookmark needs it (the slider, names, the page's spot).
-        val textWanted = !atLibrary && (menuOpen || bookmarksShown || bookmarkDraft != null)
+        val textWanted = !atLibrary && (menuOpen || bookmarksShown || bookmarkDraft != null || highlightsShown)
         val bookText by produceState<BookText?>(null, openTtuId, textWanted) {
             val id = openTtuId
             value = if (textWanted && id != null) container.searchableBook(id) else null
@@ -545,6 +617,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onBookmarks = {
                     viewModel.closeMenu()
                     bookmarksShown = true
+                },
+                onHighlights = {
+                    viewModel.closeMenu()
+                    highlightsShown = true
                 },
                 onContents = {
                     viewModel.closeMenu()
@@ -613,6 +689,26 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDelete = { bookmark -> scope.launch { container.bookmarkDao.delete(bookmark.id) } },
                 onUndoDelete = { bookmark -> scope.launch { container.bookmarkDao.put(bookmark) } },
                 onDismiss = { bookmarksShown = false },
+            )
+        }
+        if (highlightsShown && !atLibrary) {
+            HighlightsSheet(
+                highlights = highlights,
+                onOpen = { highlight ->
+                    highlightsShown = false
+                    val id = openTtuId
+                    if (id != null) {
+                        val text = bookText
+                        val spot = text?.aroundPageStart(highlight.start.toInt())
+                        jumper.jump(
+                            id, highlight.start, highlight.total, spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
+                            jumpMessage(highlight.percent), backLabel,
+                        )
+                    }
+                },
+                onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
+                onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
+                onDismiss = { highlightsShown = false },
             )
         }
         val searchedBook = openTtuId

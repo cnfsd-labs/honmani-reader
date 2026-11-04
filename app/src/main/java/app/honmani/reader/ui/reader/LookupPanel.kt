@@ -86,6 +86,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -166,6 +167,8 @@ fun LookupPanel(
     onLearn: ((LookupGroup) -> Unit)? = null,
     /** "Don't count": takes back what this tap changed (see [ReaderViewModel.dontCount]); null when it changed nothing. */
     onDontCount: (() -> Unit)? = null,
+    /** The highlight swatches (a selection's lookup, or a tap on a highlighted word); null shows none. */
+    highlight: HighlightControls? = null,
 ) {
     // Moved synchronously while dragging; an earlier version queued each move as a coroutine,
     // and moves that ran after the release cancelled the closing animation, leaving the panel
@@ -367,6 +370,7 @@ fun LookupPanel(
                     sentence = state.tap.sentence,
                 )
             }
+            if (highlight != null && (state as? LookupPanelState.Results)?.previous == null) HighlightBar(highlight)
             if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
                 Text(
                     text = previousSentence,
@@ -467,6 +471,61 @@ fun LookupPanel(
 }
 
 private const val MAX_SHOWN_TEXT = 8
+
+/**
+ * What the lookup panel offers for highlighting. [current] is the colour (0-3, see [HIGHLIGHT_SWATCHES])
+ * of the highlight a tap landed on, or null for a new selection; [onPick] saves a new highlight in
+ * a colour or changes the colour of the tapped one; [onRemove] is only there for a tapped highlight.
+ */
+data class HighlightControls(
+    val current: Int?,
+    val onPick: (Int) -> Unit,
+    val onRemove: (() -> Unit)?,
+)
+
+/** A label, the four colours and (for a highlight that exists) "Remove highlight". */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HighlightBar(controls: HighlightControls) {
+    val names = listOf(
+        R.string.highlight_yellow, R.string.highlight_green, R.string.highlight_blue, R.string.highlight_pink,
+    ).map { stringResource(it) }
+    FlowRow(
+        modifier = Modifier.padding(start = 20.dp, end = 12.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(if (controls.current == null) R.string.highlight_add else R.string.highlight_change),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = 4.dp),
+        )
+        HIGHLIGHT_SWATCHES.forEachIndexed { index, color ->
+            // 48 dp to touch, a smaller dot to look at.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clickable(role = Role.Button, onClickLabel = names[index]) { controls.onPick(index) }
+                    .semantics { contentDescription = names[index] },
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(if (controls.current == index) 30.dp else 26.dp)
+                        .background(color, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (controls.current == index) {
+                        Icon(Icons.Filled.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+        if (controls.onRemove != null) {
+            TextButton(onClick = controls.onRemove) { Text(stringResource(R.string.highlight_remove)) }
+        }
+    }
+}
 
 /** Copy buttons for a long-press lookup, which has no Android selection toolbar. */
 @OptIn(ExperimentalLayoutApi::class)

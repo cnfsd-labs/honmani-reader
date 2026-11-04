@@ -96,6 +96,7 @@ private val DOCUMENT_START_SCRIPTS = listOf(
     "honmani/text.js",
     "honmani/ttu-defaults.js",
     "honmani/tap-bridge.js",
+    "honmani/highlights.js",
     "honmani/keep-position.js",
     "honmani/library-bridge.js",
     "honmani/viewport-log.js",
@@ -186,6 +187,10 @@ fun ReaderWebView(
     panelOpen: Boolean = false,
     /** A long press looks the text up and deselects it, so Android's Copy toolbar is not shown. */
     hideSelectionToolbar: Boolean = false,
+    /** The page's highlights message for a book (the ttu id), or null when it has none to draw. */
+    highlightsMessage: suspend (Long) -> String? = { null },
+    /** Changes when the book's highlights do, so the page gets them again. */
+    highlightsKey: Any? = null,
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -200,6 +205,7 @@ fun ReaderWebView(
     val currentPanelOpen by rememberUpdatedState(panelOpen)
     val currentHideToolbar by rememberUpdatedState(hideSelectionToolbar)
     val currentMarks by rememberUpdatedState(marks)
+    val currentHighlights by rememberUpdatedState(highlightsMessage)
     val currentHighlightColor by rememberUpdatedState(highlightColor)
     val webViewRef = remember { WebViewRef() }
     var atLibrary by remember { mutableStateOf(true) }
@@ -285,6 +291,15 @@ fun ReaderWebView(
         }
     }
 
+    // The page draws highlights as the app saves them: pushed again for the book it last asked about.
+    LaunchedEffect(highlightsKey) {
+        val bookId = webViewRef.highlightsBookId ?: return@LaunchedEffect
+        val reply = currentHighlights(bookId) ?: return@LaunchedEffect
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            webViewRef.replyProxy?.postMessage(reply)
+        }
+    }
+
     // A new WebView after the page's renderer died (crashed, or killed by Android for memory):
     // the old one cannot be used again, and without this Android would close the whole app.
     var renderer by remember { mutableIntStateOf(0) }
@@ -317,6 +332,15 @@ fun ReaderWebView(
                             // A swipe on the page behind an open lookup panel does nothing.
                             BridgeMessage.OpenMenuBySwipe -> if (!currentPanelOpen) currentOnOpenMenu()
                             is BridgeMessage.Background -> currentOnBackground(message.color)
+                            is BridgeMessage.HighlightsRequest -> {
+                                webViewRef.highlightsBookId = message.bookId
+                                scope.launch {
+                                    val reply = currentHighlights(message.bookId) ?: return@launch
+                                    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                                        replyProxy.postMessage(reply)
+                                    }
+                                }
+                            }
                             is BridgeMessage.Marks -> {
                                 val generation = marksGeneration.get()
                                 scope.launch {
@@ -449,6 +473,9 @@ private class WebViewRef {
 
     /** Channel back to the page that sent the last bridge message. */
     var replyProxy: JavaScriptReplyProxy? = null
+
+    /** The book (ttu id) the page last asked highlights for. */
+    var highlightsBookId: Long? = null
 }
 
 @SuppressLint("SetJavaScriptEnabled")
