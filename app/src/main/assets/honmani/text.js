@@ -217,8 +217,39 @@
     return firstCharWalk(root, skipped);
   }
 
+  /** `Sentences.DEFAULT_ENDS` in the app is the same; `window.honmaniSentenceEnds` is the reader's choice. */
+  const DEFAULT_SENTENCE_ENDS = '。！？!?…';
+  const CLOSING_QUOTES = '」』）〉》】"\'';
+
+  function isSentenceEnd(character) {
+    return character === '\n' || (window.honmaniSentenceEnds || DEFAULT_SENTENCE_ENDS).includes(character);
+  }
+
+  /** Where the sentence holding `position` starts and ends in `text`, closing quotes included. */
+  function sentenceBounds(text, position) {
+    let start = position;
+    while (start > 0 && !isSentenceEnd(text[start - 1])) start--;
+    let end = position;
+    while (end < text.length && !isSentenceEnd(text[end])) end++;
+    while (end < text.length && isSentenceEnd(text[end])) end++;
+    while (end < text.length && CLOSING_QUOTES.includes(text[end])) end++;
+    return { start, end };
+  }
+
+  /** All of `text` as consecutive sentences, [{ start, end }], cut where `sentenceBounds` ends each. */
+  function sentenceSpans(text) {
+    const spans = [];
+    for (let start = 0; start < text.length; ) {
+      const { end } = sentenceBounds(text, start);
+      spans.push({ start, end });
+      start = end;
+    }
+    return spans;
+  }
+
   window.honmaniText = {
     SKIPPED_SELECTOR, isSkipped, isGaiji, textData, isBlock, blockAncestor, bookId, toFraction, onScreen, firstCharOnScreen,
+    DEFAULT_SENTENCE_ENDS, CLOSING_QUOTES, isSentenceEnd, sentenceBounds, sentenceSpans,
     // Exposed so tests can compare the fast path with the walk.
     firstCharWalk, firstCharNearStart,
   };

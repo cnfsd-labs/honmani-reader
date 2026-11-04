@@ -72,14 +72,11 @@
   const MAX_PICTURE_DATA = 3000000;
   /** Longest side of a redrawn picture, tried in turn until the message fits. */
   const PICTURE_SIDES = [2400, 1600, 1000];
-  const { isSkipped, blockAncestor, isGaiji, textData } = window.honmaniText;
+  const { isSkipped, blockAncestor, isGaiji, textData, CLOSING_QUOTES, isSentenceEnd, sentenceBounds } = window.honmaniText;
   const INTERACTIVE_SELECTOR = 'a[href], button, input, textarea, select, [role="button"]';
   /** Stands for a gaiji picture in the text (isGaiji): no word runs across it. */
   const GAIJI = '\uFFFC';
   const NOT_WORD_START = /^[\p{P}\p{S}]/u;
-  /** `Sentences.DEFAULT_ENDS` in the app is the same; `window.honmaniSentenceEnds` is the reader's choice. */
-  const DEFAULT_SENTENCE_ENDS = '。！？!?…';
-  const CLOSING_QUOTES = '」』）〉》】"\'';
   const OPENING_BRACKETS = '「『（(〈《【〔［｛“‘〝"\'';
   const HIGHLIGHT_NAME = 'honmani-lookup';
   const LOOKED_UP_EVENT = 'honmani-looked-up';
@@ -213,21 +210,6 @@
 
   function takeCodePoints(text, count) {
     return Array.from(text).slice(0, count).join('');
-  }
-
-  function isSentenceEnd(character) {
-    return character === '\n' || (window.honmaniSentenceEnds || DEFAULT_SENTENCE_ENDS).includes(character);
-  }
-
-  /** Where the sentence holding `position` starts and ends in `text`, closing quotes included. */
-  function sentenceBounds(text, position) {
-    let start = position;
-    while (start > 0 && !isSentenceEnd(text[start - 1])) start--;
-    let end = position;
-    while (end < text.length && !isSentenceEnd(text[end])) end++;
-    while (end < text.length && isSentenceEnd(text[end])) end++;
-    while (end < text.length && CLOSING_QUOTES.includes(text[end])) end++;
-    return { start, end };
   }
 
   function sentenceAround(text, position) {

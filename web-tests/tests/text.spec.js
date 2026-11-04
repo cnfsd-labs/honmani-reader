@@ -27,8 +27,9 @@ test('text.js shares the helpers on one object and loads only once', async ({ pa
     };
   });
   expect(result.names).toEqual(
-    ['SKIPPED_SELECTOR', 'blockAncestor', 'bookId', 'firstCharNearStart', 'firstCharOnScreen', 'firstCharWalk', 'isBlock',
-      'isGaiji', 'isSkipped', 'onScreen', 'textData', 'toFraction'].sort(),
+    ['CLOSING_QUOTES', 'DEFAULT_SENTENCE_ENDS', 'SKIPPED_SELECTOR', 'blockAncestor', 'bookId', 'firstCharNearStart',
+      'firstCharOnScreen', 'firstCharWalk', 'isBlock', 'isGaiji', 'isSentenceEnd', 'isSkipped', 'onScreen',
+      'sentenceBounds', 'sentenceSpans', 'textData', 'toFraction'].sort(),
   );
   expect(result.skipsRt).toBe(true);
   expect(result.skipsText).toBe(false);
@@ -37,6 +38,24 @@ test('text.js shares the helpers on one object and loads only once', async ({ pa
   expect(result.isBlock).toEqual([true, false]);
   expect(result.customTest).toBe('a');
   expect(result.fractions).toEqual([0.5, 0.125, 0.25, 1, 0, null, null]);
+});
+
+test('sentenceSpans cuts text where sentenceBounds ends a sentence, with the sentence ends chosen', async ({ page }) => {
+  await page.addInitScript({ path: TEXT });
+  await page.goto('file://' + path.join(__dirname, '../fixtures/book.html'));
+  const result = await page.evaluate(() => {
+    const T = window.honmaniText;
+    const cut = (text) => T.sentenceSpans(text).map((s) => text.slice(s.start, s.end));
+    const plain = cut('彼は言った。「行こう！」と。次の文');
+    const lines = cut('一行目\n二行目');
+    window.honmaniSentenceEnds = '。';
+    const custom = cut('はい！いいえ。終わり');
+    return { plain, lines, custom, empty: T.sentenceSpans('') };
+  });
+  expect(result.plain).toEqual(['彼は言った。', '「行こう！」', 'と。', '次の文']);
+  expect(result.lines).toEqual(['一行目\n', '二行目']);
+  expect(result.custom).toEqual(['はい！いいえ。', '終わり']);
+  expect(result.empty).toEqual([]);
 });
 
 test('bookId reads the id of a book address only', async ({ page }) => {
