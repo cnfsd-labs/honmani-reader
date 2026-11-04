@@ -214,6 +214,7 @@ private fun AnkiSettingsContent() {
             onSelect = settings::setDeck,
         )
         CardStylePicker(cardStyle, onSelect = settings::setCardStyle)
+        MissingFieldsRow(cardStyle)
         SentenceEndsRow(sentenceEnds, onChange = settings::setSentenceEnds)
         ListItem(
             headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
@@ -381,6 +382,54 @@ private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) 
                 )
             }
         }
+    }
+}
+
+/**
+ * Offers the fields a note type from an older Honmani lacks. Never done unasked: it makes the next
+ * AnkiWeb sync go one way, which can overwrite reviews from another device that weren't synced.
+ */
+@Composable
+private fun MissingFieldsRow(style: CardStyle) {
+    val context = LocalContext.current
+    val exporter = remember { (context.applicationContext as HonmaniApplication).container.ankiExporter }
+    val scope = rememberCoroutineScope()
+    var missing by remember { mutableStateOf(emptyList<String>()) }
+    var open by rememberSaveable { mutableStateOf(false) }
+    var refused by remember { mutableStateOf(false) }
+    LaunchedEffect(style) {
+        missing = withContext(Dispatchers.IO) { exporter.missingFields(style) }
+    }
+    if (missing.isEmpty()) return
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.anki_add_fields, missing.joinToString())) },
+        supportingContent = {
+            Text(stringResource(if (refused) R.string.anki_add_fields_refused else R.string.anki_add_fields_summary))
+        },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(stringResource(R.string.anki_add_fields_title)) },
+            text = { Text(stringResource(R.string.anki_add_fields_details)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        open = false
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                refused = !exporter.addMissingFields(style)
+                                missing = exporter.missingFields(style)
+                            }
+                        }
+                    },
+                ) { Text(stringResource(R.string.anki_add_fields_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { open = false }) { Text(stringResource(android.R.string.cancel)) }
+            },
+        )
     }
 }
 

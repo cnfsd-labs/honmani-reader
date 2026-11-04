@@ -33,7 +33,10 @@ interface AnkiApi {
         css: String,
     ): Long?
 
-    /** Adds a field at the end of [noteType]; its notes get it empty. False if AnkiDroid refused. */
+    /**
+     * Adds a field at the end of [noteType]; its notes get it empty. False if AnkiDroid refused.
+     * Anki counts this as a schema change: the next AnkiWeb sync has to go one way.
+     */
     fun addField(noteType: Long, name: String): Boolean
 
     /** The front template of the note type's first card type, if it can be read. */

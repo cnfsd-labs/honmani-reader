@@ -372,6 +372,12 @@
     <string name="card_style_details">Honmani: the word, then the sentence with the word marked, with furigana, pitch and meanings on the back. Sentence: the whole sentence on the front; the word, its reading and meaning on the back.</string>
     <string name="card_style_honmani">Honmani</string>
     <string name="card_style_sentence">Sentence</string>
+    <string name="anki_add_fields">Add the %1$s field</string>
+    <string name="anki_add_fields_summary">Your note type is from an older Honmani: new cards go in without this field.</string>
+    <string name="anki_add_fields_refused">AnkiDroid did not add the field. New cards go in without it.</string>
+    <string name="anki_add_fields_title">Change the note type?</string>
+    <string name="anki_add_fields_details">Anki counts this as a change to the whole collection: the next AnkiWeb sync has to go one way, replacing either AnkiWeb\'s copy or this phone\'s. Sync all your devices first so no reviews are lost. Existing cards keep the field empty.</string>
+    <string name="anki_add_fields_confirm">Add field</string>
     <string name="sentence_ends">Sentence ends</string>
     <string name="sentence_ends_details">The characters that end a sentence on new cards, in sentence highlights and in the sentence tint. A line break always does.</string>
     <string name="sentence_ends_save">Save</string>

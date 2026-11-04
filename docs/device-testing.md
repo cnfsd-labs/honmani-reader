@@ -155,6 +155,14 @@ the word, its reading and meanings (a word without a stored sentence shows the w
 "Check against Anki" then looks at that note type. Words → export → "Anki package" uses the same
 choice; the text file always uses the Honmani note type.
 
+Both note types end in `FuriganaPlain`, the reading in Anki's notation (`飛[と]び 散[ち]る`, for the
+`furigana:` filter). A note type from an older Honmani is left alone and its cards go in without
+the field; Settings → Anki then shows "Add the FuriganaPlain field", which warns first: changing a
+note type moves the collection's schema stamp (`scm`), so the next AnkiWeb sync has to go one way.
+Importing an `.apkg` over an older type leaves it as it is and makes a second one ("Honmani
+Sentence+"). Settings → Anki → Sentence ends: the characters that end a sentence on new cards, in
+sentence highlights and in the sentence tint; old cards are not changed.
+
 ## Reading progress sync (KOReader)
 
 With KOReader on an e-reader (or Calibre-Web Automated, whose own KOReader plugin "CWA Progress
