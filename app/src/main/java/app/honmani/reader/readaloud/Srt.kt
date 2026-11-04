@@ -12,7 +12,9 @@ data class Cue(val startMs: Long, val endMs: Long, val text: String)
  */
 object Srt {
     private val TIME_LINE = Regex("""^\s*(?:(\d+):)?(\d{1,2}):(\d{1,2})[,.](\d{1,3})\s*-->\s*(?:(\d+):)?(\d{1,2}):(\d{1,2})[,.](\d{1,3})(?:\s.*)?$""")
-    private val TAG = Regex("""<[^>]*>|\{\\[^}]*}""")
+    // Escape every brace: Android's ICU regex rejects a lone "}" (the JVM and Robolectric accept it, so
+    // the unit tests can't catch it; it crashed on the phone when this object was first loaded).
+    private val TAG = Regex("""<[^>]*>|\{\\[^}]*\}""")
     private val NUMBER = Regex("""^\s*\d+\s*$""")
 
     fun parse(source: String): List<Cue> {
