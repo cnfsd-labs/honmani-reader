@@ -77,51 +77,40 @@ class AnkiExporterTest {
     }
 
     @Test
-    fun aNoteTypeFromBeforeThePlainFurigana_isLeftAlone_andTheCardGoesInWithoutTheField() = runBlocking {
-        val oldFields = AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA
-        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, oldFields)
+    fun aNoteTypeFromBeforeThePlainFurigana_gainsTheField_notASecondNoteType_andTheCardFillsIt() = runBlocking {
+        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
 
         val result = exporter.add(savedWord())
 
         assertTrue(result is AnkiResult.Added)
         assertEquals(0, anki.noteTypesAdded)
-        assertEquals(oldFields, anki.fieldsOf[old])
+        assertEquals(AnkiCard.FIELDS, anki.fieldsOf[old])
         val note = anki.notes.single()
         assertEquals(old, note.noteType)
-        assertEquals(oldFields.size, note.fields.size)
+        assertEquals("名前[なまえ]", note.fields.last())
     }
 
     @Test
-    fun aNoteTypeFromBefore_gainsTheFieldOnlyWhenAsked_andCardsThenFillIt() = runBlocking {
-        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
-        assertEquals(listOf(AnkiCard.PLAIN_FURIGANA), exporter.missingFields(CardStyle.HONMANI))
-
-        assertTrue(exporter.addMissingFields(CardStyle.HONMANI))
-        exporter.add(savedWord())
-
-        assertEquals(AnkiCard.FIELDS, anki.fieldsOf[old])
-        assertEquals(emptyList<String>(), exporter.missingFields(CardStyle.HONMANI))
-        assertEquals("名前[なまえ]", anki.notes.single().fields.last())
-    }
-
-    @Test
-    fun aRememberedNoteTypeFromBefore_isOfferedTheFieldToo() = runBlocking {
+    fun aRememberedNoteTypeFromBefore_gainsTheFieldToo() = runBlocking {
         val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
         settings.setNoteTypeId(CardStyle.HONMANI, old)
 
-        assertTrue(exporter.addMissingFields(CardStyle.HONMANI))
+        exporter.add(savedWord())
 
         assertEquals(AnkiCard.FIELDS, anki.fieldsOf[old])
     }
 
     @Test
-    fun anAnkiDroidRefusingTheField_isReported_andNothingIsOfferedWithoutANoteType() = runBlocking {
-        assertEquals(emptyList<String>(), exporter.missingFields(CardStyle.HONMANI))
-        anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
+    fun anAnkiDroidRefusingTheField_stillTakesTheCardWithoutIt() = runBlocking {
+        val oldFields = AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA
+        val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, oldFields)
         anki.refuseFields = true
 
-        assertEquals(false, exporter.addMissingFields(CardStyle.HONMANI))
-        assertEquals(listOf(AnkiCard.PLAIN_FURIGANA), exporter.missingFields(CardStyle.HONMANI))
+        val result = exporter.add(savedWord())
+
+        assertTrue(result is AnkiResult.Added)
+        assertEquals(oldFields, anki.fieldsOf[old])
+        assertEquals(oldFields.size, anki.notes.single().fields.size)
     }
 
     @Test

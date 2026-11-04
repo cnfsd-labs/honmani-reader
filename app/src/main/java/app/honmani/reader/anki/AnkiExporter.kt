@@ -226,42 +226,37 @@ class AnkiExporter(
             ?: return null
         settings.setNoteTypeId(style, id)
         checkCard(id, model)
+        addMissingFields(id, model)
         return id
+    }
+
+    /** Note types whose missing fields were already tried once in this run. */
+    private val fieldsTried = mutableSetOf<Long>()
+
+    /**
+     * A note type from an older Honmani lacks the [NoteModel.addedFields]: adds them, once per run.
+     * Anki counts that as a change to the collection, so the next AnkiWeb sync goes one way. If
+     * AnkiDroid refuses, the cards go in without the field ([fieldCount]).
+     */
+    private fun addMissingFields(noteType: Long, model: NoteModel) {
+        if (model.addedFields.isEmpty() || !fieldsTried.add(noteType)) return
+        try {
+            val present = anki.fieldNames(noteType)
+            if (present.isEmpty()) return
+            for (field in model.addedFields) if (field !in present) anki.addField(noteType, field)
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "AnkiDroid did not add the field", e)
+        }
     }
 
     /**
      * How many of [model]'s fields [noteType] takes. One made before the [NoteModel.addedFields] gets
-     * its cards without them: adding a field is the user's choice, see [addMissingFields].
+     * its cards without them if AnkiDroid refused to add them, see [addMissingFields].
      */
     private fun fieldCount(noteType: Long, model: NoteModel): Int {
         val present = anki.fieldNames(noteType)
         if (present.isEmpty()) return model.fields.size
         return model.fields.size - model.addedFields.count { it !in present }
-    }
-
-    /** The [NoteModel.addedFields] that [style]'s existing note type lacks; none without one. */
-    fun missingFields(style: CardStyle): List<String> = try {
-        if (anki.packageName() == null || !anki.hasPermission()) {
-            emptyList()
-        } else {
-            val present = existingNoteType(style)?.let(anki::fieldNames).orEmpty()
-            if (present.isEmpty()) emptyList() else style.model.addedFields.filter { it !in present }
-        }
-    } catch (e: Exception) {
-        logWarning("Honmani.anki", "Could not read the note type's fields", e)
-        emptyList()
-    }
-
-    /**
-     * Adds what [missingFields] lists. Only on the user's word: changing a note type moves the
-     * collection's schema stamp, so the next AnkiWeb sync has to go one way. False if refused.
-     */
-    fun addMissingFields(style: CardStyle): Boolean = try {
-        val noteType = existingNoteType(style)
-        noteType != null && missingFields(style).all { anki.addField(noteType, it) }
-    } catch (e: Exception) {
-        logWarning("Honmani.anki", "AnkiDroid did not add the field", e)
-        false
     }
 
     private fun existingNoteType(style: CardStyle): Long? =
