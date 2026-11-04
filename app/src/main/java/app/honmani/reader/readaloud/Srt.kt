@@ -16,7 +16,7 @@ object Srt {
     private val NUMBER = Regex("""^\s*\d+\s*$""")
 
     fun parse(source: String): List<Cue> {
-        val lines = source.removePrefix("﻿").replace("\r\n", "\n").replace('\r', '\n').split('\n')
+        val lines = source.removePrefix("\uFEFF").replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val cues = ArrayList<Cue>()
         var start = 0L
         var end = 0L
