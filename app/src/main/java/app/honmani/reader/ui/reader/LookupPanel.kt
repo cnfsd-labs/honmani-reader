@@ -1136,7 +1136,13 @@ internal fun FrequencyBadge(frequency: Frequency) {
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = {
             PlainTooltip {
-                Text(stringResource(R.string.lookup_frequency_explained, frequency.dictionaryTitle, frequency.display))
+                Text(
+                    if (frequency.rank != null) {
+                        stringResource(R.string.lookup_frequency_explained, frequency.dictionaryTitle, frequency.display)
+                    } else {
+                        stringResource(R.string.lookup_frequency_count_explained, frequency.dictionaryTitle, frequency.display)
+                    },
+                )
             }
         },
         state = tooltip,
@@ -1147,7 +1153,7 @@ internal fun FrequencyBadge(frequency: Frequency) {
             color = MaterialTheme.colorScheme.secondaryContainer,
         ) {
             Text(
-                text = "#${frequency.display}",
+                text = frequency.badge,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),

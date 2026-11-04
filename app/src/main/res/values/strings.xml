@@ -583,6 +583,7 @@
     <string name="lookup_show_more">More meanings</string>
     <string name="lookup_show_less">Fewer meanings</string>
     <string name="lookup_frequency_explained">Frequency rank in %1$s: number %2$s among the most common Japanese words. The lower the number, the more often you will meet the word.</string>
+    <string name="lookup_frequency_count_explained">Frequency in %1$s: %2$s. This list counts how often the word occurs, so a higher number means a more common word.</string>
     <string name="lookup_expand">Show this word</string>
     <string name="lookup_show_kanji">Show kanji</string>
     <string name="catalog_kind_pitch">Pitch accent</string>

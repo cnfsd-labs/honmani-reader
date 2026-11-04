@@ -37,8 +37,11 @@ data class Frequency(
     /** Lower is more common; null if the dictionary counts occurrences or gives only text. */
     val rank: Double?,
 ) {
-    /** "Jiten #395", as on cards. */
-    val label: String get() = "$dictionaryTitle #$display"
+    /** What the badge shows: "#395" for a rank, the dictionary's own text for a count ("4242㋕"). */
+    val badge: String get() = if (rank != null) "#$display" else display
+
+    /** "Jiten #395", as on cards; "Corpus 4242" for a count. */
+    val label: String get() = "$dictionaryTitle $badge"
 }
 
 /** Frequency and pitch accent of one word (written form and reading). */

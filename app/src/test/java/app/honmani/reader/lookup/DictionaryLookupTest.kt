@@ -75,6 +75,14 @@ class DictionaryLookupTest {
     private fun LookupResult.headwords() = entries.map { it.term.expression }
 
     @Test
+    fun aRankShowsWithHash_aCountDoesNot() {
+        assertEquals("#395", Frequency("Jiten", "395", 395.0).badge)
+        assertEquals("Jiten #395", Frequency("Jiten", "395", 395.0).label)
+        assertEquals("4242㋕", Frequency("My freq", "4242㋕", null).badge)
+        assertEquals("My freq 4242㋕", Frequency("My freq", "4242㋕", null).label)
+    }
+
+    @Test
     fun frequencyRanksTheCommonWordFirst_andPitchAndFrequencyReachTheGroups() = runTest {
         jmdict()
         // かえる by reading: 帰る and 変える tie on everything a dictionary of terms says.
