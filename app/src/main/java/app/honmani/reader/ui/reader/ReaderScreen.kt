@@ -7,6 +7,7 @@ import android.content.ActivityNotFoundException
 import android.content.pm.ApplicationInfo
 import android.provider.Settings
 import android.util.Log
+import android.view.WindowManager
 import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.readaloud.LiveVoice
 import app.honmani.reader.readaloud.ReadAloudController
@@ -187,14 +188,21 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     DisposableEffect(readAloud) { onDispose { readAloud.close() } }
     // The screen stays on while the book is read aloud, and not a moment longer.
     val rootView = LocalView.current
+    // The window flag, not View.keepScreenOn: that one is only passed on at the next frame, which
+    // a stopped or still screen never draws.
     DisposableEffect(rootView, readAloudState.running) {
-        if (readAloudState.running) rootView.keepScreenOn = true
-        onDispose { rootView.keepScreenOn = false }
+        val window = rootView.context.findActivity()?.window
+        if (readAloudState.running) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) readAloud.appStopped()
+            if (event == Lifecycle.Event.ON_STOP) {
+                readAloud.appStopped()
+                // The state collection is stopped too, so the flag is cleared here, not by the effect.
+                context.findActivity()?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
             tracker.setForeground(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
             // Characters read count from ttu's positions; ask before the app may be closed.
             if (event == Lifecycle.Event.ON_STOP) {
