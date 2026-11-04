@@ -159,6 +159,15 @@ class AudiobookController(
 
     fun previous() {
         val a = alignment ?: return
+        if (phase == AudiobookPhase.ENDED) {
+            // The recording has ended: back to its last subtitle, ready to play from there.
+            val last = a.previousMatched(a.cues.size)
+            if (last >= 0) {
+                _state.value = _state.value.copy(phase = AudiobookPhase.PAUSED)
+                goTo(last)
+            }
+            return
+        }
         if (phase != AudiobookPhase.PLAYING && phase != AudiobookPhase.PAUSED) return
         resumeAfterPanel = false
         val position = player.positionMs

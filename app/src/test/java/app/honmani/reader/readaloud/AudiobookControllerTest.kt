@@ -187,6 +187,20 @@ class AudiobookControllerTest {
     }
 
     @Test
+    fun previousAfterTheEndGoesToTheLastSubtitleReadyToPlay() {
+        start()
+        player.positionMs = 3_990
+        player.listener!!.onCompleted()
+        controller.previous()
+        assertEquals(AudiobookPhase.PAUSED, controller.state.value.phase)
+        assertEquals(3_000, player.positionMs)
+        assertEquals(3_000L, saved.last())
+        controller.play()
+        assertEquals(AudiobookPhase.PLAYING, controller.state.value.phase)
+        assertEquals(3_000, player.positionMs)
+    }
+
+    @Test
     fun audioThatCannotBeOpenedIsAProblem() {
         player.openResult = AudiobookProblem.AUDIO_GONE
         start()
