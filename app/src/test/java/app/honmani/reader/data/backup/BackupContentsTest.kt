@@ -85,4 +85,14 @@ class BackupContentsTest {
         )
         assertEquals(mapOf("honmaniSelectionLookup" to "0", "honmaniVolumeKeys" to "1", "honmaniTintOneUnknown" to "1", "honmaniWordMarks" to "off"), valid)
     }
+
+    @Test
+    fun edgeTapOptionsSurviveARestore() {
+        val values = mapOf("honmaniEdgeTaps" to "1", "honmaniEdgeZone" to "narrow", "honmaniEdgeForward" to "1")
+        assertEquals(values, ReaderSettingsCheck.valid(values))
+        assertEquals(
+            mapOf("honmaniEdgeForward" to "0"),
+            ReaderSettingsCheck.valid(mapOf("honmaniEdgeZone" to "enormous", "honmaniEdgeForward" to "0")),
+        )
+    }
 }

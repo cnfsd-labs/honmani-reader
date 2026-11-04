@@ -47,6 +47,8 @@
     'honmaniWordMarks',
     'honmaniVolumeKeys',
     'honmaniEdgeTaps',
+    'honmaniEdgeZone',
+    'honmaniEdgeForward',
     'honmaniSelectionLookup',
     'honmaniHideKnownFurigana',
     'honmaniTintOneUnknown',

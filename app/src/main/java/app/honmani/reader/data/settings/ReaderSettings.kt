@@ -21,6 +21,20 @@ enum class ReaderFont(val storage: String) {
     SANS("sans-serif"),
 }
 
+/** How wide the page-turn zones at the sides are when edge taps are on (`tap-bridge.js` has the widths). */
+enum class EdgeZone(val storage: String) {
+    NARROW("narrow"),
+    MEDIUM("medium"),
+    WIDE("wide"),
+    ;
+
+    companion object {
+        val DEFAULT = MEDIUM
+
+        fun fromStorage(value: String?): EdgeZone = entries.firstOrNull { it.storage == value } ?: DEFAULT
+    }
+}
+
 /**
  * The reader settings Honmani shows on its own screen, kept where ッツ Ebook Reader keeps them
  * (its localStorage keys, see `assets/honmani/reader-settings.js`). Missing values are ttu's
@@ -47,6 +61,10 @@ data class ReaderSettings(
     val volumeKeys: Boolean = true,
     /** A tap in the left or right edge of a paginated page turns the page instead of looking up (`tap-bridge.js`); off by default. */
     val edgeTaps: Boolean = false,
+    /** How wide the page-turn zones of the edge taps are. */
+    val edgeZone: EdgeZone = EdgeZone.DEFAULT,
+    /** One-handed reading: both edges turn to the next page, not only the one in reading direction. */
+    val edgeForward: Boolean = false,
     /** Selected book text (a long press and its handles) is looked up as a tap is (`tap-bridge.js`). */
     val selectionLookup: Boolean = true,
     /** Furigana is hidden over words the reader knows (`word-marks.js`); off by default. */
@@ -77,6 +95,8 @@ data class ReaderSettings(
         put(WAKE_LOCK, flag(keepScreenOn))
         put(VOLUME_KEYS, flag(volumeKeys))
         put(EDGE_TAPS, flag(edgeTaps))
+        put(EDGE_ZONE, edgeZone.storage)
+        put(EDGE_FORWARD, flag(edgeForward))
         put(SELECTION_LOOKUP, flag(selectionLookup))
         put(HIDE_KNOWN_FURIGANA, flag(hideKnownFurigana))
         put(TINT_ONE_UNKNOWN, flag(tintOneUnknown))
@@ -105,6 +125,8 @@ data class ReaderSettings(
         private const val WORD_MARKS = "honmaniWordMarks"
         private const val VOLUME_KEYS = "honmaniVolumeKeys"
         private const val EDGE_TAPS = "honmaniEdgeTaps"
+        private const val EDGE_ZONE = "honmaniEdgeZone"
+        private const val EDGE_FORWARD = "honmaniEdgeForward"
         private const val SELECTION_LOOKUP = "honmaniSelectionLookup"
         private const val HIDE_KNOWN_FURIGANA = "honmaniHideKnownFurigana"
         private const val TINT_ONE_UNKNOWN = "honmaniTintOneUnknown"
@@ -140,6 +162,8 @@ data class ReaderSettings(
                 keepScreenOn = flag(WAKE_LOCK, defaults.keepScreenOn),
                 volumeKeys = flag(VOLUME_KEYS, defaults.volumeKeys),
                 edgeTaps = flag(EDGE_TAPS, defaults.edgeTaps),
+                edgeZone = EdgeZone.fromStorage(values[EDGE_ZONE]),
+                edgeForward = flag(EDGE_FORWARD, defaults.edgeForward),
                 selectionLookup = flag(SELECTION_LOOKUP, defaults.selectionLookup),
                 hideKnownFurigana = flag(HIDE_KNOWN_FURIGANA, defaults.hideKnownFurigana),
                 tintOneUnknown = flag(TINT_ONE_UNKNOWN, defaults.tintOneUnknown),

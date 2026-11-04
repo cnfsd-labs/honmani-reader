@@ -14,10 +14,12 @@
  * left out when there are none.
  *   { "type": "dismiss" }   (a tap on book content that is not on text)
  *   { "type": "turnPage", "next": <bool> }
- *                           (a tap in the left or right EDGE_ZONE of a paginated page, instead
- *                           of a lookup, when localStorage "honmaniEdgeTaps" = "1"; the app turns
- *                           the page, or closes an open lookup panel first. Next is the left edge
- *                           in vertical text and the right edge in horizontal text. Taps on links
+ *                           (a tap in the left or right edge zone of a paginated page, instead
+ *                           of a lookup, when localStorage "honmaniEdgeTaps" = "1"; the zone is
+ *                           10, 15 or 25 percent of the width, "honmaniEdgeZone" narrow, medium
+ *                           (default) or wide; the app turns the page, or closes an open lookup
+ *                           panel first. Next is the left edge in vertical text and the right edge
+ *                           in horizontal text, or both edges with "honmaniEdgeForward" = "1". Taps on links
  *                           and buttons, on the footer and the top bar are not affected)
  *
  * Selected book text (a long press) is looked up in the same message, with "selection": true,
@@ -258,8 +260,28 @@
     return target.closest(BOOK_ROOT_SELECTOR) !== null && target.closest(INTERACTIVE_SELECTOR) === null;
   }
 
-  /** The share of the page's width at each side where a tap turns the page (edge taps on). */
-  const EDGE_ZONE = 0.15;
+  /**
+   * The share of the page's width at each side where a tap turns the page (edge taps on), by
+   * localStorage "honmaniEdgeZone"; medium (the default) is the width edge taps always had.
+   */
+  const EDGE_ZONES = { narrow: 0.1, medium: 0.15, wide: 0.25 };
+
+  function edgeZone() {
+    try {
+      return EDGE_ZONES[window.localStorage.getItem('honmaniEdgeZone')] ?? EDGE_ZONES.medium;
+    } catch (error) {
+      return EDGE_ZONES.medium;
+    }
+  }
+
+  /** localStorage "honmaniEdgeForward" = "1": both edges turn to the next page. */
+  function edgeBothForward() {
+    try {
+      return window.localStorage.getItem('honmaniEdgeForward') === '1';
+    } catch (error) {
+      return false;
+    }
+  }
 
   function edgeTapsOn() {
     try {
@@ -274,8 +296,10 @@
   function edgeTurn(x, target) {
     const root = target.closest(BOOK_ROOT_SELECTOR);
     if (!root || target.closest(INTERACTIVE_SELECTOR) || !edgeTapsOn()) return null;
-    const left = x < innerWidth * EDGE_ZONE;
-    if (!left && x <= innerWidth * (1 - EDGE_ZONE)) return null;
+    const zone = edgeZone();
+    const left = x < innerWidth * zone;
+    if (!left && x <= innerWidth * (1 - zone)) return null;
+    if (edgeBothForward()) return true;
     const vertical = getComputedStyle(root).writingMode.startsWith('vertical');
     return vertical ? left : !left;
   }

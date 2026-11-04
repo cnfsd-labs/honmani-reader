@@ -912,6 +912,12 @@
     <string name="reader_settings_immersive_details">Hide the status and navigation bars while a book is open; swipe from the screen edge to show them for a moment</string>
     <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
     <string name="reader_settings_edge_taps_details">A tap at the left or right edge turns the page instead of looking up; paginated mode only</string>
+    <string name="reader_settings_edge_zone">Width of the page edges</string>
+    <string name="reader_settings_edge_zone_narrow">Narrow</string>
+    <string name="reader_settings_edge_zone_medium">Medium</string>
+    <string name="reader_settings_edge_zone_wide">Wide</string>
+    <string name="reader_settings_edge_forward">Both edges turn forward</string>
+    <string name="reader_settings_edge_forward_details">For reading with one hand: a tap at either edge goes to the next page</string>
     <string name="reader_settings_hide_known_furigana">Hide furigana over words you know</string>
     <string name="reader_settings_hide_known_furigana_details">Words looked up and learned, or read many times. The page keeps its layout; looking a word up brings its furigana back. Takes effect when the book is opened again.</string>
     <string name="reader_settings_tint_one_unknown">Tint sentences with one new word</string>

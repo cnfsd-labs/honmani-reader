@@ -69,6 +69,9 @@ Edge taps (Reader settings, off by default): with the switch on, a tap in the ou
 right of a paginated page turns it (vertical text: left = next, right = previous; horizontal: the
 reverse); with the panel open the first edge tap only closes it; a tap on a link, the footer or the top
 bar, a long press and the middle of the page work as before; with the switch off edge taps look up.
+With the switch on the settings also show "Width of the page edges" (Narrow 10 %, Medium 15 % as above,
+Wide 25 %: a tap just outside the zone looks up, just inside turns) and "Both edges turn forward" (off by
+default): either edge goes to the next page, in vertical and in horizontal text.
 
 Lookup panel height: tap a short word and a long one, a kanji and a non-word: the panel's top edge
 stays at the same place (about 40% of the screen), the content scrolls inside. Drag the handle or

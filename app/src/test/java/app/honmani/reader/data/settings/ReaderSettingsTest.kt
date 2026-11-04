@@ -32,6 +32,8 @@ class ReaderSettingsTest {
                 "honmaniWordMarks" to "new",
                 "honmaniVolumeKeys" to "0",
                 "honmaniEdgeTaps" to "1",
+                "honmaniEdgeZone" to "wide",
+                "honmaniEdgeForward" to "1",
                 "honmaniSelectionLookup" to "0",
                 "honmaniHideKnownFurigana" to "1",
                 "honmaniTintOneUnknown" to "1",
@@ -40,7 +42,7 @@ class ReaderSettingsTest {
         )
 
         assertEquals(
-            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true, immersive = true),
+            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, edgeZone = EdgeZone.WIDE, edgeForward = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true, immersive = true),
             settings,
         )
     }
@@ -70,6 +72,11 @@ class ReaderSettingsTest {
         assertEquals("learning", stored["honmaniWordMarks"])
         assertEquals("1", stored["honmaniVolumeKeys"])
         assertEquals("0", stored["honmaniEdgeTaps"])
+        // Medium is the width edge taps always had; an unknown value means it too.
+        assertEquals("medium", stored["honmaniEdgeZone"])
+        assertEquals("0", stored["honmaniEdgeForward"])
+        assertEquals(EdgeZone.MEDIUM, ReaderSettings.fromStorage(mapOf("honmaniEdgeZone" to "huge")).edgeZone)
+        assertFalse(ReaderSettings.fromStorage(emptyMap()).edgeForward)
         assertEquals("1", stored["honmaniSelectionLookup"])
         assertEquals("0", stored["honmaniHideKnownFurigana"])
         assertEquals("0", stored["honmaniTintOneUnknown"])
@@ -87,5 +94,11 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings.fromStorage(mapOf("honmaniMarkDue" to "0")).markDue)
         assertEquals(settings, ReaderSettings.fromStorage(stored))
         assertEquals("1.65", ReaderSettings().toStorage()["lineHeight"])
+    }
+
+    @Test
+    fun edgeTapOptionsRoundTrip() {
+        val settings = ReaderSettings(edgeTaps = true, edgeZone = EdgeZone.NARROW, edgeForward = true)
+        assertEquals(settings, ReaderSettings.fromStorage(settings.toStorage()))
     }
 }

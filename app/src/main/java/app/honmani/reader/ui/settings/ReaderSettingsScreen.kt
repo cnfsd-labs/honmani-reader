@@ -61,6 +61,7 @@ import app.honmani.reader.data.fonts.CatalogFont
 import app.honmani.reader.data.fonts.FontCatalog
 import app.honmani.reader.data.fonts.FontState
 import app.honmani.reader.data.fonts.FontStyle
+import app.honmani.reader.data.settings.EdgeZone
 import app.honmani.reader.data.settings.ReaderFont
 import app.honmani.reader.data.settings.ReaderSettings
 import app.honmani.reader.data.settings.ReaderTheme
@@ -223,6 +224,22 @@ private fun ReaderSettingsContent(
         }
         SwitchRow(R.string.reader_settings_edge_taps, R.string.reader_settings_edge_taps_details, settings.edgeTaps) {
             onChange(settings.copy(edgeTaps = it))
+        }
+        if (settings.edgeTaps) {
+            Section(stringResource(R.string.reader_settings_edge_zone)) {
+                Choice(
+                    options = listOf(
+                        EdgeZone.NARROW to R.string.reader_settings_edge_zone_narrow,
+                        EdgeZone.MEDIUM to R.string.reader_settings_edge_zone_medium,
+                        EdgeZone.WIDE to R.string.reader_settings_edge_zone_wide,
+                    ),
+                    selected = settings.edgeZone,
+                    onSelect = { onChange(settings.copy(edgeZone = it)) },
+                )
+            }
+            SwitchRow(R.string.reader_settings_edge_forward, R.string.reader_settings_edge_forward_details, settings.edgeForward) {
+                onChange(settings.copy(edgeForward = it))
+            }
         }
         SwitchRow(R.string.reader_settings_selection_lookup, R.string.reader_settings_selection_lookup_details, settings.selectionLookup) {
             onChange(settings.copy(selectionLookup = it))

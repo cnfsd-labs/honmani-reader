@@ -754,6 +754,83 @@ test.describe('edge taps (honmaniEdgeTaps)', () => {
   });
 });
 
+test.describe('edge zone width and both edges forward', () => {
+  const set = (page, values) =>
+    page.evaluate((values) => {
+      window.localStorage.setItem('honmaniEdgeTaps', '1');
+      for (const [key, value] of Object.entries(values)) window.localStorage.setItem(key, value);
+    }, values);
+  const rowY = (page, selector) =>
+    page.evaluate((selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    }, selector);
+  const width = (page) => page.evaluate(() => innerWidth);
+  const types = async (page) => (await messages(page)).map((m) => m.type);
+
+  for (const [zone, share] of [['narrow', 0.1], ['medium', 0.15], ['wide', 0.25], [null, 0.15], ['bogus', 0.15]]) {
+    test(`zone ${zone ?? 'unset'}: turns inside ${share * 100} percent, looks up just beyond`, async ({ page }) => {
+      await set(page, zone === null ? {} : { honmaniEdgeZone: zone });
+      const w = await width(page);
+      const y = await rowY(page, '#blank');
+      await page.mouse.click(w * (share - 0.01), y);
+      await page.mouse.click(w * (1 - share + 0.01), y);
+      expect(await types(page)).toEqual(['turnPage', 'turnPage']);
+      // Just beyond the zone it is a tap on the book, not on a page edge.
+      await page.mouse.click(w * (share + 0.01), y);
+      await page.mouse.click(w * (1 - share - 0.01), y);
+      expect(await types(page)).toEqual(['turnPage', 'turnPage', 'dismiss', 'dismiss']);
+    });
+  }
+
+  test('wide zone: a word 20 percent in turns the page instead of looking up; medium looks it up', async ({ page }) => {
+    await set(page, { honmaniEdgeZone: 'wide' });
+    const w = await width(page);
+    const y = await rowY(page, '#h2');
+    await page.mouse.click(w * 0.2, y);
+    await page.mouse.click(w * 0.8, y);
+    expect(await types(page)).toEqual(['turnPage', 'turnPage']);
+    await page.evaluate(() => window.localStorage.setItem('honmaniEdgeZone', 'medium'));
+    await page.mouse.click(w * 0.2, y);
+    expect((await types(page)).slice(2)).not.toContain('turnPage');
+  });
+
+  test('both edges forward, horizontal text: left and right both go to the next page', async ({ page }) => {
+    await set(page, { honmaniEdgeForward: '1' });
+    const w = await width(page);
+    const y = await rowY(page, '#h2');
+    await page.mouse.click(5, y);
+    await page.mouse.click(w - 5, y);
+    expect(await messages(page)).toEqual([
+      { type: 'turnPage', next: true },
+      { type: 'turnPage', next: true },
+    ]);
+  });
+
+  test('both edges forward, vertical text: left and right both go to the next page', async ({ page }) => {
+    await set(page, { honmaniEdgeForward: '1' });
+    await page.addStyleTag({ content: '#vertical { width: 100%; }' });
+    const w = await width(page);
+    const y = await rowY(page, '#v2');
+    await page.mouse.click(5, y);
+    await page.mouse.click(w - 5, y);
+    expect(await messages(page)).toEqual([
+      { type: 'turnPage', next: true },
+      { type: 'turnPage', next: true },
+    ]);
+  });
+
+  test('both edges forward does nothing while edge taps are off, and keeps the middle for lookups', async ({ page }) => {
+    await page.evaluate(() => window.localStorage.setItem('honmaniEdgeForward', '1'));
+    const y = await rowY(page, '#h2');
+    await page.mouse.click(5, y);
+    expect(await types(page)).toEqual(['lookup']);
+    await set(page, { honmaniEdgeForward: '1' });
+    await tapChar(page, '#h3', '東');
+    expect(await types(page)).toEqual(['lookup', 'lookup']);
+  });
+});
+
 test.describe('pictures (zoom viewer)', () => {
   /**
    * Adds pictures to the horizontal book, as ttu shows them: blob: URLs in <img> and in SVG

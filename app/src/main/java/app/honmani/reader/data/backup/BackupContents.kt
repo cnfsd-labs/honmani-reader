@@ -1,5 +1,6 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.data.settings.EdgeZone
 import app.honmani.reader.data.words.WordMarksMode
 import java.net.URI
 
@@ -38,7 +39,7 @@ private fun hostOf(url: String): String =
  */
 object ReaderSettingsCheck {
     private val themes = setOf("auto", "light-theme", "dark-theme", "ecru-theme", "water-theme", "gray-theme", "black-theme")
-    private val flags = setOf("hideFurigana", "showCharacterCounter", "showPercentage", "enableReaderWakeLock", "honmaniProgressBar", "honmaniVolumeKeys", "honmaniEdgeTaps", "honmaniSelectionLookup", "honmaniHideKnownFurigana", "honmaniTintOneUnknown", "honmaniMarkDue", "honmaniImmersive")
+    private val flags = setOf("hideFurigana", "showCharacterCounter", "showPercentage", "enableReaderWakeLock", "honmaniProgressBar", "honmaniVolumeKeys", "honmaniEdgeTaps", "honmaniEdgeForward", "honmaniSelectionLookup", "honmaniHideKnownFurigana", "honmaniTintOneUnknown", "honmaniMarkDue", "honmaniImmersive")
     private val badFontChars = Regex("""[\"'\\;{}<>()\u0000-\u001f]""")
 
     fun valid(values: Map<String, String?>): Map<String, String> = buildMap {
@@ -56,6 +57,7 @@ object ReaderSettingsCheck {
         "viewMode" -> value == "paginated" || value == "continuous"
         in flags -> value == "0" || value == "1"
         "honmaniWordMarks" -> WordMarksMode.entries.any { it.storage == value }
+        "honmaniEdgeZone" -> EdgeZone.entries.any { it.storage == value }
         else -> false
     }
 
