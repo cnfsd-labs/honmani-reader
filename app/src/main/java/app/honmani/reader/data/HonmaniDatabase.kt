@@ -24,6 +24,8 @@ import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.BookmarkEntity
+import app.honmani.reader.data.library.FolderDao
+import app.honmani.reader.data.library.FolderEntity
 import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.library.RemovedBookEntity
@@ -52,6 +54,7 @@ import app.honmani.reader.data.words.WordLookupEntity
         TagEntity::class,
         TermMetaEntity::class,
         KanjiEntity::class,
+        FolderEntity::class,
         BookEntity::class,
         BookmarkEntity::class,
         HighlightEntity::class,
@@ -83,6 +86,8 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun kanjiDao(): KanjiDao
 
     abstract fun bookDao(): BookDao
+
+    abstract fun folderDao(): FolderDao
 
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun highlightDao(): HighlightDao

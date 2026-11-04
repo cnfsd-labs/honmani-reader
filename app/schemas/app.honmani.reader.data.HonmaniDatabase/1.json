@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "e802a78fef47249ba3a6298f4c74e1d8",
+    "identityHash": "7cfa90a3b562c2b235e70cbee676da50",
     "entities": [
       {
         "tableName": "dictionary",
@@ -480,8 +480,49 @@
         ]
       },
       {
+        "tableName": "folder",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL COLLATE NOCASE, `created_at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "created_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_folder_name",
+            "unique": true,
+            "columnNames": [
+              "name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_folder_name` ON `${TABLE_NAME}` (`name`)"
+          }
+        ]
+      },
+      {
         "tableName": "book",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `format` TEXT NOT NULL, `file_name` TEXT NOT NULL, `cover_file_name` TEXT, `source` TEXT NOT NULL, `source_id` TEXT, `added_at` INTEGER NOT NULL, `last_opened_at` INTEGER, `ttu_id` INTEGER, `ttu_title` TEXT, `progress` REAL NOT NULL, `characters` INTEGER NOT NULL, `finished_at` INTEGER, `hidden` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `format` TEXT NOT NULL, `file_name` TEXT NOT NULL, `cover_file_name` TEXT, `source` TEXT NOT NULL, `source_id` TEXT, `added_at` INTEGER NOT NULL, `last_opened_at` INTEGER, `ttu_id` INTEGER, `ttu_title` TEXT, `progress` REAL NOT NULL, `characters` INTEGER NOT NULL, `finished_at` INTEGER, `hidden` INTEGER NOT NULL, `folder_id` INTEGER, FOREIGN KEY(`folder_id`) REFERENCES `folder`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -577,6 +618,11 @@
             "columnName": "hidden",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "folderId",
+            "columnName": "folder_id",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -594,6 +640,28 @@
             ],
             "orders": [],
             "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_book_content_hash` ON `${TABLE_NAME}` (`content_hash`)"
+          },
+          {
+            "name": "index_book_folder_id",
+            "unique": false,
+            "columnNames": [
+              "folder_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_book_folder_id` ON `${TABLE_NAME}` (`folder_id`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "folder",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "folder_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
           }
         ]
       },
@@ -1448,7 +1516,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e802a78fef47249ba3a6298f4c74e1d8')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7cfa90a3b562c2b235e70cbee676da50')"
     ]
   }
 }

@@ -40,6 +40,7 @@ import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.Folders
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.net.LoginGate
@@ -204,6 +205,7 @@ class AppContainer(context: Context) {
     val exampleSentences: ExampleSentences by lazy { ExampleSentences(exampleStore, appearanceSettings.showExamples) }
 
     val bookDao: BookDao by lazy { database.bookDao() }
+    val folders: Folders by lazy { Folders(database.folderDao()) }
     val bookmarkDao: BookmarkDao by lazy { database.bookmarkDao() }
     val highlightDao: HighlightDao by lazy { database.highlightDao() }
 

@@ -742,4 +742,113 @@ class BackupTest {
         without.backup.restore(backup.copy(words = backup.words.map { it.copy(ignored = false) }))
         assertEquals(false, without.words.find("猫", "よみ")!!.ignored)
     }
+
+    private suspend fun Phone.folderOf(hash: String): String? {
+        val book = database.bookDao().findByHash(hash)!!
+        return book.folderId?.let { id -> database.folderDao().all().first { it.id == id }.name }
+    }
+
+    private suspend fun Phone.putInFolder(hash: String, name: String) {
+        val folders = app.honmani.reader.data.library.Folders(database.folderDao())
+        val book = database.bookDao().findByHash(hash)!!
+        folders.createFor(book.id, name)
+    }
+
+    @Test
+    fun foldersGoThroughABackup_emptyOnesToo_andABookWaitingGetsItsFolderWhenAdded() = runTest {
+        val old = Phone("old")
+        old.addBook("hash-a")
+        old.addBook("hash-b")
+        old.putInFolder("hash-a", "Novels")
+        app.honmani.reader.data.library.Folders(old.database.folderDao()).create("Empty")
+        val backup = throughFile(old.backup.export(readerSettings = null))
+
+        assertEquals(setOf("Novels", "Empty"), backup.folders.toSet())
+        assertEquals("Novels", backup.books.single { it.key == "hash-a" }.book!!.folder)
+        assertNull(backup.books.single { it.key == "hash-b" }.book!!.folder)
+
+        val new = Phone("new")
+        new.backup.restore(backup)
+        assertEquals(setOf("Novels", "Empty"), new.database.folderDao().all().map { it.name }.toSet())
+
+        // The book is not here yet: it keeps waiting, and takes its folder when it is added.
+        val added = new.addBook("hash-a")
+        val merged = new.backup.onBookAdded(added)
+        new.database.bookDao().find(added.id)!!.let { assertEquals(merged.folderId, it.folderId) }
+        assertEquals("Novels", new.folderOf("hash-a"))
+        assertEquals(2, new.database.folderDao().all().size)
+    }
+
+    @Test
+    fun aRestoreReusesAFolderWithTheSameName_andKeepsTheFolderABookIsInAlready() = runTest {
+        val old = Phone("old")
+        old.addBook("hash-a")
+        old.addBook("hash-b")
+        old.putInFolder("hash-a", "novels")
+        old.putInFolder("hash-b", "Manga")
+        val backup = throughFile(old.backup.export(readerSettings = null))
+
+        val new = Phone("new")
+        new.addBook("hash-a")
+        new.addBook("hash-b")
+        new.putInFolder("hash-a", "Novels")
+        new.putInFolder("hash-b", "Mine")
+        val novelsId = new.database.bookDao().findByHash("hash-a")!!.folderId
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        // A book in a folder stays there; the folder with the same name (any case) is not made twice.
+        assertEquals("Novels", new.folderOf("hash-a"))
+        assertEquals(novelsId, new.database.bookDao().findByHash("hash-a")!!.folderId)
+        assertEquals("Mine", new.folderOf("hash-b"))
+        assertEquals(listOf("Manga", "Mine", "Novels"), new.database.folderDao().all().map { it.name }.sorted())
+    }
+
+    @Test
+    fun aRestoredBookWithoutAFolderOnThisPhoneTakesTheBackupsFolder_andOnlyThen() = runTest {
+        val old = Phone("old")
+        old.addBook("hash-a")
+        old.putInFolder("hash-a", "Novels")
+        val backup = throughFile(old.backup.export(readerSettings = null))
+
+        val new = Phone("new")
+        new.addBook("hash-a")
+        new.backup.restore(backup)
+        assertEquals("Novels", new.folderOf("hash-a"))
+
+        // Taken out of the folder afterwards, a second restore puts it back only because the book has none now.
+        new.database.folderDao().setBookFolder(new.database.bookDao().findByHash("hash-a")!!.id, null)
+        new.backup.restore(backup)
+        assertEquals("Novels", new.folderOf("hash-a"))
+    }
+
+    @Test
+    fun anOldBackupWithoutFoldersLoads_andTakesNoBookOutOfItsFolder() = runTest {
+        val old = Phone("old")
+        old.addBook("hash-a")
+        val file = throughFile(old.backup.export(readerSettings = null))
+        // Written as an app before folders did: no "folders", no "folder" in a book.
+        val json = kotlinx.serialization.json.Json { encodeDefaults = true }.encodeToString(BackupFile.serializer(), file)
+            .replace(Regex(""","folders":\[[^\]]*]"""), "")
+            .replace(Regex(""","folder":null"""), "")
+        assertTrue(!json.contains("\"folder"))
+        val bytes = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry(BackupCodec.ENTRY))
+                zip.write(json.toByteArray())
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        val loaded = BackupCodec.read(ByteArrayInputStream(bytes))
+        assertEquals(emptyList<String>(), loaded.folders)
+        assertNull(loaded.books.single().book!!.folder)
+
+        val new = Phone("new")
+        new.addBook("hash-a")
+        new.putInFolder("hash-a", "Novels")
+        new.backup.restore(loaded)
+        assertEquals("Novels", new.folderOf("hash-a"))
+        assertEquals(1, new.database.folderDao().all().size)
+    }
 }

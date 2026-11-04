@@ -18,6 +18,8 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
+import app.honmani.reader.data.library.FolderResult
+import app.honmani.reader.data.library.Folders
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.SampleBook
 import app.honmani.reader.data.opds.AutoImportStatus
@@ -66,14 +68,23 @@ data class LibraryBook(
     /** Identifies the book's file, and with it its difficulty grade. */
     val contentHash: String = "",
     val format: BookFormat = BookFormat.EPUB,
+    /** The folder the book is in; null for none. */
+    val folderId: Long? = null,
 )
+
+/** A folder with the books in it (not counting hidden ones). */
+data class LibraryFolder(val id: Long, val name: String, val count: Int)
 
 data class LibraryUiState(
     /** The books shown (after filter and search); null until the library has loaded. */
     val books: List<LibraryBook>? = null,
     /** All books in the library, before filter and search. */
     val totalBooks: Int = 0,
-    /** How many books (not hidden) have each status, for the filter buttons. */
+    /** The folders, by name; empty until the reader makes one, and then the library shows no folder UI. */
+    val folders: List<LibraryFolder> = emptyList(),
+    /** Only books in this folder; null for all. */
+    val folderId: Long? = null,
+    /** How many books (not hidden, in the chosen folder) have each status, for the filter buttons. */
     val counts: Map<ReadingStatus, Int> = emptyMap(),
     /** Only books with this status; null for all. */
     val filter: ReadingStatus? = null,
@@ -122,8 +133,8 @@ private data class Ordering(
     val dismissedContinue: String?,
 )
 
-/** Which books the library shows: one reading status (or all), or the hidden ones. */
-private data class Shelf(val status: ReadingStatus? = null, val hidden: Boolean = false)
+/** Which books the library shows: one folder and one reading status (or all), or the hidden ones. */
+private data class Shelf(val status: ReadingStatus? = null, val hidden: Boolean = false, val folderId: Long? = null)
 
 /** A file the user picked: its display name and contents. */
 class PickedFile(val name: String, val input: InputStream)
@@ -172,10 +183,13 @@ class LibraryViewModel(
     private val forgetBookmarks: suspend (contentHash: String) -> Unit = {},
     /** Deletes the highlights in a removed book (by content hash). */
     private val forgetHighlights: suspend (contentHash: String) -> Unit = {},
+    /** The reader's folders; null: no folders. */
+    private val folders: Folders? = null,
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
     private val shelf = MutableStateFlow(Shelf())
+    private val folderList = folders?.observeAll() ?: flowOf(emptyList())
 
     private val query = MutableStateFlow("")
 
@@ -205,23 +219,29 @@ class LibraryViewModel(
             },
             adding,
             opening,
-            shelf,
+            combine(shelf, folderList) { shelf, folders -> shelf to folders },
             searchTerms,
-        ) { (entities, grades, sort, skill, dismissed), adding, opening, shelf, terms ->
+        ) { (entities, grades, sort, skill, dismissed), adding, opening, (shelf, folders), terms ->
             val (query, readings) = terms
             val books = sort.apply(entities.map(::toLibraryBook), skill) { book ->
                 grades[book.contentHash]?.difficulty?.score?.takeIf { it > 0 }
             }
             val (hidden, shown) = books.partition { it.hidden }
+            // A folder that is gone (deleted) shows all books again.
+            val folderId = shelf.folderId?.takeIf { id -> folders.any { it.id == id } }
+            val inFolder = if (folderId == null) shown else shown.filter { it.folderId == folderId }
             val onShelf = when {
                 shelf.hidden -> hidden
-                shelf.status == null -> shown
-                else -> shown.filter { it.status == shelf.status }
+                shelf.status == null -> inFolder
+                else -> inFolder.filter { it.status == shelf.status }
             }
+            val inFolders = shown.groupingBy { it.folderId }.eachCount()
             LibraryUiState(
                 books = onShelf.filter { LibrarySearch.matches(it, query, readings[it.id]) },
                 totalBooks = books.size,
-                counts = shown.groupingBy { it.status }.eachCount(),
+                folders = folders.map { LibraryFolder(it.id, it.name, inFolders[it.id] ?: 0) },
+                folderId = folderId,
+                counts = inFolder.groupingBy { it.status }.eachCount(),
                 filter = shelf.status,
                 showHidden = shelf.hidden,
                 hiddenCount = hidden.size,
@@ -243,7 +263,14 @@ class LibraryViewModel(
         // The hidden shelf closes when its last book is unhidden or removed.
         viewModelScope.launch {
             dao.observeAll().collect { books ->
-                if (shelf.value.hidden && books.none { it.hidden }) shelf.value = Shelf()
+                if (shelf.value.hidden && books.none { it.hidden }) shelf.value = shelf.value.copy(hidden = false)
+            }
+        }
+        viewModelScope.launch {
+            folderList.collect { all ->
+                // The chosen folder was deleted: back to all books.
+                val chosen = shelf.value.folderId
+                if (chosen != null && all.none { it.id == chosen }) shelf.value = shelf.value.copy(folderId = null)
             }
         }
         viewModelScope.launch {
@@ -359,12 +386,42 @@ class LibraryViewModel(
 
     /** Shows only books with [status]; null shows all. */
     fun setFilter(status: ReadingStatus?) {
-        shelf.value = Shelf(status = status)
+        shelf.value = Shelf(status = status, folderId = shelf.value.folderId)
+    }
+
+    /** Shows only the books in folder [id]; null shows all. */
+    fun selectFolder(id: Long?) {
+        shelf.value = shelf.value.copy(folderId = id)
+    }
+
+    /** Makes a folder, and puts book [bookId] in it if there is one; [done] gets the outcome (a refused name, say). */
+    fun createFolder(name: String, bookId: Long? = null, done: (FolderResult) -> Unit = {}) {
+        val folders = folders ?: return
+        viewModelScope.launch {
+            done(if (bookId == null) folders.create(name) else folders.createFor(bookId, name))
+        }
+    }
+
+    fun renameFolder(id: Long, name: String, done: (FolderResult) -> Unit = {}) {
+        val folders = folders ?: return
+        viewModelScope.launch { done(folders.rename(id, name)) }
+    }
+
+    /** Deletes the folder; its books stay in the library, in no folder. */
+    fun deleteFolder(id: Long) {
+        val folders = folders ?: return
+        viewModelScope.launch { folders.delete(id) }
+    }
+
+    /** Puts the book in a folder; null takes it out of any. */
+    fun moveToFolder(bookId: Long, folderId: Long?) {
+        val folders = folders ?: return
+        viewModelScope.launch { folders.move(bookId, folderId) }
     }
 
     /** Shows the hidden books instead of the library, or goes back to all books. */
     fun showHidden(show: Boolean) {
-        shelf.value = Shelf(hidden = show)
+        shelf.value = Shelf(hidden = show, folderId = shelf.value.folderId)
     }
 
     fun setHidden(id: Long, hidden: Boolean) {
@@ -485,6 +542,7 @@ class LibraryViewModel(
         hidden = book.hidden,
         contentHash = book.contentHash,
         format = book.format,
+        folderId = book.folderId,
     )
 
     companion object {
@@ -517,6 +575,7 @@ class LibraryViewModel(
                     },
                     autoImport = container.opdsAutoImport.status,
                     grades = container.difficultyStore.grades,
+                    folders = container.folders,
                     sortName = container.appearanceSettings.librarySort,
                     saveSort = container.appearanceSettings::setLibrarySort,
                     skill = container.skillTracker.estimate.map { it.current }.distinctUntilChanged(),

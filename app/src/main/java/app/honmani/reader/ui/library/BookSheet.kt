@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
@@ -69,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.data.difficulty.BookDifficulty
 import app.honmani.reader.data.difficulty.GradingState
 import app.honmani.reader.ui.ProgressBar
@@ -99,6 +102,10 @@ fun BookSheet(
     onRemove: () -> Unit,
     /** Saves a copy of the book's file on the phone (an OPDS download, say). */
     onSaveCopy: () -> Unit = {},
+    folders: List<LibraryFolder> = emptyList(),
+    onMoveToFolder: (Long?) -> Unit = {},
+    /** Makes a folder with this name and moves the book in; the second argument gets what came of the name. */
+    onCreateFolder: (String, (FolderResult) -> Unit) -> Unit = { _, _ -> },
     viewModel: StatisticsViewModel = viewModel(factory = StatisticsViewModel.Factory),
     progress: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
 ) {
@@ -107,6 +114,8 @@ fun BookSheet(
     val progressState by progress.uiState.collectAsStateWithLifecycle()
     val skill = progressState?.skill?.current
     var showUnknown by rememberSaveable(book.id) { mutableStateOf(false) }
+    var pickingFolder by rememberSaveable(book.id) { mutableStateOf(false) }
+    var namingFolder by rememberSaveable(book.id) { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -195,6 +204,7 @@ fun BookSheet(
                     }
                 }
                 stats?.let { Statistics(it) }
+                FolderRow(folders.firstOrNull { it.id == book.folderId }?.name, onClick = { pickingFolder = true })
                 Actions(
                     book = book,
                     onMarkFinished = onMarkFinished,
@@ -208,6 +218,30 @@ fun BookSheet(
                 }
             }
         }
+    }
+    if (pickingFolder) {
+        FolderPickerDialog(
+            folders = folders,
+            chosen = book.folderId,
+            onPick = {
+                pickingFolder = false
+                onMoveToFolder(it)
+            },
+            onNew = {
+                pickingFolder = false
+                namingFolder = true
+            },
+            onDismiss = { pickingFolder = false },
+        )
+    }
+    if (namingFolder) {
+        FolderNameDialog(
+            title = stringResource(R.string.folder_new_title),
+            initial = "",
+            confirm = stringResource(R.string.folder_create),
+            onSave = { name, done -> onCreateFolder(name, done) },
+            onDismiss = { namingFolder = false },
+        )
     }
     // After the book's sheet, so it opens above it.
     if (showUnknown) UnknownWordsSheet(book.contentHash, viewModel, onDismiss = { showUnknown = false })
@@ -551,6 +585,28 @@ private fun Fact(label: String, value: String, modifier: Modifier = Modifier, de
                 Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+    }
+}
+
+/** "Folder: name" (or None), opening the picker. */
+@Composable
+private fun FolderRow(folder: String?, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+    ) {
+        Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Text(
+            text = stringResource(R.string.book_folder_row, folder ?: stringResource(R.string.book_folder_none)),
+            style = MaterialTheme.typography.bodyLarge,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 12.dp),
+        )
     }
 }
 

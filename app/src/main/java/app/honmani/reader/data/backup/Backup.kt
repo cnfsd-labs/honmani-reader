@@ -6,6 +6,8 @@ import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.FOLDER_NAME_MAX
+import app.honmani.reader.data.library.FolderEntity
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogEntity
@@ -81,11 +83,13 @@ class Backup(
 ) {
     private val dao = database.backupDao()
     private val wordDao = database.wordDao()
+    private val folderDao = database.folderDao()
 
     /** Everything but the books; [readerSettings] are ttu's, read by the caller (null if it couldn't). */
     suspend fun export(readerSettings: Map<String, String?>?): BackupFile {
         class Tables(
             val books: List<BookEntity>,
+            val folders: Map<Long, String>,
             val days: List<ReadingDayEntity>,
             val events: List<LookupEventEntity>,
             val words: List<WordEntity>,
@@ -100,7 +104,7 @@ class Backup(
             val reads: Map<Long, List<ReadDayEntity>>,
         )
         val tables = database.withTransaction {
-            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.catalogs(),
+            Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
             )
         }
@@ -109,7 +113,7 @@ class Backup(
         val books = ArrayList<BackupBook>()
         for (book in tables.books) {
             keys[book.id] = book.contentHash
-            books += BackupBook(book.contentHash, details(book, grades[book.contentHash]?.difficulty?.score ?: 0))
+            books += BackupBook(book.contentHash, details(book, grades[book.contentHash]?.difficulty?.score ?: 0, book.folderId?.let(tables.folders::get)))
         }
         for (waiting in restored.waiting()) {
             if (waiting.id in keys) continue
@@ -165,6 +169,7 @@ class Backup(
             readerSettings = readerSettings,
             milestones = milestones.seen.value.mapValues { (_, day) -> day.toString() },
             books = books,
+            folders = tables.folders.values.toList(),
             stretches = stretches.all().mapValues { (_, steps) -> steps.toList() },
             removedBooks = tables.removed.map { BackupRemovedBook(it.source.name, it.sourceId, it.removedAt) },
             readingDays = readingDays,
@@ -192,6 +197,7 @@ class Backup(
             val library = dao.books().associateBy { it.contentHash }
             var nextId = minOf(-1L, (waitingBefore.values.minOfOrNull { it.id } ?: 0L) - 1)
             val ids = HashMap<String, Long>()
+            for (name in backup.folders) folderId(name)
             val ownPrefix = "book:${installationId()}:"
             fun idOf(key: String): Long = ids.getOrPut(key) {
                 library[key]?.id ?: waitingBefore[key]?.id
@@ -206,7 +212,7 @@ class Backup(
                     ids[entry.key] = book.id
                     if (details == null) continue
                     booksInLibrary++
-                    val merged = merge(book, details)
+                    val merged = withFolder(merge(book, details), details)
                     if (merged != book) dao.updateBook(merged)
                     if (merged.characters > book.characters) {
                         positions += merged
@@ -377,6 +383,17 @@ class Backup(
         )
     }
 
+    /** The id of the folder called [name], made if this phone has none; null for no name. */
+    private suspend fun folderId(name: String?): Long? {
+        val clean = name?.trim()?.take(FOLDER_NAME_MAX)?.trim().orEmpty()
+        if (clean.isEmpty()) return null
+        return folderDao.findByName(clean)?.id ?: folderDao.insert(FolderEntity(name = clean, createdAt = now()))
+    }
+
+    /** [book] in the backup's folder, unless it is in one already: a restore never moves a book out of its folder. */
+    private suspend fun withFolder(book: BookEntity, details: BackupBookDetails): BookEntity =
+        if (book.folderId != null) book else book.copy(folderId = folderId(details.folder))
+
     /**
      * A book was added to the library: if a restored one was waiting for it, its progress and
      * statistics move to it. Returns the book as it is now.
@@ -384,12 +401,13 @@ class Backup(
     suspend fun onBookAdded(book: BookEntity): BookEntity {
         val waiting = restored.find(book.contentHash) ?: return book
         val details = waiting.details ?: return book
-        val merged = merge(book, details)
-        database.withTransaction {
-            dao.moveReadingDays(waiting.id, book.id)
-            dao.moveLookupEvents(waiting.id, book.id)
-            dao.moveWordLookups(waiting.id, book.id)
-            if (merged != book) dao.updateBook(merged)
+        val merged = database.withTransaction {
+            withFolder(merge(book, details), details).also { merged ->
+                dao.moveReadingDays(waiting.id, book.id)
+                dao.moveLookupEvents(waiting.id, book.id)
+                dao.moveWordLookups(waiting.id, book.id)
+                if (merged != book) dao.updateBook(merged)
+            }
         }
         // Only now: if the move failed, the book keeps waiting and the next add tries again.
         restored.remove(waiting)
@@ -463,7 +481,7 @@ class Backup(
          */
         fun position(book: BookEntity, savedAt: Long) = RestoredPosition(book.characters, book.progress, savedAt)
 
-        fun details(book: BookEntity, score: Int) = BackupBookDetails(
+        fun details(book: BookEntity, score: Int, folder: String? = null) = BackupBookDetails(
             title = book.title,
             author = book.author,
             format = book.format.name,
@@ -475,6 +493,7 @@ class Backup(
             characters = book.characters,
             finishedAt = book.finishedAt,
             hidden = book.hidden,
+            folder = folder,
             score = score,
         )
 

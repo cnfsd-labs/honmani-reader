@@ -2,6 +2,7 @@ package app.honmani.reader.data.library
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -14,7 +15,15 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "book",
-    indices = [Index(value = ["content_hash"], unique = true)],
+    indices = [Index(value = ["content_hash"], unique = true), Index(value = ["folder_id"])],
+    foreignKeys = [
+        ForeignKey(
+            entity = FolderEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["folder_id"],
+            onDelete = ForeignKey.SET_NULL,
+        ),
+    ],
 )
 data class BookEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -43,6 +52,8 @@ data class BookEntity(
     @ColumnInfo(name = "finished_at") val finishedAt: Long? = null,
     /** Hidden by the reader: only shown on the library's hidden shelf. */
     val hidden: Boolean = false,
+    /** The folder the reader put the book in; null for none. Goes back to null if the folder is deleted. */
+    @ColumnInfo(name = "folder_id") val folderId: Long? = null,
 )
 
 /**

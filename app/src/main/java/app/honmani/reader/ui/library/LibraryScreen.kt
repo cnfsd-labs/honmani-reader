@@ -131,6 +131,7 @@ import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.opds.CatalogBrowser
+import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.ui.opds.CatalogDialog
 import app.honmani.reader.ui.opds.OpdsViewModel
 import app.honmani.reader.ui.progress.ProgressViewModel
@@ -269,6 +270,11 @@ fun LibraryScreen(
             onSetHidden = viewModel::setHidden,
             onSaveCopy = saveCopy,
             onFilter = viewModel::setFilter,
+            onSelectFolder = viewModel::selectFolder,
+            onCreateFolder = viewModel::createFolder,
+            onRenameFolder = viewModel::renameFolder,
+            onDeleteFolder = viewModel::deleteFolder,
+            onMoveToFolder = viewModel::moveToFolder,
             onShowHidden = viewModel::showHidden,
             onSearch = viewModel::search,
             onSort = viewModel::setSort,
@@ -344,6 +350,12 @@ private fun LibraryContent(
     onSetHidden: (id: Long, hidden: Boolean) -> Unit = { _, _ -> },
     onSaveCopy: (LibraryBook) -> Unit = {},
     onShowHidden: (Boolean) -> Unit = {},
+    onSelectFolder: (Long?) -> Unit = {},
+    /** Makes a folder (and puts the book in it); the last argument gets what came of the name. */
+    onCreateFolder: (name: String, bookId: Long?, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
+    onRenameFolder: (id: Long, name: String, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
+    onDeleteFolder: (id: Long) -> Unit = {},
+    onMoveToFolder: (bookId: Long, folderId: Long?) -> Unit = { _, _ -> },
     /** The difficulty to show on a cover; null for none. */
     difficulty: (LibraryBook) -> Int? = { null },
     onSort: (LibrarySort) -> Unit = {},
@@ -356,6 +368,8 @@ private fun LibraryContent(
     val removedMessage = pendingRemove?.let { stringResource(R.string.book_removed, it.title) }
     var pendingReset by remember { mutableStateOf<LibraryBook?>(null) }
     var detailsFor by rememberSaveable { mutableStateOf<Long?>(null) }
+    var renamingFolder by remember { mutableStateOf<LibraryFolder?>(null) }
+    var deletingFolder by remember { mutableStateOf<LibraryFolder?>(null) }
     var searching by rememberSaveable { mutableStateOf(false) }
     val books = uiState.books
     val gridState = rememberLazyGridState()
@@ -405,6 +419,17 @@ private fun LibraryContent(
                         exit = fadeOut() + shrinkVertically(),
                     ) {
                         lastContinue[0]?.let { book -> ContinueBubble(book, onOpen = { onOpen(book.id) }, onDismiss = onDismissContinue) }
+                    }
+                    // Only once there is a folder: without one the library looks as it always did.
+                    if (uiState.totalBooks > 0 && uiState.folders.isNotEmpty() && !uiState.showHidden) {
+                        FolderBar(
+                            folders = uiState.folders,
+                            chosen = uiState.folderId,
+                            allCount = uiState.totalBooks - uiState.hiddenCount,
+                            onChoose = onSelectFolder,
+                            onRename = { renamingFolder = it },
+                            onDelete = { deletingFolder = it },
+                        )
                     }
                     if (uiState.totalBooks > 0) {
                         LibraryToolbar(
@@ -467,6 +492,7 @@ private fun LibraryContent(
                             when {
                                 uiState.query.isNotBlank() -> R.string.library_search_empty
                                 statusFilter != null -> statusEmptyText(statusFilter)
+                                uiState.folderId != null && !uiState.showHidden -> R.string.library_folder_empty
                                 else -> R.string.library_filter_empty
                             },
                         ),
@@ -477,8 +503,13 @@ private fun LibraryContent(
                             .fillMaxWidth()
                             .padding(32.dp),
                     )
-                    if (statusFilter != null) {
-                        FilledTonalButton(onClick = { onFilter(null) }) {
+                    if (statusFilter != null || (uiState.folderId != null && uiState.query.isBlank())) {
+                        FilledTonalButton(
+                            onClick = {
+                                onFilter(null)
+                                onSelectFolder(null)
+                            },
+                        ) {
                             Text(stringResource(R.string.library_show_all))
                         }
                     }
@@ -530,7 +561,33 @@ private fun LibraryContent(
             },
             onRemove = { pendingRemove = book },
             onSaveCopy = { onSaveCopy(book) },
+            folders = uiState.folders,
+            onMoveToFolder = { folderId ->
+                onMoveToFolder(book.id, folderId)
+                // In another folder's view the book leaves the list, and the sheet with it.
+                if (uiState.folderId != null && folderId != uiState.folderId) detailsFor = null
+            },
+            onCreateFolder = { name, done ->
+                onCreateFolder(name, book.id) { result ->
+                    if (result is FolderResult.Done && uiState.folderId != null) detailsFor = null
+                    done(result)
+                }
+            },
         )
+    }
+
+    renamingFolder?.let { folder ->
+        FolderNameDialog(
+            title = stringResource(R.string.folder_rename),
+            initial = folder.name,
+            confirm = stringResource(R.string.action_save),
+            onSave = { name, done -> onRenameFolder(folder.id, name, done) },
+            onDismiss = { renamingFolder = null },
+        )
+    }
+
+    deletingFolder?.let { folder ->
+        DeleteFolderDialog(folder, onDelete = { onDeleteFolder(folder.id) }, onDismiss = { deletingFolder = null })
     }
 
     pendingReset?.let { book ->

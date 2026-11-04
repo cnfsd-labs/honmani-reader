@@ -37,6 +37,8 @@ data class BackupFile(
     /** Milestones reached, with the day each was first seen (`yyyy-MM-dd`). */
     val milestones: Map<String, String> = emptyMap(),
     val books: List<BackupBook> = emptyList(),
+    /** The library folders by name (a book's folder is [BackupBookDetails.folder]); also the empty ones. */
+    val folders: List<String> = emptyList(),
     /**
      * The parts of each book really read (`ReadStretches`), by content hash: ascending steps
      * `from, to`, also for books no longer in the library (they count again if added again).
@@ -100,6 +102,8 @@ data class BackupBookDetails(
     val characters: Long = 0,
     val finishedAt: Long? = null,
     val hidden: Boolean = false,
+    /** The name of its library folder, if it was in one; a folder of that name on the phone is reused. */
+    val folder: String? = null,
     /** Its difficulty when it was graded, for the skill until the book is back; 0 if not graded. */
     val score: Int = 0,
 )
