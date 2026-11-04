@@ -51,6 +51,7 @@
     ${H} ::highlight(honmani-new), ${H} ::highlight(honmani-new-fresh) { background-color: rgba(0, 0, 0, 0.12) !important; }
     ${H} ::highlight(honmani-due), ${H} ::highlight(honmani-due-fresh) { background-color: rgba(0, 0, 0, 0.39) !important; }
     ${H} ::highlight(honmani-one-unknown), ${H} ::highlight(honmani-one-unknown-fresh) { background-color: rgba(0, 0, 0, 0.08) !important; }
+    ${H} ::highlight(honmani-read-aloud) { background-color: rgba(0, 0, 0, 0.2) !important; }
     ${H} ::highlight(honmani-search-hit) { background-color: #8c8c8c !important; color: #000000 !important; }
     ${H} ::highlight(honmani-lookup) { background-color: #000000 !important; color: #ffffff !important; }
     ${H} ::highlight(honmani-hl-0) { background-color: #dcdcdc !important; }
