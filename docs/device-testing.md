@@ -54,8 +54,8 @@ the next one turns the page.
 Immersive mode (Reader settings, off by default): with the switch on, the status and navigation bars
 are hidden while a book is open (`dumpsys window | grep ITYPE_STATUS_BAR` shows `visible=false`) and
 back on the library, other tabs, Settings and the reader settings; a swipe from the top edge shows them
-for a moment. The page keeps its size and position (ttu's counter and the bookmark don't change when the
-switch or the bars change, also after rotating); the reader menu, the lookup panel, the volume buttons
+for a moment, over the page. The book fills the screen, and its position doesn't move (ttu's counter and the
+bookmark stay the same when the bars show, when the switch changes, after rotating and on reopening); the reader menu, the lookup panel, the volume buttons
 and Back work as before, and the bars are hidden again after leaving the app and coming back.
 
 Pictures: in a book with a picture (a cover page or an illustration, horizontal and vertical), a tap on

@@ -9,7 +9,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
@@ -320,9 +318,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 panelOpen = panel != null,
                 modifier = Modifier
                     .fillMaxSize()
-                    // The bars' room stays reserved while immersive mode hides them: the book
-                    // keeps its size, so hiding or showing the bars never reflows the page.
-                    .windowInsetsPadding(readerInsets),
+                    // In immersive mode a book fills the screen, also under bars a swipe shows for
+                    // a moment: its size doesn't follow them, so they never reflow the page.
+                    .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
             val state = panel
             val countedTap by viewModel.countedTap.collectAsStateWithLifecycle()
@@ -708,10 +706,9 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** The room the reader keeps clear: the system bars (shown or hidden), the display cutout and the keyboard. */
-internal val readerInsets: WindowInsets
-    @OptIn(ExperimentalLayoutApi::class)
-    @Composable get() = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
+/** The room an immersive book keeps clear: the display cutout and the keyboard, never the bars. */
+private val bookInsets: WindowInsets
+    @Composable get() = WindowInsets.displayCutout.union(WindowInsets.ime)
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"

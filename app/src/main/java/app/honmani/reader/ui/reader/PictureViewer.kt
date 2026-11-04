@@ -9,6 +9,8 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -93,7 +95,7 @@ internal fun PictureViewer(bytes: ByteArray, onClose: () -> Unit, modifier: Modi
             onClick = onClose,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .windowInsetsPadding(readerInsets)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(8.dp)
                 .background(Color.Black.copy(alpha = 0.55f), CircleShape),
         ) {
