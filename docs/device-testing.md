@@ -314,6 +314,28 @@ can hear it, then reader menu, Read aloud, on a page of a book with furigana.
 - At the end of the book it stops and says so in the bar.
 - Rotate the phone, change the font and close the book while it reads: no crash, no voice left over.
 
+## Audiobook
+
+Needs an EPUB, an audio file and an SRT (or WebVTT) with the book's text. Use a silent test recording,
+the media volume stays at 0. Reader menu, Audiobook: choose the audio, then the subtitles (Android's picker).
+
+- The bar appears, "Matching the subtitles to the book..." shows briefly, then the audio plays and the
+  subtitle being heard is marked in the book. At the end of a page the book turns by itself, horizontal
+  and vertical, paginated and continuous. Turned pages count as reading: with progress sync on, the
+  position reaches the server (a jump to a far passage does not; see Bookmarks).
+- Subtitles whose text is not in the book change nothing: the mark stays until the next one that is.
+  If fewer than half were found the bar says so.
+- Next and previous move one subtitle (previous first restarts the one being heard), also while paused.
+  The speed button cycles 0.75, 1, 1.25, 1.5 and is kept.
+- Pause, then close the app: the audio is paused, the screen no longer stays on, and Play on the next
+  start continues where it stopped. A call or another player pauses it. A tap on a word pauses it while
+  the panel is open.
+- Starting Read aloud stops the audiobook and the other way round.
+- Reader menu, Audiobook, Remove: the pairing, the subtitle copy and the position are gone. Delete the
+  audio file and play again: the bar says the audio is gone and offers "Change files".
+- An audio file the phone can't play, an empty subtitle file and a book that is not an EPUB each give a
+  readable message, no crash.
+
 ## Bookmarks and the reading slider
 
 Reader menu, at the top: a slider with a live label ("42% · 10,350 / 24,847"), then Add bookmark and

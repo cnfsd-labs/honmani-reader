@@ -15,6 +15,10 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Read aloud (reader menu): the phone's Japanese voice reads the book from the page on screen, marks the
   sentence it says, turns the pages by itself and stops when you leave the app; play/pause, previous and
   next sentence and speed (0.75 to 1.5) are in a bar over the page. Needs a Japanese voice (Settings, Text-to-speech)
+- Audiobook (reader menu, EPUB): pair a book with its audio file and a subtitle file (SRT or WebVTT) from your
+  phone; the subtitles are matched to the book's text, the sentence being heard is marked and the pages turn by
+  themselves. Previous and next move one subtitle, the speed is 0.75 to 1.5, the place is remembered per book. A
+  subtitle that isn't in the book is skipped; if fewer than half are found, the bar asks whether the files fit
 - Named bookmarks (reader menu): save as many places as you like per book, jump to one from a list, rename
   or delete it (Undo); a slider over the whole book shows the place as % and characters and jumps when
   you let go. After a jump, "Back to where you were" returns. Bookmarks are in the backup
