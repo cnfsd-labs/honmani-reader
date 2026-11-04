@@ -234,6 +234,65 @@ class EpubPositions private constructor(
             null
         }
 
+        /**
+         * The characters ttu counts in the whole book, as code points in reading order (a gaiji
+         * picture as -1), so that the position of an entry is ttu's character count there and the
+         * same as [sectionStarts] gives. For matching text against the book (the audiobook's
+         * subtitles). Null if it is not a readable EPUB.
+         */
+        fun countedText(file: File): IntArray? = try {
+            ZipFile(file).use { zip ->
+                val entries = spineEntries(zip)
+                if (entries.isEmpty()) return null
+                val out = IntList()
+                for ((_, name) in entries) {
+                    val text = try {
+                        zip.text(name)
+                    } catch (e: TooLargeException) {
+                        return null
+                    }
+                    val body = text?.let { bodyOf(Xhtml.parse(it)) } ?: continue
+                    fun visit(node: XNode) {
+                        for (child in node.children) {
+                            when {
+                                child.isText -> {
+                                    val value = child.text!!
+                                    var i = 0
+                                    while (i < value.length) {
+                                        val cp = value.codePointAt(i)
+                                        if (isCounted(cp)) out.add(cp)
+                                        i += Character.charCount(cp)
+                                    }
+                                }
+                                skipped(child) -> {}
+                                child.name == "img" && child.attributes["class"]?.contains("gaiji") == true -> out.add(-1)
+                                else -> visit(child)
+                            }
+                        }
+                    }
+                    visit(body)
+                }
+                out.toArray()
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+
+        /** A growing list of ints without boxing. */
+        private class IntList {
+            private var data = IntArray(1 shl 16)
+            private var size = 0
+
+            fun add(value: Int) {
+                if (size == data.size) data = data.copyOf(size * 2)
+                data[size++] = value
+            }
+
+            fun toArray(): IntArray = data.copyOf(size)
+        }
+
         /** The characters ttu counts in [body]: text, and a gaiji picture as one. */
         private fun countWithGaiji(body: XNode): Int {
             var n = 0
