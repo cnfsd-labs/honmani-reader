@@ -102,3 +102,83 @@ for (const viewMode of ['paginated', 'continuous']) {
     });
   }
 }
+
+// A paragraph that continues onto the next page (and the next): its highlight is one range over all of it.
+const LONG_SENTENCE = 'これは長い文章です。'; // 9 counted characters
+const LONG_PARAGRAPH = LONG_SENTENCE.repeat(400);
+const LONG_BOOK = buildEpub({ title: '長い段落', chapters: [[`<p>前置き。</p><p>${LONG_PARAGRAPH}</p><p>後書き。</p>`]], raw: true });
+
+for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
+  test(`the paragraph extent of a long press covers a paragraph over several pages (paginated, ${writingMode})`, async ({ page }) => {
+    await page.addInitScript({ path: path.join(ASSETS, 'text.js') });
+    await page.addInitScript(
+      (writingMode) => {
+        localStorage.setItem('viewMode', 'paginated');
+        localStorage.setItem('writingMode', writingMode);
+        window.__messages = [];
+        window.honmani = {
+          postMessage: (message) => window.__messages.push(JSON.parse(message)),
+          addEventListener: (type, listener) => (window.__listener = listener),
+        };
+      },
+      writingMode,
+    );
+    for (const script of ['ttu-defaults.js', 'library-bridge.js', 'highlights.js', 'tap-bridge.js']) {
+      await page.addInitScript({ path: path.join(ASSETS, script) });
+    }
+    await page.route('**/honmani-books/*', (route) => route.fulfill({ status: 200, body: LONG_BOOK, contentType: 'application/octet-stream' }));
+    await page.goto(`${server.url}/manage`);
+    const book = await call(page, 'ensure', { ttuId: null, ttuTitle: null, url: '/honmani-books/long.epub', fileName: 'long.epub' });
+    await page.goto(`${server.url}/b?id=${book.id}`);
+    await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 10_000 });
+    await page.waitForFunction(() => window.__messages.some((m) => m.type === 'highlights.request'));
+
+    // The app answers the request with the book's table (no highlight yet).
+    const total = 3 + 400 * 9 + 3;
+    const answer = (items) =>
+      page.evaluate(
+        ([total, items, bookId]) =>
+          window.__listener({ data: JSON.stringify({ type: 'highlights', bookId, sections: [['ttu-ch1', 0]], total, items }) }),
+        [total, items, book.id],
+      );
+    await answer([]);
+
+    // A long press on the first character of the long paragraph.
+    await page.evaluate(() => {
+      const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.data.startsWith('これは長い')) continue;
+        const range = document.createRange();
+        range.setStart(node, 0);
+        range.setEnd(node, 1);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        return;
+      }
+      throw new Error('no long paragraph');
+    });
+    await page.waitForFunction(() => window.__messages.some((m) => m.type === 'lookup'), null, { timeout: 5000 });
+    const { highlight } = await page.evaluate(() => window.__messages.find((m) => m.type === 'lookup'));
+    expect(highlight.word).toMatchObject({ start: 3, end: 4 });
+    expect(highlight.sentence).toMatchObject({ start: 3, end: 12 });
+    expect(highlight.paragraph).toMatchObject({ start: 3, end: 3 + 400 * 9 });
+
+    await answer([{ id: 1, start: highlight.paragraph.start, end: highlight.paragraph.end, color: 0 }]);
+    await expect.poll(() => page.evaluate(() => (CSS.highlights.get('honmani-hl-0')?.size ?? 0))).toBe(1);
+    const spread = await page.evaluate(() => {
+      const range = [...CSS.highlights.get('honmani-hl-0')][0];
+      const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+      const xs = rects.flatMap((r) => [r.left, r.right]);
+      const ys = rects.flatMap((r) => [r.top, r.bottom]);
+      return {
+        text: range.toString().length,
+        // How far past the screen the marked text reaches, along whichever axis the pages run.
+        beyond: Math.max(Math.max(...xs) - innerWidth, -Math.min(...xs), Math.max(...ys) - innerHeight, -Math.min(...ys)),
+      };
+    });
+    // The last full stop is not a counted character, so the range ends before it.
+    expect(spread.text).toBe(400 * LONG_SENTENCE.length - 1);
+    // The text runs on past the first page.
+    expect(spread.beyond).toBeGreaterThan(0);
+  });
+}

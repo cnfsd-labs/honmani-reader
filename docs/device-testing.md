@@ -298,9 +298,12 @@ Bookmarks. Check, in paged and continuous mode, vertical and horizontal text, EP
 
 Needs an EPUB and "Look up selected text" on (Reader settings). Check on light, dark, sepia and black
 themes, vertical and horizontal text, paged and continuous mode, with and without furigana:
-- Long press a word, drag the handles over more text (also across paragraphs): the lookup panel
-  shows "Highlight" with four colours; one tap saves, closes the panel and shows "Highlight saved" with
-  Undo. The text is drawn in that colour at once, readable on every theme.
+- Long press a word (Android's handles are hidden on purpose, so the selection is one word or a few
+  characters): the lookup panel shows Selection / Sentence / Paragraph (Sentence chosen) with the
+  text of the choice in one line, and "Highlight" with four colours. One tap saves what is chosen,
+  closes the panel and shows "Highlight saved" with Undo. A sentence ends at 。！？ or a line break and keeps a
+  closing 」; a paragraph can run over several pages (marks on both pages after a turn); furigana is no part of either.
+- A new highlight that overlaps older ones in the book replaces them (any colour); Undo brings them back.
 - Close and reopen the book, change the font size, rotate: the highlight stays on the same text.
 - Tap inside a highlight: the word lookup opens as always, with the colours (the current one ticked)
   and "Remove highlight"; another colour changes it, Remove deletes it and offers Undo.
@@ -309,8 +312,8 @@ themes, vertical and horizontal text, paged and continuous mode, with and withou
 - Backup, then restore on a fresh install with the same book: the highlights are there.
 - Selection lookup off: no new highlights can be made, existing ones are still drawn, listed and
   removable. A TXT book offers no Highlight.
-- E-ink mode: four solid greys, lighter than the lookup mark. Where a word mark (also solid grey)
-  covers a highlight the highlight is hidden; the greys are close to the word-mark greys.
+- E-ink mode: four solid light greys (220, 200, 180, 160). A word mark is translucent black over them,
+  so inside a highlight it shows darker; the lookup mark and a search hit are solid and cover it.
 - A word mark, the lookup mark and a search hit lie over a highlight, they do not hide the whole text.
 
 ## Known limitations (no need to report)

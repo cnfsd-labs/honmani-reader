@@ -238,6 +238,54 @@ test.describe('e-ink', () => {
     expect(colors).toEqual(['rgb(220, 220, 220)', 'rgb(200, 200, 200)', 'rgb(180, 180, 180)', 'rgb(160, 160, 160)']);
   });
 
+  test('on: a word mark over a highlight darkens it, so both still show', async ({ page }) => {
+    await openBook(page, '<div id="ttu-a"><p style="font-size: 60px; margin: 0; line-height: 1.5">吾輩は猫である。</p></div>', {
+      storage: { honmaniEInk: '1' },
+    });
+    await send(page, [['ttu-a', 0]], [{ id: 1, start: 0, end: 4, color: 0 }]);
+    await expect.poll(() => drawn(page, 0)).not.toEqual([]);
+    // A word mark as word-marks.js draws it (priority -1, above the highlights) over characters 2 to 5.
+    await page.evaluate(() => {
+      const node = document.querySelector('p').firstChild;
+      const range = document.createRange();
+      range.setStart(node, 2);
+      range.setEnd(node, 6);
+      const mark = new Highlight(range);
+      mark.priority = -1;
+      CSS.highlights.set('honmani-learning', mark);
+    });
+    const shot = await page.screenshot();
+    const pixelOf = (index) =>
+      page.evaluate(
+        async ([data, index]) => {
+          const node = document.querySelector('p').firstChild;
+          const range = document.createRange();
+          range.setStart(node, index);
+          range.setEnd(node, index + 1);
+          const rect = range.getBoundingClientRect();
+          const image = new Image();
+          image.src = `data:image/png;base64,${data}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const context = canvas.getContext('2d');
+          context.drawImage(image, 0, 0);
+          const scale = image.width / innerWidth;
+          return context.getImageData(Math.round((rect.left + 2) * scale), Math.round((rect.top + 3) * scale), 1, 1).data[0];
+        },
+        [shot.toString('base64'), index],
+      );
+    const highlightOnly = await pixelOf(0);
+    const both = await pixelOf(3);
+    const wordOnly = await pixelOf(5);
+    console.log('e-ink greys', { highlightOnly, both, wordOnly });
+    expect(highlightOnly).toBe(220);
+    expect(wordOnly).toBeLessThan(255);
+    expect(both).toBeLessThan(highlightOnly);
+    expect(both).toBeLessThan(wordOnly);
+  });
+
   test('off: translucent colours, more opaque on a dark page', async ({ page }) => {
     await openBook(page, TWO_SECTIONS);
     await send(page, A_B, [{ id: 1, start: 0, end: 3, color: 0 }]);
@@ -369,6 +417,68 @@ test.describe('with the tap bridge', () => {
     expect(lookup.selection).toBe(true);
     expect(lookup.text.length).toBeLessThanOrEqual(20);
     // 吾輩は猫である (7) + 名前はまだ無い (7) + どこで生れたかとんと (10) = 24 counted characters.
-    expect(lookup.highlight).toEqual({ start: 0, end: 24, text: '吾輩は猫である。名前はまだ無い。どこで生れたかとんと' });
+    // A selection that leaves its paragraph has only its own extent.
+    expect(lookup.highlight).toEqual({ word: { start: 0, end: 24, text: '吾輩は猫である。名前はまだ無い。どこで生れたかとんと' } });
+  });
+
+  /** Selects one character (like a long press) and returns the extents the lookup carries. */
+  async function extentsOf(page, char) {
+    await page.evaluate((char) => {
+      const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.data.indexOf(char);
+        if (at < 0 || node.parentElement.closest('rt')) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 1);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        return;
+      }
+      throw new Error(char);
+    }, char);
+    await expect.poll(async () => (await lookups(page)).length, { timeout: 4000 }).toBe(1);
+    return (await lookups(page))[0].highlight;
+  }
+
+  // 吾輩は猫である (0-7) 名前はまだ無い (7-14) | どこで生れたかとんと見当がつかぬ (14-...)
+  for (const [name, css] of [['horizontal', ''], ['vertical', 'writing-mode: vertical-rl; height: 300px;']]) {
+    test(`${name}: a long press has a word, a sentence and a paragraph extent (ruby excluded)`, async ({ page }) => {
+      await openBook(page, BODY, { bridge: true, css });
+      await send(page, [['ttu-a', 0]], []);
+      const { word, sentence, paragraph } = await extentsOf(page, 'ま');
+      expect(word).toEqual({ start: 10, end: 11, text: 'ま' });
+      // Only the second sentence of the first paragraph, its full stop with it.
+      expect(sentence).toEqual({ start: 7, end: 14, text: '名前はまだ無い。' });
+      // The whole first paragraph; the reading of 猫 is no part of it.
+      expect(paragraph).toEqual({ start: 0, end: 14, text: '吾輩は猫である。名前はまだ無い。' });
+    });
+
+    test(`${name}: the sentence holding a ruby base is whole, with no reading in it`, async ({ page }) => {
+      await openBook(page, BODY, { bridge: true, css });
+      await send(page, [['ttu-a', 0]], []);
+      const { word, sentence } = await extentsOf(page, '猫');
+      expect(word).toEqual({ start: 3, end: 4, text: '猫' });
+      expect(sentence).toEqual({ start: 0, end: 7, text: '吾輩は猫である。' });
+    });
+  }
+
+  test('a sentence keeps its closing quote, and a line break ends it', async ({ page }) => {
+    await openBook(page, '<div id="ttu-a"><p>「行こう。」と彼は言った<br>次の行はここ</p></div>', { bridge: true });
+    await send(page, [['ttu-a', 0]], []);
+    const { sentence, paragraph } = await extentsOf(page, '行');
+    // 行 is the first match: the sentence is 「行こう。」 (行こう = 3 counted characters).
+    expect(sentence).toEqual({ start: 0, end: 3, text: '「行こう。」' });
+    expect(paragraph.start).toBe(0);
+    expect(paragraph.end).toBe(3 + 'と彼は言った'.length + '次の行はここ'.length);
+  });
+
+  test('a sentence longer than the 400 characters of the lookup is not cut', async ({ page }) => {
+    const long = 'あ'.repeat(500);
+    await openBook(page, `<div id="ttu-a"><p>${long}。次です。</p></div>`, { bridge: true });
+    await send(page, [['ttu-a', 0]], []);
+    const { sentence } = await extentsOf(page, 'あ');
+    expect(sentence.start).toBe(0);
+    expect(sentence.end).toBe(500);
   });
 });

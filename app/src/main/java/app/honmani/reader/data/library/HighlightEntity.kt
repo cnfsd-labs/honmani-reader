@@ -51,6 +51,10 @@ interface HighlightDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(highlight: HighlightEntity): Long
 
+    /** The book's highlights that share at least one character with [start, end). */
+    @Query("SELECT * FROM highlight WHERE content_hash = :contentHash AND start < :end AND end_position > :start")
+    suspend fun overlapping(contentHash: String, start: Long, end: Long): List<HighlightEntity>
+
     @Query("UPDATE highlight SET color = :color WHERE id = :id")
     suspend fun setColor(id: Long, color: Int)
 
@@ -60,4 +64,23 @@ interface HighlightDao {
     /** With the book. */
     @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
     suspend fun deleteForBook(contentHash: String)
+}
+
+/** A highlight just saved, with the ones it replaced (so Undo can bring them back). */
+data class SavedHighlight(val id: Long, val replaced: List<HighlightEntity>)
+
+/**
+ * Saves a new highlight. A highlight that overlaps older ones of the same book replaces them all,
+ * whatever their colour: the newest wins, and a reader never has to untangle layered marks.
+ */
+suspend fun HighlightDao.saveReplacingOverlaps(highlight: HighlightEntity): SavedHighlight {
+    val replaced = overlapping(highlight.contentHash, highlight.start, highlight.end)
+    for (old in replaced) delete(old.id)
+    return SavedHighlight(put(highlight), replaced)
+}
+
+/** Takes a saved highlight back and restores what it replaced, with their ids. */
+suspend fun HighlightDao.undoSave(saved: SavedHighlight) {
+    delete(saved.id)
+    for (old in saved.replaced) put(old)
 }

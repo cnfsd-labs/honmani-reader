@@ -26,23 +26,49 @@ class TapLookupTest {
     }
 
     @Test
-    fun parse_readsTheWholeSelection_forAHighlight() {
-        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"start":3,"end":9,"text":"猫である。名前"}}"""
+    fun parse_readsTheSelectionSentenceAndParagraph_forAHighlight() {
+        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"word":{"start":3,"end":4,"text":"猫"},"sentence":{"start":0,"end":7,"text":"吾輩は猫である。"},"paragraph":{"start":0,"end":14,"text":"吾輩は猫である。名前はまだ無い。"}}}"""
 
-        assertEquals(SelectedPassage(3, 9, "猫である。名前"), TapLookup.parse(message)?.selected)
+        val extents = TapLookup.parse(message)?.selected
+        assertEquals(SelectedPassage(3, 4, "猫"), extents?.selection)
+        assertEquals(SelectedPassage(0, 7, "吾輩は猫である。"), extents?.sentence)
+        assertEquals(SelectedPassage(0, 14, "吾輩は猫である。名前はまだ無い。"), extents?.paragraph)
+        assertEquals(
+            listOf(HighlightExtent.Selection, HighlightExtent.Sentence, HighlightExtent.Paragraph),
+            extents?.available?.keys?.toList(),
+        )
+        assertEquals(SelectedPassage(0, 14, "吾輩は猫である。名前はまだ無い。"), extents?.get(HighlightExtent.Paragraph))
         assertNull(TapLookup.parse(message.replace(""","selection":true""", ""))?.selected)
     }
 
     @Test
+    fun parse_aSelectionWithoutOtherExtents_fallsBackToItself() {
+        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"word":{"start":3,"end":9,"text":"猫である"}}}"""
+
+        val extents = TapLookup.parse(message)?.selected
+        assertEquals(listOf(HighlightExtent.Selection), extents?.available?.keys?.toList())
+        assertEquals(SelectedPassage(3, 9, "猫である"), extents?.get(HighlightExtent.Sentence))
+    }
+
+    @Test
+    fun parse_dropsAnExtentThatDoesNotHoldTheSelection() {
+        val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"word":{"start":3,"end":4,"text":"猫"},"sentence":{"start":5,"end":9,"text":"x"},"paragraph":{"start":0,"end":4,"text":"y"}}}"""
+
+        val extents = TapLookup.parse(message)?.selected
+        assertNull(extents?.sentence)
+        assertEquals(SelectedPassage(0, 4, "y"), extents?.paragraph)
+    }
+
+    @Test
     fun parse_dropsAnImpossibleSelection_butKeepsTheLookup() {
-        fun selected(highlight: String) =
-            TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":$highlight}""")
+        fun selected(word: String) =
+            TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true,"highlight":{"word":$word}}""")
 
         assertNull(selected("""{"start":5,"end":5,"text":"猫"}""")?.selected)
         assertNull(selected("""{"start":-1,"end":5,"text":"猫"}""")?.selected)
         assertNull(selected("""{"start":1,"end":5,"text":" "}""")?.selected)
         assertEquals("猫", selected("""{"start":5,"end":2,"text":"猫"}""")?.text)
-        assertEquals(200, selected("""{"start":1,"end":500,"text":"${"あ".repeat(300)}"}""")?.selected?.text?.length)
+        assertEquals(200, selected("""{"start":1,"end":500,"text":"${"あ".repeat(300)}"}""")?.selected?.selection?.text?.length)
     }
 
     @Test

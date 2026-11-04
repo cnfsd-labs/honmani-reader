@@ -123,7 +123,7 @@ test.describe('e-ink mode', () => {
     expect(await page.evaluate(() => localStorage.getItem('theme'))).toBe('black-theme');
   });
 
-  test('on: marks are greys as solid backgrounds, and the lookup mark is inverted', async ({ page }) => {
+  test('on: word marks are translucent greys, search hits solid, and the lookup mark is inverted', async ({ page }) => {
     await setUp(page, { honmaniEInk: '1', theme: 'light-theme' });
     await openBook(page);
     const colors = await page.evaluate(() => {
@@ -137,15 +137,19 @@ test.describe('e-ink mode', () => {
       }
       return out;
     });
-    const grey = /^rgb\((\d+), \1, \1\)$/;
-    for (const name of ['honmani-learning', 'honmani-new', 'honmani-due', 'honmani-one-unknown', 'honmani-search-hit']) {
-      expect(colors[name][0], name).toMatch(grey);
+    expect(colors['honmani-search-hit'][0]).toMatch(/^rgb\((\d+), \1, \1\)$/);
+    // Word marks are black at four different strengths (translucent, so a highlight under one still shows):
+    // dark enough to tell from the page's white and light enough to read black on.
+    const alphas = ['honmani-learning', 'honmani-new', 'honmani-due', 'honmani-one-unknown'].map((n) => {
+      const match = /^rgba\(0, 0, 0, ([\d.]+)\)$/.exec(colors[n][0]);
+      expect(match, n).not.toBeNull();
+      return Number(match[1]);
+    });
+    expect(new Set(alphas).size).toBe(4);
+    for (const alpha of alphas) {
+      expect(alpha).toBeGreaterThan(0.05);
+      expect(alpha).toBeLessThan(0.5);
     }
-    // Four different levels, all dark enough to tell from the page's white and light enough to read black on.
-    const levels = ['honmani-learning', 'honmani-new', 'honmani-due', 'honmani-one-unknown'].map((n) => Number(/\d+/.exec(colors[n][0])[0]));
-    expect(new Set(levels).size).toBe(4);
-    for (const level of levels) expect(level).toBeLessThan(250);
-    for (const level of levels) expect(level).toBeGreaterThan(120);
     expect(colors['honmani-lookup']).toEqual(['rgb(0, 0, 0)', 'rgb(255, 255, 255)']);
   });
 

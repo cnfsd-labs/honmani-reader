@@ -71,6 +71,44 @@ class HighlightDaoTest {
     }
 
     @Test
+    fun aNewHighlightReplacesTheOnesItOverlaps_inThatBookOnly() = runTest {
+        dao.put(mark("a", 0, 10))
+        dao.put(mark("a", 10, 20))
+        dao.put(mark("a", 30, 40))
+        dao.put(mark("b", 12, 18))
+
+        val saved = dao.saveReplacingOverlaps(mark("a", 5, 12, color = 3))
+
+        // [0,10) and [10,20) share characters with [5,12); [30,40) and the other book do not.
+        assertEquals(listOf(0L, 10L), saved.replaced.map { it.start })
+        assertEquals(listOf(5L, 30L), dao.observe("a").first().map { it.start })
+        assertEquals(1, dao.observe("b").first().size)
+    }
+
+    @Test
+    fun highlightsThatOnlyTouch_areNotReplaced() = runTest {
+        dao.put(mark("a", 0, 10))
+
+        val saved = dao.saveReplacingOverlaps(mark("a", 10, 20))
+
+        assertEquals(emptyList<HighlightEntity>(), saved.replaced)
+        assertEquals(listOf(0L, 10L), dao.observe("a").first().map { it.start })
+    }
+
+    @Test
+    fun undoingASave_bringsBackWhatItReplaced_withTheirIds() = runTest {
+        dao.put(mark("a", 0, 10, color = 1))
+        dao.put(mark("a", 20, 30, color = 2))
+        val before = dao.observe("a").first()
+
+        val saved = dao.saveReplacingOverlaps(mark("a", 5, 25, color = 0))
+        assertEquals(1, dao.observe("a").first().size)
+        dao.undoSave(saved)
+
+        assertEquals(before, dao.observe("a").first())
+    }
+
+    @Test
     fun removingABookClearsItsHighlightsOnly() = runTest {
         dao.put(mark("a", 100, 120))
         dao.put(mark("b", 100, 120))

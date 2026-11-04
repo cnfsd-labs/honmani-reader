@@ -230,6 +230,34 @@ sealed interface BridgeMessage {
 /** What a long press selected, counted in ttu characters from the start of the book. */
 data class SelectedPassage(val start: Long, val end: Long, val text: String)
 
+/** What a highlight made from a long press can cover; [Selection] is what was selected. */
+enum class HighlightExtent { Selection, Sentence, Paragraph }
+
+/**
+ * The places a highlight of a long press can take: the [selection] itself and, when the page could
+ * work them out, the [sentence] and the [paragraph] around it (each holds the selection).
+ */
+data class HighlightExtents(
+    val selection: SelectedPassage,
+    val sentence: SelectedPassage? = null,
+    val paragraph: SelectedPassage? = null,
+) {
+    /** The passage of [extent], or the selection where the page sent no such extent. */
+    operator fun get(extent: HighlightExtent): SelectedPassage = when (extent) {
+        HighlightExtent.Selection -> selection
+        HighlightExtent.Sentence -> sentence ?: selection
+        HighlightExtent.Paragraph -> paragraph ?: selection
+    }
+
+    /** The extents to offer, in order, each with its passage. */
+    val available: Map<HighlightExtent, SelectedPassage>
+        get() = buildMap {
+            put(HighlightExtent.Selection, selection)
+            sentence?.let { put(HighlightExtent.Sentence, it) }
+            paragraph?.let { put(HighlightExtent.Paragraph, it) }
+        }
+}
+
 /** A tap on book text, as reported by `assets/honmani/tap-bridge.js`. */
 data class TapLookup(
     /** Up to 20 characters starting at the tapped one; the lookup scans prefixes of this. */
@@ -246,8 +274,8 @@ data class TapLookup(
     val previousSentence: String = "",
     /** The text was chosen by a long press (Android's own selection tools are hidden), not a tap. */
     val bySelection: Boolean = false,
-    /** The whole selection (not only [text]), in the book's characters, for saving a highlight; null for a tap. */
-    val selected: SelectedPassage? = null,
+    /** The whole selection (not only [text]) and its sentence and paragraph, in the book's characters, for saving a highlight; null for a tap. */
+    val selected: HighlightExtents? = null,
     /** A tap on a character inside this saved highlight (`highlight.id`), else null. */
     val highlightId: Long? = null,
 ) {
@@ -279,14 +307,25 @@ data class TapLookup(
                 tapNumber = envelope.tap.coerceAtLeast(0),
                 previousSentence = envelope.previousSentence,
                 bySelection = envelope.selection,
-                selected = envelope.highlight?.let { SelectedPassage(it.start, it.end, it.text.take(HIGHLIGHT_TEXT_MAX)) }
-                    ?.takeIf { envelope.selection && it.start >= 0 && it.end > it.start && it.text.isNotBlank() },
+                selected = if (envelope.selection) extentsOf(envelope.highlight) else null,
                 highlightId = envelope.highlightId?.takeIf { it > 0 && !envelope.selection },
             )
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
             val ruby = envelope.ruby.map { RubySpan(it.start, it.end, it.reading) }
             return if (isValidRuby(ruby, lookup.text.length)) lookup.copy(ruby = ruby) else lookup
+        }
+
+        private fun passage(wire: PassageEnvelope?): SelectedPassage? =
+            wire?.takeIf { it.start >= 0 && it.end > it.start && it.text.isNotBlank() }
+                ?.let { SelectedPassage(it.start, it.end, it.text.take(HIGHLIGHT_TEXT_MAX)) }
+
+        /** The selection with the sentence and paragraph that hold it; those that do not are dropped. */
+        private fun extentsOf(wire: HighlightEnvelope?): HighlightExtents? {
+            val selection = passage(wire?.word) ?: return null
+            fun around(candidate: PassageEnvelope?) =
+                passage(candidate)?.takeIf { it.start <= selection.start && it.end >= selection.end }
+            return HighlightExtents(selection, around(wire?.sentence), around(wire?.paragraph))
         }
 
         private fun isValidRuby(ruby: List<RubySpan>, textLength: Int): Boolean =
@@ -318,7 +357,14 @@ data class TapLookup(
     )
 
     @Serializable
-    private data class HighlightEnvelope(val start: Long = 0, val end: Long = 0, val text: String = "")
+    private data class HighlightEnvelope(
+        val word: PassageEnvelope? = null,
+        val sentence: PassageEnvelope? = null,
+        val paragraph: PassageEnvelope? = null,
+    )
+
+    @Serializable
+    private data class PassageEnvelope(val start: Long = 0, val end: Long = 0, val text: String = "")
 
     @Serializable
     private data class RubyEnvelope(val start: Int, val end: Int, val reading: String)

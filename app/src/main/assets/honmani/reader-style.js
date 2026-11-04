@@ -7,9 +7,10 @@
  * the page has `.book-content`, so the library keeps its colours) there are no CSS transitions or
  * animations, no text or box shadows, plain black text on white (ttu's theme in
  * localStorage is not touched, so turning the mode off brings the theme back as it was), and the
- * marks in the text (word marks, the lookup mark, search hits) are greys as solid backgrounds
- * instead of colours. The reader's own highlights (highlights.js) are four solid light greys,
- * lighter than the lookup mark; where a word mark lies over one, the word mark's solid grey hides it.
+ * marks in the text (word marks, the lookup mark, search hits) are greys instead of colours. The
+ * lookup mark and search hits are solid; the word marks are black at 8 to 39 percent, so over a
+ * reader's highlight (highlights.js: four solid light greys, drawn below them) both still show, the
+ * word mark as a darker grey.
  * The WebView paints no text-decoration in ::highlight(), so the marks differ
  * by background alone. word-marks.js reads the switch too, to show its marks without a fade.
  *
@@ -46,10 +47,10 @@
       transition: none !important; animation: none !important; scroll-behavior: auto !important;
       text-shadow: none !important; box-shadow: none !important;
     }
-    ${H} ::highlight(honmani-learning), ${H} ::highlight(honmani-learning-fresh) { background-color: #c0c0c0 !important; }
-    ${H} ::highlight(honmani-new), ${H} ::highlight(honmani-new-fresh) { background-color: #e0e0e0 !important; }
-    ${H} ::highlight(honmani-due), ${H} ::highlight(honmani-due-fresh) { background-color: #9c9c9c !important; }
-    ${H} ::highlight(honmani-one-unknown), ${H} ::highlight(honmani-one-unknown-fresh) { background-color: #ececec !important; }
+    ${H} ::highlight(honmani-learning), ${H} ::highlight(honmani-learning-fresh) { background-color: rgba(0, 0, 0, 0.25) !important; }
+    ${H} ::highlight(honmani-new), ${H} ::highlight(honmani-new-fresh) { background-color: rgba(0, 0, 0, 0.12) !important; }
+    ${H} ::highlight(honmani-due), ${H} ::highlight(honmani-due-fresh) { background-color: rgba(0, 0, 0, 0.39) !important; }
+    ${H} ::highlight(honmani-one-unknown), ${H} ::highlight(honmani-one-unknown-fresh) { background-color: rgba(0, 0, 0, 0.08) !important; }
     ${H} ::highlight(honmani-search-hit) { background-color: #8c8c8c !important; color: #000000 !important; }
     ${H} ::highlight(honmani-lookup) { background-color: #000000 !important; color: #ffffff !important; }
     ${H} ::highlight(honmani-hl-0) { background-color: #dcdcdc !important; }

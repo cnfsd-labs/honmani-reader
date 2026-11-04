@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.CircularProgressIndicator
 import kotlinx.coroutines.launch
@@ -479,8 +480,11 @@ private const val MAX_SHOWN_TEXT = 8
  */
 data class HighlightControls(
     val current: Int?,
-    val onPick: (Int) -> Unit,
+    /** Saves a new highlight in the colour over the extent chosen, or recolours the tapped one (extent unused). */
+    val onPick: (Int, HighlightExtent) -> Unit,
     val onRemove: (() -> Unit)?,
+    /** For a new highlight: the extents to choose from with their text; empty for a tapped one. */
+    val extents: Map<HighlightExtent, String> = emptyMap(),
 )
 
 /** A label, the four colours and (for a highlight that exists) "Remove highlight". */
@@ -490,6 +494,42 @@ private fun HighlightBar(controls: HighlightControls) {
     val names = listOf(
         R.string.highlight_yellow, R.string.highlight_green, R.string.highlight_blue, R.string.highlight_pink,
     ).map { stringResource(it) }
+    // What a new highlight covers; a sentence unless the page found none.
+    var extent by remember(controls.extents.keys) {
+        mutableStateOf(if (HighlightExtent.Sentence in controls.extents) HighlightExtent.Sentence else HighlightExtent.Selection)
+    }
+    if (controls.extents.size > 1) {
+        Row(
+            modifier = Modifier.padding(start = 20.dp, end = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (option in controls.extents.keys) {
+                FilterChip(
+                    selected = extent == option,
+                    onClick = { extent = option },
+                    label = {
+                        Text(
+                            stringResource(
+                                when (option) {
+                                    HighlightExtent.Selection -> R.string.highlight_extent_selection
+                                    HighlightExtent.Sentence -> R.string.highlight_extent_sentence
+                                    HighlightExtent.Paragraph -> R.string.highlight_extent_paragraph
+                                },
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+        Text(
+            text = controls.extents[extent].orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+        )
+    }
     FlowRow(
         modifier = Modifier.padding(start = 20.dp, end = 12.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
@@ -506,7 +546,7 @@ private fun HighlightBar(controls: HighlightControls) {
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(48.dp)
-                    .clickable(role = Role.Button, onClickLabel = names[index]) { controls.onPick(index) }
+                    .clickable(role = Role.Button, onClickLabel = names[index]) { controls.onPick(index, extent) }
                     .semantics { contentDescription = names[index] },
             ) {
                 Box(

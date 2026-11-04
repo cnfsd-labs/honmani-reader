@@ -214,13 +214,19 @@
     return Array.from(text).slice(0, count).join('');
   }
 
-  function sentenceAround(text, position) {
+  /** Where the sentence holding `position` starts and ends in `text`, closing quotes included. */
+  function sentenceBounds(text, position) {
     let start = position;
     while (start > 0 && !SENTENCE_END.includes(text[start - 1])) start--;
     let end = position;
     while (end < text.length && !SENTENCE_END.includes(text[end])) end++;
     while (end < text.length && SENTENCE_END.includes(text[end])) end++;
     while (end < text.length && CLOSING_QUOTES.includes(text[end])) end++;
+    return { start, end };
+  }
+
+  function sentenceAround(text, position) {
+    let { start, end } = sentenceBounds(text, position);
 
     const previous = sentenceBefore(text, start);
 
@@ -580,6 +586,65 @@
     return length;
   }
 
+  /** A Range over text[from, to) of a block's text as blockText reads it, or null. */
+  function rangeFromText(block, from, to) {
+    const walker = lineWalker(block);
+    const range = document.createRange();
+    let offset = 0;
+    let started = false;
+    for (let current = walker.nextNode(); current; current = walker.nextNode()) {
+      const element = current.nodeType === Node.ELEMENT_NODE;
+      const length = element ? 1 : textData(current).length;
+      if (!started && from < offset + length) {
+        if (element) range.setStartBefore(current);
+        else range.setStart(current, from - offset);
+        started = true;
+      }
+      if (started && to <= offset + length) {
+        if (element) range.setEndAfter(current);
+        else range.setEnd(current, to - offset);
+        return range;
+      }
+      offset += length;
+    }
+    return null;
+  }
+
+  /**
+   * What a highlight of the selection can cover, as places in the book (highlights.js measure):
+   * { word (the selection), sentence, paragraph }. The sentence runs from the start of the
+   * selection's first sentence to the end of its last, the paragraph is its block (a line, when the
+   * text sits straight in the page). A selection that leaves its block has only the word.
+   */
+  function highlightExtents(root, from, range) {
+    const word = window.honmaniHighlights.measure(range);
+    if (!word) return null;
+    const extents = { word };
+    const block = blockAncestor(from.node, root);
+    const { text, position } = blockText(block, from.node, from.index);
+    const last = blockText(block, range.endContainer, range.endOffset);
+    if (position < 0 || last.position < 0 || range.endContainer.nodeType !== Node.TEXT_NODE) return extents;
+    const lastCharacter = Math.max(position, last.position - 1);
+    const measureText = (start, end) => {
+      while (start < end && /\s/.test(text[start])) start++;
+      while (end > start && /\s/.test(text[end - 1])) end--;
+      const part = start < end ? rangeFromText(block, start, end) : null;
+      return part ? window.honmaniHighlights.measure(part) : null;
+    };
+    const sentence = measureText(sentenceBounds(text, position).start, sentenceBounds(text, lastCharacter).end);
+    if (sentence) extents.sentence = sentence;
+    let start = 0;
+    let end = text.length;
+    if (block === root) {
+      start = text.lastIndexOf('\n', position - 1) + 1;
+      const next = text.indexOf('\n', lastCharacter);
+      end = next < 0 ? text.length : next;
+    }
+    const paragraph = measureText(start, end);
+    if (paragraph) extents.paragraph = paragraph;
+    return extents;
+  }
+
   function lookupSelection() {
     selectionTimer = 0;
     const selection = window.getSelection();
@@ -598,9 +663,9 @@
     lastSelected = selected;
     clearHighlight();
     message.selection = true;
-    // The whole selection as a place in the book (not the capped lookup text), for a highlight.
-    const measured = window.honmaniHighlights ? window.honmaniHighlights.measure(range) : null;
-    if (measured) message.highlight = measured;
+    // The selection, its sentence and its paragraph as places in the book, for a highlight.
+    const extents = window.honmaniHighlights ? highlightExtents(root, from, range) : null;
+    if (extents) message.highlight = extents;
     post(message);
     selection.removeAllRanges();
   }

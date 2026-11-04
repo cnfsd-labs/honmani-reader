@@ -313,6 +313,9 @@
     <string name="reader_menu_highlights">Highlights</string>
     <string name="highlight_add">Highlight</string>
     <string name="highlight_change">Colour</string>
+    <string name="highlight_extent_selection">Selection</string>
+    <string name="highlight_extent_sentence">Sentence</string>
+    <string name="highlight_extent_paragraph">Paragraph</string>
     <string name="highlight_yellow">Yellow</string>
     <string name="highlight_green">Green</string>
     <string name="highlight_blue">Blue</string>

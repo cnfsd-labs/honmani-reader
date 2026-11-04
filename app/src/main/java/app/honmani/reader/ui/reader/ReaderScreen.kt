@@ -46,6 +46,8 @@ import androidx.compose.runtime.withFrameNanos
 import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.saveReplacingOverlaps
+import app.honmani.reader.data.library.undoSave
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -353,7 +355,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 if (existing != null) {
                     return HighlightControls(
                         current = existing.color,
-                        onPick = { color -> scope.launch { container.highlightDao.setColor(existing.id, color) } },
+                        onPick = { color, _ -> scope.launch { container.highlightDao.setColor(existing.id, color) } },
                         onRemove = {
                             viewModel.dismiss()
                             scope.launch {
@@ -365,13 +367,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         },
                     )
                 }
-                val passage = tap.selected
+                val extents = tap.selected
                 val hash = bookHash
                 val total = sectionsTotal
-                if (!tap.bySelection || passage == null || hash == null || total == null || !appSettings.selectionLookup) return null
+                if (!tap.bySelection || extents == null || hash == null || total == null || !appSettings.selectionLookup) return null
                 return HighlightControls(
                     current = null,
-                    onPick = { color ->
+                    extents = extents.available.mapValues { it.value.text },
+                    onPick = { color, extent ->
+                        val passage = extents[extent]
                         viewModel.dismiss()
                         scope.launch {
                             val same = highlights.firstOrNull { it.start == passage.start && it.end == passage.end }
@@ -380,14 +384,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 container.highlightDao.setColor(same.id, color)
                                 jumpSnackbar.showSnackbar(savedMessage)
                             } else {
-                                val id = container.highlightDao.put(
+                                val saved = container.highlightDao.saveReplacingOverlaps(
                                     HighlightEntity(
                                         contentHash = hash, start = passage.start, end = passage.end, color = color,
                                         text = passage.text, total = total.toLong(), createdAt = System.currentTimeMillis(),
                                     ),
                                 )
                                 val result = jumpSnackbar.showSnackbar(savedMessage, undoLabel, duration = SnackbarDuration.Long)
-                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.delete(id)
+                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.undoSave(saved)
                             }
                         }
                     },
