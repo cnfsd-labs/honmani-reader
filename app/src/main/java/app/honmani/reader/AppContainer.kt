@@ -60,6 +60,7 @@ import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
+import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
@@ -175,6 +176,9 @@ class AppContainer(context: Context) {
 
     /** Whether reading time counts while the lookup panel is open (Settings → Reading). */
     val readingTimeSettings: ReadingTimeSettings by lazy { ReadingTimeSettings(settingsPreferences) }
+
+    /** The read aloud speed (reader menu → Read aloud). */
+    val readAloudSettings: ReadAloudSettings by lazy { ReadAloudSettings(settingsPreferences) }
 
     /** Where the Refold export left off (Progress). */
     val refoldExportSettings: RefoldExportSettings by lazy { RefoldExportSettings(settingsPreferences) }

@@ -196,6 +196,12 @@ fun ReaderWebView(
     highlightsMessage: suspend (Long) -> String? = { null },
     /** Changes when the book's highlights do, so the page gets them again. */
     highlightsKey: Any? = null,
+    /** Messages for read aloud's half of the page (`read-aloud.js`), as JSON, in order. */
+    readAloudMessages: Flow<String> = emptyFlow(),
+    /** The page's answers for read aloud: [BridgeMessage.ReadAloudSentences] and [BridgeMessage.ReadAloudLost]. */
+    onReadAloud: (BridgeMessage) -> Unit = {},
+    /** A book was laid out on screen (also after the page was loaded again, such as for a font change). */
+    onBookShown: () -> Unit = {},
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -211,6 +217,8 @@ fun ReaderWebView(
     val currentHideToolbar by rememberUpdatedState(hideSelectionToolbar)
     val currentMarks by rememberUpdatedState(marks)
     val currentHighlights by rememberUpdatedState(highlightsMessage)
+    val currentOnReadAloud by rememberUpdatedState(onReadAloud)
+    val currentOnBookShown by rememberUpdatedState(onBookShown)
     val currentHighlightColor by rememberUpdatedState(highlightColor)
     val webViewRef = remember { WebViewRef() }
     var atLibrary by remember { mutableStateOf(true) }
@@ -310,6 +318,14 @@ fun ReaderWebView(
         }
     }
 
+    LaunchedEffect(readAloudMessages) {
+        readAloudMessages.collect { message ->
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+                webViewRef.replyProxy?.postMessage(message)
+            }
+        }
+    }
+
     // A new WebView after the page's renderer died (crashed, or killed by Android for memory):
     // the old one cannot be used again, and without this Android would close the whole app.
     var renderer by remember { mutableIntStateOf(0) }
@@ -333,8 +349,13 @@ fun ReaderWebView(
                             is BridgeMessage.TurnPage ->
                                 if (currentPanelOpen) currentOnDismiss() else webViewRef.view?.let { turnPage(it, message.next) }
                             is BridgeMessage.Library -> ttuLibrary.onMessage(message.message)
-                            is BridgeMessage.BookShown, BridgeMessage.SettingsShown ->
+                            is BridgeMessage.BookShown -> {
+                                currentOnBookShown()
                                 if (uncover[0] != null) uncoverAfter(UNCOVER_SETTLE_MS)
+                            }
+                            BridgeMessage.SettingsShown ->
+                                if (uncover[0] != null) uncoverAfter(UNCOVER_SETTLE_MS)
+                            is BridgeMessage.ReadAloudSentences, is BridgeMessage.ReadAloudLost -> currentOnReadAloud(message)
                             BridgeMessage.Activity -> currentOnActivity()
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()

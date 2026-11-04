@@ -58,6 +58,7 @@ fun ReaderMenuSheet(
     onHighlights: () -> Unit = {},
     onContents: () -> Unit,
     onSearch: () -> Unit,
+    onReadAloud: () -> Unit = {},
     onSettings: () -> Unit,
     onSessionWords: () -> Unit,
     onCloseBook: () -> Unit,
@@ -106,6 +107,12 @@ fun ReaderMenuSheet(
                 headlineContent = { Text(stringResource(R.string.reader_menu_search)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onSearch),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_listen), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_read_aloud)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onReadAloud),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },

@@ -3,6 +3,17 @@ package app.honmani.reader.ui.reader
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
+import android.content.ActivityNotFoundException
+import android.content.pm.ApplicationInfo
+import android.provider.Settings
+import android.util.Log
+import app.honmani.reader.data.settings.ReadAloudSettings
+import app.honmani.reader.readaloud.LiveVoice
+import app.honmani.reader.readaloud.ReadAloudController
+import app.honmani.reader.readaloud.ReadAloudPhase
+import app.honmani.reader.readaloud.SpokenSentence
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import android.content.ContextWrapper
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -74,6 +85,7 @@ import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.review.ReviewScreen
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.HomeTab
+import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.anki.showVoiceProblem
@@ -126,6 +138,20 @@ fun ReaderScreen(
     }
 }
 
+/** Android's text-to-speech settings, where a Japanese voice is installed; the main settings if there are none. */
+private fun openVoiceSettings(context: Context) {
+    val tts = Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(tts)
+    } catch (_: ActivityNotFoundException) {
+        try {
+            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: ActivityNotFoundException) {
+            // No settings app: nothing more to offer.
+        }
+    }
+}
+
 @Composable
 private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val panel by viewModel.panel.collectAsStateWithLifecycle()
@@ -143,9 +169,32 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val tracker = remember { container.readingTracker }
     val showPreviousSentence by container.appearanceSettings.showPreviousSentence.collectAsStateWithLifecycle()
     val sentenceEnds by container.ankiSettings.sentenceEnds.collectAsStateWithLifecycle()
+    val readAloudMessages = remember { Channel<String>(Channel.UNLIMITED) }
+    val readAloud = remember {
+        // The spoken text is only logged by a debug build.
+        val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        ReadAloudController(
+            voice = LiveVoice(context),
+            toPage = { readAloudMessages.trySend(it) },
+            initialRate = container.readAloudSettings.rate.value,
+            saveRate = container.readAloudSettings::setRate,
+            onSpoken = tracker::onActivity,
+            log = { if (debuggable) Log.i("ReadAloud", it) },
+        )
+    }
+    val readAloudState by readAloud.state.collectAsStateWithLifecycle()
+    // The engine, the focus and the queue go with the reader.
+    DisposableEffect(readAloud) { onDispose { readAloud.close() } }
+    // The screen stays on while the book is read aloud, and not a moment longer.
+    val rootView = LocalView.current
+    DisposableEffect(rootView, readAloudState.running) {
+        if (readAloudState.running) rootView.keepScreenOn = true
+        onDispose { rootView.keepScreenOn = false }
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) readAloud.appStopped()
             tracker.setForeground(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
             // Characters read count from ttu's positions; ask before the app may be closed.
             if (event == Lifecycle.Event.ON_STOP) {
@@ -164,8 +213,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // (its touches are native: the book sees no activity).
     val countDuringLookup by container.readingTimeSettings.countDuringLookup.collectAsStateWithLifecycle()
     LaunchedEffect(countDuringLookup) { tracker.setCountLookupTime(countDuringLookup) }
-    LaunchedEffect(panel != null) { tracker.setLookupOpen(panel != null) }
+    LaunchedEffect(panel != null) {
+        tracker.setLookupOpen(panel != null)
+        // The panel's word audio never talks over the reader's voice: it ends before that goes on.
+        if (panel == null) container.wordAudio.stop()
+        readAloud.panelChanged(panel != null)
+    }
     LaunchedEffect(atLibrary) {
+        if (atLibrary) readAloud.close()
         tracker.setVisible(!atLibrary)
         // Back at the library: the position reached goes to the sync server now.
         if (atLibrary) container.progressSync.flush()
@@ -337,6 +392,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 highlightsKey = highlights,
+                readAloudMessages = readAloudMessages.receiveAsFlow(),
+                onReadAloud = { message ->
+                    when (message) {
+                        is BridgeMessage.ReadAloudSentences ->
+                            readAloud.onSentences(message.gen, message.items.map { SpokenSentence(it.i, it.text) }, message.end)
+                        is BridgeMessage.ReadAloudLost -> readAloud.onLost(message.gen)
+                        else -> Unit
+                    }
+                },
+                onBookShown = readAloud::pageReloaded,
                 volumeKeysTurnPages = appSettings.volumeKeys,
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,
@@ -346,6 +411,28 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     // a moment: its size doesn't follow them, so they never reflow the page.
                     .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
+            if (readAloudState.phase != ReadAloudPhase.OFF && !atLibrary) {
+                val problem = readAloudState.problem
+                val ended = readAloudState.phase == ReadAloudPhase.ENDED
+                ReadAloudBar(
+                    playing = readAloudState.running,
+                    rate = readAloudState.rate,
+                    onPlayPause = readAloud::togglePlay,
+                    onPrevious = readAloud::previous,
+                    onNext = readAloud::next,
+                    onSpeed = { readAloud.setRate(ReadAloudSettings.nextRate(readAloudState.rate)) },
+                    onClose = readAloud::close,
+                    message = when {
+                        readAloudState.phase == ReadAloudPhase.PROBLEM && problem != null ->
+                            stringResource(R.string.read_aloud_problem, stringResource(problem.label()))
+                        ended -> stringResource(R.string.read_aloud_ended)
+                        else -> null
+                    },
+                    messageAction = if (readAloudState.phase == ReadAloudPhase.PROBLEM) stringResource(R.string.read_aloud_voice_settings) else null,
+                    onMessageAction = { openVoiceSettings(context) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
             val state = panel
             // What the lookup panel offers for highlighting: the colours of a new selection (when
             // selection lookup is on), or of the highlight a tap landed on, with "Remove highlight".
@@ -636,6 +723,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onSearch = {
                     viewModel.closeMenu()
                     searchShown = true
+                },
+                onReadAloud = {
+                    viewModel.closeMenu()
+                    readAloud.start()
                 },
                 onSettings = {
                     viewModel.closeMenu()

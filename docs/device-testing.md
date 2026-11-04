@@ -291,6 +291,29 @@ moment (also when it is further down a long paragraph, in vertical and horizonta
 and continuous). Back from the search returns to the page you were on. Check a search in a long book
 for speed and that the keyboard does not cover the list.
 
+## Read aloud
+
+Needs a Japanese voice (Android Settings, Text-to-speech output). Keep the media volume where you
+can hear it, then reader menu, Read aloud, on a page of a book with furigana.
+
+- The bar appears at the bottom (previous, play/pause, next, speed, close) and the first sentence on
+  the page is marked in grey over the text, then said aloud. The mark follows the sentence, and
+  inside a long sentence it follows the words. It is visible next to word marks and highlights, and in
+  e-ink mode.
+- A ruby word is read as its furigana (hiragana above the kanji), not as the kanji.
+- At the end of the page the book turns by itself (a sentence that crosses the page break turns when the part
+  still to read is off the page), in paginated and continuous mode, horizontal and vertical. Close the
+  book and open it again: it is on the page the reading had reached.
+- Pause, then play: it goes on from the start of that sentence. Next and previous move one sentence,
+  also while paused. The speed button cycles 0.75, 1, 1.25, 1.5 and the book keeps the speed on the next
+  start. Everything fits at 360 dp wide and the largest font; TalkBack reads each button.
+- Tap a word: reading pauses while the panel is open, and goes on from the start of that sentence when
+  it closes. The word's audio in the panel never plays over the reader's voice.
+- A call, another player or the Home button pauses it. The screen stays on only while it reads.
+- Without a Japanese voice the bar says so and offers "Voice settings".
+- At the end of the book it stops and says so in the bar.
+- Rotate the phone, change the font and close the book while it reads: no crash, no voice left over.
+
 ## Bookmarks and the reading slider
 
 Reader menu, at the top: a slider with a live label ("42% · 10,350 / 24,847"), then Add bookmark and

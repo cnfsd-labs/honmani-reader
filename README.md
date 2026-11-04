@@ -12,6 +12,9 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   with pinch zoom, double-tap zoom and panning
 - Search in the open book (reader menu): every match with its surroundings and place in the book; a tap opens
   the book there and marks it
+- Read aloud (reader menu): the phone's Japanese voice reads the book from the page on screen, marks the
+  sentence it says, turns the pages by itself and stops when you leave the app; play/pause, previous and
+  next sentence and speed (0.75 to 1.5) are in a bar over the page. Needs a Japanese voice (Settings, Text-to-speech)
 - Named bookmarks (reader menu): save as many places as you like per book, jump to one from a list, rename
   or delete it (Undo); a slider over the whole book shows the place as % and characters and jumps when
   you let go. After a jump, "Back to where you were" returns. Bookmarks are in the backup

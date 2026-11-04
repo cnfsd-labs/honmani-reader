@@ -68,6 +68,16 @@ sealed interface BridgeMessage {
     /** The book page is up and wants its saved highlights (`assets/honmani/highlights.js`). */
     data class HighlightsRequest(val bookId: Long) : BridgeMessage
 
+    /** One sentence for read aloud: its number and the text to speak (`assets/honmani/read-aloud.js`). */
+    @Serializable
+    data class ReadAloudItem(val i: Int = -1, val text: String = "")
+
+    /** The page's next sentences for read aloud; [end] is null, "section" or "book" once the text ran out. */
+    data class ReadAloudSentences(val gen: Int, val items: List<ReadAloudItem>, val end: String?) : BridgeMessage
+
+    /** Read aloud asked for text that is no longer in the page. */
+    data class ReadAloudLost(val gen: Int) : BridgeMessage
+
     /** A paragraph's text without furigana, and the page's id for it. */
     @Serializable
     data class MarksBlock(val id: Long = 0, val text: String = "")
@@ -94,6 +104,8 @@ sealed interface BridgeMessage {
                 "reader.background" -> parseBackground(message, obj)
                 "marks.request" -> parseMarks(message, obj)
                 "highlights.request" -> parseHighlightsRequest(message, obj)
+                "readAloud.sentences" -> parseReadAloudSentences(message, obj)
+                "readAloud.lost" -> parseReadAloudLost(message, obj)
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
@@ -186,6 +198,32 @@ sealed interface BridgeMessage {
         }
 
         @Serializable
+        private data class ReadAloudSentencesEnvelope(
+            val type: String = "",
+            val gen: Int = -1,
+            val items: List<ReadAloudItem> = emptyList(),
+            val end: String? = null,
+        )
+
+        private fun parseReadAloudSentences(message: String, obj: JsonObject): ReadAloudSentences? {
+            if (message.length > MAX_READ_ALOUD_LENGTH) return null
+            val envelope = decode<ReadAloudSentencesEnvelope>(obj) ?: return null
+            val valid = envelope.gen >= 0 && envelope.items.size <= MAX_READ_ALOUD_ITEMS &&
+                envelope.items.all { it.i >= 0 && it.text.length <= MAX_READ_ALOUD_TEXT } &&
+                (envelope.end == null || envelope.end == "section" || envelope.end == "book")
+            return if (valid) ReadAloudSentences(envelope.gen, envelope.items, envelope.end) else null
+        }
+
+        @Serializable
+        private data class ReadAloudLostEnvelope(val type: String = "", val gen: Int = -1)
+
+        private fun parseReadAloudLost(message: String, obj: JsonObject): ReadAloudLost? {
+            if (message.length > MAX_BOOK_SHOWN_LENGTH) return null
+            val envelope = decode<ReadAloudLostEnvelope>(obj) ?: return null
+            return if (envelope.gen >= 0) ReadAloudLost(envelope.gen) else null
+        }
+
+        @Serializable
         private data class MarksEnvelope(
             val type: String = "",
             val requestId: Long = 0,
@@ -217,6 +255,11 @@ sealed interface BridgeMessage {
         private const val MAX_MARKS_LENGTH = 64_000
         private const val MAX_MARKS_BLOCKS = 500
         private const val MAX_MARKS_TEXT = 8_000
+
+        /** The page sends up to 10 sentences, each up to 4,000 characters (`read-aloud.js`). */
+        private const val MAX_READ_ALOUD_LENGTH = 200_000
+        private const val MAX_READ_ALOUD_ITEMS = 20
+        private const val MAX_READ_ALOUD_TEXT = 4_000
         private const val IMAGE_PREFIX = """{"type":"image","""
         private const val DISMISS_MESSAGE = """{"type":"dismiss"}"""
         private const val SETTINGS_SHOWN_MESSAGE = """{"type":"pageShown","path":"/settings"}"""
