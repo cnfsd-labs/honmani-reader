@@ -37,6 +37,7 @@ import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookmarkDao
+import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookImporter
@@ -78,6 +79,7 @@ import app.honmani.reader.data.sync.KoSyncSettings
 import app.honmani.reader.data.sync.KoSyncStatus
 import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
+import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
@@ -203,6 +205,7 @@ class AppContainer(context: Context) {
 
     val bookDao: BookDao by lazy { database.bookDao() }
     val bookmarkDao: BookmarkDao by lazy { database.bookmarkDao() }
+    val highlightDao: HighlightDao by lazy { database.highlightDao() }
 
     val bookImporter: BookImporter by lazy {
         BookImporter(bookDao, booksDir, File(appContext.filesDir, "covers"), restore = { backup.onBookAdded(it) })
@@ -454,6 +457,22 @@ class AppContainer(context: Context) {
             BookFormat.TXT -> if (file.exists()) listOf(file.readText()) else null
         }
         documents?.let(::BookText)
+    }
+
+    private val sectionTables = object : LinkedHashMap<String, SectionStarts>(4, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, SectionStarts>?) = size > 3
+    }
+
+    /**
+     * Where each document of an EPUB begins in the book's characters, for drawing and saving
+     * highlights (see [SectionStarts]). Worked out once per book (it reads the whole file);
+     * null for a book that is not an EPUB or whose file can't be read.
+     */
+    suspend fun sectionStarts(book: BookEntity): SectionStarts? = withContext(Dispatchers.IO) {
+        if (book.format != BookFormat.EPUB) return@withContext null
+        synchronized(sectionTables) { sectionTables[book.contentHash] }?.let { return@withContext it }
+        val file = bookImporter.bookFile(book).takeIf { it.isFile } ?: return@withContext null
+        EpubPositions.sectionStarts(file)?.also { synchronized(sectionTables) { sectionTables[book.contentHash] = it } }
     }
 
     /**

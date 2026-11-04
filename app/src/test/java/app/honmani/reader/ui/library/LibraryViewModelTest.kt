@@ -339,6 +339,28 @@ class LibraryViewModelTest {
         assertNull(dao.find(book.id))
     }
 
+    @Test
+    fun removingABookDeletesItsBookmarksAndHighlights() = runBlocking {
+        val bookmarks = mutableListOf<String>()
+        val highlights = mutableListOf<String>()
+        viewModel = LibraryViewModel(
+            dao = dao,
+            importer = importer,
+            ttu = ttu,
+            openFile = { uri -> files[uri.lastPathSegment]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) } },
+            now = { 42L },
+            forgetBookmarks = { bookmarks += it },
+            forgetHighlights = { highlights += it },
+        )
+        val book = addAndWait("neko.epub", TestBooks.epub())
+
+        viewModel.remove(book.id)
+        eventually { highlights.takeIf { it.isNotEmpty() } }
+
+        assertEquals(listOf(book.contentHash), highlights)
+        assertEquals(listOf(book.contentHash), bookmarks)
+    }
+
     private fun viewModelRecording(
         recorded: MutableList<FinishedBookEntity>,
         forgotten: MutableList<Pair<Long, String>>,

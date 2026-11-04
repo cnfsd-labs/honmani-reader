@@ -12,6 +12,7 @@ import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.library.BookmarkEntity
+import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.LookupEventEntity
@@ -83,6 +84,12 @@ interface BackupDao {
 
     @Insert
     suspend fun insertBookmarks(bookmarks: List<BookmarkEntity>)
+
+    @Query("SELECT * FROM highlight ORDER BY content_hash, start, id")
+    suspend fun highlights(): List<HighlightEntity>
+
+    @Insert
+    suspend fun insertHighlights(highlights: List<HighlightEntity>)
 
     @Query("SELECT * FROM opds_catalog ORDER BY added_at, id")
     suspend fun catalogs(): List<OpdsCatalogEntity>

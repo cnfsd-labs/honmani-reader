@@ -8,6 +8,8 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
 import app.honmani.reader.data.library.BookmarkEntity
+import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
+import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.review.Grade
 import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewRepository
@@ -342,6 +344,52 @@ class BackupTest {
             new.database.backupDao().bookmarks().sortedBy { it.contentHash + it.characters }.map { it.name },
         )
         assertEquals(listOf("Chapter one", "Mine"), new.database.bookmarkDao().observe("h1").first().map { it.name })
+    }
+
+    @Test
+    fun highlightsComeBackOnceEvenForBooksNotInTheLibrary_andALocalOneOnTheSamePassageStays() = runTest {
+        val old = Phone("old")
+        val marks = old.database.highlightDao()
+        marks.put(HighlightEntity(contentHash = "h1", start = 100, end = 130, color = 1, text = "one", total = 1_000, createdAt = 4))
+        marks.put(HighlightEntity(contentHash = "h1", start = 500, end = 520, color = 2, text = "same", total = 1_000, createdAt = 5))
+        marks.put(HighlightEntity(contentHash = "h2", start = 7, end = 9, color = 3, text = "other", total = 90, createdAt = 6))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+        new.database.highlightDao().put(HighlightEntity(contentHash = "h1", start = 500, end = 520, color = 0, text = "mine", total = 1_000, createdAt = 9))
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(
+            listOf("one", "mine", "other"),
+            new.database.backupDao().highlights().sortedBy { it.contentHash + it.start.toString().padStart(5, '0') }.map { it.text },
+        )
+        val restored = new.database.highlightDao().observe("h1").first()
+        assertEquals(listOf(100L to 130L, 500L to 520L), restored.map { it.start to it.end })
+        assertEquals(listOf(1, 0), restored.map { it.color })
+    }
+
+    @Test
+    fun brokenHighlightsInABackupAreSkipped_andLongTextCut() = runTest {
+        val old = Phone("old")
+        val good = BackupHighlight(hash = "h", start = 5, end = 9, color = 3, text = "x".repeat(500), total = 10)
+        val backup = throughFile(old.backup.export(readerSettings = null)).copy(
+            highlights = listOf(
+                good,
+                good.copy(hash = ""),
+                good.copy(start = -1),
+                good.copy(start = 9, end = 9),
+                good.copy(start = 20, end = 30, color = 4),
+                good.copy(start = 40, end = 50, color = -1),
+                good.copy(start = 60, end = 70, total = 0),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        val kept = new.database.backupDao().highlights().single()
+        assertEquals(HIGHLIGHT_TEXT_MAX, kept.text.length)
     }
 
     @Test

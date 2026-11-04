@@ -20,6 +20,9 @@ import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
 import app.honmani.reader.data.library.BookmarkEntity
+import app.honmani.reader.data.library.HIGHLIGHT_COLORS
+import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
+import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -90,13 +93,14 @@ class Backup(
             val removed: List<RemovedBookEntity>,
             val finished: List<FinishedBookEntity>,
             val bookmarks: List<BookmarkEntity>,
+            val highlights: List<HighlightEntity>,
             val catalogs: List<OpdsCatalogEntity>,
             val cards: Map<Long, ReviewCardEntity>,
             val logs: Map<Long, List<ReviewLogEntity>>,
             val reads: Map<Long, List<ReadDayEntity>>,
         )
         val tables = database.withTransaction {
-            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.catalogs(),
+            Tables(dao.books(), dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
             )
         }
@@ -165,6 +169,7 @@ class Backup(
             readingDays = readingDays,
             finishedBooks = tables.finished.map { BackupFinishedBook(it.contentHash, it.title, it.finishedAt) },
             bookmarks = tables.bookmarks.map { BackupBookmark(it.contentHash, it.name, it.characters, it.total, it.createdAt) },
+            highlights = tables.highlights.map { BackupHighlight(it.contentHash, it.start, it.end, it.color, it.text, it.total, it.createdAt) },
             lookupEvents = lookupEvents,
             words = words,
             catalogs = tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
@@ -320,6 +325,21 @@ class Backup(
                 backup.bookmarks
                     .filter { it.hash.isNotEmpty() && it.characters >= 0 && it.total > 0 && placed.add(it.hash to it.characters) }
                     .map { BookmarkEntity(contentHash = it.hash, name = it.name.take(BOOKMARK_NAME_MAX), characters = it.characters, total = it.total, createdAt = it.createdAt) },
+            )
+            // A passage this phone has at the same range stays (its colour may have been changed here).
+            val marked = dao.highlights().mapTo(HashSet()) { Triple(it.contentHash, it.start, it.end) }
+            dao.insertHighlights(
+                backup.highlights
+                    .filter {
+                        it.hash.isNotEmpty() && it.start >= 0 && it.end > it.start && it.total > 0 &&
+                            it.color in 0 until HIGHLIGHT_COLORS && marked.add(Triple(it.hash, it.start, it.end))
+                    }
+                    .map {
+                        HighlightEntity(
+                            contentHash = it.hash, start = it.start, end = it.end, color = it.color,
+                            text = it.text.take(HIGHLIGHT_TEXT_MAX), total = it.total, createdAt = it.createdAt,
+                        )
+                    },
             )
             val urls = dao.catalogs().mapTo(HashSet()) { it.url }
             for (catalog in backup.catalogs) {

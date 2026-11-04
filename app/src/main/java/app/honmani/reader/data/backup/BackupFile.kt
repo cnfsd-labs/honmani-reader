@@ -49,6 +49,8 @@ data class BackupFile(
     val finishedBooks: List<BackupFinishedBook> = emptyList(),
     /** Named places in books, by content hash. */
     val bookmarks: List<BackupBookmark> = emptyList(),
+    /** Highlighted passages in books, by content hash. */
+    val highlights: List<BackupHighlight> = emptyList(),
     val lookupEvents: List<BackupLookupEvent> = emptyList(),
     val words: List<BackupWord> = emptyList(),
     /** Book servers, without their passwords. */
@@ -112,6 +114,10 @@ data class BackupFinishedBook(val hash: String, val title: String, val finishedA
 /** A named place in a book, by content hash. */
 @Serializable
 data class BackupBookmark(val hash: String, val name: String, val characters: Long, val total: Long, val createdAt: Long = 0)
+
+/** A highlighted passage in a book, by content hash; the range is in ttu's character counting. */
+@Serializable
+data class BackupHighlight(val hash: String, val start: Long, val end: Long, val color: Int, val text: String, val total: Long, val createdAt: Long = 0)
 
 @Serializable
 data class BackupReadingDay(
