@@ -218,6 +218,9 @@ private fun ReaderSettingsContent(
         SwitchRow(R.string.reader_settings_volume_keys, R.string.reader_settings_volume_keys_details, settings.volumeKeys) {
             onChange(settings.copy(volumeKeys = it))
         }
+        SwitchRow(R.string.reader_settings_immersive, R.string.reader_settings_immersive_details, settings.immersive) {
+            onChange(settings.copy(immersive = it))
+        }
         SwitchRow(R.string.reader_settings_edge_taps, R.string.reader_settings_edge_taps_details, settings.edgeTaps) {
             onChange(settings.copy(edgeTaps = it))
         }

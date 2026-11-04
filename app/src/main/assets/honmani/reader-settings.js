@@ -51,6 +51,7 @@
     'honmaniHideKnownFurigana',
     'honmaniTintOneUnknown',
     'honmaniMarkDue',
+    'honmaniImmersive',
   ];
   const USER_FONTS = 'userfonts';
   const FONT_PATH = '/honmani-fonts/';

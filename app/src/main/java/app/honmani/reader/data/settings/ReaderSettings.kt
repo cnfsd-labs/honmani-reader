@@ -55,7 +55,12 @@ data class ReaderSettings(
     val tintOneUnknown: Boolean = false,
     /** Words whose review card is due today get their own tint (`word-marks.js`); on by default. */
     val markDue: Boolean = true,
+    /** The status and navigation bars are hidden while a book is open (a swipe from the edge shows them for a moment); off by default. */
+    val immersive: Boolean = false,
 ) {
+    /** Whether the system bars are hidden now: only with a book on screen, never over the library, other tabs or the reader settings. */
+    fun hidesBars(atLibrary: Boolean, settingsOpen: Boolean): Boolean = immersive && !atLibrary && !settingsOpen
+
     /** The values to store, as ttu writes them. */
     fun toStorage(): Map<String, String> = buildMap {
         theme?.let { put(THEME, it.storage) }
@@ -76,6 +81,7 @@ data class ReaderSettings(
         put(HIDE_KNOWN_FURIGANA, flag(hideKnownFurigana))
         put(TINT_ONE_UNKNOWN, flag(tintOneUnknown))
         put(MARK_DUE, flag(markDue))
+        put(IMMERSIVE, flag(immersive))
     }
 
     companion object {
@@ -103,6 +109,7 @@ data class ReaderSettings(
         private const val HIDE_KNOWN_FURIGANA = "honmaniHideKnownFurigana"
         private const val TINT_ONE_UNKNOWN = "honmaniTintOneUnknown"
         private const val MARK_DUE = "honmaniMarkDue"
+        private const val IMMERSIVE = "honmaniImmersive"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
         private const val PAGINATED = "paginated"
@@ -137,6 +144,7 @@ data class ReaderSettings(
                 hideKnownFurigana = flag(HIDE_KNOWN_FURIGANA, defaults.hideKnownFurigana),
                 tintOneUnknown = flag(TINT_ONE_UNKNOWN, defaults.tintOneUnknown),
                 markDue = flag(MARK_DUE, defaults.markDue),
+                immersive = flag(IMMERSIVE, defaults.immersive),
             )
         }
     }

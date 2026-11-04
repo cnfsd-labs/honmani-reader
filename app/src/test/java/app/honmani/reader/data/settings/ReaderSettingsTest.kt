@@ -35,11 +35,12 @@ class ReaderSettingsTest {
                 "honmaniSelectionLookup" to "0",
                 "honmaniHideKnownFurigana" to "1",
                 "honmaniTintOneUnknown" to "1",
+                "honmaniImmersive" to "1",
             ),
         )
 
         assertEquals(
-            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true),
+            ReaderSettings(ReaderTheme.SEPIA, ReaderFont.SANS.storage, 32, 1.8f, vertical = false, paginated = false, furigana = false, showProgress = false, progressBar = false, wordMarks = WordMarksMode.NEW, keepScreenOn = true, volumeKeys = false, edgeTaps = true, selectionLookup = false, hideKnownFurigana = true, tintOneUnknown = true, immersive = true),
             settings,
         )
     }
@@ -72,6 +73,14 @@ class ReaderSettingsTest {
         assertEquals("1", stored["honmaniSelectionLookup"])
         assertEquals("0", stored["honmaniHideKnownFurigana"])
         assertEquals("0", stored["honmaniTintOneUnknown"])
+        // Immersive mode is off unless the reader turned it on; it hides the bars over a book only.
+        assertEquals("0", stored["honmaniImmersive"])
+        assertFalse(ReaderSettings.fromStorage(emptyMap()).immersive)
+        val immersive = ReaderSettings(immersive = true)
+        assertTrue(immersive.hidesBars(atLibrary = false, settingsOpen = false))
+        assertFalse(immersive.hidesBars(atLibrary = true, settingsOpen = false))
+        assertFalse(immersive.hidesBars(atLibrary = false, settingsOpen = true))
+        assertFalse(ReaderSettings().hidesBars(atLibrary = false, settingsOpen = false))
         // The due mark is on unless the reader turned it off.
         assertEquals("1", stored["honmaniMarkDue"])
         assertTrue(ReaderSettings.fromStorage(emptyMap()).markDue)

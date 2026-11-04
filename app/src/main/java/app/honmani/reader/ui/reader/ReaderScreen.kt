@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -18,6 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.systemBarsIgnoringVisibility
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarHost
@@ -50,6 +55,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -263,6 +270,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var bookBackground by remember { mutableStateOf<Color?>(null) }
     val frame = bookBackground.takeIf { !atLibrary && !readerSettings }
     BarIcons(background = frame)
+    ImmersiveBars(hidden = appSettings.hidesBars(atLibrary, readerSettings))
 
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize().then(frame?.let { Modifier.background(it) } ?: Modifier)) {
@@ -306,7 +314,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 panelOpen = panel != null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
+                    // The bars' room stays reserved while immersive mode hides them: the book
+                    // keeps its size, so hiding or showing the bars never reflows the page.
+                    .windowInsetsPadding(readerInsets),
             )
             val state = panel
             val countedTap by viewModel.countedTap.collectAsStateWithLifecycle()
@@ -654,11 +664,42 @@ private fun BarIcons(background: Color?) {
     }
 }
 
+/**
+ * Hides the status and navigation bars while [hidden] (immersive mode, over a book); a swipe
+ * from the screen edge shows them for a moment without moving the page. They come back when
+ * [hidden] ends, and are hidden again after the app was in the background.
+ */
+@Composable
+private fun ImmersiveBars(hidden: Boolean) {
+    val view = LocalView.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(view, lifecycle, hidden) {
+        val window = view.context.findActivity()?.window
+        if (!hidden || window == null) return@DisposableEffect onDispose {}
+        val controller = WindowCompat.getInsetsController(window, view)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) controller.hide(WindowInsetsCompat.Type.systemBars())
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+}
+
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+/** The room the reader keeps clear: the system bars (shown or hidden), the display cutout and the keyboard. */
+private val readerInsets: WindowInsets
+    @OptIn(ExperimentalLayoutApi::class)
+    @Composable get() = WindowInsets.systemBarsIgnoringVisibility.union(WindowInsets.displayCutout).union(WindowInsets.ime)
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"

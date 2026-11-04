@@ -51,6 +51,13 @@ Long-press a word: the lookup panel opens, no blue selection handles or Copy too
 panel offers "Copy word" and "Copy sentence". With the panel open a volume press only closes it;
 the next one turns the page.
 
+Immersive mode (Reader settings, off by default): with the switch on, the status and navigation bars
+are hidden while a book is open (`dumpsys window | grep ITYPE_STATUS_BAR` shows `visible=false`) and
+back on the library, other tabs, Settings and the reader settings; a swipe from the top edge shows them
+for a moment. The page keeps its size and position (ttu's counter and the bookmark don't change when the
+switch or the bars change, also after rotating); the reader menu, the lookup panel, the volume buttons
+and Back work as before, and the bars are hidden again after leaving the app and coming back.
+
 Edge taps (Reader settings, off by default): with the switch on, a tap in the outer 15 % at the left or
 right of a paginated page turns it (vertical text: left = next, right = previous; horizontal: the
 reverse); with the panel open the first edge tap only closes it; a tap on a link, the footer or the top
