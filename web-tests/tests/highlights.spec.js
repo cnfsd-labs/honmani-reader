@@ -84,8 +84,15 @@ test('items are drawn in their colour, across paragraphs and across sections', a
   // Colour 1 crosses the paragraph end; the full stop lies inside the range but is not counted.
   expect(await drawn(page, 1)).toEqual(['ある。名前は']);
   // Colour 3 crosses from section a into b: drawn as two pieces, one per section.
-  expect(await drawn(page, 3)).toEqual(['無い', 'どこで']);
+  expect(await drawn(page, 3)).toEqual(['無い。', 'どこで']);
   expect(await drawn(page, 2)).toEqual([]);
+});
+
+test('a mark takes along the closing punctuation ttu does not count, but not a comma', async ({ page }) => {
+  await openBook(page, '<div id="ttu-a"><p>寒い冬が来た。」次に、雪だ。</p></div>');
+  await send(page, [['ttu-a', 0]], [{ id: 1, start: 0, end: 6, color: 0 }, { id: 2, start: 6, end: 8, color: 1 }]);
+  await expect.poll(() => drawn(page, 0)).toEqual(['寒い冬が来た。」']);
+  expect(await drawn(page, 1)).toEqual(['次に']);
 });
 
 test('an answer for another book is ignored', async ({ page }) => {
@@ -173,7 +180,7 @@ for (const mode of ['horizontal-tb', 'vertical-rl']) {
   test(`${mode}: the same text is drawn, has a box on the page and the same position is measured`, async ({ page }) => {
     await openBook(page, TWO_SECTIONS, { css: `writing-mode: ${mode};` });
     await send(page, A_B, [{ id: 1, start: 12, end: 17, color: 0 }]);
-    await expect.poll(() => drawn(page, 0)).toEqual(['無い', 'どこで']);
+    await expect.poll(() => drawn(page, 0)).toEqual(['無い。', 'どこで']);
     const boxes = await page.evaluate(() =>
       [...CSS.highlights.get('honmani-hl-0')].map((range) => {
         const rect = range.getBoundingClientRect();

@@ -176,8 +176,8 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
         beyond: Math.max(Math.max(...xs) - innerWidth, -Math.min(...xs), Math.max(...ys) - innerHeight, -Math.min(...ys)),
       };
     });
-    // The last full stop is not a counted character, so the range ends before it.
-    expect(spread.text).toBe(400 * LONG_SENTENCE.length - 1);
+    // The last full stop isn't a counted character, but the mark takes it along.
+    expect(spread.text).toBe(400 * LONG_SENTENCE.length);
     // The text runs on past the first page.
     expect(spread.beyond).toBeGreaterThan(0);
   });

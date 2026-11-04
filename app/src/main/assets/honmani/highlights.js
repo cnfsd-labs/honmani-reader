@@ -36,6 +36,8 @@
   const BOOK_ROOT_SELECTOR = '.book-content';
   const TEXT_MAX = 200;
   const REBUILD_DELAY_MS = 200;
+  /** The closing punctuation right after a highlight's last character, which its mark takes along. */
+  const CLOSING = /^[。．！？!?…‥」』）］】〕〉》”’]*/u;
   /** ttu's counted characters (get-character-count.ts), the same flags. */
   const COUNTED = /[0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]/iu;
   const { isGaiji } = window.honmaniText;
@@ -159,7 +161,9 @@
     else {
       const text = last.node.data;
       const at = offsetOfCounted(text, to - 1 - last.from);
-      range.setEnd(last.node, at + (text.codePointAt(at) > 0xffff ? 2 : 1));
+      const end = at + (text.codePointAt(at) > 0xffff ? 2 : 1);
+      // ttu doesn't count punctuation: a sentence's mark would stop short of its 。 or 」.
+      range.setEnd(last.node, end + text.slice(end).match(CLOSING)[0].length);
     }
     return range;
   }

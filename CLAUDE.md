@@ -147,6 +147,9 @@ repository is public: never copy those notes, personal details or discussions in
   `bmgr` and the local transport (`docs/device-testing.md`).
 - Android WebView paints no `text-decoration` (or `-webkit-text-stroke`) in CSS `::highlight()`;
   background, colour and `text-shadow` work. Desktop Chromium does draw it, so check marks on the phone.
+- A long press in the reader can't grow into a passage: the page clears the selection after 250 ms, and the
+  WebView sends `touchcancel` once it selects, so the page never sees the finger lift. Highlights take their extent
+  from the lookup panel. Test selection features with more than one character.
 - ttu reserves some font families (`reservedFontNames`) without their files: downloaded fonts use
   their own family ("Honmani Klee One"), or books wait for ttu's 30 s font timeout.
 
