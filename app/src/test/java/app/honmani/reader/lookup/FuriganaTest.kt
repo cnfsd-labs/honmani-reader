@@ -73,4 +73,49 @@ class FuriganaTest {
         // The kana of the expression is not in the reading (an irregular or wrong reading).
         assertEquals(listOf(RubySegment("明日る", "あした")), Furigana.segments("明日る", "あした"))
     }
+
+    @Test
+    fun anOverrideRoundTripsThroughItsStoredForm() {
+        val segments = listOf(RubySegment("飛", "と"), RubySegment("び"), RubySegment("散", "ち"), RubySegment("る"))
+        assertEquals("飛[と]び 散[ち]る", FuriganaOverride.format(segments))
+        assertEquals(segments, FuriganaOverride.parse("飛[と]び 散[ち]る", "飛び散る"))
+        // What the automatic split gives goes through unchanged, also with kana first or katakana ruby.
+        for ((expression, reading) in listOf("飛び散る" to "とびちる", "大人" to "おとな", "お茶" to "おちゃ", "漢字" to "カンジ")) {
+            val auto = Furigana.segments(expression, reading)
+            assertEquals(auto, FuriganaOverride.parse(FuriganaOverride.format(auto), expression))
+        }
+        assertEquals(listOf(RubySegment("大人", "おとな")), FuriganaOverride.parse("大人[おとな]", "大人"))
+        assertEquals(listOf(RubySegment("漢字", "カンジ")), FuriganaOverride.parse("漢字[カンジ]", "漢字"))
+    }
+
+    @Test
+    fun anOverrideThatNoLongerFitsTheWordOrIsBrokenFallsBack() {
+        val auto = Furigana.segments("飛び散る", "とびちる")
+        for (bad in listOf("", "飛[と]び 散[ち]ら", "飛[と]び 散[ち]", "飛[と", "飛と]び散る", "[と]飛び散る", "飛[]び散る", "飛[[と]]び散る", "x".repeat(300))) {
+            assertNull(bad, FuriganaOverride.parse(bad, "飛び散る"))
+            assertEquals(bad, auto, Furigana.shown("飛び散る", "とびちる", bad))
+        }
+        assertEquals(listOf(RubySegment("飛", "ひ"), RubySegment("び散る")), Furigana.shown("飛び散る", "とびちる", "飛[ひ]び散る"))
+    }
+
+    @Test
+    fun theEditorStartsFromTheShownRubyAndOnlyAcceptsKana() {
+        assertTrue(FuriganaOverride.canCorrect("飛び散る"))
+        assertFalse(FuriganaOverride.canCorrect("たべる"))
+        assertFalse(FuriganaOverride.canCorrect("コーヒー"))
+        assertEquals(listOf("と", "ち"), FuriganaOverride.prefill("飛び散る", Furigana.segments("飛び散る", "とびちる")))
+        assertEquals(listOf("おとな"), FuriganaOverride.prefill("大人", Furigana.segments("大人", "おとな")))
+        // A shown ruby that does not follow the runs (the kana was not found) gives empty fields.
+        assertEquals(listOf(""), FuriganaOverride.prefill("お茶", Furigana.segments("お茶", "ちゃ")))
+        assertEquals("飛[と]び 散[ち]る", FuriganaOverride.build("飛び散る", listOf("と", " ち ")))
+        assertEquals("お 茶[ちゃ]", FuriganaOverride.build("お茶", listOf("ちゃ")))
+        assertNull(FuriganaOverride.build("飛び散る", listOf("と", "")))
+        assertNull(FuriganaOverride.build("飛び散る", listOf("と", "chi")))
+        assertNull(FuriganaOverride.build("飛び散る", listOf("と", "ち散")))
+        assertNull(FuriganaOverride.build("飛び散る", listOf("と")))
+        assertTrue(FuriganaOverride.isReading("カンジー"))
+        assertFalse(FuriganaOverride.isReading("かん字"))
+        assertFalse(FuriganaOverride.isReading("[か]"))
+        assertEquals("とびちる", FuriganaOverride.reading(Furigana.segments("飛び散る", "とびちる")))
+    }
 }

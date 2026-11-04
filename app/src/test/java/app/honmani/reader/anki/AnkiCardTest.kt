@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.lookup.Furigana
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -134,5 +135,22 @@ class AnkiCardTest {
         assertEquals(2, CardStyle.entries.map { it.model.id }.distinct().size)
         assertEquals(true, "{{Sentence}}" in SentenceCard.FRONT)
         assertEquals(false, "{{Word}}" in SentenceCard.FRONT)
+    }
+
+    @Test
+    fun aFuriganaOverrideReachesTheFuriganaFieldsButNotTheReading() {
+        val corrected = content.copy(furigana = "取[と]り 扱[あつかい]う")
+        val fields = AnkiCard.fields(corrected)
+        assertEquals("とりあつかう", fields[1])
+        assertEquals("<ruby>取<rt>と</rt></ruby>り<ruby>扱<rt>あつかい</rt></ruby>う", fields[2])
+        assertEquals("取[と]り 扱[あつかい]う", fields.last())
+        val sentence = SentenceCard.fields(corrected)
+        assertEquals("とりあつかう", sentence[1])
+        assertEquals("取[と]り 扱[あつかい]う", sentence.last())
+        // An override for another spelling of the word is ignored.
+        val stale = AnkiCard.fields(content.copy(furigana = "取り扱い[とりあつかい]"))
+        assertEquals(AnkiCard.fields(content), stale)
+        assertEquals("飛[ひ]び 散[ち]る", AnkiCard.plainFurigana("飛び散る", "とびちる", "飛[ひ]び 散[ち]る"))
+        assertEquals("飛[と]び 散[ち]る", AnkiCard.plainFurigana("飛び散る", "とびちる"))
     }
 }

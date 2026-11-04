@@ -113,6 +113,7 @@ import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.DictionarySection
 import app.honmani.reader.lookup.Frequency
 import app.honmani.reader.lookup.Furigana
+import app.honmani.reader.lookup.FuriganaOverride
 import app.honmani.reader.lookup.GlossLine
 import app.honmani.reader.lookup.Inflection
 import app.honmani.reader.lookup.JapaneseText
@@ -121,6 +122,7 @@ import app.honmani.reader.lookup.LookupGroup
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.lookup.PitchAccent
 import app.honmani.reader.lookup.PitchMora
+import app.honmani.reader.lookup.RubySegment
 import app.honmani.reader.lookup.Sense
 import app.honmani.reader.ui.theme.HonmaniTheme
 
@@ -144,6 +146,8 @@ fun LookupPanel(
     onAddToAnki: (LookupGroup) -> Unit = {},
     /** The star of a word: star it (true) or remove the star. Words reached from a reference have no star. */
     onSetStarred: (LookupGroup, Boolean) -> Unit = { _, _ -> },
+    /** "Correct furigana" in a word's overflow menu: save the corrected furigana (blank removes it); null shows no such entry. */
+    onSetFurigana: ((LookupGroup, String) -> Unit)? = null,
     /** "Ignore word" in a word's overflow menu: ignore it (true) or stop ignoring it. */
     onSetIgnored: (LookupGroup, Boolean) -> Unit = { _, _ -> },
     /** Opens the search screen with a text filled in, when nothing was found; null shows no such button. */
@@ -200,6 +204,21 @@ fun LookupPanel(
     LaunchedEffect(groups) { if (groups != null) listState.scrollToItem(0) }
     // How much of each result is shown, by position; reset for every new word.
     val details = remember(groups) { mutableStateMapOf<Int, Detail>() }
+    // The word whose furigana is being corrected.
+    var correcting by remember { mutableStateOf<LookupGroup?>(null) }
+    val correct = correcting
+    if (correct != null && state is LookupPanelState.Results) {
+        FuriganaDialog(
+            expression = correct.expression,
+            reading = correct.reading,
+            furigana = state.furigana[WordRepository.key(correct.expression, correct.reading)].orEmpty(),
+            onSave = {
+                correcting = null
+                onSetFurigana?.invoke(correct, it)
+            },
+            onDismiss = { correcting = null },
+        )
+    }
 
     // Up grows the panel (after bringing it back to its place), down shrinks it, then pushes it away.
     fun dragBy(delta: Float) {
@@ -437,6 +456,12 @@ fun LookupPanel(
                             saved = WordRepository.key(group.expression, group.reading) in state.saved,
                             kanji = state.kanji,
                             onShowKanji = onShowKanji,
+                            furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
+                            onCorrectFurigana = if (onSetFurigana != null && state.previous == null && FuriganaOverride.canCorrect(group.expression)) {
+                                { correcting = group }
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -702,6 +727,10 @@ private fun LookupGroupItem(
     saved: Boolean = false,
     kanji: Map<String, KanjiInfo> = emptyMap(),
     onShowKanji: (String) -> Unit = {},
+    /** The reader's furigana correction of this word (see [FuriganaOverride]); empty if none. */
+    furigana: String = "",
+    /** Opens the furigana editor; null (a word reached from a reference, or kana only) shows no such entry. */
+    onCorrectFurigana: (() -> Unit)? = null,
 ) {
     val folded = detail == Detail.FOLDED
     Column(
@@ -715,7 +744,7 @@ private fun LookupGroupItem(
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 // Kanji open their entry once the result is open (a folded one opens first).
-                HeadwordWithPitch(group, if (folded) emptySet() else kanji.keys, onShowKanji)
+                HeadwordWithPitch(group, furigana, if (folded) emptySet() else kanji.keys, onShowKanji)
             }
             group.frequencies.firstOrNull()?.let { FrequencyBadge(it) }
             IconButton(onClick = onListen) {
@@ -754,8 +783,8 @@ private fun LookupGroupItem(
                     )
                 }
             }
-            if (onSetIgnored != null) {
-                // Unobtrusive: names and wrong splits only, in an overflow menu.
+            if (onSetIgnored != null || onCorrectFurigana != null) {
+                // Unobtrusive: names, wrong splits and wrong furigana only, in an overflow menu.
                 var menu by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { menu = true }) {
@@ -766,13 +795,24 @@ private fun LookupGroupItem(
                         )
                     }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(if (ignored) R.string.action_unignore_word else R.string.action_ignore_word)) },
-                            onClick = {
-                                menu = false
-                                onSetIgnored(!ignored)
-                            },
-                        )
+                        if (onCorrectFurigana != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.furigana_correct)) },
+                                onClick = {
+                                    menu = false
+                                    onCorrectFurigana()
+                                },
+                            )
+                        }
+                        if (onSetIgnored != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(if (ignored) R.string.action_unignore_word else R.string.action_ignore_word)) },
+                                onClick = {
+                                    menu = false
+                                    onSetIgnored(!ignored)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -840,13 +880,11 @@ private fun LearnButton(saved: Boolean, onLearn: () -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Headword(
-    expression: String,
-    reading: String,
+internal fun Headword(
+    segments: List<RubySegment>,
     tappable: Set<String> = emptySet(),
     onKanji: (String) -> Unit = {},
 ) {
-    val segments = remember(expression, reading) { Furigana.segments(expression, reading) }
     // Every segment reserves the ruby line, so kana and kanji share one baseline.
     val rubyStyle = MaterialTheme.typography.labelMedium.copy(lineHeight = 14.sp)
     // Wraps between segments, so a long expression stays readable at a large font size.
@@ -895,6 +933,7 @@ private fun Headword(
 @Composable
 private fun HeadwordWithPitch(
     group: LookupGroup,
+    furigana: String,
     tappableKanji: Set<String> = emptySet(),
     onKanji: (String) -> Unit = {},
 ) {
@@ -907,7 +946,10 @@ private fun HeadwordWithPitch(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         itemVerticalAlignment = Alignment.Bottom,
     ) {
-        Headword(group.expression, group.reading, tappableKanji, onKanji)
+        val segments = remember(group.expression, group.reading, furigana) {
+            Furigana.shown(group.expression, group.reading, furigana)
+        }
+        Headword(segments, tappableKanji, onKanji)
         patterns.forEach { PitchReading(it, Modifier.padding(bottom = 4.dp)) }
         // Readings merged into this entry (same meanings), after the main one.
         if (group.otherReadings.isNotEmpty()) {

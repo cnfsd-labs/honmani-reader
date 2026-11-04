@@ -851,4 +851,59 @@ class BackupTest {
         assertEquals("Novels", new.folderOf("hash-a"))
         assertEquals(1, new.database.folderDao().all().size)
     }
+
+    @Test
+    fun aFuriganaOverrideGoesThroughABackup_andAnOldBackupWithoutOneLoads() = runTest {
+        val old = oldPhone()
+        old.words.setFurigana("猫", "よみ", "猫[ねこ]")
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        assertEquals("猫[ねこ]", backup.words.single { it.expression == "猫" }.furigana)
+        assertEquals("", backup.words.single { it.expression == "犬" }.furigana)
+
+        val new = Phone("new")
+        new.backup.restore(backup)
+        assertEquals("猫[ねこ]", new.words.find("猫", "よみ")!!.furigana)
+        assertEquals("よみ", new.words.find("猫", "よみ")!!.reading)
+        assertEquals("", new.words.find("犬", "よみ")!!.furigana)
+
+        // A value that does not fit its word is dropped instead of stored.
+        val broken = backup.copy(words = backup.words.map { it.copy(furigana = if (it.expression == "猫") "犬[いぬ" else "") })
+        Phone("broken").also {
+            it.backup.restore(broken)
+            assertEquals("", it.words.find("猫", "よみ")!!.furigana)
+        }
+
+        // A file made before the override existed has no "furigana" at all.
+        val json = """{"format":"honmani-backup","version":1,"exportedAt":1,"words":[{"expression":"鳥","reading":"とり","gloss":"bird",""" +
+            """"status":"LEARNING","lookupCount":1,"firstLookedUpAt":1,"lastLookedUpAt":1,"rankKey":1.0,"lastSentence":"",""" +
+            """"lastSurfaceStart":0,"lastSurfaceEnd":0}]}"""
+        val bytes = ByteArrayOutputStream().also { output ->
+            ZipOutputStream(output).use { zip ->
+                zip.putNextEntry(ZipEntry(BackupCodec.ENTRY))
+                zip.write(json.toByteArray())
+                zip.closeEntry()
+            }
+        }.toByteArray()
+        val loaded = BackupCodec.read(ByteArrayInputStream(bytes))
+        assertEquals("", loaded.words.single().furigana)
+    }
+
+    @Test
+    fun restoringABackupKeepsAFuriganaOverrideThePhoneHas_andFillsAnEmptyOne() = runTest {
+        val old = oldPhone()
+        old.words.setFurigana("猫", "よみ", "猫[ねこ]")
+        val withOverride = throughFile(old.backup.export(readerSettings = null))
+        val without = withOverride.copy(words = withOverride.words.map { it.copy(furigana = "") })
+
+        val phone = Phone("new")
+        phone.words.record(lookup("猫", null))
+        phone.backup.restore(withOverride)
+        assertEquals("猫[ねこ]", phone.words.find("猫", "よみ")!!.furigana)
+        // The phone's own correction stays against a different one and against a backup without any.
+        phone.words.setFurigana("猫", "よみ", "猫[びょう]")
+        phone.backup.restore(withOverride)
+        assertEquals("猫[びょう]", phone.words.find("猫", "よみ")!!.furigana)
+        phone.backup.restore(without)
+        assertEquals("猫[びょう]", phone.words.find("猫", "よみ")!!.furigana)
+    }
 }

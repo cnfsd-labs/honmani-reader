@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "7cfa90a3b562c2b235e70cbee676da50",
+    "identityHash": "7abce1804c228474bf71390d33034a2e",
     "entities": [
       {
         "tableName": "dictionary",
@@ -799,7 +799,7 @@
       },
       {
         "tableName": "word",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `ignored` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER, `scheduler` TEXT NOT NULL DEFAULT 'HONMANI', `note` TEXT NOT NULL DEFAULT '')",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `ignored` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER, `scheduler` TEXT NOT NULL DEFAULT 'HONMANI', `note` TEXT NOT NULL DEFAULT '', `furigana` TEXT NOT NULL DEFAULT '')",
         "fields": [
           {
             "fieldPath": "id",
@@ -905,6 +905,13 @@
           {
             "fieldPath": "note",
             "columnName": "note",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "furigana",
+            "columnName": "furigana",
             "affinity": "TEXT",
             "notNull": true,
             "defaultValue": "''"
@@ -1516,7 +1523,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7cfa90a3b562c2b235e70cbee676da50')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7abce1804c228474bf71390d33034a2e')"
     ]
   }
 }

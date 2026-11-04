@@ -155,6 +155,8 @@ data class BackupWord(
     val lastBookTitle: String? = null,
     /** The reader's note on the word; older backups have none. */
     val note: String = "",
+    /** The reader's correction of the furigana (`WordEntity.furigana`); older backups have none. */
+    val furigana: String = "",
     /**
      * Older backups carry the AnkiDroid note id; it is neither written nor restored now: it is
      * only valid in the AnkiDroid it was made in, and on another phone it would show "in Anki"

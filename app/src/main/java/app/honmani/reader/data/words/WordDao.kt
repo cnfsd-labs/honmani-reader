@@ -104,6 +104,9 @@ interface WordDao {
     @Query("UPDATE word SET note = :note WHERE id = :id")
     suspend fun setNote(id: Long, note: String)
 
+    @Query("UPDATE word SET furigana = :furigana WHERE id = :id")
+    suspend fun setFurigana(id: Long, furigana: String)
+
     @Query("UPDATE word SET starred = :starred WHERE id = :id")
     suspend fun setStarred(id: Long, starred: Boolean)
 

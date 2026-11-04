@@ -83,8 +83,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewSentence
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.lookup.FuriganaOverride
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.reader.FuriganaDialog
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
 import kotlin.math.abs
@@ -221,6 +223,7 @@ private fun ReviewTopBar(
     var menuOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf(false) }
+    var editingFurigana by remember { mutableStateOf(false) }
     val card = state.card
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
@@ -256,6 +259,9 @@ private fun ReviewTopBar(
                         MenuItem(if (card.note.isEmpty()) R.string.review_add_note else R.string.review_edit_note, close) {
                             editingNote = true
                         }
+                        if (FuriganaOverride.canCorrect(card.expression)) {
+                            MenuItem(R.string.furigana_correct, close) { editingFurigana = true }
+                        }
                         MenuItem(R.string.action_lookup_word, close) { onLookUp(card) }
                         val bookId = card.sentence?.bookId
                         if (bookId != null) MenuItem(R.string.review_open_in_book, close) { onOpenBook(bookId) }
@@ -286,6 +292,18 @@ private fun ReviewTopBar(
                 }) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = { TextButton(onClick = { editing = false }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+    if (editingFurigana && card != null) {
+        FuriganaDialog(
+            expression = card.expression,
+            reading = card.reading,
+            furigana = card.furigana,
+            onSave = {
+                editingFurigana = false
+                viewModel.editFurigana(it)
+            },
+            onDismiss = { editingFurigana = false },
         )
     }
     if (editingNote && card != null) {
@@ -347,9 +365,9 @@ private fun CardFace(
     val description = if (revealed) {
         val meaning = card.gloss.ifBlank { stringResource(R.string.review_no_meaning) }
         if (card.note.isEmpty()) {
-            stringResource(R.string.review_card_back, frontText, card.reading, meaning)
+            stringResource(R.string.review_card_back, frontText, card.shownReading, meaning)
         } else {
-            stringResource(R.string.review_card_back_note, frontText, card.reading, meaning, card.note)
+            stringResource(R.string.review_card_back_note, frontText, card.shownReading, meaning, card.note)
         }
     } else {
         stringResource(R.string.review_card_front, frontText)
@@ -437,7 +455,7 @@ private fun CardFace(
                     HorizontalDivider()
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        if (sentence != null) "${card.expression} · ${card.reading}" else card.reading,
+                        if (sentence != null) "${card.expression} · ${card.shownReading}" else card.shownReading,
                         style = MaterialTheme.typography.titleLarge,
                         textAlign = TextAlign.Center,
                     )

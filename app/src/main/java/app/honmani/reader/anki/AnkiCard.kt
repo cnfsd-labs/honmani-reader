@@ -19,6 +19,8 @@ data class CardContent(
     val pitches: List<Int> = emptyList(),
     /** How common the word is, as shown on the card ("Jiten #395"). */
     val frequency: String? = null,
+    /** The reader's correction of the furigana (`WordEntity.furigana`); empty if none. */
+    val furigana: String = "",
 )
 
 /** What the dictionaries say about a word, for a card made from a saved word. */
@@ -136,7 +138,7 @@ object AnkiCard {
         return listOf(
             escape(content.expression),
             escape(reading),
-            furigana(content.expression, reading),
+            furigana(content.expression, reading, content.furigana),
             meaning(content.senses),
             sentence(content.sentence, content.surfaceStart, content.surfaceEnd),
             escape(content.bookTitle.orEmpty()),
@@ -144,13 +146,13 @@ object AnkiCard {
             sentenceAudio,
             PitchAccent.html(reading, content.pitches),
             escape(content.frequency.orEmpty()),
-            plainFurigana(content.expression, reading),
+            plainFurigana(content.expression, reading, content.furigana),
         )
     }
 
     /** 取り扱う read とりあつかう as `<ruby>取<rt>と</rt></ruby>り<ruby>扱<rt>あつか</rt></ruby>う`. */
-    fun furigana(expression: String, reading: String): String =
-        Furigana.segments(expression, reading).joinToString("") { segment ->
+    fun furigana(expression: String, reading: String, override: String = ""): String =
+        Furigana.shown(expression, reading, override).joinToString("") { segment ->
             val ruby = segment.ruby
             if (ruby == null || ruby == segment.text) {
                 escape(segment.text)
@@ -164,8 +166,8 @@ object AnkiCard {
      * text back to the last space, so each one after the start needs a space before its kanji; the
      * `furigana:` filter drops those spaces.
      */
-    fun plainFurigana(expression: String, reading: String): String = buildString {
-        for (segment in Furigana.segments(expression, reading)) {
+    fun plainFurigana(expression: String, reading: String, override: String = ""): String = buildString {
+        for (segment in Furigana.shown(expression, reading, override)) {
             val ruby = segment.ruby
             if (ruby == null || ruby == segment.text) {
                 append(escape(segment.text))
@@ -304,7 +306,7 @@ object SentenceCard {
             sentence(content),
             wordAudio,
             sentenceAudio,
-            AnkiCard.plainFurigana(content.expression, reading),
+            AnkiCard.plainFurigana(content.expression, reading, content.furigana),
         )
     }
 

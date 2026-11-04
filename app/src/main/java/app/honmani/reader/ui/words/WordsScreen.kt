@@ -388,6 +388,7 @@ fun WordsScreen(
                 onAddToAnki = { group -> anki.whenReady { searchPanel.addToAnki(group) } },
                 onSetStarred = searchPanel::setStarred,
                 onSetIgnored = searchPanel::setIgnored,
+                onSetFurigana = searchPanel::setFurigana,
                 onListen = searchPanel::listen,
                 onLookupWord = searchPanel::lookupWord,
                 onShowKanji = searchPanel::showKanji,

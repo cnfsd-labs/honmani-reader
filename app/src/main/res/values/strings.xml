@@ -683,6 +683,11 @@
     <string name="review_note_title">Note on %1$s</string>
     <string name="review_note_label">Note</string>
     <string name="word_note_line">Note: %1$s</string>
+    <string name="furigana_correct">Correct furigana</string>
+    <string name="furigana_title">Furigana of %1$s</string>
+    <string name="furigana_field">Reading of %1$s</string>
+    <string name="furigana_invalid">Enter a reading in hiragana or katakana for each part. Nothing else is accepted.</string>
+    <string name="furigana_reset">Reset to automatic furigana</string>
     <string name="review_open_in_book">Open in book</string>
     <string name="review_not_a_word">Not a word</string>
     <string name="review_remove">Remove</string>

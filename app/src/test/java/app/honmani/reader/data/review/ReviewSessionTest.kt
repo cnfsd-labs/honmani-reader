@@ -370,4 +370,22 @@ class ReviewSessionTest {
         assertEquals(0, session.remaining)
         assertFalse(session.answer(Grade.GOOD))
     }
+
+    @Test
+    fun aFuriganaOverrideShowsOnTheCardAtOnce_andComesBackWithTheWordWhenRemovingIsTakenBack() = runTest {
+        dueWord("飛び散る")
+        val session = session()
+        val id = session.current!!.word.id
+        session.editFurigana("飛[と]び 散[ち]る")
+        assertEquals("飛[と]び 散[ち]る", session.current!!.word.furigana)
+        assertEquals("飛[と]び 散[ち]る", words.find(id)!!.furigana)
+        assertTrue(session.removeWord())
+        assertNull(words.find(id))
+        session.undo()
+        assertEquals("飛[と]び 散[ち]る", words.find(id)!!.furigana)
+        assertEquals("飛[と]び 散[ち]る", session.current!!.word.furigana)
+        session.editFurigana("")
+        assertEquals("", session.current!!.word.furigana)
+        assertEquals("", words.find(id)!!.furigana)
+    }
 }

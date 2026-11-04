@@ -2,6 +2,7 @@ package app.honmani.reader.data.words
 
 import androidx.room.withTransaction
 import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.lookup.FuriganaOverride
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -265,6 +266,28 @@ class WordRepository(
 
     /** Sets the reader's note on the word; blank removes it. Lookups never touch it. */
     suspend fun setNote(id: Long, note: String) = dao.setNote(id, note.trim().take(MAX_NOTE_LENGTH))
+
+    /**
+     * Sets the reader's correction of the word's furigana (the stored form of
+     * [FuriganaOverride]); blank removes it. A value that does not fit the word is not saved.
+     * Lookups never touch it.
+     */
+    suspend fun setFurigana(id: Long, furigana: String) {
+        val word = dao.find(id) ?: return
+        val value = furigana.trim()
+        if (value.isEmpty() || FuriganaOverride.parse(value, word.expression) != null) dao.setFurigana(id, value)
+    }
+
+    /** [setFurigana] for a saved word by its written form and reading; nothing if it isn't saved. */
+    suspend fun setFurigana(expression: String, reading: String, furigana: String) {
+        dao.find(expression, reading)?.let { setFurigana(it.id, furigana) }
+    }
+
+    /** The corrections of these words (expression, reading) that have one, by [key]. */
+    suspend fun furiganaAmong(words: Collection<Pair<String, String>>): Map<String, String> =
+        words.mapNotNull { (expression, reading) ->
+            dao.find(expression, reading)?.furigana?.takeIf { it.isNotEmpty() }?.let { key(expression, reading) to it }
+        }.toMap()
 
     suspend fun setStarred(id: Long, starred: Boolean) = dao.setStarred(id, starred)
 

@@ -333,4 +333,47 @@ class WordRepositoryTest {
         repository.setIgnored("猫", "よみ", false)
         assertEquals(2, learning().size)
     }
+
+    @Test
+    fun aFuriganaOverrideSurvivesLookingUpAgainAndDeletingAndRestoring_andKeepsTheReading() = runTest {
+        repository.record(lookup("飛び散る", sentence = "飛び散る。"))
+        val id = learning().single().id
+        repository.setFurigana(id, " 飛[と]び 散[ち]る ")
+        assertEquals("飛[と]び 散[ち]る", repository.find(id)!!.furigana)
+        assertEquals("よみ", repository.find(id)!!.reading)
+
+        now += 60_000
+        val undo = repository.record(lookup("飛び散る", sentence = "また飛び散る。", bookTitle = "本"))!!
+        assertEquals(1, learning().size)
+        assertEquals("飛[と]び 散[ち]る", repository.find(id)!!.furigana)
+        repository.undo(undo)
+        assertEquals("飛[と]び 散[ち]る", repository.find(id)!!.furigana)
+
+        repository.markLearned(id)
+        repository.setStarred(id, true)
+        repository.setGloss(id, "scatter")
+        repository.setNote(id, "n")
+        assertEquals("飛[と]び 散[ち]る", repository.find(id)!!.furigana)
+
+        val deleted = repository.delete(id)!!
+        repository.restore(deleted)
+        assertEquals("飛[と]び 散[ち]る", repository.find("飛び散る", "よみ")!!.furigana)
+
+        // The by-word form works too and a reset clears it.
+        repository.setFurigana("飛び散る", "よみ", "")
+        assertEquals("", repository.find("飛び散る", "よみ")!!.furigana)
+    }
+
+    @Test
+    fun aFuriganaThatDoesNotFitTheWordIsNotStored() = runTest {
+        repository.record(lookup("猫"))
+        val id = learning().single().id
+        repository.setFurigana(id, "犬[いぬ]")
+        assertEquals("", repository.find(id)!!.furigana)
+        repository.setFurigana(id, "猫[")
+        assertEquals("", repository.find(id)!!.furigana)
+        repository.setFurigana(id, "猫[ねこ]")
+        assertEquals("猫[ねこ]", repository.find(id)!!.furigana)
+        assertEquals(mapOf(WordRepository.key("猫", "よみ") to "猫[ねこ]"), repository.furiganaAmong(listOf("猫" to "よみ", "犬" to "よみ")))
+    }
 }

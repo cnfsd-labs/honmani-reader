@@ -46,6 +46,12 @@ data class WordEntity(
     @ColumnInfo(defaultValue = "'HONMANI'") val scheduler: WordScheduler = WordScheduler.HONMANI,
     /** The reader's own hint or mnemonic, shown on the back of the review card; empty if none. */
     @ColumnInfo(defaultValue = "''") val note: String = "",
+    /**
+     * The reader's correction of the furigana Honmani builds for this word, in the bracket form of
+     * [app.honmani.reader.lookup.FuriganaOverride] (`飛[と]び 散[ち]る`); empty if none. [reading]
+     * stays as it is, because (expression, reading) identifies the word.
+     */
+    @ColumnInfo(defaultValue = "''") val furigana: String = "",
 )
 
 enum class WordScheduler {

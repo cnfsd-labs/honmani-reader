@@ -37,6 +37,7 @@ import app.honmani.reader.data.words.WordProgressStore
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.data.words.WordStep
+import app.honmani.reader.lookup.FuriganaOverride
 import java.time.LocalDate
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -145,6 +146,7 @@ class Backup(
                 lastSurfaceEnd = word.lastSurfaceEnd,
                 lastBookTitle = word.lastBookTitle,
                 note = word.note,
+                furigana = word.furigana,
                 progress = progress[word.id]?.let { BackupWordStep(it.steps, it.reads, it.lookups, it.learned, it.kana) },
                 lookups = lookups[word.id].orEmpty().map { lookup ->
                     BackupWordLookup(
@@ -565,7 +567,12 @@ class Backup(
             lastSurfaceEnd = word.lastSurfaceEnd,
             lastBookTitle = word.lastBookTitle,
             note = word.note.take(WordRepository.MAX_NOTE_LENGTH),
+            furigana = validFurigana(word),
         )
+
+        /** The backup's correction of the furigana, empty unless it still fits the word. */
+        private fun validFurigana(word: BackupWord): String =
+            word.furigana.takeIf { FuriganaOverride.parse(it, word.expression) != null }.orEmpty()
 
         /**
          * A word saved on both sides: the latest lookup's sentence and status (a lookup takes back
@@ -582,6 +589,7 @@ class Backup(
             return word.copy(
                 gloss = word.gloss.ifEmpty { backup.gloss },
                 note = word.note.ifEmpty { backup.note.take(WordRepository.MAX_NOTE_LENGTH) },
+                furigana = word.furigana.ifEmpty { validFurigana(backup) },
                 status = status,
                 starred = word.starred || backup.starred,
                 ignored = word.ignored || backup.ignored,

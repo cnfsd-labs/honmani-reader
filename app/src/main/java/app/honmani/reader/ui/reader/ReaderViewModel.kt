@@ -57,6 +57,8 @@ sealed interface LookupPanelState {
         val starred: Set<String> = emptySet(),
         /** Words ignored ("Ignore word"), as [WordRepository.key]s. */
         val ignored: Set<String> = emptySet(),
+        /** The furigana corrections of saved words ([app.honmani.reader.lookup.FuriganaOverride]), by [WordRepository.key]. */
+        val furigana: Map<String, String> = emptyMap(),
         /** Words in the word list, as [WordRepository.key]s; only a search ([LookupOrigin.SEARCH]) asks. */
         val saved: Set<String> = emptySet(),
         /** Words whose card is being made right now, as [WordRepository.key]s. */
@@ -121,6 +123,10 @@ class ReaderViewModel(
     private val ignoredAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
     /** Ignores or un-ignores the saved word (expression, reading). */
     private val saveIgnored: suspend (expression: String, reading: String, ignored: Boolean) -> Unit = { _, _, _ -> },
+    /** The furigana corrections of these words (expression, reading) that have one, by [WordRepository.key]. */
+    private val furiganaAmong: suspend (Collection<Pair<String, String>>) -> Map<String, String> = { emptyMap() },
+    /** Saves the furigana correction of the saved word (expression, reading); blank removes it. */
+    private val saveFurigana: suspend (expression: String, reading: String, furigana: String) -> Unit = { _, _, _ -> },
     /** The kanji dictionaries' entries for the kanji in a text; see [app.honmani.reader.lookup.DictionaryLookup.kanji]. */
     private val lookupKanji: suspend (String) -> Map<String, KanjiInfo> = { emptyMap() },
     /** Says a word (its reading); returns why it couldn't. See [app.honmani.reader.anki.WordAudio]. */
@@ -304,8 +310,9 @@ class ReaderViewModel(
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
             val ignored = ignoredWords(groups)
+            val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, furigana = furigana, kanji = kanji) }
         }
     }
 
@@ -350,13 +357,14 @@ class ReaderViewModel(
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
-            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), kanji = emptyMap()) }
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), furigana = emptyMap(), kanji = emptyMap()) }
             _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
             val ignored = ignoredWords(groups)
+            val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, furigana = furigana, kanji = kanji) }
         }
     }
 
@@ -413,8 +421,9 @@ class ReaderViewModel(
         val starred = starredWords(groups)
         val ignored = ignoredWords(groups)
         val saved = savedWords(groups)
+        val furigana = furiganaOf(groups)
         val kanji = kanjiOf(groups)
-        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, saved = saved, kanji = kanji) }
+        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, saved = saved, furigana = furigana, kanji = kanji) }
     }
 
     /** "+ Learn" in a search: saves [group] to the word list (origin [LookupOrigin.SEARCH]). */
@@ -541,6 +550,45 @@ class ReaderViewModel(
         }
     }
 
+    private suspend fun furiganaOf(groups: List<LookupGroup>): Map<String, String> = try {
+        furiganaAmong(groups.map { it.expression to it.reading })
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log("Checking furigana corrections failed: $e")
+        emptyMap()
+    }
+
+    /**
+     * Saves the furigana correction [furigana] (blank removes it) of [group]. The word is saved
+     * first if this lookup hasn't (only the best match of a tap is), like starring it; the panel
+     * shows the new furigana at once.
+     */
+    fun setFurigana(group: LookupGroup, furigana: String) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        if (state.previous != null) return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        val before = state.furigana[key]
+        fun change(value: String?) = { it: LookupPanelState.Results ->
+            it.copy(furigana = if (value.isNullOrEmpty()) it.furigana - key else it.furigana + (key to value))
+        }
+        updateResults(tap, change(furigana))
+        keep(key)
+        viewModelScope.launch {
+            try {
+                record(tap, group).join()
+                saveFurigana(group.expression, group.reading, furigana)
+                if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Saving furigana failed: $e")
+                updateResults(tap, change(before))
+            }
+        }
+    }
+
     private suspend fun ignoredWords(groups: List<LookupGroup>): Set<String> = try {
         ignoredAmong(groups.map { it.expression to it.reading })
     } catch (e: CancellationException) {
@@ -598,6 +646,7 @@ class ReaderViewModel(
                 bookTitle = awaitBook(book)?.title,
                 pitches = group.pitches,
                 frequency = group.frequencies.firstOrNull()?.label,
+                furigana = state.furigana[key].orEmpty(),
             )
             val result = try {
                 addCard(content)
@@ -767,6 +816,10 @@ class ReaderViewModel(
                     ignoredAmong = { container.wordRepository.ignoredAmong(it) },
                     saveIgnored = { expression, reading, ignored ->
                         container.wordRepository.setIgnored(expression, reading, ignored)
+                    },
+                    furiganaAmong = { container.wordRepository.furiganaAmong(it) },
+                    saveFurigana = { expression, reading, furigana ->
+                        container.wordRepository.setFurigana(expression, reading, furigana)
                     },
                     lookupKanji = { lookup.kanji(it) },
                     say = { container.wordAudio.play(it) },

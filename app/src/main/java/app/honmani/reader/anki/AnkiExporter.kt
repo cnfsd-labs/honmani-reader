@@ -139,6 +139,7 @@ class AnkiExporter(
             bookTitle = book,
             pitches = found.pitches,
             frequency = found.frequency,
+            furigana = word.furigana,
         )
     }
 

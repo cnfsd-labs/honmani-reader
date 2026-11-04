@@ -240,7 +240,9 @@ strokes" and as checkboxes). Handwriting is the keyboard's job (Gboard's Japanes
 Add a few words to Learning (look them up in a book). The next day Words shows "Review · n due" and
 the Words icon a badge. Start: the front shows the sentence with the word marked, a tap shows the
 answer, Forgot / Got it (or swipe left/right) moves on, Undo takes the last answer back. ⋮ offers
-Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Add note / Edit note (up to 500
+Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (a field per
+kanji part, kana only, Reset; the same entry is in the lookup panel's ⋮; it changes only the furigana
+Honmani builds: the panel headword, the card's reading and new Anki cards, never the book), Add note / Edit note (up to 500
 characters, several lines; on the back of the card only, under the meaning; saving it empty removes it; it stays
 when the word is looked up again, removed and taken back, or restored from a backup; Words shows it when a word is
 opened), Look up, Open in book (the

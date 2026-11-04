@@ -17,6 +17,7 @@ import app.honmani.reader.data.review.ReviewSession
 import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.lookup.FuriganaOverride
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,9 +37,15 @@ data class ReviewCardUi(
     val gloss: String,
     /** The reader's note, shown on the back only; empty if none. */
     val note: String = "",
+    /** The furigana correction (`WordEntity.furigana`); empty if none. */
+    val furigana: String = "",
     val sentence: ReviewSentence?,
     val isNew: Boolean,
-)
+) {
+    /** The reading to show: the one the furigana correction spells, else the word's own. */
+    val shownReading: String
+        get() = FuriganaOverride.parse(furigana, expression)?.let(FuriganaOverride::reading) ?: reading
+}
 
 data class ReviewUiState(
     val loading: Boolean = true,
@@ -110,6 +117,8 @@ class ReviewViewModel(
 
     fun editNote(note: String) = act(keepRevealed = true) { it.editNote(note) }
 
+    fun editFurigana(furigana: String) = act(keepRevealed = true) { it.editFurigana(furigana) }
+
     fun undo() = act { it.undo() }
 
     /** The book of the current card's sentence, if it has one. */
@@ -137,6 +146,7 @@ class ReviewViewModel(
                 reading = it.word.reading,
                 gloss = it.word.gloss,
                 note = it.word.note,
+                furigana = it.word.furigana,
                 sentence = ReviewSentences.pick(it.word, lookups, it.card.reps),
                 isNew = it.card.state == ReviewState.NEW,
             )

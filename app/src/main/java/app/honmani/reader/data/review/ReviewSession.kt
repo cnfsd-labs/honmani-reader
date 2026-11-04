@@ -137,6 +137,14 @@ class ReviewSession(
         queue[0] = item.copy(word = word)
     }
 
+    /** Sets or (blank) removes the furigana correction of the current word. Not undoable, like [editMeaning]. */
+    suspend fun editFurigana(furigana: String) {
+        val item = current ?: return
+        words.setFurigana(item.word.id, furigana)
+        val word: WordEntity = words.find(item.word.id) ?: return
+        queue[0] = item.copy(word = word)
+    }
+
     /** Takes back the last action; false if there is none. */
     suspend fun undo(): Boolean {
         val action = actions.removeLastOrNull() ?: return false
