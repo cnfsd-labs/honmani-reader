@@ -90,6 +90,152 @@ class AnkiExporterTest {
         assertEquals("名前[なまえ]", note.fields.last())
     }
 
+    private val lapisLike = listOf(
+        "Expression", "ExpressionFurigana", "ExpressionReading", "ExpressionAudio", "MainDefinition", "Sentence",
+        "SentenceFurigana", "SentenceAudio", "Picture", "Glossary", "PitchPosition", "Frequency", "MiscInfo", "Hint",
+    )
+
+    /** The reader's own note type in the fake AnkiDroid, chosen in the settings with the guessed mapping. */
+    private fun ownType(fields: List<String> = lapisLike, mapping: FieldMapping = MappingPresets.guess(fields)): Long {
+        val id = anki.oldNoteType("Lapis", fields)
+        settings.setCustomNoteType("Lapis", id, mapping)
+        return id
+    }
+
+    @Test
+    fun ownNoteType_getsTheMappedFields_andNeverANewFieldOrCard() = runBlocking {
+        assertEquals(14, lapisLike.size)
+        val type = ownType()
+
+        val result = exporter.add(savedWord())
+
+        assertTrue(result is AnkiResult.Added)
+        val note = anki.notes.single()
+        assertEquals(type, note.noteType)
+        assertEquals(setOf(AnkiCard.TAG), note.tags)
+        assertEquals(14, note.fields.size)
+        val byName = lapisLike.zip(note.fields).toMap()
+        assertEquals("名前", byName["Expression"])
+        assertEquals("名前[なまえ]", byName["ExpressionFurigana"])
+        assertEquals("なまえ", byName["ExpressionReading"])
+        assertTrue(byName.getValue("ExpressionAudio").startsWith("[sound:honmani_"))
+        assertEquals("<ol><li>name; full name</li><li>reputation</li></ol>", byName["MainDefinition"])
+        assertEquals("<b>名前</b>はまだ無い。", byName["Sentence"])
+        assertEquals("名前はまだ無い。", byName["SentenceFurigana"])
+        assertTrue(byName.getValue("SentenceAudio").startsWith("[sound:honmani_"))
+        assertEquals("Jiten #600", byName["Frequency"])
+        assertEquals("吾輩は猫である", byName["MiscInfo"])
+        // Not mapped: empty.
+        for (empty in listOf("Picture", "Glossary", "PitchPosition", "Hint")) assertEquals(empty, "", byName[empty])
+        // The reader's note type is only read: no field, no card template, no second note type.
+        assertEquals(0, anki.addFieldCalls)
+        assertEquals(0, anki.setCardCalls)
+        assertEquals(0, anki.noteTypesAdded)
+        assertEquals(lapisLike, anki.fieldsOf[type])
+        assertEquals((result as AnkiResult.Added).noteId, words.find(savedWord().id)?.ankiNoteId)
+    }
+
+    @Test
+    fun ownNoteType_findsTheWordAlreadyThere_byTheWordAndReadingFields() = runBlocking {
+        val type = ownType()
+        val word = savedWord()
+        assertTrue(exporter.add(word) is AnkiResult.Added)
+
+        assertEquals(AnkiResult.AlreadyInAnki, exporter.add(word))
+        assertEquals(1, anki.notes.size)
+
+        // The same word with another reading is another card.
+        val other = CardContent("名前", "めいぜん", listOf(listOf("x")), sentence = "", surfaceStart = 0, surfaceEnd = 0)
+        assertTrue(exporter.add(other) is AnkiResult.Added)
+        assertEquals(2, anki.notes.size)
+        assertEquals(type, anki.notes.last().noteType)
+    }
+
+    @Test
+    fun ownNoteType_withTheWordNotInTheFirstField_isSearchedByThatField() = runBlocking {
+        ownType(listOf("Hint", "Vocab", "Kana", "Meaning"))
+        val word = savedWord()
+
+        assertTrue(exporter.add(word) is AnkiResult.Added)
+        assertEquals(AnkiResult.AlreadyInAnki, exporter.add(word))
+
+        assertEquals(listOf("", "名前", "なまえ", "<ol><li>name; full name</li><li>reputation</li></ol>"), anki.notes.single().fields)
+        assertEquals(listOf(1, 1), anki.findNotesIndexes)
+    }
+
+    @Test
+    fun ownNoteType_withoutAReadingField_countsTheWordAlone() = runBlocking {
+        ownType(listOf("Front", "Back"))
+        val first = CardContent("名前", "なまえ", listOf(listOf("name")), sentence = "", surfaceStart = 0, surfaceEnd = 0)
+
+        assertTrue(exporter.add(first) is AnkiResult.Added)
+        assertEquals(AnkiResult.AlreadyInAnki, exporter.add(first.copy(reading = "めいぜん")))
+        assertEquals(listOf("名前", "name"), anki.notes.single().fields)
+    }
+
+    @Test
+    fun ownNoteType_speaksOnlyWhatAFieldTakes() = runBlocking {
+        ownType(listOf("Expression", "ExpressionReading", "SentenceAudio"))
+
+        exporter.add(savedWord())
+
+        assertEquals(listOf("名前はまだ無い。"), voice.spoken)
+        ownType(listOf("Expression", "MainDefinition"))
+        exporter.add(CardContent("見当", "けんとう", listOf(listOf("x")), sentence = "見当がつく。", surfaceStart = 0, surfaceEnd = 2))
+        assertEquals(listOf("名前はまだ無い。"), voice.spoken)
+    }
+
+    @Test
+    fun ownNoteType_goneFromAnkiDroid_isRefusedWithItsName() = runBlocking {
+        val type = ownType()
+        settings.setNoteTypeId(CardStyle.CUSTOM, 777)
+
+        // The id is stale but the name is still there: found by name, and the id is remembered.
+        assertTrue(exporter.add(savedWord()) is AnkiResult.Added)
+        assertEquals(type, settings.noteTypeId(CardStyle.CUSTOM))
+
+        val missing = AnkiExporter(FakeAnki(), settings, words, { voice }, folder.root) { _, _ -> WordDetails() }
+        assertEquals(
+            AnkiResult.CustomUnusable("Lapis", CustomProblem.MISSING),
+            missing.add(CardContent("猫", "ねこ", listOf(listOf("cat")), sentence = "", surfaceStart = 0, surfaceEnd = 0)),
+        )
+    }
+
+    @Test
+    fun ownNoteType_withoutAWordField_isRefused_andNothingIsAdded() = runBlocking {
+        ownType(mapping = FieldMapping(mapOf("MainDefinition" to CardSource.MEANING, "Gone" to CardSource.WORD)))
+
+        val result = exporter.add(savedWord())
+
+        assertEquals(AnkiResult.CustomUnusable("Lapis", CustomProblem.NO_WORD_FIELD), result)
+        assertTrue(anki.notes.isEmpty())
+        assertEquals(0, anki.noteTypesAdded)
+    }
+
+    @Test
+    fun ownNoteType_withoutAChoice_isRefused() = runBlocking {
+        settings.setCardStyle(CardStyle.CUSTOM)
+
+        val result = exporter.add(savedWord())
+
+        assertEquals(AnkiResult.CustomUnusable("", CustomProblem.NOT_CHOSEN), result)
+        assertEquals(0, anki.noteTypesAdded)
+    }
+
+    @Test
+    fun ownNoteType_packageAndTextFileFallBackToHonmanisNoteType() = runBlocking {
+        ownType()
+        val word = savedWord()
+
+        val out = java.io.ByteArrayOutputStream()
+        exporter.ankiPackage(listOf(word), out)
+
+        assertTrue(out.size() > 0)
+        assertEquals(AnkiCard.MODEL, settings.cardStyle.value.model)
+        assertTrue(exporter.textFile(listOf(word)).contains("名前"))
+        assertTrue(anki.notes.isEmpty())
+    }
+
     @Test
     fun aRememberedNoteTypeFromBefore_gainsTheFieldToo() = runBlocking {
         val old = anki.oldNoteType(AnkiCard.NOTE_TYPE, AnkiCard.FIELDS - AnkiCard.PLAIN_FURIGANA)
@@ -466,6 +612,18 @@ class AnkiExporterTest {
 
         override fun noteTypeExists(id: Long) = id in noteTypes
 
+        override fun noteTypes() = noteTypes.map { (id, name) -> AnkiNoteTypeInfo(id, name, fieldsOf[id].orEmpty()) }
+
+        var addFieldCalls = 0
+        var setCardCalls = 0
+        var findNotesIndexes = mutableListOf<Int>()
+
+        override fun findNotes(noteType: Long, index: Int, value: String): List<AnkiNote> {
+            findNotesIndexes += index
+            return notes.mapIndexed { i, note -> AnkiNote(i + 1L, note.noteType, note.fields) }
+                .filter { it.noteType == noteType && it.fields.getOrNull(index) == value }
+        }
+
         /** Field names of the note types made with some; the others answer for any fields. */
         val fieldsOf = mutableMapOf<Long, List<String>>()
         var refuseFields = false
@@ -481,6 +639,7 @@ class AnkiExporterTest {
             noteTypes.entries.firstOrNull { it.value == name && fieldsOf[it.key].let { have -> have == null || have == fields } }?.key
 
         override fun addField(noteType: Long, name: String): Boolean {
+            addFieldCalls++
             if (refuseFields) return false
             fieldsOf[noteType] = fieldsOf.getValue(noteType) + name
             return true
@@ -505,6 +664,7 @@ class AnkiExporterTest {
         override fun cardFront(noteType: Long) = fronts[noteType]
 
         override fun setCard(noteType: Long, cardName: String, front: String, back: String): Boolean {
+            setCardCalls++
             fronts[noteType] = front
             return true
         }

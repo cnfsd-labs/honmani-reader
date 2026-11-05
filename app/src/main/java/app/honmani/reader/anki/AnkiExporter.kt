@@ -27,6 +27,12 @@ sealed interface AnkiResult {
     /** AnkiDroid didn't take it, for example because it was never opened (no collection yet). */
     data object Refused : AnkiResult
 
+    /**
+     * The reader's own note type can't take the card ([problem]); nothing was added. [name] is
+     * the note type's name, empty if none was ever chosen.
+     */
+    data class CustomUnusable(val name: String, val problem: CustomProblem) : AnkiResult
+
     /** Something unexpected went wrong; [reason] is for the message (and a bug report). */
     data class Failed(val reason: String) : AnkiResult
 }
@@ -162,11 +168,26 @@ class AnkiExporter(
         if (!anki.hasPermission()) return AnkiResult.NoPermission
         val style = settings.cardStyle.value
         val model = style.model
-        val noteType = noteType(style) ?: return AnkiResult.Refused
-        val fieldCount = fieldCount(noteType, model)
+        // The reader's own note type is only ever read: no setup, no new fields, no new card template.
+        val custom = if (style == CardStyle.CUSTOM) {
+            when (val found = resolveCustomNoteType(anki, settings)) {
+                is CustomResolution.Ready -> found.type
+                is CustomResolution.Unusable -> return AnkiResult.CustomUnusable(found.name, found.problem)
+            }
+        } else {
+            null
+        }
+        val noteType = custom?.id ?: noteType(style) ?: return AnkiResult.Refused
+        val fieldCount = if (custom == null) fieldCount(noteType, model) else custom.fieldNames.size
         val deck = anki.deck(settings.deck.value) ?: return AnkiResult.Refused
-        val plain = model.build(content, "", "")
-        anki.findNote(noteType, plain[0], plain[1])?.let { existing ->
+        val existing = if (custom != null) {
+            val key = custom.key(content)
+            anki.findNotes(noteType, custom.wordIndex, key.first).firstOrNull { custom.key(it.fields) == key }?.id
+        } else {
+            val plain = model.build(content, "", "")
+            anki.findNote(noteType, plain[0], plain[1])
+        }
+        if (existing != null) {
             markInAnki(content, existing, deferred)
             return AnkiResult.AlreadyInAnki
         }
@@ -174,22 +195,28 @@ class AnkiExporter(
         var audioProblem: VoiceProblem? = null
         val made = mutableListOf<File>()
         try {
-            val voice = settings.voice(phoneVoice)
+            // A note type of the reader's own may have no audio field: then nothing is spoken.
+            val voice = settings.voice(phoneVoice)?.takeIf { custom == null || custom.usesWordAudio || custom.usesSentenceAudio }
             var wordAudio = ""
             var sentenceAudio = ""
             if (voice != null) {
                 try {
                     // The reading, not the written form: a voice can misread kanji, never kana.
-                    wordAudio = sound(voice, content.reading.ifEmpty { content.expression }, made)
+                    if (custom == null || custom.usesWordAudio) {
+                        wordAudio = sound(voice, content.reading.ifEmpty { content.expression }, made)
+                    }
                     // A sentence too long for the voice goes without audio; the card still gets its word.
-                    if (content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength) {
+                    if ((custom == null || custom.usesSentenceAudio) &&
+                        content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength
+                    ) {
                         sentenceAudio = sound(voice, content.sentence, made, settings.sentenceSpeed.value.rate)
                     }
                 } catch (e: VoiceException) {
                     audioProblem = e.problem
                 }
             }
-            val fields = model.build(content, wordAudio, sentenceAudio).take(fieldCount)
+            val fields = custom?.fields(content, wordAudio, sentenceAudio)
+                ?: model.build(content, wordAudio, sentenceAudio).take(fieldCount)
             val noteId = anki.addNote(noteType, deck, fields, setOf(AnkiCard.TAG)) ?: return AnkiResult.Refused
             markInAnki(content, noteId, deferred)
             return AnkiResult.Added(noteId, audioProblem)

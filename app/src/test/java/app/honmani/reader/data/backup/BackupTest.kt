@@ -543,6 +543,36 @@ class BackupTest {
     }
 
     @Test
+    fun theOwnNoteTypeAndItsMappingsComeBackWithTheSettings_butNotItsId() = runTest {
+        val mappings = app.honmani.reader.anki.FieldMapping.toJson(
+            mapOf(
+                "Lapis \"日本語\"" to app.honmani.reader.anki.FieldMapping(
+                    mapOf("Expression" to app.honmani.reader.anki.CardSource.WORD),
+                ),
+            ),
+        )
+        val backup = throughFile(
+            BackupFile(
+                exportedAt = 1,
+                settings = mapOf(
+                    "anki_card_style" to BackupValue(BackupValue.STRING, JsonPrimitive("CUSTOM")),
+                    "anki_custom_note_type_name" to BackupValue(BackupValue.STRING, JsonPrimitive("Lapis \"日本語\"")),
+                    "anki_field_mappings" to BackupValue(BackupValue.STRING, JsonPrimitive(mappings)),
+                    "anki_custom_note_type" to BackupValue(BackupValue.LONG, JsonPrimitive(5)),
+                ),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        assertEquals(
+            mapOf("anki_card_style" to "CUSTOM", "anki_custom_note_type_name" to "Lapis \"日本語\"", "anki_field_mappings" to mappings),
+            new.settings.all,
+        )
+    }
+
+    @Test
     fun anEditedBackupWithABadDayOrTheSameWordTwiceStillRestores() = runTest {
         val good = throughFile(oldPhone().backup.export(readerSettings = null))
         val edited = good.copy(

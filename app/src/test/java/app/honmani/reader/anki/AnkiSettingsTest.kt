@@ -39,6 +39,29 @@ class AnkiSettingsTest {
     }
 
     @Test
+    fun theOwnNoteType_isKeptByName_withItsMappings_andItsIdStaysOnThisPhone() {
+        val settings = AnkiSettings(choices, plainCipher, device)
+        val lapis = FieldMapping(mapOf("Expression" to CardSource.WORD))
+        val other = FieldMapping(mapOf("Front" to CardSource.WORD, "Back" to CardSource.MEANING))
+
+        settings.setCustomNoteType("Other", 3, other)
+        settings.setCustomNoteType("Lapis \"日本語\"", 9, lapis)
+
+        assertEquals(CardStyle.CUSTOM, settings.cardStyle.value)
+        assertEquals(9L, settings.noteTypeId(CardStyle.CUSTOM))
+        assertEquals(setOf("anki_card_style", "anki_custom_note_type_name", "anki_field_mappings"), choices.all.keys)
+        assertEquals(setOf("anki_custom_note_type"), device.all.keys)
+
+        val reopened = AnkiSettings(choices, plainCipher, device)
+        assertEquals(CardStyle.CUSTOM, reopened.cardStyle.value)
+        assertEquals("Lapis \"日本語\"", reopened.customNoteTypeName.value)
+        assertEquals(lapis, reopened.fieldMapping("Lapis \"日本語\""))
+        // The mapping made for the other note type is still there.
+        assertEquals(other, reopened.fieldMapping("Other"))
+        assertEquals(FieldMapping.EMPTY, reopened.fieldMapping("Unknown"))
+    }
+
+    @Test
     fun sentenceEnds_keepTheDefaultUntilChanged_andGoBackToItWhenBlank() {
         val settings = AnkiSettings(choices, plainCipher, device)
         assertEquals("。！？!?…", settings.sentenceEnds.value)

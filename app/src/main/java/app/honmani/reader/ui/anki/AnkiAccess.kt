@@ -16,6 +16,7 @@ import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCheck
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiResult
+import app.honmani.reader.anki.CustomProblem
 import app.honmani.reader.anki.VoiceProblem
 
 /** Runs an action that needs AnkiDroid once it is installed and Honmani may add cards. */
@@ -69,6 +70,7 @@ fun showAnkiResult(context: Context, expression: String, result: AnkiResult) {
         AnkiResult.NotInstalled -> context.getString(R.string.anki_not_installed)
         AnkiResult.NoPermission -> context.getString(R.string.anki_no_permission)
         AnkiResult.Refused -> context.getString(R.string.anki_refused)
+        is AnkiResult.CustomUnusable -> context.getString(customProblemMessage(result.problem), result.name)
         is AnkiResult.Failed -> context.getString(R.string.anki_failed, result.reason)
     }
     toast(context, message)
@@ -87,9 +89,16 @@ fun showAnkiCheck(context: Context, result: AnkiCheck) {
         }
         AnkiCheck.NotInstalled -> context.getString(R.string.anki_not_installed)
         AnkiCheck.NoPermission -> context.getString(R.string.anki_no_permission)
+        is AnkiCheck.CustomUnusable -> context.getString(customProblemMessage(result.problem), result.name)
         is AnkiCheck.Failed -> context.getString(R.string.anki_check_failed, result.reason)
     }
     toast(context, message)
+}
+
+private fun customProblemMessage(problem: CustomProblem): Int = when (problem) {
+    CustomProblem.NOT_CHOSEN -> R.string.anki_custom_not_chosen
+    CustomProblem.MISSING -> R.string.anki_custom_missing
+    CustomProblem.NO_WORD_FIELD -> R.string.anki_custom_no_word
 }
 
 /** Tells why the lookup panel's speaker couldn't say a word. */

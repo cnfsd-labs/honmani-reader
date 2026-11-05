@@ -499,6 +499,8 @@ class Backup(
             AnkiSettings.KEY_GOOGLE_VOICE to BackupValue.STRING,
             AnkiSettings.KEY_DECK to BackupValue.STRING,
             AnkiSettings.KEY_CARD_STYLE to BackupValue.STRING,
+            AnkiSettings.KEY_CUSTOM_NOTE_TYPE_NAME to BackupValue.STRING,
+            AnkiSettings.KEY_FIELD_MAPPINGS to BackupValue.STRING,
             AnkiSettings.KEY_SENTENCE_ENDS to BackupValue.STRING,
         )
 

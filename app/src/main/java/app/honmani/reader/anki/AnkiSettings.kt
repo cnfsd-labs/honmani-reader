@@ -77,6 +77,11 @@ class AnkiSettings(
     /** Which note type new cards and the package use ([CardStyle.HONMANI] unless changed). */
     val cardStyle: StateFlow<CardStyle> = _cardStyle.asStateFlow()
 
+    private val _customNoteTypeName = MutableStateFlow(preferences.getString(KEY_CUSTOM_NOTE_TYPE_NAME, null))
+
+    /** The name of the reader's own note type for [CardStyle.CUSTOM]; null if none was chosen. */
+    val customNoteTypeName: StateFlow<String?> = _customNoteTypeName.asStateFlow()
+
     private val _sentenceEnds = MutableStateFlow(Sentences.cleanEnds(preferences.getString(KEY_SENTENCE_ENDS, null)))
 
     /** The characters that end a sentence on cards, in highlights and in the sentence tint ([Sentences]). */
@@ -111,6 +116,27 @@ class AnkiSettings(
     fun setCardStyle(style: CardStyle) {
         _cardStyle.value = style
         preferences.edit().putString(KEY_CARD_STYLE, style.name).apply()
+    }
+
+    /** The saved [FieldMapping] of the note type called [noteType]; empty if there is none. */
+    fun fieldMapping(noteType: String): FieldMapping =
+        FieldMapping.fromJson(preferences.getString(KEY_FIELD_MAPPINGS, null))[noteType] ?: FieldMapping.EMPTY
+
+    /**
+     * Chooses the reader's own note type [name] (its AnkiDroid id is [id]) with [mapping], and
+     * switches new cards to it. The mapping is kept per note type name, so a choice made earlier
+     * for another note type is still there.
+     */
+    fun setCustomNoteType(name: String, id: Long, mapping: FieldMapping) {
+        val all = FieldMapping.fromJson(preferences.getString(KEY_FIELD_MAPPINGS, null)) + (name to mapping)
+        preferences.edit()
+            .putString(KEY_FIELD_MAPPINGS, FieldMapping.toJson(all))
+            .putString(KEY_CUSTOM_NOTE_TYPE_NAME, name)
+            .putString(KEY_CARD_STYLE, CardStyle.CUSTOM.name)
+            .apply()
+        setNoteTypeId(CardStyle.CUSTOM, id)
+        _customNoteTypeName.value = name
+        _cardStyle.value = CardStyle.CUSTOM
     }
 
     /** Nothing usable in [ends] goes back to [Sentences.DEFAULT_ENDS]. */
@@ -162,6 +188,7 @@ class AnkiSettings(
         _googleVoice.value = preferences.getString(KEY_GOOGLE_VOICE, null)
         _deck.value = preferences.getString(KEY_DECK, null) ?: AnkiCard.DECK
         _cardStyle.value = CardStyle.fromName(preferences.getString(KEY_CARD_STYLE, null))
+        _customNoteTypeName.value = preferences.getString(KEY_CUSTOM_NOTE_TYPE_NAME, null)
         _sentenceEnds.value = Sentences.cleanEnds(preferences.getString(KEY_SENTENCE_ENDS, null))
     }
 
@@ -185,6 +212,7 @@ class AnkiSettings(
     private fun noteTypeKey(style: CardStyle) = when (style) {
         CardStyle.HONMANI -> KEY_NOTE_TYPE
         CardStyle.SENTENCE -> KEY_SENTENCE_NOTE_TYPE
+        CardStyle.CUSTOM -> KEY_CUSTOM_NOTE_TYPE
     }
 
     companion object {
@@ -197,6 +225,10 @@ class AnkiSettings(
         const val KEY_DECK = "anki_deck"
         const val KEY_CARD_STYLE = "anki_card_style"
         const val KEY_SENTENCE_ENDS = "anki_sentence_ends"
+        // The reader's own note type is kept by name (and the mappings by name): backed up. Its id is not.
+        const val KEY_CUSTOM_NOTE_TYPE_NAME = "anki_custom_note_type_name"
+        const val KEY_FIELD_MAPPINGS = "anki_field_mappings"
+        const val KEY_CUSTOM_NOTE_TYPE = "anki_custom_note_type"
         // "v2": the note type got Pitch and Frequency fields; an id kept from before is not it.
         const val KEY_NOTE_TYPE = "anki_note_type_v2"
         const val KEY_SENTENCE_NOTE_TYPE = "anki_sentence_note_type"

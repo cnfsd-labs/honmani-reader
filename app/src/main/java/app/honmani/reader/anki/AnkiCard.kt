@@ -51,13 +51,19 @@ class NoteModel(
     val build: (content: CardContent, wordAudio: String, sentenceAudio: String) -> List<String>,
 )
 
-/** Which of Honmani's note types new cards use; the reader's choice in the Anki settings. */
+/** Which note type new cards use; the reader's choice in the Anki settings. */
 enum class CardStyle(val model: NoteModel) {
     /** Word and marked sentence on the front, furigana, pitch and meanings on the back. */
     HONMANI(AnkiCard.MODEL),
 
     /** The whole sentence, unmarked, on the front; word, reading and meaning on the back. */
     SENTENCE(SentenceCard.MODEL),
+
+    /**
+     * The reader's own note type in AnkiDroid ([FieldMapping]); Honmani never changes it. Its
+     * [model] is only what the `.apkg` and the text file use, as they can't write into it.
+     */
+    CUSTOM(AnkiCard.MODEL),
     ;
 
     companion object {

@@ -22,6 +22,9 @@ interface AnkiApi {
 
     fun noteTypeExists(id: Long): Boolean
 
+    /** Every note type of AnkiDroid, to choose one for the cards. */
+    fun noteTypes(): List<AnkiNoteTypeInfo>
+
     fun findNoteType(name: String, fields: List<String>): Long?
 
     fun addNoteType(
@@ -51,6 +54,9 @@ interface AnkiApi {
     fun deckNames(): List<String>
 
     fun findNote(noteType: Long, first: String, second: String): Long?
+
+    /** The notes of [noteType] whose field number [index] is exactly [value] (raw HTML). */
+    fun findNotes(noteType: Long, index: Int, value: String): List<AnkiNote>
 
     fun addNote(noteType: Long, deck: Long, fields: List<String>, tags: Set<String>): Long?
 
@@ -94,6 +100,17 @@ class AnkiDroid(context: Context) : AnkiApi {
     override fun noteTypeExists(id: Long): Boolean =
         resolver.query(Uri.withAppendedPath(MODELS, id.toString()), arrayOf(ID), null, null, null)
             ?.use { it.moveToFirst() } == true
+
+    override fun noteTypes(): List<AnkiNoteTypeInfo> =
+        resolver.query(MODELS, null, null, null, null)?.use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    val id = cursor.long(ID) ?: continue
+                    val name = cursor.string(MODEL_NAME) ?: continue
+                    add(AnkiNoteTypeInfo(id, name, cursor.string(MODEL_FIELD_NAMES)?.split(SEPARATOR).orEmpty()))
+                }
+            }
+        }.orEmpty()
 
     /** The id of the note type called [name] with exactly [fields], if there is one. */
     override fun findNoteType(name: String, fields: List<String>): Long? =
@@ -183,6 +200,30 @@ class AnkiDroid(context: Context) : AnkiApi {
             null
         }
     }
+
+    /**
+     * Anki keeps a checksum of the first field only, so a word in the first field is found by it;
+     * any other field by Anki's own search (`mid:… "Field:text"`), or, if AnkiDroid doesn't take
+     * that, by reading the notes of the type.
+     */
+    override fun findNotes(noteType: Long, index: Int, value: String): List<AnkiNote> {
+        if (index == 0) {
+            val selection = "$NOTE_TYPE=$noteType and $CHECKSUM=${AnkiCard.checksum(value)}"
+            return readNotes(NOTES_V2, selection).orEmpty().filter { it.fields.getOrNull(0) == value }
+        }
+        val name = fieldNames(noteType).getOrNull(index) ?: return emptyList()
+        val found = try {
+            readNotes(NOTES, "mid:$noteType \"${searchText(name).replace(":", "\\:")}:${searchText(value)}\"")
+        } catch (e: RuntimeException) {
+            // Another app's provider; reading the notes below still gives the right answer.
+            null
+        }
+        return (found ?: notes(noteType).orEmpty()).filter { it.fields.getOrNull(index) == value }
+    }
+
+    /** [text] inside quotes in Anki's search syntax. */
+    private fun searchText(text: String) =
+        text.replace("\\", "\\\\").replace("\"", "\\\"").replace("*", "\\*").replace("_", "\\_")
 
     /** Adds a note and moves its cards to [deck]; returns the note id, or null if refused. */
     override fun addNote(noteType: Long, deck: Long, fields: List<String>, tags: Set<String>): Long? {

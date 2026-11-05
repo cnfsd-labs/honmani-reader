@@ -72,6 +72,9 @@ repository is public: never copy those notes, personal details or discussions in
 - **Anki:** own client for AnkiDroid's content provider (not the LGPL library); note type and
   deck "Honmani"; a second note type "Honmani Sentence" (`SentenceCard`: unmarked sentence on the
   front; Settings → Anki → Card type, `anki_card_style`, backed up) for AnkiDroid and `.apkg`;
+  a third type "My own" (`CardMapping.kt`: per-field `CardSource` mapping stored as JSON by note
+  type name, presets Lapis/JPMN/generic) fills a note type the user already has in AnkiDroid and
+  never adds a field or changes its template (that would force a one-way AnkiWeb sync);
   `.apkg` (schema 11, fixed note type ids, guid from the word) or a text file (Honmani type only)
   for Anki on a computer. The Google Cloud key is Keystore-encrypted and only sent in
   `X-Goog-Api-Key`.

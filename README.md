@@ -33,7 +33,9 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   a book holds that you do not know; "Ignore word" sets aside names and wrongly split words (no mark,
   no card, not counted), with a list to undo it in Words
 - Every word you look up is saved with its sentence ("Don't count" in the panel takes a lookup back); send words to Anki (AnkiDroid or an
-  `.apkg` for Anki on a computer)
+  `.apkg` for Anki on a computer). Cards use Honmani's own note type, a sentence-first variant, or your own
+  note type (Lapis, Marvin's Mining Note or any other): you choose which field gets what, and Honmani never
+  adds fields to it or changes its template
 - Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search"); the
   button 部 in the field finds a kanji by its parts (radical search). Handwriting input is left to
   the keyboard: Gboard's Japanese handwriting layout works in the field

@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCard
+import app.honmani.reader.anki.AnkiNoteTypeInfo
 import app.honmani.reader.anki.CardAudio
 import app.honmani.reader.anki.CardStyle
 import app.honmani.reader.data.words.Sentences
@@ -127,6 +128,8 @@ private fun AnkiSettingsContent() {
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
     val cardStyle by settings.cardStyle.collectAsStateWithLifecycle()
     val sentenceEnds by settings.sentenceEnds.collectAsStateWithLifecycle()
+    val customName by settings.customNoteTypeName.collectAsStateWithLifecycle()
+    var customTypes by remember { mutableStateOf<List<AnkiNoteTypeInfo>?>(null) }
     val anki = rememberAnkiAccess()
     val knownFromAnki = rememberKnownFromAnki()
     val scope = rememberCoroutineScope()
@@ -145,6 +148,24 @@ private fun AnkiSettingsContent() {
                 KeyCheck.Works(GoogleCloudVoice.voices(key))
             } catch (e: VoiceException) {
                 KeyCheck.Failed(e.problem.label())
+            }
+        }
+    }
+
+    fun openCustomNoteType() {
+        anki.whenReady {
+            scope.launch {
+                customTypes = withContext(Dispatchers.IO) {
+                    try {
+                        container.ankiDroid.noteTypes()
+                    } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        logWarning("Honmani.anki", "Could not list the AnkiDroid note types", e)
+                        // Another app's provider: its problems must not close Honmani.
+                        emptyList()
+                    }
+                }
             }
         }
     }
@@ -213,7 +234,25 @@ private fun AnkiSettingsContent() {
             },
             onSelect = settings::setDeck,
         )
-        CardStylePicker(cardStyle, onSelect = settings::setCardStyle)
+        CardStylePicker(
+            cardStyle,
+            onSelect = { if (it == CardStyle.CUSTOM) openCustomNoteType() else settings.setCardStyle(it) },
+        )
+        if (cardStyle == CardStyle.CUSTOM) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.custom_note_type)) },
+                supportingContent = {
+                    Text(
+                        customName?.let { stringResource(R.string.custom_note_type_current, it) }
+                            ?: stringResource(R.string.custom_note_type_none_chosen),
+                    )
+                },
+                modifier = Modifier.clickable(onClick = ::openCustomNoteType),
+            )
+        }
+        customTypes?.let { types ->
+            CustomNoteTypeDialog(types, settings, onDismiss = { customTypes = null })
+        }
         SentenceEndsRow(sentenceEnds, onChange = settings::setSentenceEnds)
         ListItem(
             headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
@@ -375,6 +414,7 @@ private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) 
                         val label = when (style) {
                             CardStyle.HONMANI -> R.string.card_style_honmani
                             CardStyle.SENTENCE -> R.string.card_style_sentence
+                            CardStyle.CUSTOM -> R.string.card_style_custom
                         }
                         Text(stringResource(label), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },

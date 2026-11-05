@@ -61,6 +61,40 @@ class AnkiSyncTest {
     }
 
     @Test
+    fun ownNoteType_marksWordsByTheirWordAndReadingFields_andClearsDeletedCards() = runBlocking {
+        save("名前", "なまえ")
+        save("見当", "けんとう")
+        save("猫", "ねこ")
+        val fields = listOf("Hint", "Expression", "ExpressionReading", "MainDefinition")
+        val type = anki.noteType("Lapis")
+        anki.customFields[type] = fields
+        settings.setCustomNoteType("Lapis", type, MappingPresets.guess(fields))
+        anki.addNote(type, listOf("", "名前", "なまえ", "name"))
+        // Same word, another reading: not this word's card.
+        anki.addNote(type, listOf("", "猫", "びょう", "x"))
+        val gone = anki.addNote(type, listOf("", "見当", "けんとう", "x"))
+        words.setAnkiNote(word("見当").id, gone)
+        anki.notes.remove(gone)
+
+        val result = sync.check()
+
+        assertEquals(AnkiCheck.Done(cleared = 1, marked = 1), result)
+        assertEquals(1L, word("名前").ankiNoteId)
+        assertNull(word("見当").ankiNoteId)
+        assertNull(word("猫").ankiNoteId)
+    }
+
+    @Test
+    fun ownNoteType_thatIsGone_isReportedNotCheckedAgainstHonmanisOwn() = runBlocking {
+        save("名前", "なまえ")
+        card("名前", "なまえ")
+        settings.setCustomNoteType("Lapis", 5, FieldMapping(mapOf("Expression" to CardSource.WORD)))
+
+        assertEquals(AnkiCheck.CustomUnusable("Lapis", CustomProblem.MISSING), sync.check())
+        assertNull(word("名前").ankiNoteId)
+    }
+
+    @Test
     fun clearsTheMarkOfACardDeletedInAnki_andKeepsOthers() = runBlocking {
         save("名前", "なまえ")
         save("見当", "けんとう")
@@ -234,6 +268,13 @@ class AnkiSyncTest {
         override fun hasPermission() = permission
 
         override fun noteTypeExists(id: Long) = id in types
+
+        val customFields = mutableMapOf<Long, List<String>>()
+
+        override fun noteTypes() = types.map { (id, name) -> AnkiNoteTypeInfo(id, name, customFields[id].orEmpty()) }
+
+        override fun findNotes(noteType: Long, index: Int, value: String) =
+            notes.values.filter { it.noteType == noteType && it.fields.getOrNull(index) == value }
 
         override fun findNoteType(name: String, fields: List<String>) = types.entries.firstOrNull { it.value == name }?.key
 

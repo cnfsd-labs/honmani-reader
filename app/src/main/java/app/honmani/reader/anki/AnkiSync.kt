@@ -16,6 +16,9 @@ sealed interface AnkiCheck {
 
     data object NoPermission : AnkiCheck
 
+    /** The reader's own note type can't be read ([problem]); see [AnkiResult.CustomUnusable]. */
+    data class CustomUnusable(val name: String, val problem: CustomProblem) : AnkiCheck
+
     data class Failed(val reason: String) : AnkiCheck
 }
 
@@ -56,18 +59,29 @@ class AnkiSync(
         val markedIds = all.mapNotNull { it.ankiNoteId }
         val existing = anki.existingNotes(markedIds) ?: return@guarded AnkiCheck.Failed("AnkiDroid gave no answer")
         val style = settings.cardStyle.value
-        val noteType = settings.noteTypeId(style)?.takeIf { anki.noteTypeExists(it) }
+        val custom = if (style == CardStyle.CUSTOM) {
+            when (val found = resolveCustomNoteType(anki, settings)) {
+                is CustomResolution.Ready -> found.type
+                is CustomResolution.Unusable -> return@guarded AnkiCheck.CustomUnusable(found.name, found.problem)
+            }
+        } else {
+            null
+        }
+        val noteType = custom?.id ?: settings.noteTypeId(style)?.takeIf { anki.noteTypeExists(it) }
             ?: anki.findNoteType(style.model)
         val byWord = noteType?.let { type ->
             (anki.notes(type) ?: return@guarded AnkiCheck.Failed("AnkiDroid gave no answer"))
-                .associate { (it.fields.getOrNull(0).orEmpty() to it.fields.getOrNull(1).orEmpty()) to it.id }
+                .associate { (custom?.key(it.fields) ?: (it.fields.getOrNull(0).orEmpty() to it.fields.getOrNull(1).orEmpty())) to it.id }
         }.orEmpty()
         var cleared = 0
         var marked = 0
         for (word in all) {
             val current = word.ankiNoteId
             if (current != null && current in existing) continue
-            val found = byWord[AnkiCard.escape(word.expression) to AnkiCard.escape(word.reading.ifEmpty { word.expression })]
+            val found = byWord[
+                custom?.key(word.expression, word.reading)
+                    ?: (AnkiCard.escape(word.expression) to AnkiCard.escape(word.reading.ifEmpty { word.expression })),
+            ]
             when {
                 found != null -> {
                     words.setAnkiNote(word.id, found)
