@@ -56,6 +56,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        // Whatever screen was open, the sync file (if the reader turned it on) is brought up to date.
+        (application as HonmaniApplication).container.saveSyncFile()
+    }
+
     /**
      * Dark mode, font size and language switch (by hand or at sunset) without recreating the
      * activity: that would drop the open book and its lookup panel. Compose follows the system theme by itself; the system

@@ -38,6 +38,7 @@ import app.honmani.reader.R
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.FolderBackupState
 import app.honmani.reader.data.backup.RestoreSummary
+import app.honmani.reader.data.backup.SyncFolderState
 import java.text.DateFormat
 import java.util.Date
 
@@ -83,6 +84,7 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
     }
     BackupStateDialog(state, onDismiss = viewModel::dismiss, onConfirm = { confirm, withCatalogs -> viewModel.confirmRestore(confirm.backup, withCatalogs) })
     FolderBackupRow()
+    SyncFolderRow()
 }
 
 /** Settings → Back up and restore → Back up to a folder: a copy of the automatic backup in a folder the reader picks. */
@@ -122,6 +124,57 @@ private fun FolderBackupRow() {
         modifier = Modifier.toggleable(value = on, role = Role.Switch) { _ ->
             // Off, or no longer reachable: pick the folder (again); otherwise switch off.
             if (state is FolderBackupState.On) folderBackup.disable() else pick.launch(null)
+        },
+    )
+}
+
+/**
+ * Settings → Back up and restore → Sync folder: this phone's sync file in a folder the reader picks
+ * (off by default), for their other phones; see `SyncFolder`.
+ */
+@Composable
+private fun SyncFolderRow() {
+    val context = LocalContext.current
+    val container = remember { (context.applicationContext as HonmaniApplication).container }
+    val syncFolder = container.syncFolder
+    val state by syncFolder.state.collectAsStateWithLifecycle()
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        // Right away, so the folder has the file before the app next goes to the background.
+        if (uri != null && syncFolder.choose(uri.toString())) container.saveSyncFile()
+    }
+    val on = state != SyncFolderState.Off
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.sync_folder_title)) },
+        supportingContent = {
+            Column {
+                when (val current = state) {
+                    SyncFolderState.Off -> Unit
+                    is SyncFolderState.On -> {
+                        current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }
+                        Text(
+                            current.lastAt?.let {
+                                stringResource(
+                                    R.string.sync_folder_last,
+                                    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)),
+                                )
+                            } ?: stringResource(R.string.sync_folder_waiting),
+                        )
+                    }
+                    is SyncFolderState.Unavailable -> {
+                        current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }
+                        Text(stringResource(R.string.sync_folder_unavailable))
+                    }
+                }
+                Text(stringResource(R.string.sync_folder_details))
+                if (state is SyncFolderState.Unavailable) {
+                    TextButton(onClick = syncFolder::disable) { Text(stringResource(R.string.backup_folder_switch_off)) }
+                }
+            }
+        },
+        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        modifier = Modifier.toggleable(value = on, role = Role.Switch) { _ ->
+            // Off, or no longer reachable: pick the folder (again); otherwise switch off.
+            if (state is SyncFolderState.On) syncFolder.disable() else pick.launch(null)
         },
     )
 }

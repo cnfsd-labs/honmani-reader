@@ -39,6 +39,40 @@ interface FolderTarget {
 
     /** Renames [file] to [name] (which must be free) and returns its new address; throws if it can't. */
     fun rename(file: String, name: String): String
+
+    /** The folder's name as the reader knows it, or null if the provider doesn't say. */
+    fun displayName(folder: String): String? = null
+}
+
+/**
+ * Writes [name] into [folder] so that an interruption (storage full, the card pulled, the process
+ * killed) leaves the earlier file untouched: [write] fills a finished temporary file called
+ * [tempName] first (its name must end the way the provider expects for a zip), and only then is the
+ * old file deleted and the new one renamed. A provider that can't rename gets the old file
+ * overwritten in place instead, while the finished temporary file still exists.
+ */
+internal fun FolderTarget.replaceFile(folder: String, name: String, tempName: String, write: (OutputStream) -> Unit) {
+    find(folder, tempName)?.let { delete(it) }
+    val temp = create(folder, tempName)
+    var complete = false
+    try {
+        open(temp).use(write)
+        complete = true
+        val old = find(folder, name)
+        if (canRename(temp)) {
+            if (old != null && !delete(old)) throw IOException("Cannot replace $old")
+            rename(temp, name)
+        } else {
+            open(old ?: create(folder, name)).use(write)
+            delete(temp)
+        }
+    } catch (e: Exception) {
+        // A finished temporary file may be all that is left if the swap failed: keep it then.
+        runCatching {
+            if (!complete || find(folder, name) != null) delete(temp)
+        }
+        throw e
+    }
 }
 
 /** How the copy of the backup in the chosen folder stands. */
@@ -63,9 +97,9 @@ class FolderBackup(
     private val device: SharedPreferences,
     private val target: FolderTarget,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Shared with the other writers of backup files, so they never run at once. */
+    private val mutex: Mutex = Mutex(),
 ) {
-    private val mutex = Mutex()
-
     private val _state = MutableStateFlow(read())
     val state: StateFlow<FolderBackupState> = _state.asStateFlow()
 
@@ -74,6 +108,9 @@ class FolderBackup(
         device.getBoolean(KEY_FAILED, false) -> FolderBackupState.Unavailable
         else -> FolderBackupState.On(device.getLong(KEY_LAST, 0L).takeIf { it > 0 })
     }
+
+    /** The folder copied into (a tree address), or null when it is off. */
+    val folder: String? get() = device.getString(KEY_FOLDER, null)
 
     /** Starts copying into [folder] (a tree address the reader picked). Returns whether it was accepted. */
     fun choose(folder: String): Boolean {
@@ -126,38 +163,8 @@ class FolderBackup(
         }
     }
 
-    /**
-     * The copy is written whole into a temporary file first, so an interruption (storage full,
-     * the card pulled, the process killed) leaves the earlier backup untouched. Only then the
-     * old file is deleted and the new one renamed. A provider that can't rename gets the old
-     * file overwritten in place instead, while the finished temporary file still exists.
-     */
     private fun write(folder: String, source: File) {
-        target.find(folder, TEMP_NAME)?.let { target.delete(it) }
-        val temp = target.create(folder, TEMP_NAME)
-        var complete = false
-        try {
-            copyInto(temp, source)
-            complete = true
-            val old = target.find(folder, FILE_NAME)
-            if (target.canRename(temp)) {
-                if (old != null && !target.delete(old)) throw IOException("Cannot replace $old")
-                target.rename(temp, FILE_NAME)
-            } else {
-                copyInto(old ?: target.create(folder, FILE_NAME), source)
-                target.delete(temp)
-            }
-        } catch (e: Exception) {
-            // A finished temporary file may be all that is left if the swap failed: keep it then.
-            runCatching {
-                if (!complete || target.find(folder, FILE_NAME) != null) target.delete(temp)
-            }
-            throw e
-        }
-    }
-
-    private fun copyInto(file: String, source: File) {
-        target.open(file).use { out -> source.inputStream().use { it.copyTo(out) } }
+        target.replaceFile(folder, FILE_NAME, TEMP_NAME) { out -> source.inputStream().use { it.copyTo(out) } }
     }
 
     companion object {

@@ -28,9 +28,10 @@ class AutoBackup(
     /** This phone's preferences ("device"): whether the offer was answered. Never backed up. */
     private val device: SharedPreferences,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Shared with the other writers of backup files, so they never run at once. */
+    private val mutex: Mutex = Mutex(),
 ) {
     val file = File(dir, FILE_NAME)
-    private val mutex = Mutex()
 
     private val _offer = MutableStateFlow<Long?>(null)
 

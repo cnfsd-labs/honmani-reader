@@ -61,12 +61,24 @@ data class BackupFile(
     val knownBatches: List<BackupKnownBatch> = emptyList(),
     /** Book servers, without their passwords. */
     val catalogs: List<BackupCatalog> = emptyList(),
+    /** Sync files only (see [SyncFolder]): 1 for the first format; null in a backup. A newer number is skipped. */
+    val syncFormat: Int? = null,
+    /** Sync files only: the installation id of the phone that wrote the file. */
+    val deviceId: String? = null,
+    /** Sync files only: the phone's model, for the status line. */
+    val deviceName: String? = null,
+    /** Sync files only: rows deleted on the writing phone, so other phones delete them too. */
+    val tombstones: List<BackupTombstone> = emptyList(),
 ) {
     companion object {
         const val FORMAT = "honmani-backup"
         const val VERSION = 1
     }
 }
+
+/** A deletion marker (`TombstoneEntity`) in a sync file. */
+@Serializable
+data class BackupTombstone(val kind: String, val key: String, val deletedAt: Long)
 
 /** A shared preference's value with its type, so it is written back as the same type. */
 @Serializable
@@ -110,6 +122,8 @@ data class BackupBookDetails(
     val folder: String? = null,
     /** Its difficulty when it was graded, for the skill until the book is back; 0 if not graded. */
     val score: Int = 0,
+    /** When a synced field last changed (`BookEntity.updatedAt`); 0 in older backups. */
+    val updatedAt: Long = 0,
 )
 
 @Serializable
@@ -121,15 +135,15 @@ data class BackupFinishedBook(val hash: String, val title: String, val finishedA
 
 /** A named place in a book, by content hash. */
 @Serializable
-data class BackupBookmark(val hash: String, val name: String, val characters: Long, val total: Long, val createdAt: Long = 0)
+data class BackupBookmark(val hash: String, val name: String, val characters: Long, val total: Long, val createdAt: Long = 0, val updatedAt: Long = 0)
 
 /** A highlighted passage in a book, by content hash; the range is in ttu's character counting. */
 @Serializable
-data class BackupHighlight(val hash: String, val start: Long, val end: Long, val color: Int, val text: String, val total: Long, val createdAt: Long = 0)
+data class BackupHighlight(val hash: String, val start: Long, val end: Long, val color: Int, val text: String, val total: Long, val createdAt: Long = 0, val updatedAt: Long = 0)
 
 /** A Read aloud replacement in a book, by content hash. */
 @Serializable
-data class BackupPronunciation(val hash: String, val text: String, val reading: String, val createdAt: Long = 0)
+data class BackupPronunciation(val hash: String, val text: String, val reading: String, val createdAt: Long = 0, val updatedAt: Long = 0)
 
 @Serializable
 data class BackupReadingDay(
@@ -186,6 +200,8 @@ data class BackupWord(
     val note: String = "",
     /** The reader's correction of the furigana (`WordEntity.furigana`); older backups have none. */
     val furigana: String = "",
+    /** When a field the reader sets last changed (`WordEntity.updatedAt`); 0 in older backups. */
+    val updatedAt: Long = 0,
     /**
      * Older backups carry the AnkiDroid note id; it is neither written nor restored now: it is
      * only valid in the AnkiDroid it was made in, and on another phone it would show "in Anki"
@@ -218,6 +234,8 @@ data class BackupCard(
     val reviewStability: Double = 0.0,
     val buriedUntil: Long? = null,
     val addedAt: Long,
+    /** `ReviewCardEntity.updatedAt`; 0 in older backups. */
+    val updatedAt: Long = 0,
 )
 
 @Serializable
@@ -263,10 +281,13 @@ object BackupCodec {
         encodeDefaults = true
     }
 
+    /** The JSON a zip holds; also what [SyncFolder] fingerprints to tell whether anything changed. */
+    fun toJson(backup: BackupFile): String = json.encodeToString(BackupFile.serializer(), backup)
+
     fun write(backup: BackupFile, output: OutputStream) {
         val zip = ZipOutputStream(output)
         zip.putNextEntry(ZipEntry(ENTRY))
-        zip.write(json.encodeToString(BackupFile.serializer(), backup).toByteArray(Charsets.UTF_8))
+        zip.write(toJson(backup).toByteArray(Charsets.UTF_8))
         zip.closeEntry()
         zip.finish()
         zip.flush()

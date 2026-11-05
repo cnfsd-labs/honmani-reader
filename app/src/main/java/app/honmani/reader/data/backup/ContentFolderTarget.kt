@@ -73,4 +73,13 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
     override fun rename(file: String, name: String): String =
         DocumentsContract.renameDocument(resolver, Uri.parse(file), name)?.toString()
             ?: throw IOException("Cannot rename $file to $name")
+
+    override fun displayName(folder: String): String? = try {
+        val tree = Uri.parse(folder)
+        val document = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        resolver.query(document, arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME), null, null, null)
+            ?.use { if (it.moveToFirst()) it.getString(0) else null }
+    } catch (_: Exception) {
+        null
+    }
 }

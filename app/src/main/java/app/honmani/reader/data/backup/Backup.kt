@@ -6,6 +6,7 @@ import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.merge.TombstoneEntity
 import app.honmani.reader.data.library.FOLDER_NAME_MAX
 import app.honmani.reader.data.library.FolderEntity
 import app.honmani.reader.data.library.BookSource
@@ -68,6 +69,9 @@ data class RestoreSummary(
     val positions: List<BookEntity> = emptyList(),
 )
 
+/** Who writes a sync file: this installation's id and the phone's model. */
+data class SyncIdentity(val deviceId: String, val deviceName: String)
+
 /**
  * Makes and restores [BackupFile]s. A restore merges: whatever this phone already has stays, and
  * restoring the same backup twice changes nothing the second time. Per book and day the larger
@@ -93,8 +97,13 @@ class Backup(
     private val wordDao = database.wordDao()
     private val folderDao = database.folderDao()
 
-    /** Everything but the books; [readerSettings] are ttu's, read by the caller (null if it couldn't). */
-    suspend fun export(readerSettings: Map<String, String?>?): BackupFile {
+    /**
+     * Everything but the books; [readerSettings] are ttu's, read by the caller (null if it couldn't).
+     * With [sync] the file is this phone's sync file instead (see [SyncFolder]): the edit times and
+     * deletion markers are in, the reading days carry this phone's id, and nothing that stays on a
+     * phone (settings, ttu's settings, book servers, removed catalogue books) is.
+     */
+    suspend fun export(readerSettings: Map<String, String?>?, sync: SyncIdentity? = null): BackupFile {
         class Tables(
             val books: List<BookEntity>,
             val folders: Map<Long, String>,
@@ -113,11 +122,13 @@ class Backup(
             val reads: Map<Long, List<ReadDayEntity>>,
             val batches: List<KnownBatchEntity>,
             val batchWords: List<KnownBatchWordEntity>,
+            val tombstones: List<TombstoneEntity>,
         )
         val tables = database.withTransaction {
             Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.pronunciations(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
                 dao.knownBatches(), dao.knownBatchWords(),
+                if (sync != null) database.tombstoneDao().all() else emptyList(),
             )
         }
         val grades = grades()
@@ -125,7 +136,7 @@ class Backup(
         val books = ArrayList<BackupBook>()
         for (book in tables.books) {
             keys[book.id] = book.contentHash
-            books += BackupBook(book.contentHash, details(book, grades[book.contentHash]?.difficulty?.score ?: 0, book.folderId?.let(tables.folders::get)))
+            books += BackupBook(book.contentHash, details(book, grades[book.contentHash]?.difficulty?.score ?: 0, book.folderId?.let(tables.folders::get), if (sync != null) book.updatedAt else 0))
         }
         for (waiting in restored.waiting()) {
             if (waiting.id in keys) continue
@@ -136,7 +147,7 @@ class Backup(
         fun keyOf(id: Long): String = keys.getOrPut(id) {
             "book:${installationId()}:$id".also { books += BackupBook(it) }
         }
-        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.refoldSeconds, it.deviceId) }
+        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.refoldSeconds, if (sync != null && it.deviceId.isEmpty()) sync.deviceId else it.deviceId) }
         val lookupEvents = tables.events.map { BackupLookupEvent(it.lookedUpAt, it.bookId?.let(::keyOf)) }
         val progress = wordProgress.load()
         val lookups = tables.lookups.groupBy { it.wordId }
@@ -158,6 +169,7 @@ class Backup(
                 lastBookTitle = word.lastBookTitle,
                 note = word.note,
                 furigana = word.furigana,
+                updatedAt = if (sync != null) word.updatedAt else 0,
                 progress = progress[word.id]?.let { BackupWordStep(it.steps, it.reads, it.lookups, it.learned, it.kana) },
                 lookups = lookups[word.id].orEmpty().map { lookup ->
                     BackupWordLookup(
@@ -171,7 +183,7 @@ class Backup(
                         origin = lookup.origin.name,
                     )
                 },
-                card = tables.cards[word.id]?.let(::backupCard),
+                card = tables.cards[word.id]?.let { backupCard(it).copy(updatedAt = if (sync != null) it.updatedAt else 0) },
                 reviews = tables.logs[word.id].orEmpty().map { BackupReview(it.at, it.grade, it.elapsedDays) },
                 reads = tables.reads[word.id].orEmpty().map { BackupReadDay(it.day, it.count) },
             )
@@ -192,22 +204,26 @@ class Backup(
         }
         return BackupFile(
             exportedAt = now(),
-            settings = settings.all.mapNotNull { (key, value) -> typed(value)?.let { key to it } }.toMap(),
-            readerSettings = readerSettings,
+            settings = if (sync != null) emptyMap() else settings.all.mapNotNull { (key, value) -> typed(value)?.let { key to it } }.toMap(),
+            readerSettings = if (sync != null) null else readerSettings,
             milestones = milestones.seen.value.mapValues { (_, day) -> day.toString() },
             books = books,
             folders = tables.folders.values.toList(),
             stretches = stretches.all().mapValues { (_, steps) -> steps.toList() },
-            removedBooks = tables.removed.map { BackupRemovedBook(it.source.name, it.sourceId, it.removedAt) },
+            removedBooks = if (sync != null) emptyList() else tables.removed.map { BackupRemovedBook(it.source.name, it.sourceId, it.removedAt) },
             readingDays = readingDays,
             finishedBooks = tables.finished.map { BackupFinishedBook(it.contentHash, it.title, it.finishedAt) },
-            bookmarks = tables.bookmarks.map { BackupBookmark(it.contentHash, it.name, it.characters, it.total, it.createdAt) },
-            highlights = tables.highlights.map { BackupHighlight(it.contentHash, it.start, it.end, it.color, it.text, it.total, it.createdAt) },
-            pronunciations = tables.pronunciations.map { BackupPronunciation(it.contentHash, it.text, it.reading, it.createdAt) },
+            bookmarks = tables.bookmarks.map { BackupBookmark(it.contentHash, it.name, it.characters, it.total, it.createdAt, if (sync != null) it.updatedAt else 0) },
+            highlights = tables.highlights.map { BackupHighlight(it.contentHash, it.start, it.end, it.color, it.text, it.total, it.createdAt, if (sync != null) it.updatedAt else 0) },
+            pronunciations = tables.pronunciations.map { BackupPronunciation(it.contentHash, it.text, it.reading, it.createdAt, if (sync != null) it.updatedAt else 0) },
             lookupEvents = lookupEvents,
             words = words,
             knownBatches = knownBatches,
-            catalogs = tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
+            catalogs = if (sync != null) emptyList() else tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
+            syncFormat = sync?.let { SyncFolder.FORMAT },
+            deviceId = sync?.deviceId,
+            deviceName = sync?.deviceName,
+            tombstones = tables.tombstones.map { BackupTombstone(it.kind, it.key, it.deletedAt) },
         )
     }
 
@@ -539,7 +555,7 @@ class Backup(
          */
         fun position(book: BookEntity, savedAt: Long) = RestoredPosition(book.characters, book.progress, savedAt)
 
-        fun details(book: BookEntity, score: Int, folder: String? = null) = BackupBookDetails(
+        fun details(book: BookEntity, score: Int, folder: String? = null, updatedAt: Long = 0) = BackupBookDetails(
             title = book.title,
             author = book.author,
             format = book.format.name,
@@ -553,6 +569,7 @@ class Backup(
             hidden = book.hidden,
             folder = folder,
             score = score,
+            updatedAt = updatedAt,
         )
 
         /** [book] with what the backup knew of it: the further reading position, the first dates. */

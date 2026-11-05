@@ -1207,7 +1207,13 @@
     <string name="backup_folder_last">Last folder backup: %1$s</string>
     <string name="backup_folder_unavailable">Folder not available, choose it again</string>
     <string name="backup_folder_switch_off">Switch off</string>
-    <string name="backup_failed_title">Not restored</string>
+    <string name="sync_folder_title">Sync folder</string>
+    <string name="sync_folder_details">Writes one file for this phone into a folder you choose, for your other phones. The files are readable (not encrypted); each phone has its own, so it works with a Syncthing, Nextcloud or Drive folder. Honmani itself makes no network calls.</string>
+    <string name="sync_folder_folder">Folder: %1$s</string>
+    <string name="sync_folder_waiting">Waiting for the first write.</string>
+    <string name="sync_folder_last">Last written %1$s</string>
+    <string name="sync_folder_unavailable">Folder unavailable: choose it again</string>
+Not restored</string>
     <string name="backup_not_a_backup">This file is not a Honmani backup, or it comes from a newer version of Honmani. Update Honmani and try again.</string>
     <string name="backup_failed">The file could not be read or written. Try again, or pick another place for it.</string>
     <string name="sync_error_unauthorized">The server did not accept the user name or password.</string>

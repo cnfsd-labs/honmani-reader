@@ -15,6 +15,7 @@ import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.backup.AutoBackup
 import app.honmani.reader.data.backup.ContentFolderTarget
 import app.honmani.reader.data.backup.FolderBackup
+import app.honmani.reader.data.backup.SyncFolder
 import app.honmani.reader.data.backup.Backup
 import app.honmani.reader.data.backup.RestoredBooks
 import app.honmani.reader.data.dictionary.DictionaryDownloader
@@ -634,12 +635,14 @@ class AppContainer(context: Context) {
             wordProgress = wordProgressStore,
             restored = restoredBooks,
             grades = { difficultyStore.grades.value },
-            installationId = {
-                devicePreferences.getString(KEY_INSTALLATION_ID, null)
-                    ?: UUID.randomUUID().toString().also { devicePreferences.edit().putString(KEY_INSTALLATION_ID, it).apply() }
-            },
+            installationId = ::installationId,
         )
     }
+
+    /** Names this installation in backups and sync files; made on first use. */
+    private fun installationId(): String =
+        devicePreferences.getString(KEY_INSTALLATION_ID, null)
+            ?: UUID.randomUUID().toString().also { devicePreferences.edit().putString(KEY_INSTALLATION_ID, it).apply() }
 
     /** The words read and how well each is known; one computation shared by its screens. */
     val wordKnowledge: Flow<WordKnowledge> by lazy {
@@ -696,10 +699,31 @@ class AppContainer(context: Context) {
      * app start; the stored grades are read first, for the book sheets.
      */
     /** Honmani's own backup of itself, taken along by Android's backup; see [AutoBackup]. */
-    val autoBackup: AutoBackup by lazy { AutoBackup(File(appContext.filesDir, AutoBackup.DIRECTORY), devicePreferences) }
+    val autoBackup: AutoBackup by lazy { AutoBackup(File(appContext.filesDir, AutoBackup.DIRECTORY), devicePreferences, mutex = backupLock) }
+
+    /** One writer of backup and sync files at a time. */
+    private val backupLock = Mutex()
 
     /** The copy of [autoBackup] in a folder the reader chose (Settings → Back up and restore). */
-    val folderBackup: FolderBackup by lazy { FolderBackup(devicePreferences, ContentFolderTarget(appContext.contentResolver)) }
+    val folderBackup: FolderBackup by lazy { FolderBackup(devicePreferences, ContentFolderTarget(appContext.contentResolver), mutex = backupLock) }
+
+    /** This phone's sync file in a folder the reader chose (Settings → Sync folder). */
+    val syncFolder: SyncFolder by lazy {
+        SyncFolder(
+            device = devicePreferences,
+            target = ContentFolderTarget(appContext.contentResolver),
+            installationId = ::installationId,
+            deviceName = Build.MODEL,
+            export = { identity -> backup.export(null, identity) },
+            pruneTombstones = { before -> database.tombstoneDao().deleteOlderThan(before) },
+            mutex = backupLock,
+        )
+    }
+
+    /** Writes the sync file (if sync is on and something changed) off the main thread. */
+    fun saveSyncFile() {
+        applicationScope.launch { syncFolder.write() }
+    }
 
     /**
      * Brings [autoBackup] up to date when it is due, as the app goes to the background. ttu's
@@ -715,8 +739,10 @@ class AppContainer(context: Context) {
                 }
                 backup.export(readerSettings)
             }
-            // The same file, also into the folder the reader chose (if any).
-            if (wrote) folderBackup.copy(autoBackup.file)
+            // The same file, also into the folder the reader chose (if any); not into the sync
+            // folder: that has the sync files, and one copy of the backup per phone isn't wanted there.
+            if (wrote && (folderBackup.folder == null || folderBackup.folder != syncFolder.folder)) folderBackup.copy(autoBackup.file)
+            syncFolder.write()
         }
     }
 
