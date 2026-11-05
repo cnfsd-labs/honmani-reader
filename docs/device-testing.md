@@ -48,7 +48,7 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   zoom (second double tap = fit), drag stops at edges; Back/close ("Close picture") -> same page. Text
   beside it still looks up; picture tap never turns a page or looks up; tiny inline pictures and
   pictures in links do nothing new.
-- **Lookup panel height**: short/long word, kanji, non-word -> top edge stays ~40 %, content scrolls.
+- **Lookup panel height**: short/long word, kanji, non-word -> top edge stays ~50 %, content scrolls.
   Drag handle/header up -> ~88 %; tap handle toggles (TalkBack Expand/Collapse); drag down shrinks, then
   closes. New tap opens small; back/kanji keep size. Landscape usable.
 - **Reader bottom menu**: tap the strip under the text -> Contents, slider, Add bookmark, Bookmarks,
