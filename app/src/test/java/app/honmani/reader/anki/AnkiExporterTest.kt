@@ -207,7 +207,7 @@ class AnkiExporterTest {
         assertEquals(AnkiResult.Added(1, null), withClip { cache }.add(content).let { it as AnkiResult.Added }.copy(noteId = 1))
 
         assertTrue(voice.spoken.isEmpty())
-        assertTrue(anki.notes.single().fields.any { it.endsWith(".m4a]") })
+        assertTrue(anki.notes.single().fields.any { it.endsWith(".mp4]") })
     }
 
     @Test

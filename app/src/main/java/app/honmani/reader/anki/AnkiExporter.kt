@@ -271,7 +271,9 @@ class AnkiExporter(
     private suspend fun clipSound(content: CardContent, made: MutableList<File>): String {
         val file = findClip(content) ?: return ""
         val name = clipName(file)
-        val copy = File(audioDir, "$name.${file.extension}")
+        // AnkiDroid takes the stored extension from the file's MIME type, and Android's table calls .m4a "audio/mpeg":
+        // the card then said .mp3 over AAC. .mp4 keeps its name (checked on the 7 Pro).
+        val copy = File(audioDir, "$name." + if (file.extension == "m4a") "mp4" else file.extension)
         return try {
             audioDir.mkdirs()
             file.copyTo(copy, overwrite = true)
