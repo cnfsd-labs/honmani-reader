@@ -470,6 +470,25 @@ test.describe('with the tap bridge', () => {
     });
   }
 
+  test('a real long press (held finger) marks the word and then carries the word, sentence and paragraph', async ({ page }) => {
+    await openBook(page, BODY, { bridge: true });
+    await send(page, [['ttu-a', 0]], []);
+    const at = await centerOf(page, 'ま');
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at.x, y: at.y }] });
+    await page.waitForTimeout(700);
+    expect(await page.evaluate(() => CSS.highlights.has('honmani-lookup'))).toBe(true);
+    expect(await page.evaluate(() => getSelection().toString())).toBe('');
+    expect(await lookups(page)).toEqual([]);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect.poll(async () => (await lookups(page)).length).toBe(1);
+    const [lookup] = await lookups(page);
+    expect(lookup.selection).toBe(true);
+    expect(lookup.highlight.word.text).toContain('ま');
+    expect(lookup.highlight.sentence).toEqual({ start: 7, end: 14, text: '名前はまだ無い。' });
+    expect(lookup.highlight.paragraph).toEqual({ start: 0, end: 14, text: '吾輩は猫である。名前はまだ無い。' });
+  });
+
   test('a sentence keeps its closing quote, and a line break ends it', async ({ page }) => {
     await openBook(page, '<div id="ttu-a"><p>「行こう。」と彼は言った<br>次の行はここ</p></div>', { bridge: true });
     await send(page, [['ttu-a', 0]], []);

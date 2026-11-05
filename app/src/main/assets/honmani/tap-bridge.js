@@ -22,10 +22,12 @@
  *                           in horizontal text, or both edges with "honmaniEdgeForward" = "1". Taps on links
  *                           and buttons, on the footer and the top bar are not affected)
  *
- * Selected book text (a long press) is looked up in the same message, with "selection": true,
- * once the selection has settled, and then deselected: "text" is the selection, up to
- * SCAN_LENGTH characters. localStorage
- * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns it off. A selection message also
+ * A long press on book text (a finger held still for 400 ms) marks the word under it with the
+ * lookup mark and, when the finger lifts, looks it up in the same message, with "selection": true:
+ * "text" is the word, up to SCAN_LENGTH characters. Android's own selection (a selection that
+ * settles for 250 ms) is looked up the same way and deselected. localStorage
+ * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns both off and leaves the book
+ * text natively selectable (otherwise it is not: user-select: none). A selection message also
  * carries "highlight": { start, end, text }, the whole selection as a place in the book
  * (highlights.js), and a tap inside a highlight carries "highlightId": its id.
  *
@@ -471,6 +473,12 @@
     window.dispatchEvent(
       new CustomEvent(LOOKED_UP_EVENT, { detail: { ranges: ranges.map((range) => range.cloneRange()), color } }),
     );
+    showMark(ranges, color);
+    logTiming(performance.now());
+  }
+
+  /** Paints the mark over `ranges` (one per text node), in the colour or the default amber. */
+  function showMark(ranges, color) {
     if (hasHighlightApi()) {
       setHighlightStyle(color);
       CSS.highlights.set(HIGHLIGHT_NAME, new Highlight(...ranges));
@@ -478,7 +486,6 @@
       overlayMark = { ranges, background: highlightBackground(color) };
       drawOverlay();
     }
-    logTiming(performance.now());
   }
 
   function onAppMessage(event) {
@@ -642,19 +649,26 @@
     if (!root) return;
     const selected = selection.toString().trim();
     if (!selected || selected === lastSelected) return;
+    if (lookupRange(range, root)) {
+      lastSelected = selected;
+      selection.removeAllRanges();
+    }
+  }
+
+  /** Looks up the book text a range holds as a selection lookup; false when there is nothing to look up. */
+  function lookupRange(range, root) {
     const from = selectionStart(range, root);
-    if (!from) return;
+    if (!from) return false;
     const length = selectedLength(range, root, from.node, from.index);
     const message = lookupFrom(root, from.node, from.index, length);
-    if (!message) return;
-    lastSelected = selected;
+    if (!message) return false;
     clearHighlight();
     message.selection = true;
     // The selection, its sentence and its paragraph as places in the book, for a highlight.
     const extents = window.honmaniHighlights ? highlightExtents(root, from, range) : null;
     if (extents) message.highlight = extents;
     post(message);
-    selection.removeAllRanges();
+    return true;
   }
 
   document.addEventListener('selectionchange', () => {
@@ -667,6 +681,161 @@
     }
     selectionTimer = setTimeout(lookupSelection, SELECTION_SETTLE);
   });
+
+  /**
+   * Honmani's own long press, instead of Android's text selection (whose blue highlight, handles and
+   * toolbar differ between WebView versions). A finger held still on book text for LONG_PRESS_TIME
+   * marks the word under it (Intl.Segmenter) in the lookup mark's colour, so the reader sees what
+   * is chosen; lifting the finger looks it up as a selection lookup ("selection": true, with the
+   * highlight extents). Moving more than LONG_PRESS_SLOP, scrolling, a second finger or a cancelled
+   * touch drops the mark and looks nothing up: a drag cannot extend the word. While the switch
+   * honmaniSelectionLookup is on, the book text cannot be selected natively (user-select: none, no
+   * callout, no context menu); with it off, Android's selection is left alone.
+   */
+  const LONG_PRESS_TIME = 400;
+  const LONG_PRESS_SLOP = 12;
+  const NO_SELECT_ID = 'honmani-noselect';
+  const WORD_WINDOW = 40;
+  let noSelectElement = null;
+  let hold = null;
+  /** Where and when the last long press ended, so the click that follows is kept from ttu once. */
+  let lastLongPress = null;
+  let wordSegmenter;
+
+  /** Keeps the book text unselectable while selection lookups are on. */
+  function syncNoSelect() {
+    const style = noSelectElement;
+    if (!selectionLookupOn()) {
+      if (style) style.remove();
+      noSelectElement = null;
+      return;
+    }
+    if (style && style.isConnected) return;
+    const parent = document.head || document.documentElement;
+    if (!parent) return;
+    const element = document.createElement('style');
+    element.id = NO_SELECT_ID;
+    element.textContent =
+      `${BOOK_ROOT_SELECTOR}, ${BOOK_ROOT_SELECTOR} * { ` +
+      '-webkit-user-select: none !important; user-select: none !important; ' +
+      '-webkit-touch-callout: none !important; }';
+    noSelectElement = element;
+    parent.appendChild(element);
+  }
+
+  /** The [start, end) of the word at `position` in `text`, or null on whitespace, punctuation and symbols. */
+  function wordBounds(text, position) {
+    const character = String.fromCodePoint(text.codePointAt(position));
+    if (/^[\s\p{P}\p{S}\p{C}￼]/u.test(character)) return null;
+    if (wordSegmenter === undefined) {
+      try {
+        wordSegmenter = new Intl.Segmenter('ja', { granularity: 'word' });
+      } catch (error) {
+        wordSegmenter = null;
+      }
+    }
+    if (wordSegmenter) {
+      const from = Math.max(0, position - WORD_WINDOW);
+      const piece = text.slice(from, position + WORD_WINDOW);
+      for (const part of wordSegmenter.segment(piece)) {
+        const start = from + part.index;
+        const end = start + part.segment.length;
+        if (position < start || position >= end) continue;
+        return part.isWordLike === false ? null : { start, end };
+      }
+    }
+    // Without Intl.Segmenter: the run of the same kind of letters (kanji, hiragana, katakana, other).
+    const run = /^(?:\p{sc=Han}+|\p{sc=Hiragana}+|\p{sc=Katakana}+|[\p{L}\p{N}]+)/u.exec(text.slice(position));
+    return { start: position, end: position + (run ? run[0].length : character.length) };
+  }
+
+  /** A Range over the word under (x, y) in the book, or null when the finger is not on a word. */
+  function wordRangeAt(x, y, target, root) {
+    const hit = rubyBaseOf(target) || charAt(x, y);
+    if (!hit || !root.contains(hit.node)) return null;
+    const block = blockAncestor(hit.node, root);
+    const { text, position } = blockText(block, hit.node, hit.index);
+    if (position < 0 || position >= text.length) return null;
+    const bounds = wordBounds(text, position);
+    return bounds ? rangeFromText(block, bounds.start, bounds.end) : null;
+  }
+
+  /** One Range per text node of the book text (furigana left out) a range holds. */
+  function textRanges(range, root) {
+    const from = selectionStart(range, root);
+    if (!from) return [];
+    const walker = textWalker(root);
+    walker.currentNode = from.node;
+    const ranges = [];
+    for (let node = from.node; node && range.intersectsNode(node); node = walker.nextNode()) {
+      const part = document.createRange();
+      part.setStart(node, node === from.node ? from.index : 0);
+      part.setEnd(node, node === range.endContainer ? range.endOffset : node.data.length);
+      if (!part.collapsed) ranges.push(part);
+    }
+    return ranges;
+  }
+
+  function cancelHold() {
+    const current = hold;
+    hold = null;
+    if (!current) return;
+    clearTimeout(current.timer);
+    if (current.range) clearHighlight();
+  }
+
+  function startHold(event) {
+    cancelHold();
+    lastLongPress = null;
+    if (!event.isPrimary || event.pointerType === 'mouse') return;
+    // At document start there may be no <html> yet; each touch checks again.
+  syncNoSelect();
+  document.addEventListener('DOMContentLoaded', syncNoSelect);
+    const target = event.target;
+    if (!selectionLookupOn() || !(target instanceof Element)) return;
+    const root = target.closest(BOOK_ROOT_SELECTOR);
+    if (!root || target.closest(INTERACTIVE_SELECTOR) || pictureAt(target)) return;
+    const current = { x: event.clientX, y: event.clientY, target, root, range: null, timer: 0 };
+    current.timer = setTimeout(() => {
+      current.timer = 0;
+      if (hold !== current) return;
+      const range = wordRangeAt(current.x, current.y, target, root);
+      const ranges = range ? textRanges(range, root) : [];
+      if (ranges.length === 0) return;
+      current.range = range;
+      const selection = window.getSelection();
+      if (selection) selection.removeAllRanges();
+      clearHighlight();
+      showMark(ranges, null);
+    }, LONG_PRESS_TIME);
+    hold = current;
+  }
+
+  /** The finger went up on a long press: look the marked word up. Returns whether there was one. */
+  function endHold(event) {
+    const current = hold;
+    if (!current || !current.range) {
+      cancelHold();
+      return false;
+    }
+    hold = null;
+    lastLongPress = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+    const selection = window.getSelection();
+    if (selection) selection.removeAllRanges();
+    if (!lookupRange(current.range, current.root)) clearHighlight();
+    return true;
+  }
+
+  document.addEventListener(
+    'contextmenu',
+    (event) => {
+      if (event.target instanceof Element && event.target.closest(BOOK_ROOT_SELECTOR) && selectionLookupOn()) {
+        event.preventDefault();
+      }
+    },
+    true,
+  );
+  syncNoSelect();
 
   /**
    * The picture a tap landed on, for the zoom viewer: an <img> or an SVG <image> in the book (a
@@ -792,6 +961,18 @@
   window.addEventListener(
     'click',
     (event) => {
+      // The click that follows a long press is kept from ttu (it would reveal furigana, say).
+      const press = lastLongPress;
+      lastLongPress = null;
+      if (
+        press &&
+        event.timeStamp - press.time < CLICK_AFTER_TAP &&
+        Math.hypot(event.clientX - press.x, event.clientY - press.y) <= LONG_PRESS_SLOP
+      ) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+        return;
+      }
       const tap = lastTapUp;
       lastTapUp = null;
       // The click of a tap already looked up when the finger went up.
@@ -816,6 +997,17 @@
     'pointerdown',
     (event) => {
       tapStart = event.isPrimary ? { x: event.clientX, y: event.clientY, time: event.timeStamp } : null;
+      if (event.isPrimary) startHold(event);
+      else cancelHold();
+    },
+    true,
+  );
+  window.addEventListener(
+    'pointermove',
+    (event) => {
+      if (hold && event.isPrimary && Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > LONG_PRESS_SLOP) {
+        cancelHold();
+      }
     },
     true,
   );
@@ -826,6 +1018,7 @@
       tapStart = null;
       lastUp = event.timeStamp;
       if (!start || !event.isPrimary) return;
+      if (endHold(event)) return;
       const moved = Math.hypot(event.clientX - start.x, event.clientY - start.y);
       if (moved > TAP_SLOP || event.timeStamp - start.time > TAP_TIME) return;
       lastTapUp = { x: event.clientX, y: event.clientY, time: event.timeStamp };
@@ -835,12 +1028,14 @@
   );
   window.addEventListener('pointercancel', () => {
     tapStart = null;
+    cancelHold();
   }, true);
 
   // The fallback mark follows the text: capture catches scrolls of ttu's inner containers too.
   const redrawOverlay = () => {
     if (overlayMark) drawOverlay();
   };
+  window.addEventListener('scroll', cancelHold, true);
   window.addEventListener('scroll', redrawOverlay, true);
   window.addEventListener('resize', redrawOverlay);
 })();

@@ -694,6 +694,129 @@ test('the app can highlight a selection lookup like a tap', async ({ page }) => 
   expect(await page.evaluate(() => CSS.highlights.has('honmani-lookup'))).toBe(true);
 });
 
+test.describe('long press (own selection)', () => {
+  /** Puts a finger down on the character, through the browser's touch input (CDP). */
+  async function touchDown(page, selector, char, occurrence = 0, dx = 0) {
+    const { x, y } = await charCenter(page, selector, char, occurrence);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x + dx, y }] });
+    return { cdp, x, y };
+  }
+  const touchUp = (cdp) => cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  const marked = (page) => page.evaluate(() => CSS.highlights.has('honmani-lookup'));
+  const markedText = (page) =>
+    page.evaluate(() =>
+      Array.from(CSS.highlights.get('honmani-lookup') || [])
+        .map((range) => range.toString())
+        .join(''),
+    );
+
+  test('marks the word under a held finger and looks it up when the finger lifts', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(150);
+    expect(await marked(page)).toBe(false);
+    await page.waitForTimeout(500);
+
+    // Marked while held, nothing looked up yet, nothing natively selected.
+    expect(await marked(page)).toBe(true);
+    expect(await markedText(page)).not.toBe('');
+    expect(await messages(page)).toEqual([]);
+    expect(await page.evaluate(() => window.getSelection().toString())).toBe('');
+
+    await touchUp(cdp);
+    const lookups = await messages(page);
+    expect(lookups.length).toBe(1);
+    expect(lookups[0]).toMatchObject({ type: 'lookup', selection: true, tap: 1 });
+    expect(lookups[0].text.length).toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.getSelection().toString())).toBe('');
+  });
+
+  test('the mark is the looked-up text, and a book cannot be selected natively', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', 'と', 0);
+    await page.waitForTimeout(600);
+    const mark = await markedText(page);
+    await touchUp(cdp);
+    const [message] = await messages(page);
+    expect(message.text).toBe(mark);
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#v2')).userSelect)).toBe('none');
+  });
+
+  test('a long press on furigana text looks up the word of its base', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v1', '猫');
+    await page.waitForTimeout(600);
+    expect(await markedText(page)).toContain('猫');
+    await touchUp(cdp);
+    const [message] = await messages(page);
+    expect(message.selection).toBe(true);
+    expect(message.text.startsWith('猫')).toBe(true);
+    expect(message.ruby[0]).toEqual({ start: 0, end: 1, reading: 'ねこ' });
+  });
+
+  test('the app can recolour the mark with its answer', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(600);
+    await touchUp(cdp);
+    await reply(page, { type: 'highlight', length: 2, color: '#336699', tap: 1 });
+    expect(await marked(page)).toBe(true);
+    expect(await page.evaluate(() => document.querySelector('#honmani-style').textContent)).toContain('51, 102, 153');
+  });
+
+  test('a finger that moves before the time is up looks nothing up', async ({ page }) => {
+    const { cdp, x, y } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(150);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 60, y }] });
+    await page.waitForTimeout(600);
+    expect(await marked(page)).toBe(false);
+    await touchUp(cdp);
+    expect(await messages(page)).toEqual([]);
+  });
+
+  test('moving after the mark appeared drops it, with no lookup', async ({ page }) => {
+    const { cdp, x, y } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(600);
+    expect(await marked(page)).toBe(true);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 60, y }] });
+    expect(await marked(page)).toBe(false);
+    await touchUp(cdp);
+    expect(await messages(page)).toEqual([]);
+  });
+
+  test('a quick tap still looks up as a tap, without the selection flag', async ({ page }) => {
+    const { x, y } = await charCenter(page, '#v2', '生');
+    await page.touchscreen.tap(x, y);
+    const lookups = await messages(page);
+    expect(lookups.length).toBe(1);
+    expect(lookups[0].selection).toBeUndefined();
+  });
+
+  test('a long press on punctuation or off the text looks nothing up', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', '。');
+    await page.waitForTimeout(600);
+    expect(await marked(page)).toBe(false);
+    await touchUp(cdp);
+    expect((await messages(page)).filter((message) => message.selection)).toEqual([]);
+  });
+
+  test('the switch honmaniSelectionLookup = 0 leaves the text selectable and the press alone', async ({ page }) => {
+    await page.evaluate(() => window.localStorage.setItem('honmaniSelectionLookup', '0'));
+    const { cdp } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(600);
+    expect(await marked(page)).toBe(false);
+    await touchUp(cdp);
+    expect((await messages(page)).filter((message) => message.selection)).toEqual([]);
+    expect(await page.evaluate(() => document.querySelector('#honmani-noselect'))).toBeNull();
+  });
+
+  test('the context menu is blocked on book text', async ({ page }) => {
+    const prevented = await page.evaluate(() => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      document.querySelector('#v2').dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+    expect(prevented).toBe(true);
+  });
+});
+
 test.describe('edge taps (honmaniEdgeTaps)', () => {
   const edgeOn = (page) => page.evaluate(() => window.localStorage.setItem('honmaniEdgeTaps', '1'));
   const rowY = (page, selector) =>

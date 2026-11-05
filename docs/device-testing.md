@@ -378,8 +378,9 @@ Bookmarks. Check, in paged and continuous mode, vertical and horizontal text, EP
 
 Needs an EPUB and "Look up selected text" on (Reader settings). Check on light, dark, sepia and black
 themes, vertical and horizontal text, paged and continuous mode, with and without furigana:
-- Long press a word (Android's handles are hidden on purpose, so the selection is one word or a few
-  characters): the lookup panel shows Selection / Sentence / Paragraph (Sentence chosen) with the
+- Hold a finger on a word (Honmani's own long press, no blue selection or handles): after a moment the word
+  is marked while the finger is down, and the lookup panel opens when it lifts; moving the finger first cancels
+  it. The panel shows Selection / Sentence / Paragraph (Sentence chosen) with the
   text of the choice in one line, and "Highlight" with four colours. One tap saves what is chosen,
   closes the panel and shows "Highlight saved" with Undo. A sentence ends at 。！？ or a line break and keeps a
   closing 」; a paragraph can run over several pages (marks on both pages after a turn); furigana is no part of either.
