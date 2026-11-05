@@ -28,6 +28,10 @@ import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.words.KNOWN_DETAIL_MAX
+import app.honmani.reader.data.words.KnownBatchEntity
+import app.honmani.reader.data.words.KnownBatchWordEntity
+import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.ReadStretchStore
@@ -103,10 +107,13 @@ class Backup(
             val cards: Map<Long, ReviewCardEntity>,
             val logs: Map<Long, List<ReviewLogEntity>>,
             val reads: Map<Long, List<ReadDayEntity>>,
+            val batches: List<KnownBatchEntity>,
+            val batchWords: List<KnownBatchWordEntity>,
         )
         val tables = database.withTransaction {
             Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
+                dao.knownBatches(), dao.knownBatchWords(),
             )
         }
         val grades = grades()
@@ -165,6 +172,20 @@ class Backup(
                 reads = tables.reads[word.id].orEmpty().map { BackupReadDay(it.day, it.count) },
             )
         }
+        val wordsById = tables.words.associateBy { it.id }
+        val batchWords = tables.batchWords.groupBy { it.batchId }
+        val knownBatches = tables.batches.map { batch ->
+            BackupKnownBatch(
+                source = batch.source.name,
+                detail = batch.detail,
+                createdAt = batch.createdAt,
+                count = batch.count,
+                words = batchWords[batch.id].orEmpty().mapNotNull { entry ->
+                    val word = wordsById[entry.wordId] ?: return@mapNotNull null
+                    BackupKnownBatchWord(word.expression, word.reading, entry.created, entry.previousStatus?.name, entry.lookupCount)
+                },
+            )
+        }
         return BackupFile(
             exportedAt = now(),
             settings = settings.all.mapNotNull { (key, value) -> typed(value)?.let { key to it } }.toMap(),
@@ -180,6 +201,7 @@ class Backup(
             highlights = tables.highlights.map { BackupHighlight(it.contentHash, it.start, it.end, it.color, it.text, it.total, it.createdAt) },
             lookupEvents = lookupEvents,
             words = words,
+            knownBatches = knownBatches,
             catalogs = tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
         )
     }
@@ -312,6 +334,21 @@ class Backup(
                     wordDao.insertLookups(added)
                     wordDao.pruneLookups(id, WordRepository.KEPT_LOOKUPS)
                 }
+            }
+
+            // A batch this phone has (same source, detail and time) stays; its words are found again by written form and reading.
+            val batchesHere = dao.knownBatches().mapTo(HashSet()) { Triple(it.source, it.detail, it.createdAt) }
+            val wordIds = dao.words().associate { WordRepository.key(it.expression, it.reading) to it.id }
+            for (batch in backup.knownBatches) {
+                val source = KnownSource.entries.firstOrNull { it.name == batch.source } ?: continue
+                if (!batchesHere.add(Triple(source, batch.detail, batch.createdAt))) continue
+                val entries = batch.words.mapNotNull { entry ->
+                    val id = wordIds[WordRepository.key(entry.expression, entry.reading)] ?: return@mapNotNull null
+                    KnownBatchWordEntity(0, id, entry.created, entry.previousStatus?.let { status(it) }, entry.lookupCount.coerceAtLeast(0))
+                }
+                if (entries.isEmpty()) continue
+                val id = dao.insertKnownBatch(KnownBatchEntity(source = source, detail = batch.detail.take(KNOWN_DETAIL_MAX), createdAt = batch.createdAt, count = entries.size))
+                dao.insertKnownBatchWords(entries.map { it.copy(batchId = id) })
             }
 
             if (cards.isNotEmpty()) dao.putReviewCards(cards)

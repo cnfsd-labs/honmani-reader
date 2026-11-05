@@ -15,6 +15,8 @@ import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.words.KnownBatchEntity
+import app.honmani.reader.data.words.KnownBatchWordEntity
 import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
@@ -45,6 +47,18 @@ interface BackupDao {
 
     @Query("SELECT * FROM word_lookup ORDER BY word_id, looked_up_at, id")
     suspend fun wordLookups(): List<WordLookupEntity>
+
+    @Query("SELECT * FROM known_batch ORDER BY created_at, id")
+    suspend fun knownBatches(): List<KnownBatchEntity>
+
+    @Query("SELECT * FROM known_batch_word ORDER BY batch_id, word_id")
+    suspend fun knownBatchWords(): List<KnownBatchWordEntity>
+
+    @Insert
+    suspend fun insertKnownBatch(batch: KnownBatchEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertKnownBatchWords(words: List<KnownBatchWordEntity>)
 
     @Query("SELECT * FROM review_card ORDER BY word_id")
     suspend fun reviewCards(): List<ReviewCardEntity>

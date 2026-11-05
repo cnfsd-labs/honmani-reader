@@ -161,6 +161,8 @@ class WordRepository(
                         status = WordStatus.LEARNING,
                         gloss = gloss.ifEmpty { existing.gloss },
                         lookupCount = existing.lookupCount + 1,
+                        // A word marked Known without a lookup has no first time yet.
+                        firstLookedUpAt = if (existing.firstLookedUpAt == 0L) time else existing.firstLookedUpAt,
                         lastLookedUpAt = time,
                         rankKey = WordScore.add(existing.rankKey, time),
                         lastSentence = sentence,

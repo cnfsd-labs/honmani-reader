@@ -22,6 +22,9 @@ import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.words.KnownBatchRepository
+import app.honmani.reader.data.words.KnownCandidate
+import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.ReadStretchStore
 import app.honmani.reader.data.words.WordProgressStore
@@ -305,6 +308,33 @@ class BackupTest {
         val again = phone.backup.restore(backup)
         assertEquals(0, again.wordsAdded)
         assertEquals(5, phone.logs().size)
+    }
+
+    @Test
+    fun knownBatchesComeBackOnceWithTheirWords_andCanBeUndoneThere() = runTest {
+        val old = Phone("old")
+        old.words.record(lookup("猫", null))
+        val oldKnown = KnownBatchRepository(old.database, now = { 5_000 })
+        oldKnown.apply(KnownSource.WORD_LIST, "list.txt", listOf(KnownCandidate("猫", "よみ"), KnownCandidate("鳥", "よみ", "bird")))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        assertEquals(1, backup.knownBatches.size)
+        assertEquals(2, backup.knownBatches.single().words.size)
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        val batches = new.database.backupDao().knownBatches()
+        assertEquals(1, batches.size)
+        assertEquals(KnownSource.WORD_LIST, batches.single().source)
+        assertEquals("list.txt", batches.single().detail)
+        assertEquals(5_000L, batches.single().createdAt)
+        assertEquals(2, new.database.backupDao().knownBatchWords().size)
+        val undo = KnownBatchRepository(new.database).undo(batches.single().id)
+        assertEquals(1, undo.removed)
+        assertEquals(1, undo.restored)
+        assertNull(new.words.find("鳥", "よみ"))
+        assertEquals(WordStatus.LEARNING, new.words.find("猫", "よみ")!!.status)
     }
 
     @Test

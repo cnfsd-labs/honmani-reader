@@ -55,6 +55,8 @@ data class BackupFile(
     val highlights: List<BackupHighlight> = emptyList(),
     val lookupEvents: List<BackupLookupEvent> = emptyList(),
     val words: List<BackupWord> = emptyList(),
+    /** The batches of Known words the reader can still undo ("Tell Honmani what you already know"). */
+    val knownBatches: List<BackupKnownBatch> = emptyList(),
     /** Book servers, without their passwords. */
     val catalogs: List<BackupCatalog> = emptyList(),
 ) {
@@ -136,6 +138,25 @@ data class BackupReadingDay(
 
 @Serializable
 data class BackupLookupEvent(@SerialName("at") val lookedUpAt: Long, val book: String? = null)
+
+@Serializable
+data class BackupKnownBatch(
+    val source: String,
+    val detail: String,
+    val createdAt: Long,
+    val count: Int,
+    val words: List<BackupKnownBatchWord> = emptyList(),
+)
+
+/** A word a batch changed, by written form and reading; see `KnownBatchWordEntity`. */
+@Serializable
+data class BackupKnownBatchWord(
+    val expression: String,
+    val reading: String,
+    val created: Boolean,
+    val previousStatus: String? = null,
+    val lookupCount: Int = 0,
+)
 
 @Serializable
 data class BackupWord(

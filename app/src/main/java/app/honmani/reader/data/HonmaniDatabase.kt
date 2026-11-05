@@ -42,6 +42,9 @@ import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.WordDao
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.LookupEventEntity
+import app.honmani.reader.data.words.KnownBatchDao
+import app.honmani.reader.data.words.KnownBatchEntity
+import app.honmani.reader.data.words.KnownBatchWordEntity
 import app.honmani.reader.data.words.WordLookupEntity
 
 // Edited in place (version 1) until the first public release, when the schema freezes: from then
@@ -60,6 +63,8 @@ import app.honmani.reader.data.words.WordLookupEntity
         HighlightEntity::class,
         WordEntity::class,
         WordLookupEntity::class,
+        KnownBatchEntity::class,
+        KnownBatchWordEntity::class,
         LookupEventEntity::class,
         OpdsCatalogEntity::class,
         RemovedBookEntity::class,
@@ -93,6 +98,8 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun highlightDao(): HighlightDao
 
     abstract fun wordDao(): WordDao
+
+    abstract fun knownBatchDao(): KnownBatchDao
 
     abstract fun opdsCatalogDao(): OpdsCatalogDao
 
