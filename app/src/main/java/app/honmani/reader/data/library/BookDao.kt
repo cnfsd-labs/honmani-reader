@@ -33,9 +33,15 @@ interface BookDao {
     @Insert
     suspend fun insertRow(book: BookEntity): Long
 
-    /** Stamped now (also an Undo re-insert, so the book's folder, hidden and finished state beat an older remote copy). */
+    /**
+     * Stamped now if it comes with a folder, hidden or finished state (an Undo re-insert, so they beat
+     * an older remote copy). A plain new book is unstamped: adding it must not clear those on another phone.
+     */
     @Transaction
-    suspend fun insert(book: BookEntity): Long = insertRow(book.copy(updatedAt = UpdateClock.now()))
+    suspend fun insert(book: BookEntity): Long {
+        val chosen = book.folderId != null || book.hidden || book.finishedAt != null
+        return insertRow(book.copy(updatedAt = if (chosen) UpdateClock.now() else 0))
+    }
 
     @Query("UPDATE book SET ttu_id = :ttuId, ttu_title = :ttuTitle WHERE id = :id")
     suspend fun setTtuBook(id: Long, ttuId: Long, ttuTitle: String)

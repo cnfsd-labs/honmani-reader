@@ -56,6 +56,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // Whatever the reader's other phones wrote into the sync folder (if turned on) comes in.
+        (application as HonmaniApplication).container.syncWithFolder()
+    }
+
     override fun onStop() {
         super.onStop()
         // Whatever screen was open, the sync file (if the reader turned it on) is brought up to date.

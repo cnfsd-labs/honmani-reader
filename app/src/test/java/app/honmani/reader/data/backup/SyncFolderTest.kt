@@ -69,6 +69,7 @@ class SyncFolderTest {
             installationId = { id },
             deviceName = "Test Phone",
             export = { backup.export(mapOf("ttu" to "x"), it) },
+            merge = {},
             pruneTombstones = { db.tombstoneDao().deleteOlderThan(it) },
             now = { clock },
         )
@@ -121,8 +122,9 @@ class SyncFolderTest {
         assertEquals(id, written.deviceId)
         assertEquals("Test Phone", written.deviceName)
         assertEquals(listOf("猫"), written.words.map { it.expression })
-        assertEquals(1_000L, written.words.single().updatedAt)
-        assertEquals(1_000L, written.books.single().book!!.updatedAt)
+        // Merely looked up or added: nothing of the reader's choosing that should beat another phone.
+        assertEquals(0L, written.words.single().updatedAt)
+        assertEquals(0L, written.books.single().book!!.updatedAt)
         assertEquals(1_000L, written.bookmarks.single().updatedAt)
         assertEquals(SyncFolderState.On(null, 5_000L), sync.state.value)
     }

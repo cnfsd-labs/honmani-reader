@@ -116,11 +116,15 @@ interface WordDao : TombstoneWriter {
     @Insert
     suspend fun insertRow(word: WordEntity): Long
 
-    /** Adds the word, stamped now; a marker of a deleted word with the same spelling goes. */
+    /**
+     * Adds the word; a marker of a deleted word with the same spelling goes. Stamped now only if the
+     * reader chose something: a word merely looked up must not beat their star or note on another phone.
+     */
     @Transaction
     suspend fun insert(word: WordEntity): Long {
         clearTombstone(SyncKeys.WORD, SyncKeys.word(word.expression, word.reading))
-        return insertRow(word.copy(updatedAt = UpdateClock.now()))
+        val chosen = word.status != WordStatus.LEARNING || word.starred || word.ignored || word.note.isNotEmpty() || word.furigana.isNotEmpty()
+        return insertRow(word.copy(updatedAt = if (chosen) UpdateClock.now() else 0))
     }
 
     @Update

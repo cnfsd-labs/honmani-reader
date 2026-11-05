@@ -67,9 +67,6 @@ interface BookmarkDao : TombstoneWriter {
     @Query("DELETE FROM bookmark WHERE id = :id")
     suspend fun deleteRow(id: Long)
 
-    @Query("DELETE FROM bookmark WHERE content_hash = :contentHash")
-    suspend fun deleteForBookRows(contentHash: String)
-
     /** Deletes the bookmark and leaves a marker, in one transaction. */
     @Transaction
     suspend fun delete(id: Long) {
@@ -77,10 +74,7 @@ interface BookmarkDao : TombstoneWriter {
         deleteRow(id)
     }
 
-    /** With the book. */
-    @Transaction
-    suspend fun deleteForBook(contentHash: String) {
-        for (b in forBook(contentHash)) putTombstone(SyncKeys.BOOKMARK, SyncKeys.bookmark(b.contentHash, b.characters))
-        deleteForBookRows(contentHash)
-    }
+    /** With the book, and without a marker: each phone keeps its own library, so the other phones keep theirs. */
+    @Query("DELETE FROM bookmark WHERE content_hash = :contentHash")
+    suspend fun deleteForBook(contentHash: String)
 }

@@ -130,7 +130,7 @@ private fun FolderBackupRow() {
 
 /**
  * Settings → Back up and restore → Sync folder: this phone's sync file in a folder the reader picks
- * (off by default), for their other phones; see `SyncFolder`.
+ * (off by default), shared with their other phones; see `SyncFolder`.
  */
 @Composable
 private fun SyncFolderRow() {
@@ -140,7 +140,7 @@ private fun SyncFolderRow() {
     val state by syncFolder.state.collectAsStateWithLifecycle()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         // Right away, so the folder has the file before the app next goes to the background.
-        if (uri != null && syncFolder.choose(uri.toString())) container.saveSyncFile()
+        if (uri != null && syncFolder.choose(uri.toString())) container.syncWithFolder()
     }
     val on = state != SyncFolderState.Off
     ListItem(
@@ -151,14 +151,16 @@ private fun SyncFolderRow() {
                     SyncFolderState.Off -> Unit
                     is SyncFolderState.On -> {
                         current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }
+                        val format = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                         Text(
-                            current.lastAt?.let {
-                                stringResource(
-                                    R.string.sync_folder_last,
-                                    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)),
-                                )
-                            } ?: stringResource(R.string.sync_folder_waiting),
+                            if (current.syncedWith != null && current.syncedAt != null) {
+                                stringResource(R.string.sync_folder_synced, current.syncedWith, format.format(Date(current.syncedAt)))
+                            } else {
+                                current.lastAt?.let { stringResource(R.string.sync_folder_last, format.format(Date(it))) }
+                                    ?: stringResource(R.string.sync_folder_waiting)
+                            },
                         )
+                        current.newerDevice?.let { Text(stringResource(R.string.sync_folder_newer, it)) }
                     }
                     is SyncFolderState.Unavailable -> {
                         current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }

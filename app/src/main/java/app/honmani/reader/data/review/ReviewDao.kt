@@ -48,10 +48,13 @@ interface ReviewDao : TombstoneWriter {
     @Query("SELECT * FROM word WHERE id = :id")
     suspend fun wordById(id: Long): WordEntity?
 
-    /** Stamped now; a new card removes the marker of a deleted one. */
+    /**
+     * A new card removes the marker of a deleted one. Never answered, it knows nothing yet: unstamped,
+     * so it can't replace the review memory of the same word on another phone.
+     */
     @Transaction
     suspend fun insertIfMissing(card: ReviewCardEntity): Long {
-        val id = insertCardRow(card.copy(updatedAt = UpdateClock.now()))
+        val id = insertCardRow(card.copy(updatedAt = if (card.reps == 0) 0 else UpdateClock.now()))
         if (id != -1L) clearCardTombstone(card.wordId)
         return id
     }

@@ -69,6 +69,10 @@ data class BackupFile(
     val deviceName: String? = null,
     /** Sync files only: rows deleted on the writing phone, so other phones delete them too. */
     val tombstones: List<BackupTombstone> = emptyList(),
+    /** Sync files only: when each folder in [folders] was made or renamed to that name, by name. */
+    val folderTimes: Map<String, Long> = emptyMap(),
+    /** Sync files only: the few settings that follow the reader across phones (see [SyncSettings]). */
+    val syncSettings: Map<String, BackupSyncSetting> = emptyMap(),
 ) {
     companion object {
         const val FORMAT = "honmani-backup"
@@ -79,6 +83,10 @@ data class BackupFile(
 /** A deletion marker (`TombstoneEntity`) in a sync file. */
 @Serializable
 data class BackupTombstone(val kind: String, val key: String, val deletedAt: Long)
+
+/** A setting's value and when it was changed. */
+@Serializable
+data class BackupSyncSetting(val value: Int, val at: Long)
 
 /** A shared preference's value with its type, so it is written back as the same type. */
 @Serializable
@@ -269,7 +277,10 @@ data class BackupCatalog(
 )
 
 /** The file isn't a Honmani backup, or one from a newer Honmani. */
-class BackupFormatException(message: String, cause: Throwable? = null) : IOException(message, cause)
+open class BackupFormatException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+/** The file is from a newer Honmani; [deviceName] says which phone, if it is a sync file. */
+class NewerBackupException(message: String, val deviceName: String? = null) : BackupFormatException(message)
 
 /** Reads and writes [BackupFile]s: one JSON entry in a zip. */
 object BackupCodec {
@@ -315,7 +326,7 @@ object BackupCodec {
             throw BackupFormatException("Not a Honmani backup", e)
         }
         if (backup.format != BackupFile.FORMAT) throw BackupFormatException("Not a Honmani backup")
-        if (backup.version > BackupFile.VERSION) throw BackupFormatException("Made by a newer Honmani")
+        if (backup.version > BackupFile.VERSION) throw NewerBackupException("Made by a newer Honmani", backup.deviceName)
         return backup
     }
 }

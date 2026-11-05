@@ -80,9 +80,6 @@ interface HighlightDao : TombstoneWriter {
     @Query("DELETE FROM highlight WHERE id = :id")
     suspend fun deleteRow(id: Long)
 
-    @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
-    suspend fun deleteForBookRows(contentHash: String)
-
     /** Deletes the highlight and leaves a marker, in one transaction. */
     @Transaction
     suspend fun delete(id: Long) {
@@ -90,12 +87,9 @@ interface HighlightDao : TombstoneWriter {
         deleteRow(id)
     }
 
-    /** With the book. */
-    @Transaction
-    suspend fun deleteForBook(contentHash: String) {
-        for (h in forBook(contentHash)) putTombstone(SyncKeys.HIGHLIGHT, SyncKeys.highlight(h.contentHash, h.start, h.end))
-        deleteForBookRows(contentHash)
-    }
+    /** With the book, and without a marker: each phone keeps its own library, so the other phones keep theirs. */
+    @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
+    suspend fun deleteForBook(contentHash: String)
 }
 
 /** A highlight just saved, with the ones it replaced (so Undo can bring them back). */

@@ -13,6 +13,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.difficulty.StoredDifficulty
+import app.honmani.reader.data.backup.WaitingBook
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
@@ -179,6 +180,8 @@ class LibraryViewModel(
     private val recordFinished: suspend (FinishedBookEntity) -> Unit = {},
     /** Deletes a book's reading statistics (its reading days, by book id) and its finished record (by content hash). */
     private val forgetStatistics: suspend (bookId: Long, contentHash: String) -> Unit = { _, _ -> },
+    /** The book goes but its statistics stay: they keep its content hash as their name in sync files. */
+    private val keepStatistics: (bookId: Long, contentHash: String) -> Unit = { _, _ -> },
     /** Deletes the reader's named bookmarks in a removed book (by content hash). */
     private val forgetBookmarks: suspend (contentHash: String) -> Unit = {},
     /** Deletes the highlights in a removed book (by content hash). */
@@ -517,8 +520,9 @@ class LibraryViewModel(
             }
             if (deleteStatistics) {
                 forgetStatistics(book.id, book.contentHash)
-            } else if (FinishedBooks.isFinished(book)) {
-                recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
+            } else {
+                keepStatistics(book.id, book.contentHash)
+                if (FinishedBooks.isFinished(book)) recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
             }
             dao.delete(book.id)
             forgetBookmarks(book.contentHash)
@@ -596,6 +600,7 @@ class LibraryViewModel(
                         container.readingDao.deleteBook(bookId)
                         container.finishedBookDao.forget(hash)
                     },
+                    keepStatistics = { bookId, hash -> container.restoredBooks.addWaiting(listOf(WaitingBook(hash, bookId))) },
                     forgetBookmarks = container.bookmarkDao::deleteForBook,
                     forgetHighlights = container.highlightDao::deleteForBook,
                     forgetPronunciations = container.pronunciationDao::deleteForBook,

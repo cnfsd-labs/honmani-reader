@@ -16,6 +16,8 @@ import app.honmani.reader.data.backup.AutoBackup
 import app.honmani.reader.data.backup.ContentFolderTarget
 import app.honmani.reader.data.backup.FolderBackup
 import app.honmani.reader.data.backup.SyncFolder
+import app.honmani.reader.data.backup.SyncMerge
+import app.honmani.reader.data.backup.SyncSettings
 import app.honmani.reader.data.backup.Backup
 import app.honmani.reader.data.backup.RestoredBooks
 import app.honmani.reader.data.dictionary.DictionaryDownloader
@@ -714,15 +716,33 @@ class AppContainer(context: Context) {
             target = ContentFolderTarget(appContext.contentResolver),
             installationId = ::installationId,
             deviceName = Build.MODEL,
-            export = { identity -> backup.export(null, identity) },
+            export = { identity -> backup.export(null, identity).copy(syncSettings = syncSettings.stamped()) },
+            merge = { file ->
+                syncMerge.merge(file)
+                if (syncSettings.merge(file.syncSettings)) {
+                    reviewSettings.reload()
+                    daySettings.reload()
+                }
+            },
             pruneTombstones = { before -> database.tombstoneDao().deleteOlderThan(before) },
             mutex = backupLock,
         )
     }
 
+    private val syncMerge: SyncMerge by lazy {
+        SyncMerge(database, milestoneStore, readStretches, wordProgressStore, restoredBooks, ::installationId)
+    }
+
+    private val syncSettings: SyncSettings by lazy { SyncSettings(settingsPreferences, devicePreferences) }
+
     /** Writes the sync file (if sync is on and something changed) off the main thread. */
     fun saveSyncFile() {
         applicationScope.launch { syncFolder.write() }
+    }
+
+    /** Takes in what the reader's other phones wrote, then writes this phone's file (if sync is on), off the main thread. */
+    fun syncWithFolder() {
+        applicationScope.launch { syncFolder.sync() }
     }
 
     /**

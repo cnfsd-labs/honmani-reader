@@ -6,6 +6,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 
 /** [FolderTarget] on Android's document providers; [folder] is the tree address `OpenDocumentTree` returned. */
@@ -64,6 +65,38 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
     } catch (_: FileNotFoundException) {
         true
     }
+
+    override fun list(folder: String): List<FolderFile> {
+        val tree = Uri.parse(folder)
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        val files = ArrayList<FolderFile>()
+        resolver.query(
+            children,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            ),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(1) ?: continue
+                files += FolderFile(
+                    DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(0)).toString(),
+                    name,
+                    if (cursor.isNull(2)) 0 else cursor.getLong(2),
+                    if (cursor.isNull(3)) 0 else cursor.getLong(3),
+                )
+            }
+        } ?: throw IOException("Cannot list $folder")
+        return files
+    }
+
+    override fun read(file: String): InputStream =
+        resolver.openInputStream(Uri.parse(file)) ?: throw IOException("Cannot read $file")
 
     override fun canRename(file: String): Boolean =
         resolver.query(Uri.parse(file), arrayOf(DocumentsContract.Document.COLUMN_FLAGS), null, null, null)

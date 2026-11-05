@@ -937,6 +937,7 @@ class BackupTest {
         val json = kotlinx.serialization.json.Json { encodeDefaults = true }.encodeToString(BackupFile.serializer(), file)
             .replace(Regex(""","folders":\[[^\]]*]"""), "")
             .replace(Regex(""","folder":null"""), "")
+            .replace(Regex(""","folderTimes":\{}"""), "")
         assertTrue(!json.contains("\"folder"))
         val bytes = ByteArrayOutputStream().also { output ->
             ZipOutputStream(output).use { zip ->

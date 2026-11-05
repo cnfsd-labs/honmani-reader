@@ -62,9 +62,6 @@ interface PronunciationDao : TombstoneWriter {
     @Query("DELETE FROM pronunciation WHERE id = :id")
     suspend fun deleteRow(id: Long)
 
-    @Query("DELETE FROM pronunciation WHERE content_hash = :contentHash")
-    suspend fun deleteForBookRows(contentHash: String)
-
     /** Deletes the reading and leaves a marker, in one transaction. */
     @Transaction
     suspend fun delete(id: Long) {
@@ -72,10 +69,7 @@ interface PronunciationDao : TombstoneWriter {
         deleteRow(id)
     }
 
-    /** With the book. */
-    @Transaction
-    suspend fun deleteForBook(contentHash: String) {
-        for (p in forBook(contentHash)) putTombstone(SyncKeys.PRONUNCIATION, SyncKeys.pronunciation(p.contentHash, p.text))
-        deleteForBookRows(contentHash)
-    }
+    /** With the book, and without a marker: each phone keeps its own library, so the other phones keep theirs. */
+    @Query("DELETE FROM pronunciation WHERE content_hash = :contentHash")
+    suspend fun deleteForBook(contentHash: String)
 }

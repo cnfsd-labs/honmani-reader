@@ -123,12 +123,14 @@ class Backup(
             val batches: List<KnownBatchEntity>,
             val batchWords: List<KnownBatchWordEntity>,
             val tombstones: List<TombstoneEntity>,
+            val folderTimes: Map<String, Long>,
         )
         val tables = database.withTransaction {
             Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.pronunciations(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
                 dao.knownBatches(), dao.knownBatchWords(),
                 if (sync != null) database.tombstoneDao().all() else emptyList(),
+                if (sync != null) folderDao.all().associate { it.name to it.createdAt } else emptyMap(),
             )
         }
         val grades = grades()
@@ -224,6 +226,7 @@ class Backup(
             deviceId = sync?.deviceId,
             deviceName = sync?.deviceName,
             tombstones = tables.tombstones.map { BackupTombstone(it.kind, it.key, it.deletedAt) },
+            folderTimes = tables.folderTimes,
         )
     }
 
@@ -471,8 +474,18 @@ class Backup(
      * statistics move to it. Returns the book as it is now.
      */
     suspend fun onBookAdded(book: BookEntity): BookEntity {
-        val waiting = restored.find(book.contentHash) ?: return book
-        val details = waiting.details ?: return book
+        val waiting = restored.waiting().firstOrNull { it.key == book.contentHash } ?: return book
+        val details = waiting.details
+        if (details == null) {
+            // Only its statistics were kept (it was removed from this library): they join it again.
+            database.withTransaction {
+                dao.moveReadingDays(waiting.id, book.id)
+                dao.moveLookupEvents(waiting.id, book.id)
+                dao.moveWordLookups(waiting.id, book.id)
+            }
+            restored.remove(waiting)
+            return book
+        }
         val merged = database.withTransaction {
             withFolder(merge(book, details), details).also { merged ->
                 dao.moveReadingDays(waiting.id, book.id)
@@ -509,7 +522,7 @@ class Backup(
         editor.apply()
     }
 
-    private companion object {
+    internal companion object {
         /** The `settings` preferences a backup brings back, and their types. Add new settings here. */
         val SETTING_TYPES = mapOf(
             AppearanceSettings.KEY_ACCENT to BackupValue.STRING,
@@ -644,7 +657,7 @@ class Backup(
         )
 
         /** The backup's correction of the furigana, empty unless it still fits the word. */
-        private fun validFurigana(word: BackupWord): String =
+        fun validFurigana(word: BackupWord): String =
             word.furigana.takeIf { FuriganaOverride.parse(it, word.expression) != null }.orEmpty()
 
         /**

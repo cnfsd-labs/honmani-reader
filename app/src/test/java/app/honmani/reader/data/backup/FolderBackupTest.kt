@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
@@ -69,6 +70,17 @@ internal class FakeFolder : FolderTarget {
         files.remove(file)
         return true
     }
+
+    /** When each file was last changed, for [list]; a test bumps it as a folder app would. */
+    val modified = mutableMapOf<String, Long>()
+
+    override fun list(folder: String): List<FolderFile> {
+        if (folderGone) throw FileNotFoundException(folder)
+        return files.filterKeys { it.substringBeforeLast('/') == folder }
+            .map { (address, bytes) -> FolderFile(address, address.substringAfterLast('/'), bytes.size.toLong(), modified[address] ?: 0) }
+    }
+
+    override fun read(file: String): InputStream = files[file]?.inputStream() ?: throw FileNotFoundException(file)
 
     var renamable = true
 

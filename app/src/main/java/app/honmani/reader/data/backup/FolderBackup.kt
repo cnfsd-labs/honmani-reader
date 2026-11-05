@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+
+data class FolderFile(val address: String, val name: String, val size: Long, val modified: Long)
 
 /** The folder the reader chose, as the document provider (Android's file picker) offers it. */
 interface FolderTarget {
@@ -33,6 +36,12 @@ interface FolderTarget {
 
     /** Deletes [file]; returns whether it is gone. */
     fun delete(file: String): Boolean
+
+    /** The files directly in [folder]. */
+    fun list(folder: String): List<FolderFile>
+
+    /** Opens [file] to be read. */
+    fun read(file: String): InputStream
 
     /** Whether the provider can rename [file]. */
     fun canRename(file: String): Boolean

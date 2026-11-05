@@ -18,22 +18,32 @@ sealed interface SyncFolderState {
     data object Off : SyncFolderState
 
     /** A folder is chosen ([name] as the provider calls it); [lastAt] is when the file was last written (epoch ms). */
-    data class On(val name: String?, val lastAt: Long?) : SyncFolderState
+    data class On(
+        val name: String?,
+        val lastAt: Long?,
+        /** The phone whose file was merged last, and when (epoch ms). */
+        val syncedWith: String? = null,
+        val syncedAt: Long? = null,
+        /** A phone whose file this Honmani is too old to read. */
+        val newerDevice: String? = null,
+    ) : SyncFolderState
 
     /** The last write failed: the folder is gone, or the right to write to it. */
     data class Unavailable(val name: String?) : SyncFolderState
 }
 
 /**
- * Writes this phone's own sync file, `honmani-sync-<installationId>.zip`, into a folder the reader
- * chose (a Syncthing, Nextcloud or Drive folder). One file per phone and one writer per file, so
- * folder sync tools never see a conflict. It is a [BackupFile] with the sync additions and without
- * anything that stays on the phone (settings, book servers, passwords). Honmani makes no network
- * call; moving the files is the folder app's job. Reading the other phones' files is a later slice.
+ * Keeps this phone in step with the reader's other phones through a folder they chose (a Syncthing,
+ * Nextcloud or Drive folder). Each phone writes one file of its own, `honmani-sync-<installationId>.zip`,
+ * and reads the others' ([SyncMerge]). One writer per file, so folder sync tools never see a conflict.
+ * It is a [BackupFile] with the sync additions and without what stays on the phone (most settings,
+ * book servers, passwords). Honmani makes no network call; moving the files is the folder app's job.
  *
- * Off by default. Written when the app goes to the background and right after the folder is chosen,
- * and only if the content changed since the last write. A failure only shows as
- * [SyncFolderState.Unavailable]. The folder is tied to this phone ("device" preferences, not backed up).
+ * Off by default. [sync] reads and writes when the app comes to the front and right after the folder
+ * is chosen; [write] only writes, when it goes to the background. A file is merged once, unless it
+ * changes; one that fails (still being copied, say) is tried again next time. The own file is written
+ * only if the content changed. A failure only shows as [SyncFolderState.Unavailable]. The folder is
+ * tied to this phone ("device" preferences, not backed up).
  */
 class SyncFolder(
     private val device: SharedPreferences,
@@ -42,6 +52,8 @@ class SyncFolder(
     private val deviceName: String,
     /** Builds the file's content for this phone (see [Backup.export]). */
     private val export: suspend (SyncIdentity) -> BackupFile,
+    /** Takes another phone's file into this phone's data. */
+    private val merge: suspend (BackupFile) -> Unit,
     /** Drops deletion markers deleted before the given time (epoch ms). */
     private val pruneTombstones: suspend (before: Long) -> Unit,
     /** Shared with the other writers of backup files, so they never run at once. */
@@ -60,7 +72,13 @@ class SyncFolder(
         return if (device.getBoolean(KEY_FAILED, false)) {
             SyncFolderState.Unavailable(name)
         } else {
-            SyncFolderState.On(name, device.getLong(KEY_LAST, 0L).takeIf { it > 0 })
+            SyncFolderState.On(
+                name,
+                device.getLong(KEY_LAST, 0L).takeIf { it > 0 },
+                device.getString(KEY_SYNCED_WITH, null),
+                device.getLong(KEY_SYNCED_AT, 0L).takeIf { it > 0 },
+                device.getString(KEY_NEWER, null),
+            )
         }
     }
 
@@ -79,6 +97,10 @@ class SyncFolder(
             .putString(KEY_NAME, target.displayName(folder))
             .remove(KEY_LAST)
             .remove(KEY_FINGERPRINT)
+            .remove(KEY_SEEN)
+            .remove(KEY_SYNCED_WITH)
+            .remove(KEY_SYNCED_AT)
+            .remove(KEY_NEWER)
             .putBoolean(KEY_FAILED, false)
             .apply()
         _state.value = read()
@@ -88,13 +110,70 @@ class SyncFolder(
     /** Stops syncing: gives the folder's right back and forgets it. The file already there stays. */
     fun disable() {
         device.getString(KEY_FOLDER, null)?.let(target::release)
-        device.edit().remove(KEY_FOLDER).remove(KEY_NAME).remove(KEY_LAST).remove(KEY_FINGERPRINT).remove(KEY_FAILED).apply()
+        device.edit().remove(KEY_FOLDER).remove(KEY_NAME).remove(KEY_LAST).remove(KEY_FINGERPRINT).remove(KEY_FAILED)
+            .remove(KEY_SEEN).remove(KEY_SYNCED_WITH).remove(KEY_SYNCED_AT).remove(KEY_NEWER).apply()
         _state.value = SyncFolderState.Off
     }
 
     /** Writes the file if sync is on and something changed; never throws. */
     suspend fun write() {
         mutex.withLock { writeLocked() }
+    }
+
+    /** Merges the other phones' changed files, then writes this phone's, if sync is on; never throws. */
+    suspend fun sync() {
+        mutex.withLock {
+            val folder = device.getString(KEY_FOLDER, null) ?: return
+            withContext(Dispatchers.IO) {
+                try {
+                    readOthers(folder)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // The write below finds out the same and shows it.
+                    logWarning("Honmani.sync", "Reading the sync folder failed", e)
+                }
+            }
+            writeLocked()
+        }
+    }
+
+    private suspend fun readOthers(folder: String) {
+        val id = installationId()
+        val seen = device.getStringSet(KEY_SEEN, null).orEmpty()
+        val nowSeen = HashSet<String>()
+        var newer: String? = null
+        for (file in target.list(folder)) {
+            if (!OTHER_FILE.matches(file.name) || file.name == fileName(id)) continue
+            val stamp = "${file.address}|${file.size}|${file.modified}"
+            if (stamp in seen) {
+                nowSeen += stamp
+                continue
+            }
+            try {
+                val backup = target.read(file.address).use { BackupCodec.read(it) }
+                when {
+                    backup.syncFormat == null || backup.deviceId == id -> nowSeen += stamp
+                    backup.syncFormat > FORMAT -> newer = backup.deviceName ?: ANOTHER_PHONE
+                    else -> {
+                        merge(backup)
+                        nowSeen += stamp
+                        device.edit()
+                            .putString(KEY_SYNCED_WITH, backup.deviceName ?: ANOTHER_PHONE)
+                            .putLong(KEY_SYNCED_AT, now())
+                            .apply()
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: NewerBackupException) {
+                newer = e.deviceName ?: ANOTHER_PHONE
+            } catch (e: Exception) {
+                // Half copied, or a merge that failed: not marked as seen, so it is tried again.
+                logWarning("Honmani.sync", "Merging a sync file failed", e)
+            }
+        }
+        device.edit().putStringSet(KEY_SEEN, nowSeen).putString(KEY_NEWER, newer).apply()
     }
 
     private suspend fun writeLocked() {
@@ -150,6 +229,14 @@ class SyncFolder(
                 .joinToString("") { "%02x".format(it) }
         }
 
+        /** Another phone's file: no temporary file or a folder app's conflict copy ("name (1).zip", "name.sync-conflict-….zip"). */
+        private val OTHER_FILE = Regex("^honmani-sync-[^. ]+\\.zip$")
+
+        private const val ANOTHER_PHONE = "Another phone"
+        private const val KEY_SEEN = "sync_folder_seen"
+        private const val KEY_SYNCED_WITH = "sync_folder_synced_with"
+        private const val KEY_SYNCED_AT = "sync_folder_synced_at"
+        private const val KEY_NEWER = "sync_folder_newer"
         private const val KEY_FOLDER = "sync_folder_uri"
         private const val KEY_NAME = "sync_folder_name"
         private const val KEY_LAST = "sync_folder_last"

@@ -55,16 +55,21 @@ interface FolderDao : TombstoneWriter {
     @Query("SELECT * FROM folder WHERE id = :id")
     suspend fun byId(id: Long): FolderEntity?
 
-    @Query("UPDATE folder SET name = :name WHERE id = :id")
-    suspend fun setNameRow(id: Long, name: String)
+    @Query("UPDATE folder SET name = :name, created_at = :now WHERE id = :id")
+    suspend fun setNameRow(id: Long, name: String, now: Long = UpdateClock.now())
 
-    /** The old name is a deleted folder to the others; the new one is not. */
+    /**
+     * The old name is a deleted folder to the others; the new one is not, and counts as made now (or
+     * renaming to a name deleted earlier would lose). Its books are stamped: on the others they
+     * lose the old folder and have to take the new one.
+     */
     @Transaction
     suspend fun setName(id: Long, name: String) {
         val old = byId(id)
         setNameRow(id, name)
         if (old != null && SyncKeys.folder(old.name) != SyncKeys.folder(name)) {
             putTombstone(SyncKeys.FOLDER, SyncKeys.folder(old.name))
+            touchBooksIn(id)
         }
         clearTombstone(SyncKeys.FOLDER, SyncKeys.folder(name))
     }

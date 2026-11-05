@@ -62,13 +62,13 @@ class TombstoneTest {
     fun wordsAndCardsAreStampedAndTheirDeleteLeavesMarkers() = runTest {
         val words = db.wordDao()
         val id = words.insert(word("猫"))
-        assertEquals(1_000L, words.find(id)!!.updatedAt)
+        assertEquals("a word merely looked up holds no choice yet", 0L, words.find(id)!!.updatedAt)
         clock = 2_000
         words.setNote(id, "n")
         assertEquals(2_000L, words.find(id)!!.updatedAt)
 
         db.reviewDao().insertIfMissing(ReviewCardEntity(wordId = id, due = 5, addedAt = 1))
-        assertEquals(2_000L, db.reviewDao().find(id)!!.updatedAt)
+        assertEquals("a card never answered knows nothing yet", 0L, db.reviewDao().find(id)!!.updatedAt)
         clock = 3_000
         db.reviewDao().upsert(db.reviewDao().find(id)!!.copy(reps = 1))
         assertEquals(3_000L, db.reviewDao().find(id)!!.updatedAt)
@@ -133,11 +133,11 @@ class TombstoneTest {
         readings.put(PronunciationEntity(contentHash = "h", text = "名", reading = "な", createdAt = 1))
         assertEquals(emptySet<Pair<String, String>>(), markers())
 
-        // Removing the book's data marks every row.
+        // Removing the book's data leaves no marker: the other phones keep their library.
         bookmarks.deleteForBook("h")
         highlights.deleteForBook("h")
         readings.deleteForBook("h")
-        assertEquals(setOf(bKey, hKey, pKey), markers())
+        assertEquals(emptySet<Pair<String, String>>(), markers())
     }
 
     @Test
@@ -159,7 +159,7 @@ class TombstoneTest {
         val books = db.bookDao()
         val folder = folders.insert(FolderEntity(name = "Novels", createdAt = 1))
         val book = books.insert(book("a"))
-        assertEquals(1_000L, books.find(book)!!.updatedAt)
+        assertEquals("a plain new book holds no choice yet", 0L, books.find(book)!!.updatedAt)
         clock = 2_000
         folders.setBookFolder(book, folder)
         assertEquals(2_000L, books.find(book)!!.updatedAt)
