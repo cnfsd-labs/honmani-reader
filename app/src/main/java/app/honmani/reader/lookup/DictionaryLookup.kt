@@ -115,6 +115,25 @@ class DictionaryLookup(
             term
         }
 
+    /**
+     * The entries of the enabled word dictionaries whose written form or reading is one of
+     * [texts], as they stand (no deinflection, glossaries still packed; see [unpack]). One batch
+     * of queries per [MAX_LOOKUP_TEXTS] texts, for seeding many words at once.
+     */
+    suspend fun entriesFor(texts: Collection<String>): List<LookupEntry> {
+        val dictionaries = dictionaryDao.enabledReady().associateBy { it.id }
+        return texts.distinct().chunked(MAX_LOOKUP_TEXTS)
+            .flatMap { termDao.findByExpressionOrReading(it) }
+            .distinctBy { it.id }
+            .mapNotNull { term ->
+                val dictionary = dictionaries[term.dictionaryId] ?: return@mapNotNull null
+                LookupEntry(term, dictionary, term.expression, emptyList(), matchedExpression = true)
+            }
+    }
+
+    /** [entry] with its glossary unpacked, so [Glossary.json] reads it. */
+    suspend fun unpack(entry: LookupEntry): LookupEntry = entry.copy(term = unpacked(entry.term, entry.dictionary))
+
     suspend fun lookup(
         text: String,
         ruby: List<RubySpan> = emptyList(),

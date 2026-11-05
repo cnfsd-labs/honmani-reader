@@ -156,33 +156,25 @@ class AnkiSyncTest {
     }
 
     @Test
-    fun findsSavedWordsAmongTheNotesOfADeck_usingTheExpressionField() = runBlocking {
-        save("名前", "なまえ")
-        save("見当", "けんとう")
-        save("猫", "ねこ")
+    fun readsTheWordOfEachNoteOfADeck_usingTheExpressionField_andCountsNotesWithoutOne() = runBlocking {
         deckNote("Core", "Basic", listOf("Reading", "Expression"), listOf("なまえ", "名前"))
         deckNote("Core", "Basic", listOf("Reading", "Expression"), listOf("ねこ", "<b>猫</b>[ねこ]"))
         deckNote("Core", "Other", listOf("Back", "Front"), listOf("x", "大きい"))
-        words.markLearned(word("猫").id)
+        deckNote("Core", "Other", listOf("Back", "Front"), listOf("x", "<b>abc</b>"))
 
-        val result = sync.deckWords("Core")
+        val found = sync.deckWords("Core") as DeckWords.Found
 
-        val found = result as DeckWords.Found
-        assertEquals(3, found.notes)
-        // 猫 is known already; 見当 is not in the deck.
-        assertEquals(listOf("名前"), found.matching.map { it.expression })
+        assertEquals(4, found.notes)
+        assertEquals(listOf("名前", "猫", "大きい"), found.forms)
+        assertEquals(1, found.skipped)
     }
 
     @Test
-    fun markingMarksWordsAsKnown_andNoLongerOffers() = runBlocking {
-        save("名前", "なまえ")
-        deckNote("Core", "Basic", listOf("Front", "Back"), listOf("名前", "name"))
-        val found = sync.deckWords("Core") as DeckWords.Found
+    fun anImportedDeckIsNoLongerOffered() = runBlocking {
         assertEquals(false, settings.knownFromAnkiOffered.value)
 
-        sync.markKnown(found.matching)
+        sync.deckImported()
 
-        assertEquals(app.honmani.reader.data.words.WordStatus.LEARNED, word("名前").status)
         assertEquals(true, settings.knownFromAnkiOffered.value)
     }
 

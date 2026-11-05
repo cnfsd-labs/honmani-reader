@@ -95,7 +95,10 @@ import app.honmani.reader.data.words.WordKnowledgeTracker
 import app.honmani.reader.data.words.WordMarker
 import app.honmani.reader.data.words.LookupRecorder
 import app.honmani.reader.data.words.WordProgressStore
+import app.honmani.reader.data.words.KnownBatchRepository
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.known.KnownWordResolver
+import app.honmani.reader.known.KnownWords
 import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.DictionaryLookup
@@ -313,6 +316,17 @@ class AppContainer(context: Context) {
             voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice },
             dir = File(appContext.cacheDir, "listen"),
             sentenceVoice = { phoneVoice },
+        )
+    }
+
+    val knownWords: KnownWords by lazy {
+        KnownWords(
+            resolver = KnownWordResolver(dictionaryLookup),
+            batches = KnownBatchRepository(database),
+            frequencyDictionary = { lexiconSources()?.frequency?.let { it.id to it.title } },
+            topWords = { dictionary, maxRank ->
+                database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { it.expression to it.reading }
+            },
         )
     }
 

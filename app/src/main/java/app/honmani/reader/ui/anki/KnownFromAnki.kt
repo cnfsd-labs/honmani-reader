@@ -29,10 +29,12 @@ import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.anki.DeckWords
 import app.honmani.reader.diagnostics.logWarning
+import app.honmani.reader.known.KnownPlan
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -52,7 +54,7 @@ class KnownFromAnki internal constructor(
 
         data class Reading(val deck: String) : Step
 
-        data class Confirm(val found: DeckWords.Found) : Step
+        data class Confirm(val plan: KnownPlan, val notes: Int) : Step
     }
 
     var step by mutableStateOf<Step?>(null)
@@ -85,11 +87,14 @@ class KnownFromAnki internal constructor(
         step = Step.Reading(deck)
         reading = scope.launch {
             when (val result = container.ankiSync.deckWords(deck)) {
-                is DeckWords.Found -> if (result.matching.isEmpty()) {
-                    step = null
-                    toast(context.resources.getQuantityString(R.plurals.anki_known_none, result.notes, result.notes, deck))
-                } else {
-                    step = Step.Confirm(result)
+                is DeckWords.Found -> {
+                    val plan = container.knownWords.planDeck(deck, result.forms, result.skipped)
+                    if (plan.change.changed == 0) {
+                        step = null
+                        toast(context.resources.getQuantityString(R.plurals.anki_known_none, result.notes, result.notes, deck))
+                    } else {
+                        step = Step.Confirm(plan, result.notes)
+                    }
                 }
                 DeckWords.NotInstalled -> finish(context.getString(R.string.anki_not_installed))
                 DeckWords.NoPermission -> finish(context.getString(R.string.anki_no_permission))
@@ -98,11 +103,14 @@ class KnownFromAnki internal constructor(
         }
     }
 
-    fun confirm(found: DeckWords.Found) {
+    fun confirm(plan: KnownPlan) {
         step = null
         scope.launch {
-            container.ankiSync.markKnown(found.matching)
-            toast(context.resources.getQuantityString(R.plurals.anki_known_done, found.matching.size, found.matching.size))
+            // Not cancelled with the screen: a half-marked deck would offer itself again.
+            val (_, change) = withContext(NonCancellable) {
+                container.knownWords.confirm(plan).also { container.ankiSync.deckImported() }
+            }
+            toast(context.resources.getQuantityString(R.plurals.anki_known_done, change.changed, change.changed))
         }
     }
 
@@ -164,13 +172,24 @@ fun KnownFromAnkiDialogs(state: KnownFromAnki) {
             dismissButton = { TextButton(onClick = state::cancel) { Text(stringResource(R.string.action_cancel)) } },
         )
         is KnownFromAnki.Step.Confirm -> {
-            val count = step.found.matching.size
+            val change = step.plan.change
             AlertDialog(
                 onDismissRequest = state::cancel,
-                title = { Text(pluralStringResource(R.plurals.anki_known_title, count, count)) },
-                text = { Text(stringResource(R.string.anki_known_text, step.found.deck, step.found.notes)) },
+                title = { Text(pluralStringResource(R.plurals.anki_known_title, change.changed, change.changed)) },
+                text = {
+                    Text(
+                        stringResource(
+                            R.string.anki_known_text,
+                            step.plan.detail,
+                            step.notes,
+                            change.upgraded,
+                            change.created,
+                            step.plan.skipped,
+                        ),
+                    )
+                },
                 confirmButton = {
-                    TextButton(onClick = { state.confirm(step.found) }) { Text(stringResource(R.string.anki_known_mark)) }
+                    TextButton(onClick = { state.confirm(step.plan) }) { Text(stringResource(R.string.anki_known_mark)) }
                 },
                 dismissButton = { TextButton(onClick = state::cancel) { Text(stringResource(R.string.action_cancel)) } },
             )

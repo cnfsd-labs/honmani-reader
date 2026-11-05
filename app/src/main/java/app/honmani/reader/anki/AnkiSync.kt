@@ -1,12 +1,9 @@
 package app.honmani.reader.anki
 
-import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
-import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.logWarning
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
@@ -24,8 +21,8 @@ sealed interface AnkiCheck {
 
 /** The outcome of [AnkiSync.deckWords]. */
 sealed interface DeckWords {
-    /** The deck has [notes] notes; [matching] are saved words not known yet whose form is among them. */
-    data class Found(val deck: String, val notes: Int, val matching: List<WordEntity>) : DeckWords
+    /** The deck has [notes] notes; [forms] are the words on them, [skipped] notes had no word to take. */
+    data class Found(val deck: String, val notes: Int, val forms: List<String>, val skipped: Int) : DeckWords
 
     data object NotInstalled : DeckWords
 
@@ -36,8 +33,8 @@ sealed interface DeckWords {
 
 /**
  * Compares the saved words with what AnkiDroid holds, on request only (nothing runs in the
- * background): [check] fixes the "in Anki" marks, [deckWords] and [markKnown] take words the
- * reader already learns in an Anki deck as known.
+ * background): [check] fixes the "in Anki" marks, [deckWords] reads the words of an Anki deck
+ * (to mark them as known, see KnownWords).
  */
 class AnkiSync(
     private val anki: AnkiApi,
@@ -86,8 +83,7 @@ class AnkiSync(
     }
 
     /**
-     * Reads the notes of [deck] and finds which saved words (not known yet) they contain. The
-     * word of a note is its field named like Expression, Word or Front, else its first field,
+     * Reads the notes of [deck] and the word on each. The word of a note is its field named like Expression, Word or Front, else its first field,
      * cleaned of markup and readings ([AnkiWords]).
      */
     suspend fun deckWords(deck: String): DeckWords = guarded({ DeckWords.Failed(it) }) {
@@ -95,20 +91,15 @@ class AnkiSync(
         if (!anki.hasPermission()) return@guarded DeckWords.NoPermission
         val notes = anki.deckNotes(deck) ?: return@guarded DeckWords.Failed("AnkiDroid gave no answer")
         val fieldNames = notes.map { it.noteType }.distinct().associateWith { anki.fieldNames(it) }
-        val forms = notes.mapNotNull { note ->
+        val forms = notes.map { note ->
             val index = AnkiWords.fieldIndex(fieldNames[note.noteType].orEmpty())
             AnkiWords.extract(note.fields.getOrNull(index).orEmpty())
-        }.toSet()
-        val matching = words.all.first().filter { it.status == WordStatus.LEARNING && it.expression in forms }
-        DeckWords.Found(deck, notes.size, matching)
+        }
+        DeckWords.Found(deck, notes.size, forms.filterNotNull().distinct(), forms.count { it == null })
     }
 
-    /** Marks [found] as known (learned), and records that the import was done. */
-    suspend fun markKnown(found: List<WordEntity>) = withContext(NonCancellable) {
-        // Not cancelled with the screen: a half-marked deck would offer itself again.
-        found.forEach { words.markLearned(it.id) }
-        settings.setKnownFromAnkiOffered(true)
-    }
+    /** Records that a deck was imported as known, so the Words list stops offering it. */
+    fun deckImported() = settings.setKnownFromAnkiOffered(true)
 
     private suspend fun <T> guarded(failed: (String) -> T, block: suspend () -> T): T =
         withContext(Dispatchers.IO) {

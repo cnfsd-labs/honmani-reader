@@ -68,6 +68,7 @@ import app.honmani.reader.data.opds.OpdsCatalog
 import app.honmani.reader.data.settings.Accent
 import app.honmani.reader.data.settings.customAccentColor
 import app.honmani.reader.ui.dictionaries.DictionariesScreen
+import app.honmani.reader.ui.known.KnownWordsSettingsRow
 import app.honmani.reader.ui.theme.HonmaniTheme
 import kotlinx.coroutines.launch
 
@@ -294,6 +295,7 @@ private fun SettingsContent(
             item { SectionHeading(R.string.settings_section_flashcards) }
             item { review() }
             item { anki() }
+            item { KnownWordsSettingsRow() }
             item { SectionHeading(R.string.settings_section_books) }
             items(catalogs, key = { it.id }) { catalog ->
                 ListItem(

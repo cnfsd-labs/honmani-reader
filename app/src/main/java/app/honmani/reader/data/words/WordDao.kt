@@ -15,6 +15,9 @@ interface WordDao {
     @Query("SELECT * FROM word WHERE starred = 1 AND ignored = 0 ORDER BY rank_key DESC, id DESC")
     fun observeStarred(): Flow<List<WordEntity>>
 
+    @Query("SELECT COUNT(*) FROM word WHERE status = 'LEARNED' AND ignored = 0")
+    fun observeLearnedCount(): Flow<Int>
+
     @Query("SELECT * FROM word WHERE status = 'LEARNED' AND ignored = 0 ORDER BY expression, reading")
     fun observeLearned(): Flow<List<WordEntity>>
 

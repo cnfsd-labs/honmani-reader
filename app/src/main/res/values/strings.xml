@@ -444,7 +444,7 @@
     </plurals>
     <string name="anki_check_failed">Could not read AnkiDroid: %1$s</string>
     <string name="action_mark_known_from_anki">Mark words from an Anki deck as known</string>
-    <string name="anki_known_summary">Words you already learned in AnkiDroid stop showing as being learned here. Only words you have looked up are changed.</string>
+    <string name="anki_known_summary">Words you already learned in AnkiDroid stop showing as being learned here. Words not saved yet are added as known.</string>
     <string name="anki_known_offer">Already learn with Anki? Words from one of your decks can be marked as known.</string>
     <string name="anki_known_choose">Choose a deck</string>
     <string name="anki_known_not_now">Not now</string>
@@ -452,19 +452,74 @@
     <string name="anki_known_no_decks">AnkiDroid has no decks to read. Open AnkiDroid once, then try again.</string>
     <string name="anki_known_failed">Could not read the deck: %1$s</string>
     <plurals name="anki_known_none">
-        <item quantity="one">%2$s has %1$d note, but none is a saved word that is still being learned.</item>
-        <item quantity="other">%2$s has %1$d notes, but none is a saved word that is still being learned.</item>
+        <item quantity="one">%2$s has %1$d note, but no word on it is new to Known.</item>
+        <item quantity="other">%2$s has %1$d notes, but no word on them is new to Known.</item>
     </plurals>
     <plurals name="anki_known_title">
         <item quantity="one">Mark %1$d word as known?</item>
         <item quantity="other">Mark %1$d words as known?</item>
     </plurals>
-    <string name="anki_known_text" tools:ignore="PluralsCandidate">Saved words that are still being learned and appear in the %1$s deck (%2$d notes). They move to Known; you can move any back.</string>
+    <string name="anki_known_text" tools:ignore="PluralsCandidate">The %1$s deck has %2$d notes. %3$d of its words you already saved move to Known, and %4$d more are added as known. %5$d notes without a word are skipped. You can undo this under “Tell Honmani what you already know”.</string>
     <string name="anki_known_mark">Mark as known</string>
     <plurals name="anki_known_done">
         <item quantity="one">%1$d word marked as known</item>
         <item quantity="other">%1$d words marked as known</item>
     </plurals>
+    <string name="known_title">Tell Honmani what you already know</string>
+    <string name="known_intro">Words marked as known stop showing as new and count in your percentage of known words. Every step can be undone below.</string>
+    <string name="known_top_heading">The most common words</string>
+    <string name="known_word_list">Word list</string>
+    <string name="known_word_list_details">A text or CSV file: one word per line, an optional reading after a tab or comma.</string>
+    <string name="known_paste">Paste a word list</string>
+    <string name="known_paste_hint">One word per line</string>
+    <string name="known_check">Check</string>
+    <string name="known_anki_deck">Anki deck</string>
+    <string name="known_anki_deck_details">Every word of one of your AnkiDroid decks.</string>
+    <string name="known_quiz">Quick quiz</string>
+    <string name="known_quiz_soon">Coming soon</string>
+    <string name="known_batches">Earlier steps</string>
+    <string name="known_undo">Undo</string>
+    <string name="known_working">Looking up the words</string>
+    <string name="known_pasted_name">pasted text</string>
+    <string name="known_file_name">word list</string>
+    <string name="known_no_frequency">The most common words need a frequency dictionary, for example Jiten. Install one in Settings under Dictionaries.</string>
+    <string name="known_file_unreadable">That file could not be read.</string>
+    <string name="known_file_too_large">That file is larger than 5 MB, which is too large for a word list.</string>
+    <string name="known_list_empty">That list holds no words.</string>
+    <string name="known_failed">Could not mark the words: %1$s</string>
+    <string name="known_batch_top">The %1$s most common words</string>
+    <string name="known_batch_anki">Anki deck %1$s</string>
+    <string name="known_batch_list">Word list %1$s</string>
+    <string name="known_batch_quiz">Quick quiz</string>
+    <plurals name="known_batch_words">
+        <item quantity="one">%1$d word</item>
+        <item quantity="other">%1$d words</item>
+    </plurals>
+    <string name="known_review_top">The %1$s most common words by %2$s. Particles and grammar words are included, names are not.</string>
+    <string name="known_review_anki">The words of the %1$s deck.</string>
+    <string name="known_review_list">The words of %1$s.</string>
+    <string name="known_review_marks" tools:ignore="PluralsCandidate">Marks %1$d words as known: %2$d new to your list, %3$d moved from Learning.</string>
+    <string name="known_review_already" tools:ignore="PluralsCandidate">%1$d were known already.</string>
+    <string name="known_review_names" tools:ignore="PluralsCandidate">%1$d names were left out.</string>
+    <string name="known_review_skipped" tools:ignore="PluralsCandidate">%1$d without a word were skipped.</string>
+    <string name="known_review_unmatched" tools:ignore="PluralsCandidate">%1$d not found in your dictionaries: %2$s</string>
+    <string name="known_review_undo">You can undo this.</string>
+    <plurals name="known_done">
+        <item quantity="one">%1$d word marked as known</item>
+        <item quantity="other">%1$d words marked as known</item>
+    </plurals>
+    <plurals name="known_undone">
+        <item quantity="one">%1$d word undone.</item>
+        <item quantity="other">%1$d words undone.</item>
+    </plurals>
+    <plurals name="known_left_alone">
+        <item quantity="one">%1$d you changed since stays.</item>
+        <item quantity="other">%1$d you changed since stay.</item>
+    </plurals>
+    <string name="known_card_text">Tell Honmani what you already know</string>
+    <string name="known_card_details">Mark the most common words, a word list or an Anki deck as known, so new words stand out.</string>
+    <string name="known_card_open">Choose</string>
+    <string name="known_card_dismiss">Not now</string>
     <string name="anki_failed">Adding to Anki failed: %1$s</string>
     <string name="anki_added_without_audio">%1$s added to Anki, without audio: %2$s</string>
     <string name="voice_problem_no_engine">this phone has no text-to-speech voice</string>

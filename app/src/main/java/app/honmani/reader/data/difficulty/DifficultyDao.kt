@@ -51,6 +51,13 @@ interface DifficultyDao {
     )
     suspend fun frequencies(dictionary: Long, after: Long, limit: Int): List<LexiconFrequency>
 
+    /** The frequency rows of [dictionary] with a rank of at most [maxRank], most common first (for "the top N words"). */
+    @Query(
+        "SELECT id, expression, reading, value, display FROM term_meta WHERE dictionary_id = :dictionary " +
+            "AND kind = 'FREQUENCY' AND value IS NOT NULL AND value <= :maxRank ORDER BY value, id",
+    )
+    suspend fun topFrequencies(dictionary: Long, maxRank: Double): List<LexiconFrequency>
+
     /** Whether the dictionary has frequency rows (pitch-accent dictionaries have meta rows too). */
     @Query("SELECT EXISTS(SELECT 1 FROM term_meta WHERE dictionary_id = :dictionary AND kind = 'FREQUENCY' AND value IS NOT NULL)")
     suspend fun hasFrequencies(dictionary: Long): Boolean

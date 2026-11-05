@@ -147,6 +147,8 @@ Words → Learning: "Check against Anki" (beside "Add all N to Anki") forgets th
 cards deleted in AnkiDroid and marks words whose card exists there. It only looks at Honmani's
 own note type of the chosen "Card type" and at words already saved. "Choose a deck" (also in Settings → Anki) marks saved
 words found in a deck's word field as learned; decks of whole sentences match almost nothing.
+Since the known-words sheet, a deck marks every word on its notes as Known, also ones you never
+looked up, and the confirm text shows both numbers (saved words moved, new words added).
 
 Settings → Anki → Card type: "Honmani" (default) or "Sentence". With "Sentence", adding a word
 (lookup panel, Words → Learning, "Add all N to Anki") creates the note type "Honmani Sentence" in
@@ -189,6 +191,17 @@ HTTP status), and in that book the reader menu (tap the bottom strip) starts wit
 failed: …"; other books show no hint. When the server is back, the next sync clears both.
 
 ## Word marks and known words
+
+"Tell Honmani what you already know" (Words → three dots, Settings, or the card at the top of
+Words → Learning while fewer than 50 words are Known; "Not now" hides the card for good): the sheet
+marks the most common words (500 to 5000 by the frequency dictionary; needs one, for example Jiten),
+a text or CSV word list (file or pasted; one word per line, optional reading after a tab or comma,
+`#` lines ignored; over 5 MB is refused), or an Anki deck as Known. Each shows a preview (how many
+are matched, new, already known, not found with a few examples) before "Mark as known". Under
+"Earlier steps" every step has Undo: it removes the words it added and moves back the ones it
+moved from Learning, but leaves any word you looked up, starred, moved or changed since. Check:
+mark the top 1000, see the Known filter and a book's "% known" rise; undo and see them fall;
+change one word first and see it stay. "Quick quiz" is a greyed placeholder.
 
 Reader settings → Mark words. "Learning" (the default): look up a word, turn a page or two and
 come back: the word and its other forms (食べた, 食べない) have a light accent tint; after

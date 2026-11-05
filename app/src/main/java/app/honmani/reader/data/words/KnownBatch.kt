@@ -105,6 +105,9 @@ class KnownBatchRepository(
     private val dao = database.knownBatchDao()
     private val words = database.wordDao()
 
+    /** How many words are Known now. */
+    val knownCount: Flow<Int> = words.observeLearnedCount()
+
     val batches: Flow<List<KnownBatchEntity>> = dao.observeBatches()
 
     /** What [apply] would do, without doing it. */

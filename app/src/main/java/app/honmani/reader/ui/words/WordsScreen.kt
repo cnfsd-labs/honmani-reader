@@ -117,6 +117,8 @@ import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
+import app.honmani.reader.ui.known.KnownWordsCard
+import app.honmani.reader.ui.known.KnownWordsSheet
 import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.anki.showVoiceProblem
@@ -633,6 +635,9 @@ private fun WordList(
                     }
                 }
             }
+            if (filter == WordFilter.LEARNING) {
+                item(key = "knownCard") { KnownWordsCard() }
+            }
             item(key = "hint") {
                 Text(
                     text = stringResource(
@@ -794,6 +799,8 @@ private fun WordsMenu(
     exportEnabled: Boolean,
 ) {
     var open by remember { mutableStateOf(false) }
+    var showKnown by remember { mutableStateOf(false) }
+    if (showKnown) KnownWordsSheet(onDismiss = { showKnown = false })
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
@@ -823,6 +830,18 @@ private fun WordsMenu(
                 onClick = {
                     open = false
                     onShowIgnored()
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.known_title), style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.Filled.Check, contentDescription = null) },
+                colors = MenuDefaults.itemColors(leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                onClick = {
+                    open = false
+                    showKnown = true
                 },
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
@@ -1106,6 +1125,8 @@ private fun Sentence(sentence: AnnotatedString, source: String?, maxLines: Int) 
 /** "3 lookups · 2 days ago · 吾輩は猫である" */
 @Composable
 private fun details(word: WordEntity, now: Long): String {
+    // Words marked as known without a lookup (word lists, Anki decks) were never looked up.
+    if (word.lookupCount == 0) return word.lastBookTitle.orEmpty()
     val count = pluralStringResource(R.plurals.words_lookup_count, word.lookupCount, word.lookupCount)
     // Android says "0 minutes ago" for the first minute.
     val time = if (now - word.lastLookedUpAt < DateUtils.MINUTE_IN_MILLIS) {
