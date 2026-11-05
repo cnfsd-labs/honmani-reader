@@ -56,13 +56,16 @@ fun BookmarksSheet(
     onDelete: (BookmarkEntity) -> Unit,
     onUndoDelete: (BookmarkEntity) -> Unit,
     onDismiss: () -> Unit,
+    /** Back (not a tap outside): returns to the reader menu; null closes like a tap outside. */
+    onBack: (() -> Unit)? = null,
 ) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var renaming by remember { mutableStateOf<BookmarkEntity?>(null) }
     val deleted = stringResource(R.string.bookmark_deleted)
     val undo = stringResource(R.string.action_undo)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+        MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
             if (bookmarks.isEmpty()) {
                 Text(

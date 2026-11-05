@@ -293,6 +293,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var addBookOnStart by remember { mutableStateOf<AddBookStart?>(null) }
     // Honmani's reader settings, from the Settings tab or the reader's top bar.
     var readerSettings by rememberSaveable { mutableStateOf(false) }
+    // The open sub-screen came from the reader menu: Back returns there (a tap outside or a swipe down closes to the book).
+    var openedFromMenu by rememberSaveable { mutableStateOf(false) }
     // The words of this reading session, from the reader's bottom menu.
     var sessionShown by rememberSaveable { mutableStateOf(false) }
     // The search in the open book, from the reader's bottom menu; ttu's id of the book.
@@ -485,9 +487,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onOpenSettings = {
                     viewModel.dismiss()
+                    openedFromMenu = false
                     readerSettings = true
                 },
                 onOpenMenu = viewModel::openMenu,
+                onContentsClosedByBack = { if (openedFromMenu) viewModel.openMenu() },
                 onImage = {
                     viewModel.dismiss()
                     picture = it
@@ -588,7 +592,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         else -> null
                     },
                     messageAction = if (needsFiles) stringResource(R.string.audiobook_change) else null,
-                    onMessageAction = { audiobookStep = AudiobookStep.INTRO },
+                    onMessageAction = {
+                        openedFromMenu = false
+                        audiobookStep = AudiobookStep.INTRO
+                    },
                     previousDescription = stringResource(R.string.audiobook_previous),
                     nextDescription = stringResource(R.string.audiobook_next),
                     closeDescription = stringResource(R.string.audiobook_close),
@@ -792,7 +799,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 bottomBar = bottomBar,
                                 showingDictionaries = dictionariesShown,
                                 onShowDictionaries = { dictionariesShown = it },
-                                onOpenReaderSettings = { readerSettings = true },
+                                onOpenReaderSettings = {
+                                    openedFromMenu = false
+                                    readerSettings = true
+                                },
                                 onOpenSample = {
                                     // Back from the book is the library, where it now is.
                                     tab = HomeTab.LIBRARY
@@ -839,6 +849,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             val id = openTtuId
             value = if (textWanted && id != null) container.searchableBook(id) else null
         }
+        // Back from a sub-screen that came from the menu: close it and show the menu again; null otherwise.
+        val backToMenu = { close: () -> Unit -> if (openedFromMenu) ({ close(); viewModel.openMenu() }) else null }
         val jumpMessage = { percent: Int -> resources.getString(R.string.jump_back_message, percent) }
         val backLabel = stringResource(R.string.jump_back_action)
         val defaultName = { percent: Int -> resources.getString(R.string.bookmark_default_name, percent) }
@@ -887,18 +899,22 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onBookmarks = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     bookmarksShown = true
                 },
                 onHighlights = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     highlightsShown = true
                 },
                 onContents = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     viewModel.ttuLibrary.openContents()
                 },
                 onSearch = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     searchShown = true
                 },
                 onReadAloud = {
@@ -910,19 +926,23 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 pronunciationCount = pronunciations.size,
                 onPronunciations = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     pronunciationsShown = true
                 },
                 audiobookPaired = audiobookPaired,
                 onAudiobook = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     audiobookStep = if (audiobookPaired) AudiobookStep.MANAGE else AudiobookStep.INTRO
                 },
                 onSettings = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     readerSettings = true
                 },
                 onSessionWords = {
                     viewModel.closeMenu()
+                    openedFromMenu = true
                     sessionShown = true
                 },
                 onCloseBook = viewModel::closeBook,
@@ -974,6 +994,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 onDismiss = { audiobookStep = null },
+                onBack = backToMenu { audiobookStep = null },
             )
         }
         bookmarkDraft?.let { draft ->
@@ -1016,6 +1037,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDelete = { bookmark -> scope.launch { container.bookmarkDao.delete(bookmark.id) } },
                 onUndoDelete = { bookmark -> scope.launch { container.bookmarkDao.put(bookmark) } },
                 onDismiss = { bookmarksShown = false },
+                onBack = backToMenu { bookmarksShown = false },
             )
         }
         if (highlightsShown && !atLibrary) {
@@ -1036,6 +1058,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
                 onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
                 onDismiss = { highlightsShown = false },
+                onBack = backToMenu { highlightsShown = false },
             )
         }
         if (pronunciationsShown && !atLibrary) {
@@ -1052,6 +1075,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDelete = { item -> scope.launch { container.pronunciationDao.delete(item.id) } },
                 onUndoDelete = { item -> scope.launch { container.pronunciationDao.put(item) } },
                 onDismiss = { pronunciationsShown = false },
+                onBack = backToMenu { pronunciationsShown = false },
             )
         }
         val searchedBook = openTtuId
@@ -1065,12 +1089,12 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         resources.getString(R.string.jump_back_message, hit.percent), backLabel,
                     )
                 },
-                onClose = { searchShown = false },
+                onClose = { searchShown = false; if (openedFromMenu) viewModel.openMenu() },
             )
         }
         if (sessionShown) {
             val session by container.wordRepository.session.collectAsStateWithLifecycle(SessionWords(null, emptyList()))
-            SessionSheet(session, onDismiss = { sessionShown = false })
+            SessionSheet(session, onDismiss = { sessionShown = false }, onBack = backToMenu { sessionShown = false })
         }
         if (reviewShown) {
             ReviewScreen(
@@ -1084,7 +1108,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
         if (readerSettings) {
             // On top of everything; closing it reloads the reader if anything changed.
-            ReaderSettingsScreen(onClose = { readerSettings = false })
+            ReaderSettingsScreen(onClose = { readerSettings = false; if (openedFromMenu) viewModel.openMenu() })
         }
         SnackbarHost(jumpSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }

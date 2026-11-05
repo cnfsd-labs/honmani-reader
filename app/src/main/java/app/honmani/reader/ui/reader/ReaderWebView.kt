@@ -173,6 +173,8 @@ fun ReaderWebView(
     onOpenSettings: () -> Unit = {},
     /** A tap on the footer along the bottom of the page, or a long swipe up: the app shows its reader menu. */
     onOpenMenu: () -> Unit = {},
+    /** Back closed ttu's table of contents (not a tap on an entry): the app may return to its reader menu. */
+    onContentsClosedByBack: () -> Unit = {},
     /** A tap on a picture in the book: its bytes (PNG, JPEG, WebP or GIF) for the zoom viewer. */
     onImage: (ByteArray) -> Unit = {},
     /** Each item asks to leave the open book, as back does (to the book list). */
@@ -212,6 +214,7 @@ fun ReaderWebView(
     val currentOnPage by rememberUpdatedState(onPage)
     val currentOnOpenSettings by rememberUpdatedState(onOpenSettings)
     val currentOnOpenMenu by rememberUpdatedState(onOpenMenu)
+    val currentOnContentsClosedByBack by rememberUpdatedState(onContentsClosedByBack)
     val currentOnImage by rememberUpdatedState(onImage)
     val currentOnBackground by rememberUpdatedState(onBackground)
     val currentPanelOpen by rememberUpdatedState(panelOpen)
@@ -248,7 +251,9 @@ fun ReaderWebView(
         pendingFileCallback = null
     }
 
-    BackHandler(enabled = !atLibrary) { webViewRef.view?.let(::backOrCloseContents) }
+    BackHandler(enabled = !atLibrary) {
+        webViewRef.view?.let { backOrCloseContents(it) { currentOnContentsClosedByBack() } }
+    }
     LaunchedEffect(closeRequests) {
         closeRequests.collect { if (!atLibrary) webViewRef.view?.let(::goBack) }
     }
@@ -614,9 +619,9 @@ private fun turnPage(view: WebView, next: Boolean) {
 }
 
 /** Back closes ttu's table of contents when it is open (`reader-menu.js`), else see [goBack]. */
-private fun backOrCloseContents(view: WebView) {
+private fun backOrCloseContents(view: WebView, onContentsClosed: () -> Unit) {
     view.evaluateJavascript("window.honmaniReaderMenu ? honmaniReaderMenu.closeContents() : false;") { closed ->
-        if (closed != "true" && view.isAttachedToWindow) goBack(view)
+        if (closed == "true") onContentsClosed() else if (view.isAttachedToWindow) goBack(view)
     }
 }
 

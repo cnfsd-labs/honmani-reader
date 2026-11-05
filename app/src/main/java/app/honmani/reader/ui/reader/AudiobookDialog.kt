@@ -28,11 +28,15 @@ fun AudiobookDialog(
     onChange: () -> Unit,
     onRemove: () -> Unit,
     onDismiss: () -> Unit,
+    /** Back (not a tap outside): returns to the reader menu; null closes like a tap outside. */
+    onBack: (() -> Unit)? = null,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = menuReturnDialogProperties(onBack),
         title = { Text(stringResource(R.string.audiobook_title)) },
         text = {
+            MenuReturnBack(onBack)
             when (step) {
                 AudiobookStep.INTRO -> Text(stringResource(R.string.audiobook_intro))
                 AudiobookStep.SUBTITLES -> Text(stringResource(R.string.audiobook_next_step))

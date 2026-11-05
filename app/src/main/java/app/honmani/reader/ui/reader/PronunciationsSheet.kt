@@ -59,6 +59,8 @@ fun PronunciationsSheet(
     onDelete: (PronunciationEntity) -> Unit,
     onUndoDelete: (PronunciationEntity) -> Unit,
     onDismiss: () -> Unit,
+    /** Back (not a tap outside): returns to the reader menu; null closes like a tap outside. */
+    onBack: (() -> Unit)? = null,
 ) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -66,7 +68,8 @@ fun PronunciationsSheet(
     val undo = stringResource(R.string.action_undo)
     // The pair being edited; ("" to "") is a new one.
     var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+        MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
             LazyColumn(modifier = Modifier.padding(bottom = 48.dp)) {
                 item {

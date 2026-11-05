@@ -48,12 +48,15 @@ fun HighlightsSheet(
     onDelete: (HighlightEntity) -> Unit,
     onUndoDelete: (HighlightEntity) -> Unit,
     onDismiss: () -> Unit,
+    /** Back (not a tap outside): returns to the reader menu; null closes like a tap outside. */
+    onBack: (() -> Unit)? = null,
 ) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val removed = stringResource(R.string.highlight_removed)
     val undo = stringResource(R.string.action_undo)
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+        MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
             if (highlights.isEmpty()) {
                 Text(

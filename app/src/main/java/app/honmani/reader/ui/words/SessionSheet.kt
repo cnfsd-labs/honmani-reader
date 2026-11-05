@@ -15,6 +15,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import app.honmani.reader.ui.reader.MenuReturnBack
+import app.honmani.reader.ui.reader.menuReturnSheetProperties
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -36,9 +38,10 @@ import app.honmani.reader.ui.lookup.LookupActivity
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SessionSheet(session: SessionWords, onDismiss: () -> Unit) {
+fun SessionSheet(session: SessionWords, onDismiss: () -> Unit, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+        MenuReturnBack(onBack)
         Column(modifier = Modifier.navigationBarsPadding()) {
             Text(
                 text = stringResource(R.string.session_title),
