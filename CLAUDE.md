@@ -36,7 +36,11 @@ repository is public: never copy those notes, personal details or discussions in
   rebuildable cache fed through ttu's own import input (`library-bridge.js`).
 - **Database:** one Room database, schema version 1 in `app/schemas`. Until the first public
   release it is edited in place (commit the regenerated JSON); an install made before a schema
-  change must be uninstalled (identity-hash crash). **Frozen from the first public release on:**
+  change must be uninstalled (identity-hash crash). That crash ("Room cannot verify the data
+  integrity") is dev-machine only: reproduced on the 7 Pro by writing a wrong `identity_hash` into
+  the debug DB. Auto-backup/transfer cannot restore a stale DB (it is excluded from both backup
+  rule files), and fresh installs never hit it. **Freeze the schema from the first Play upload or
+  closed test, not later:** testers update over old data. **Frozen from the first public release on:**
   a change then needs a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test in
   `DatabaseMigrationTest` and the exported JSON committed. No destructive fallback. Manual DI in
   `AppContainer`, no Hilt.
