@@ -38,6 +38,7 @@ import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.HighlightDao
+import app.honmani.reader.data.library.PronunciationDao
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.Folders
@@ -217,6 +218,7 @@ class AppContainer(context: Context) {
     val folders: Folders by lazy { Folders(database.folderDao()) }
     val bookmarkDao: BookmarkDao by lazy { database.bookmarkDao() }
     val highlightDao: HighlightDao by lazy { database.highlightDao() }
+    val pronunciationDao: PronunciationDao by lazy { database.pronunciationDao() }
 
     val bookImporter: BookImporter by lazy {
         BookImporter(bookDao, booksDir, File(appContext.filesDir, "covers"), restore = { backup.onBookAdded(it) })

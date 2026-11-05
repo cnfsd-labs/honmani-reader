@@ -107,6 +107,10 @@ interface WordDao {
     @Query("UPDATE word SET note = :note WHERE id = :id")
     suspend fun setNote(id: Long, note: String)
 
+    /** Words whose furigana the reader corrected: the suggestions for Read aloud pronunciations. */
+    @Query("SELECT * FROM word WHERE furigana != '' AND ignored = 0 ORDER BY last_looked_up_at DESC")
+    suspend fun withCorrectedFurigana(): List<WordEntity>
+
     @Query("UPDATE word SET furigana = :furigana WHERE id = :id")
     suspend fun setFurigana(id: Long, furigana: String)
 

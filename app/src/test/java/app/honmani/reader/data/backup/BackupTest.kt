@@ -10,6 +10,7 @@ import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.data.review.Grade
 import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewRepository
@@ -397,6 +398,27 @@ class BackupTest {
         val restored = new.database.highlightDao().observe("h1").first()
         assertEquals(listOf(100L to 130L, 500L to 520L), restored.map { it.start to it.end })
         assertEquals(listOf(1, 0), restored.map { it.color })
+    }
+
+    @Test
+    fun pronunciationsComeBackOnce_aLocalReadingStays_andBrokenOnesAreSkipped() = runTest {
+        val old = Phone("old")
+        val dao = old.database.pronunciationDao()
+        dao.put(PronunciationEntity(contentHash = "h1", text = "雨宮", reading = "あめみや", createdAt = 1))
+        dao.put(PronunciationEntity(contentHash = "h1", text = "北", reading = "きた", createdAt = 2))
+        dao.put(PronunciationEntity(contentHash = "h2", text = "雨宮", reading = "うみや", createdAt = 3))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+        new.database.pronunciationDao().put(PronunciationEntity(contentHash = "h1", text = "北", reading = "ほく", createdAt = 9))
+
+        val withBroken = backup.copy(pronunciations = backup.pronunciations + listOf(BackupPronunciation("", "a", "b"), BackupPronunciation("h1", "c", "")))
+        new.backup.restore(withBroken)
+        new.backup.restore(withBroken)
+
+        assertEquals(
+            listOf("h1:北:ほく", "h1:雨宮:あめみや", "h2:雨宮:うみや"),
+            new.database.backupDao().pronunciations().map { "${it.contentHash}:${it.text}:${it.reading}" }.sorted(),
+        )
     }
 
     @Test

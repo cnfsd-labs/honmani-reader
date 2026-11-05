@@ -53,6 +53,8 @@ data class BackupFile(
     val bookmarks: List<BackupBookmark> = emptyList(),
     /** Highlighted passages in books, by content hash. */
     val highlights: List<BackupHighlight> = emptyList(),
+    /** Read aloud "read this as that" replacements, by content hash. */
+    val pronunciations: List<BackupPronunciation> = emptyList(),
     val lookupEvents: List<BackupLookupEvent> = emptyList(),
     val words: List<BackupWord> = emptyList(),
     /** The batches of Known words the reader can still undo ("Tell Honmani what you already know"). */
@@ -124,6 +126,10 @@ data class BackupBookmark(val hash: String, val name: String, val characters: Lo
 /** A highlighted passage in a book, by content hash; the range is in ttu's character counting. */
 @Serializable
 data class BackupHighlight(val hash: String, val start: Long, val end: Long, val color: Int, val text: String, val total: Long, val createdAt: Long = 0)
+
+/** A Read aloud replacement in a book, by content hash. */
+@Serializable
+data class BackupPronunciation(val hash: String, val text: String, val reading: String, val createdAt: Long = 0)
 
 @Serializable
 data class BackupReadingDay(

@@ -67,6 +67,8 @@ import androidx.compose.runtime.withFrameNanos
 import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.PronunciationEntity
+import app.honmani.reader.readaloud.PronunciationRules
 import app.honmani.reader.data.library.saveReplacingOverlaps
 import app.honmani.reader.data.library.undoSave
 import androidx.compose.ui.Alignment
@@ -185,6 +187,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val readAloudMessages = remember { Channel<String>(Channel.UNLIMITED) }
     val audiobookMessages = remember { Channel<String>(Channel.UNLIMITED) }
     val pageMessages = remember { merge(readAloudMessages.receiveAsFlow(), audiobookMessages.receiveAsFlow()) }
+    // The open book's "read this as that" list, set below once the book is known.
+    val pronunciationRules = remember { arrayOf(PronunciationRules.EMPTY) }
     val readAloud = remember {
         // The spoken text is only logged by a debug build.
         val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
@@ -195,6 +199,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             saveRate = container.readAloudSettings::setRate,
             onSpoken = tracker::onActivity,
             log = { if (debuggable) Log.i("ReadAloud", it) },
+            pronunciations = { pronunciationRules[0] },
         )
     }
     val readAloudState by readAloud.state.collectAsStateWithLifecycle()
@@ -310,6 +315,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val highlights by remember(bookHash) {
         bookHash?.let { container.highlightDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(emptyList())
+    var pronunciationsShown by rememberSaveable { mutableStateOf(false) }
+    val pronunciations by remember(bookHash) {
+        bookHash?.let { container.pronunciationDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(emptyList())
+    SideEffect { pronunciationRules[0] = PronunciationRules(pronunciations.map { it.text to it.reading }) }
     val sectionsTotal by produceState<Int?>(null, openTtuId) {
         value = openTtuId?.let { id -> container.bookDao.findByTtuId(id)?.let { container.sectionStarts(it)?.total } }
     }
@@ -880,6 +890,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     audiobook.close()
                     readAloud.start()
                 },
+                pronunciationCount = pronunciations.size,
+                onPronunciations = {
+                    viewModel.closeMenu()
+                    pronunciationsShown = true
+                },
                 audiobookPaired = audiobookPaired,
                 onAudiobook = {
                     viewModel.closeMenu()
@@ -1004,6 +1019,22 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
                 onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
                 onDismiss = { highlightsShown = false },
+            )
+        }
+        if (pronunciationsShown && !atLibrary) {
+            val hash = bookHash
+            val corrected by produceState(emptyList<Pair<String, String>>(), pronunciationsShown) {
+                value = container.wordRepository.withCorrectedFurigana().mapNotNull { PronunciationRules.fromFurigana(it.expression, it.furigana) }
+            }
+            PronunciationsSheet(
+                items = pronunciations,
+                suggestions = corrected.filter { (text, _) -> pronunciations.none { it.text == text } },
+                onSave = { text, reading ->
+                    if (hash != null) scope.launch { container.pronunciationDao.put(PronunciationEntity(contentHash = hash, text = text, reading = reading, createdAt = System.currentTimeMillis())) }
+                },
+                onDelete = { item -> scope.launch { container.pronunciationDao.delete(item.id) } },
+                onUndoDelete = { item -> scope.launch { container.pronunciationDao.put(item) } },
+                onDismiss = { pronunciationsShown = false },
             )
         }
         val searchedBook = openTtuId

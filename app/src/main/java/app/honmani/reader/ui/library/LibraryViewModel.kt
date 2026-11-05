@@ -183,6 +183,8 @@ class LibraryViewModel(
     private val forgetBookmarks: suspend (contentHash: String) -> Unit = {},
     /** Deletes the highlights in a removed book (by content hash). */
     private val forgetHighlights: suspend (contentHash: String) -> Unit = {},
+    /** Deletes the Read aloud pronunciations of a removed book (by content hash). */
+    private val forgetPronunciations: suspend (contentHash: String) -> Unit = {},
     /** The reader's folders; null: no folders. */
     private val folders: Folders? = null,
 ) : ViewModel() {
@@ -521,6 +523,7 @@ class LibraryViewModel(
             dao.delete(book.id)
             forgetBookmarks(book.contentHash)
             forgetHighlights(book.contentHash)
+            forgetPronunciations(book.contentHash)
             // A book from a catalogue stays removed: automatic imports skip it from now on.
             book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
                 dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
@@ -595,6 +598,7 @@ class LibraryViewModel(
                     },
                     forgetBookmarks = container.bookmarkDao::deleteForBook,
                     forgetHighlights = container.highlightDao::deleteForBook,
+                    forgetPronunciations = container.pronunciationDao::deleteForBook,
                     forgetDerivedData = { hash ->
                         container.difficultyStore.forget(hash)
                         container.audiobookStore.forget(hash)

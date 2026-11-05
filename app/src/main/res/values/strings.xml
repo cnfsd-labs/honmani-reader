@@ -306,6 +306,17 @@
     <string name="reader_menu_settings">Reader settings</string>
     <string name="reader_menu_search">Search in book</string>
     <string name="reader_menu_read_aloud">Read aloud</string>
+    <string name="reader_menu_pronunciations">Pronunciations</string>
+    <string name="reader_menu_pronunciations_count">%d replacements for Read aloud</string>
+    <string name="reader_menu_pronunciations_none">Fix a name the voice gets wrong</string>
+    <string name="pronunciation_title">Pronunciations</string>
+    <string name="pronunciation_explain">Read aloud speaks the kana instead of the text, in this book only.</string>
+    <string name="pronunciation_add">Add pronunciation</string>
+    <string name="pronunciation_delete">Delete pronunciation</string>
+    <string name="pronunciation_removed">Pronunciation removed</string>
+    <string name="pronunciation_text_label">Text in the book</string>
+    <string name="pronunciation_reading_label">Read as (kana)</string>
+    <string name="pronunciation_suggestions">From your corrected furigana</string>
     <string name="read_aloud_play">Play</string>
     <string name="read_aloud_pause">Pause</string>
     <string name="read_aloud_previous">Previous sentence</string>

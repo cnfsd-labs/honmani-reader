@@ -59,6 +59,9 @@ fun ReaderMenuSheet(
     onContents: () -> Unit,
     onSearch: () -> Unit,
     onReadAloud: () -> Unit = {},
+    /** How many Read aloud replacements this book has. */
+    pronunciationCount: Int = 0,
+    onPronunciations: () -> Unit = {},
     /** Whether this book has an audiobook (audio and subtitles) chosen. */
     audiobookPaired: Boolean = false,
     onAudiobook: () -> Unit = {},
@@ -116,6 +119,18 @@ fun ReaderMenuSheet(
                 headlineContent = { Text(stringResource(R.string.reader_menu_read_aloud)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onReadAloud),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_listen), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.reader_menu_pronunciations)) },
+                supportingContent = {
+                    Text(
+                        if (pronunciationCount > 0) stringResource(R.string.reader_menu_pronunciations_count, pronunciationCount)
+                        else stringResource(R.string.reader_menu_pronunciations_none),
+                    )
+                },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onPronunciations),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_audiobook), contentDescription = null) },

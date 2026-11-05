@@ -52,6 +52,8 @@ class ReadAloudController(
     /** A sentence began: counts as reading activity. */
     private val onSpoken: () -> Unit = {},
     private val log: (String) -> Unit = {},
+    /** The book's "read this as that" list, asked for each sentence so a change applies at once. */
+    private val pronunciations: () -> PronunciationRules = { PronunciationRules.EMPTY },
 ) : ReadAloudVoice.Listener {
     private val _state = MutableStateFlow(ReadAloudState(rate = initialRate))
     val state: StateFlow<ReadAloudState> = _state.asStateFlow()
@@ -72,6 +74,9 @@ class ReadAloudController(
     private var emptyAnswers = 0
     private var lastRange = -1
     private var resumeAfterPanel = false
+
+    /** The sentences spoken with a replacement in them: where the voice's characters came from. */
+    private val spoken = HashMap<Int, SpokenText>()
 
     init {
         voice.listener = this
@@ -217,7 +222,8 @@ class ReadAloudController(
         if (phase == ReadAloudPhase.STARTING) _state.value = _state.value.copy(phase = ReadAloudPhase.SPEAKING)
         log("start ${id.sentence}+${id.offset}")
         if (id.offset == 0) onSpoken()
-        toPage(markMessage(id.sentence, id.offset))
+        spoken.keys.removeAll { it < id.sentence - 1 }
+        toPage(markMessage(id.sentence, originalOffset(id.sentence, id.offset)))
         if (!awaiting && pageEnd == null && lastReceived - id.sentence < 2) requestMore()
     }
 
@@ -227,7 +233,7 @@ class ReadAloudController(
         val offset = id.offset + start
         if (offset == lastRange || start == 0) return
         lastRange = offset
-        toPage(markMessage(id.sentence, offset))
+        toPage(markMessage(id.sentence, originalOffset(id.sentence, offset)))
     }
 
     override fun onDone(utteranceId: String) {
@@ -303,7 +309,9 @@ class ReadAloudController(
     private fun enqueue(item: SpokenSentence) {
         val max = minOf(voice.maxInputLength, MAX_PIECE)
         var offset = 0
-        val pieces = splitForSpeech(item.text, max)
+        val text = pronunciations().apply(item.text)
+        if (text.changed) spoken[item.index] = text else spoken.remove(item.index)
+        val pieces = splitForSpeech(text.text, max)
         for ((n, piece) in pieces.withIndex()) {
             val last = if (n == pieces.lastIndex) 1 else 0
             log("speak ${item.index}+$offset: $piece")
@@ -312,8 +320,11 @@ class ReadAloudController(
         }
     }
 
+    private fun originalOffset(sentence: Int, offset: Int) = spoken[sentence]?.originalOffset(offset) ?: offset
+
     private fun resetRun(first: Int) {
         gen++
+        spoken.clear()
         voice.stop()
         current = -1
         lastReceived = first - 1

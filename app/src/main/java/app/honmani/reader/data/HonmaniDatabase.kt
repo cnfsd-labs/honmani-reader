@@ -28,6 +28,8 @@ import app.honmani.reader.data.library.FolderDao
 import app.honmani.reader.data.library.FolderEntity
 import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.PronunciationDao
+import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.opds.OpdsCatalogDao
 import app.honmani.reader.data.opds.OpdsCatalogEntity
@@ -61,6 +63,7 @@ import app.honmani.reader.data.words.WordLookupEntity
         BookEntity::class,
         BookmarkEntity::class,
         HighlightEntity::class,
+        PronunciationEntity::class,
         WordEntity::class,
         WordLookupEntity::class,
         KnownBatchEntity::class,
@@ -96,6 +99,7 @@ abstract class HonmaniDatabase : RoomDatabase() {
 
     abstract fun bookmarkDao(): BookmarkDao
     abstract fun highlightDao(): HighlightDao
+    abstract fun pronunciationDao(): PronunciationDao
 
     abstract fun wordDao(): WordDao
 

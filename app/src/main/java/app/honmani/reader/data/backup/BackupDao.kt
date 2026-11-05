@@ -13,6 +13,7 @@ import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.words.KnownBatchEntity
@@ -104,6 +105,12 @@ interface BackupDao {
 
     @Insert
     suspend fun insertHighlights(highlights: List<HighlightEntity>)
+
+    @Query("SELECT * FROM pronunciation ORDER BY content_hash, id")
+    suspend fun pronunciations(): List<PronunciationEntity>
+
+    @Insert
+    suspend fun insertPronunciations(pronunciations: List<PronunciationEntity>)
 
     @Query("SELECT * FROM opds_catalog ORDER BY added_at, id")
     suspend fun catalogs(): List<OpdsCatalogEntity>

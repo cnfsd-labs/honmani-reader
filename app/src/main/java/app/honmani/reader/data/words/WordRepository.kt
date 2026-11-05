@@ -52,6 +52,9 @@ class WordRepository(
 ) {
     private val dao = database.wordDao()
 
+    /** Words whose furigana the reader corrected, newest lookup first. */
+    suspend fun withCorrectedFurigana(): List<WordEntity> = dao.withCorrectedFurigana()
+
     val learning = dao.observeLearning()
 
     /** How many lookups were recorded since [from] (epoch milliseconds; null: ever). */

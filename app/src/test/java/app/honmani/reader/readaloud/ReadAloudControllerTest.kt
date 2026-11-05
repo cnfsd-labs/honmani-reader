@@ -77,6 +77,19 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun aPronunciationIsSpokenInsteadOfTheText_andTheMarkStaysOnTheBooksWord() {
+        val rules = PronunciationRules(listOf("雨宮" to "あめみや"))
+        val replacing = ReadAloudController(voice = voice, toPage = { sent.add(it) }, pronunciations = { rules })
+        replacing.start()
+        replacing.onSentences(gen, listOf(SpokenSentence(0, "雨宮は笑った。")), null)
+        assertEquals(listOf("あめみやは笑った。"), voice.spoken.map { it.second })
+        replacing.onStart(id(0))
+        replacing.onRange(id(0), 4)
+        // The voice is at は (spoken 4), which is character 2 of the page's sentence.
+        assertEquals(""""offset":2""", Regex(""""offset":\d+""").find(sent.last())!!.value)
+    }
+
+    @Test
     fun asksForMoreAsTheQueueRunsLow() {
         startAndReceive()
         controller.onStart(id(0))

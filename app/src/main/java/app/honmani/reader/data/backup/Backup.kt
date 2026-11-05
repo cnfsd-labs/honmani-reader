@@ -25,6 +25,9 @@ import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HIGHLIGHT_COLORS
 import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
 import app.honmani.reader.data.library.HighlightEntity
+import app.honmani.reader.data.library.PRONUNCIATION_READING_MAX
+import app.honmani.reader.data.library.PRONUNCIATION_TEXT_MAX
+import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
@@ -103,6 +106,7 @@ class Backup(
             val finished: List<FinishedBookEntity>,
             val bookmarks: List<BookmarkEntity>,
             val highlights: List<HighlightEntity>,
+            val pronunciations: List<PronunciationEntity>,
             val catalogs: List<OpdsCatalogEntity>,
             val cards: Map<Long, ReviewCardEntity>,
             val logs: Map<Long, List<ReviewLogEntity>>,
@@ -111,7 +115,7 @@ class Backup(
             val batchWords: List<KnownBatchWordEntity>,
         )
         val tables = database.withTransaction {
-            Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.catalogs(),
+            Tables(dao.books(), folderDao.all().associate { it.id to it.name }, dao.readingDays(), dao.lookupEvents(), dao.words(), dao.wordLookups(), dao.removedBooks(), dao.finishedBooks(), dao.bookmarks(), dao.highlights(), dao.pronunciations(), dao.catalogs(),
                 dao.reviewCards().associateBy { it.wordId }, dao.reviewLogs().groupBy { it.wordId }, dao.readDays().groupBy { it.wordId },
                 dao.knownBatches(), dao.knownBatchWords(),
             )
@@ -199,6 +203,7 @@ class Backup(
             finishedBooks = tables.finished.map { BackupFinishedBook(it.contentHash, it.title, it.finishedAt) },
             bookmarks = tables.bookmarks.map { BackupBookmark(it.contentHash, it.name, it.characters, it.total, it.createdAt) },
             highlights = tables.highlights.map { BackupHighlight(it.contentHash, it.start, it.end, it.color, it.text, it.total, it.createdAt) },
+            pronunciations = tables.pronunciations.map { BackupPronunciation(it.contentHash, it.text, it.reading, it.createdAt) },
             lookupEvents = lookupEvents,
             words = words,
             knownBatches = knownBatches,
@@ -386,6 +391,17 @@ class Backup(
                             text = it.text.take(HIGHLIGHT_TEXT_MAX), total = it.total, createdAt = it.createdAt,
                         )
                     },
+            )
+            // A text this phone already has a reading for stays as it is.
+            val read = dao.pronunciations().mapTo(HashSet()) { it.contentHash to it.text }
+            dao.insertPronunciations(
+                backup.pronunciations
+                    .filter {
+                        it.hash.isNotEmpty() && it.text.isNotEmpty() && it.reading.isNotEmpty() &&
+                            it.text.length <= PRONUNCIATION_TEXT_MAX && it.reading.length <= PRONUNCIATION_READING_MAX &&
+                            read.add(it.hash to it.text)
+                    }
+                    .map { PronunciationEntity(contentHash = it.hash, text = it.text, reading = it.reading, createdAt = it.createdAt) },
             )
             val urls = dao.catalogs().mapTo(HashSet()) { it.url }
             for (catalog in backup.catalogs) {
