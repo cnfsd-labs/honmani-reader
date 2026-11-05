@@ -320,10 +320,11 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
     expect(await page.evaluate(() => window.__passage.startContainer.isConnected)).toBe(true); // still this section
     expect(await page.evaluate(() => window.honmaniFollow.startOnScreen(window.__passage))).toBe(false);
 
-    await page.evaluate(async () => {
+    const kept = await page.evaluate(async () => {
       window.honmaniFollow.mark(window.__passage);
-      await window.honmaniFollow.keepOnScreen(window.__passage);
+      return window.honmaniFollow.keepOnScreen(window.__passage);
     });
+    expect(kept).toBe(true);
     await page.setViewportSize({ width: 360, height: 612 });
     await page.waitForTimeout(2000);
 
@@ -332,3 +333,18 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
     expect(await page.evaluate(() => window.honmaniFollow.startOnScreen(window.__passage))).toBe(true);
   });
 }
+
+// WenQuanYi Zen Hei (CI's Japanese font) gives a single kanji in vertical text a box of height 0.
+// It is still on the page: treated as "no box", the follower turned 40 pages looking for it.
+test('a character with a box of no height still counts as on screen', async ({ page }) => {
+  await page.goto('about:blank');
+  await page.addScriptTag({ path: path.join(ASSETS, 'sentence-follow.js') });
+  const onScreen = (rects) => page.evaluate((rects) => window.honmaniFollow.startOnScreen({ getClientRects: () => rects }), rects);
+  const box = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height });
+
+  expect(await onScreen([box(306, 32, 31, 0)])).toBe(true);
+  expect(await onScreen([box(306, 32 - 2000, 31, 0)])).toBe(false);
+  // A real box comes first: an empty one elsewhere does not decide.
+  expect(await onScreen([box(306, 32 - 2000, 31, 0), box(306, 32, 31, 14)])).toBe(true);
+  expect(await onScreen([box(306, 32, 0, 0)])).toBe(false);
+});

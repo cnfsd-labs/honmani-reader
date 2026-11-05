@@ -138,9 +138,15 @@
     }
   }
 
-  /** The first rect of the range that has a size, or null. */
+  /**
+   * The first rect of the range that has a size, or null. Some fonts give a single character in
+   * vertical text a box of no height (WenQuanYi Zen Hei): it still shows where the character is.
+   */
   function firstRect(range) {
-    return Array.from(range.getClientRects()).find((rect) => rect.width > 0 && rect.height > 0) || null;
+    const rects = Array.from(range.getClientRects());
+    return rects.find((rect) => rect.width > 0 && rect.height > 0)
+      || rects.find((rect) => rect.width > 0 || rect.height > 0)
+      || null;
   }
 
   /** Whether the start of the range is on the page: its first rect lies within the viewport. */
