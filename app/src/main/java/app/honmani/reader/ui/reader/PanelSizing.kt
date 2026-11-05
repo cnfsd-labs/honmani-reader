@@ -8,7 +8,7 @@ internal data class PanelHeights(val collapsed: Float, val expanded: Float) {
 
 /** The lookup panel's heights and snapping: fixed, so its top edge stays put from word to word. */
 internal object PanelSizing {
-    const val COLLAPSED_FRACTION = 0.4f
+    const val COLLAPSED_FRACTION = 0.5f
     const val EXPANDED_FRACTION = 0.88f
 
     /**

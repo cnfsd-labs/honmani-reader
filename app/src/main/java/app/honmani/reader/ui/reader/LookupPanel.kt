@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -128,7 +129,7 @@ import app.honmani.reader.ui.theme.HonmaniTheme
 
 /**
  * Dictionary results for the last tap, at the bottom of the reader. The book stays tappable.
- * The panel always opens at the same height ([PanelSizing]: about 40% of [availableHeight]) so its
+ * The panel always opens at the same height ([PanelSizing]: about half of [availableHeight]) so its
  * top edge stays put from word to word; the content scrolls inside it. Dragging the handle or
  * header up expands it (about 88%), tapping the handle toggles. Swiping down collapses and then
  * closes it: on the header row, or on the results when they are already scrolled to the top when
@@ -293,204 +294,217 @@ fun LookupPanel(
         tonalElevation = 3.dp,
         shadowElevation = 8.dp,
     ) {
-        Column(modifier = Modifier.navigationBarsPadding()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .draggable(
-                        state = rememberDraggableState { dragBy(it) },
-                        orientation = Orientation.Vertical,
-                        onDragStopped = { velocity -> settle(velocity) },
-                    ),
-            ) {
-            val expanded = extra > maxExtra.value / 2f
-            val handleLabel = stringResource(if (expanded) R.string.lookup_panel_collapse else R.string.lookup_panel_expand)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(HANDLE_AREA)
-                    .clickable(onClickLabel = handleLabel, role = Role.Button) {
-                        scope.launch {
-                            animate(extra, if (expanded) 0f else maxExtra.value) { value, _ -> extra = value }
-                        }
-                    }
-                    .semantics { contentDescription = handleLabel },
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(width = 32.dp, height = 4.dp)
-                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), CircleShape),
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 4.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val canGoBack = when (state) {
-                    is LookupPanelState.Results -> state.previous != null
-                    is LookupPanelState.Kanji -> state.previous != null
-                    else -> false
-                }
-                // The tapped sentence is not repeated here: it is on screen in the book (only the
-                // sentence before it, if the reader asked, see [previousSentence]). Back sits
-                // beside close, where the thumb already is.
-                if (state is LookupPanelState.Results && state.previous == null) {
-                    MatchControls(
-                        matched = state.tap.text.take(state.highlight.length),
-                        canShorten = state.canShorten,
-                        canLengthen = state.canLengthen,
-                        onShorter = onShorterMatch,
-                        onLonger = onLongerMatch,
-                        modifier = Modifier.weight(1f),
-                    )
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-                if (onDontCount != null && state is LookupPanelState.Results && state.previous == null) {
-                    // An icon, not a text button: at the largest font a label left the matched word
-                    // only three characters.
-                    IconButton(onClick = onDontCount, modifier = Modifier.size(HEADER_BUTTON)) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_undo),
-                            contentDescription = stringResource(R.string.lookup_dont_count_description),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (state.tap.sentence.isNotBlank()) {
-                    IconButton(onClick = onReadSentence, modifier = Modifier.size(HEADER_BUTTON)) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_listen),
-                            contentDescription = stringResource(R.string.lookup_read_sentence),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (canGoBack) {
-                    IconButton(onClick = onBack, modifier = Modifier.size(HEADER_BUTTON)) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.lookup_back),
-                        )
-                    }
-                }
-                IconButton(onClick = onClose, modifier = Modifier.size(HEADER_BUTTON)) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
-                }
-            }
-            }
-            // The selection is gone after a long press: its text can be copied here, found or not.
-            val results = state as? LookupPanelState.Results
-            if (state.tap.bySelection && results?.previous == null) {
-                CopyActions(
-                    word = results?.let { state.tap.text.take(it.highlight.length) } ?: state.tap.text,
-                    sentence = state.tap.sentence,
-                )
-            }
-            if (highlight != null && (state as? LookupPanelState.Results)?.previous == null) HighlightBar(highlight)
-            if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
-                Text(
-                    text = previousSentence,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+        Box(modifier = Modifier.navigationBarsPadding()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
-                )
-            }
-            when (state) {
-                is LookupPanelState.Results -> LazyColumn(
-                    state = listState,
-                    // Fills the panel below the header; a short list leaves empty space.
+                        .draggable(
+                            state = rememberDraggableState { dragBy(it) },
+                            orientation = Orientation.Vertical,
+                            onDragStopped = { velocity -> settle(velocity) },
+                        ),
+                ) {
+                val expanded = extra > maxExtra.value / 2f
+                val handleLabel = stringResource(if (expanded) R.string.lookup_panel_collapse else R.string.lookup_panel_expand)
+                Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .pointerInput(Unit) {
-                            awaitEachGesture {
-                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                swipe.startedAtTop = !listState.canScrollBackward
+                        .fillMaxWidth()
+                        .height(HANDLE_AREA)
+                        .clickable(onClickLabel = handleLabel, role = Role.Button) {
+                            scope.launch {
+                                animate(extra, if (expanded) 0f else maxExtra.value) { value, _ -> extra = value }
                             }
                         }
-                        .nestedScroll(listConnection),
-                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                        .semantics { contentDescription = handleLabel },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    itemsIndexed(
-                        items = state.groups,
-                        key = { i, group -> "$i:${group.expression}:${group.reading}" },
-                    ) { i, group ->
-                        if (i > 0) HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
-                        // The best match opens with its first meanings; the others are folded
-                        // to a line each until tapped.
-                        val detail = details[i] ?: if (i == 0) Detail.BRIEF else Detail.FOLDED
-                        LookupGroupItem(
-                            group = group,
-                            detail = detail,
-                            onDetail = { details[i] = it },
-                            inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
-                            adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
-                            onAddToAnki = { onAddToAnki(group) },
-                            starred = WordRepository.key(group.expression, group.reading) in state.starred,
-                            onSetStarred = if (state.previous == null) {
-                                { onSetStarred(group, it) }
-                            } else {
-                                null
-                            },
-                            ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
-                            onSetIgnored = if (state.previous == null) {
-                                { onSetIgnored(group, it) }
-                            } else {
-                                null
-                            },
-                            onListen = { onListen(group) },
-                            onLookupWord = onLookupWord,
-                            onLearn = if (onLearn != null && state.previous == null) {
-                                { onLearn(group) }
-                            } else {
-                                null
-                            },
-                            saved = WordRepository.key(group.expression, group.reading) in state.saved,
-                            kanji = state.kanji,
-                            onShowKanji = onShowKanji,
-                            furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
-                            onCorrectFurigana = if (onSetFurigana != null && state.previous == null && FuriganaOverride.canCorrect(group.expression)) {
-                                { correcting = group }
-                            } else {
-                                null
-                            },
+                    Box(
+                        modifier = Modifier
+                            .size(width = 32.dp, height = 4.dp)
+                            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), CircleShape),
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 4.dp, bottom = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val canGoBack = when (state) {
+                        is LookupPanelState.Results -> state.previous != null
+                        is LookupPanelState.Kanji -> state.previous != null
+                        else -> false
+                    }
+                    // The tapped sentence is not repeated here: it is on screen in the book (only the
+                    // sentence before it, if the reader asked, see [previousSentence]). Back sits
+                    // beside close, where the thumb already is.
+                    if (state is LookupPanelState.Results && state.previous == null) {
+                        Text(
+                            text = state.tap.text.take(state.highlight.length),
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    if (onDontCount != null && state is LookupPanelState.Results && state.previous == null) {
+                        // An icon, not a text button: at the largest font a label left the matched word
+                        // only three characters.
+                        IconButton(onClick = onDontCount, modifier = Modifier.size(HEADER_BUTTON)) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_undo),
+                                contentDescription = stringResource(R.string.lookup_dont_count_description),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (state.tap.sentence.isNotBlank()) {
+                        IconButton(onClick = onReadSentence, modifier = Modifier.size(HEADER_BUTTON)) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_listen),
+                                contentDescription = stringResource(R.string.lookup_read_sentence),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (canGoBack) {
+                        IconButton(onClick = onBack, modifier = Modifier.size(HEADER_BUTTON)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.lookup_back),
+                            )
+                        }
+                    }
+                    IconButton(onClick = onClose, modifier = Modifier.size(HEADER_BUTTON)) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
+                    }
+                }
+                }
+                // The selection is gone after a long press: its text can be copied here, found or not.
+                val results = state as? LookupPanelState.Results
+                if (state.tap.bySelection && results?.previous == null) {
+                    CopyActions(
+                        word = results?.let { state.tap.text.take(it.highlight.length) } ?: state.tap.text,
+                        sentence = state.tap.sentence,
+                    )
+                }
+                if (highlight != null && (state as? LookupPanelState.Results)?.previous == null) HighlightBar(highlight)
+                if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
+                    Text(
+                        text = previousSentence,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                    )
+                }
+                when (state) {
+                    is LookupPanelState.Results -> LazyColumn(
+                        state = listState,
+                        // Fills the panel below the header; a short list leaves empty space.
+                        modifier = Modifier
+                            .weight(1f)
+                            .pointerInput(Unit) {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                    swipe.startedAtTop = !listState.canScrollBackward
+                                }
+                            }
+                            .nestedScroll(listConnection),
+                        // Room under the last lines for the match arrows (see [MatchPill]), when they are there.
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (state.previous == null && (state.canShorten || state.canLengthen)) PILL_CLEARANCE else 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        itemsIndexed(
+                            items = state.groups,
+                            key = { i, group -> "$i:${group.expression}:${group.reading}" },
+                        ) { i, group ->
+                            if (i > 0) HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+                            // The best match opens with its first meanings; the others are folded
+                            // to a line each until tapped.
+                            val detail = details[i] ?: if (i == 0) Detail.BRIEF else Detail.FOLDED
+                            LookupGroupItem(
+                                group = group,
+                                detail = detail,
+                                onDetail = { details[i] = it },
+                                inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
+                                adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
+                                onAddToAnki = { onAddToAnki(group) },
+                                starred = WordRepository.key(group.expression, group.reading) in state.starred,
+                                onSetStarred = if (state.previous == null) {
+                                    { onSetStarred(group, it) }
+                                } else {
+                                    null
+                                },
+                                ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
+                                onSetIgnored = if (state.previous == null) {
+                                    { onSetIgnored(group, it) }
+                                } else {
+                                    null
+                                },
+                                onListen = { onListen(group) },
+                                onLookupWord = onLookupWord,
+                                onLearn = if (onLearn != null && state.previous == null) {
+                                    { onLearn(group) }
+                                } else {
+                                    null
+                                },
+                                saved = WordRepository.key(group.expression, group.reading) in state.saved,
+                                kanji = state.kanji,
+                                onShowKanji = onShowKanji,
+                                furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
+                                onCorrectFurigana = if (onSetFurigana != null && state.previous == null && FuriganaOverride.canCorrect(group.expression)) {
+                                    { correcting = group }
+                                } else {
+                                    null
+                                },
+                            )
+                        }
+                    }
+                    is LookupPanelState.Kanji -> KanjiCard(
+                        kanji = state.kanji,
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+                    )
+                    is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
+                        Message(
+                            stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
+                            bottomPadding = 0.dp,
+                        )
+                        // After a long press the copy buttons are already above.
+                        CopyActions(
+                            word = state.tap.text.take(MAX_SHOWN_TEXT),
+                            sentence = state.tap.sentence,
+                            showCopy = !state.tap.bySelection,
+                            onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
                         )
                     }
-                }
-                is LookupPanelState.Kanji -> KanjiCard(
-                    kanji = state.kanji,
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
-                )
-                is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
-                    Message(
-                        stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
-                        bottomPadding = 0.dp,
-                    )
-                    // After a long press the copy buttons are already above.
-                    CopyActions(
-                        word = state.tap.text.take(MAX_SHOWN_TEXT),
-                        sentence = state.tap.sentence,
-                        showCopy = !state.tap.bySelection,
-                        onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
-                    )
-                }
-                is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
-                    Message(stringResource(R.string.lookup_no_dictionaries))
-                    TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
-                        Text(stringResource(R.string.lookup_open_dictionaries))
+                    is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
+                        Message(stringResource(R.string.lookup_no_dictionaries))
+                        TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
+                            Text(stringResource(R.string.lookup_open_dictionaries))
+                        }
                     }
                 }
+            }
+            // Over the results, at the bottom right where the thumb is: the match arrows (see [MatchPill]).
+            val matchState = state as? LookupPanelState.Results
+            if (matchState != null && matchState.previous == null && (matchState.canShorten || matchState.canLengthen)) {
+                MatchPill(
+                    canShorten = matchState.canShorten,
+                    canLengthen = matchState.canLengthen,
+                    onShorter = onShorterMatch,
+                    onLonger = onLongerMatch,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp),
+                )
             }
         }
     }
@@ -628,45 +642,47 @@ private fun CopyActions(
 }
 
 /**
- * The matched text of a tap with buttons to make it one character shorter or longer; a button
- * that can't do anything is left out (its place stays, so the text doesn't jump).
+ * The buttons that make the matched text of a tap one character shorter or longer: a small pill
+ * floating at the panel's bottom right, in reach of the thumb, over the scrolling results. A
+ * button that can't do anything is left out (its place stays, so the other doesn't move).
  */
 @Composable
-private fun MatchControls(
-    matched: String,
+private fun MatchPill(
     canShorten: Boolean,
     canLengthen: Boolean,
     onShorter: () -> Unit,
     onLonger: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (canShorten) {
-            IconButton(onClick = onShorter, modifier = Modifier.size(HEADER_BUTTON)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                    contentDescription = stringResource(R.string.lookup_match_shorter),
-                )
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (canShorten) {
+                IconButton(onClick = onShorter, modifier = Modifier.size(HEADER_BUTTON)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.lookup_match_shorter),
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(HEADER_BUTTON))
             }
-        } else {
-            Spacer(modifier = Modifier.size(HEADER_BUTTON))
-        }
-        Text(
-            text = matched,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        if (canLengthen) {
-            IconButton(onClick = onLonger, modifier = Modifier.size(HEADER_BUTTON)) {
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = stringResource(R.string.lookup_match_longer),
-                )
+            if (canLengthen) {
+                IconButton(onClick = onLonger, modifier = Modifier.size(HEADER_BUTTON)) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = stringResource(R.string.lookup_match_longer),
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.size(HEADER_BUTTON))
             }
-        } else {
-            Spacer(modifier = Modifier.size(HEADER_BUTTON))
         }
     }
 }
@@ -674,6 +690,9 @@ private fun MatchControls(
 /** The header's buttons: the usual 48 dp touch size, for the thumb at the bottom of a tall phone. */
 private val HEADER_BUTTON = 48.dp
 private val HANDLE_AREA = 24.dp
+
+/** Bottom padding of the results while the match pill floats over them: the pill (56 dp) and its margin (12 dp), plus some air. */
+private val PILL_CLEARANCE = 80.dp
 
 /** In a short (landscape) area the collapsed panel is at least this tall, up to 60% of the area. */
 private val MIN_COLLAPSED = 220.dp
