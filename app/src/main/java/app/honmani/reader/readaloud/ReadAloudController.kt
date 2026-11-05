@@ -80,6 +80,9 @@ class ReadAloudController(
     /** Where in the sentence (as the book has it) the page was last told the voice is. */
     private var markOffset = 0
 
+    /** The run the page knows while paused: Pause moves [gen] on without telling the page. */
+    private var pausedPageGen = 0
+
     /** The sentences spoken with a replacement in them: where the voice's characters came from. */
     private val spoken = HashMap<Int, SpokenText>()
 
@@ -100,6 +103,7 @@ class ReadAloudController(
 
     fun pause() {
         if (!state.value.running) return
+        pausedPageGen = gen
         gen++
         voice.stop()
         awaiting = false
@@ -152,7 +156,7 @@ class ReadAloudController(
         if (!_state.value.detached) return
         _state.value = _state.value.copy(detached = false)
         toPage(FOLLOW_ATTACH)
-        if (current >= 0) toPage(markMessage(current, markOffset))
+        if (current >= 0) toPage(markMessage(current, markOffset, if (phase == ReadAloudPhase.PAUSED) pausedPageGen else gen))
         log("view attached again at $current")
     }
 
@@ -397,8 +401,8 @@ class ReadAloudController(
         }
     }
 
-    private fun markMessage(sentence: Int, offset: Int) =
-        """{"type":"readAloud.mark","gen":$gen,"index":$sentence,"offset":$offset}"""
+    private fun markMessage(sentence: Int, offset: Int, pageGen: Int = gen) =
+        """{"type":"readAloud.mark","gen":$pageGen,"index":$sentence,"offset":$offset}"""
 
     private data class UtteranceId(val gen: Int, val sentence: Int, val offset: Int, val last: Boolean) {
         companion object {

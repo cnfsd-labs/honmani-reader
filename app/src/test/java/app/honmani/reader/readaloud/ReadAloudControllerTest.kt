@@ -338,6 +338,20 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun followWhilePausedSendsTheRunThePageKnows_elseThePageDropsTheMarkAsStale() {
+        startAndReceive()
+        val pageGen = gen
+        controller.onStart(id(1))
+        controller.viewDetached(true)
+        controller.pause()
+        sent.clear()
+        controller.follow()
+        assertEquals(listOf("follow.attach", "readAloud.mark"), types())
+        assertEquals(pageGen, gen)
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+    }
+
+    @Test
     fun followOnlyActsWhileDetached_andTheDetachedStateIsNotKept() {
         startAndReceive()
         controller.onStart(id(0))

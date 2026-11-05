@@ -192,6 +192,35 @@ for (const [viewMode, writingMode] of [['paginated', 'horizontal-tb'], ['paginat
   });
 }
 
+for (const viewMode of ['paginated', 'continuous']) {
+  test(`a page turned by hand detaches while the voice keeps reporting words (${viewMode})`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await openBook(page, BOOK, viewMode, 'horizontal-tb');
+    const { items } = await ask(page, 'begin', { count: 10 });
+    await speak(page, items[0].i);
+    // A real voice sends a mark for every word, several a second, all through the turn by hand.
+    await page.evaluate(
+      ([gen, index]) => {
+        let offset = 1;
+        window.__words = setInterval(() => window.__listener({ data: JSON.stringify({ type: 'readAloud.mark', gen, index, offset: offset++ % 5 }) }), 100);
+      },
+      [gen, items[0].i],
+    );
+    await page.waitForTimeout(1000);
+    const before = await firstOnScreen(page);
+    if (viewMode === 'paginated') {
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true })));
+    } else {
+      await page.mouse.move(300, 300);
+      await page.mouse.wheel(0, 900);
+    }
+    await expect.poll(() => detachedMessages(page), { timeout: 5_000 }).toBe(1);
+    await page.waitForTimeout(1000);
+    expect(await firstOnScreen(page)).not.toBe(before);
+    await page.evaluate(() => clearInterval(window.__words));
+  });
+}
+
 for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
   test(`a sentence over a page break turns when the part being read is off the page (paginated, ${writingMode})`, async ({ page }) => {
     test.setTimeout(120_000);

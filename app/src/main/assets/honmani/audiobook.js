@@ -60,9 +60,9 @@
     const token = ++latest;
     const follow = window.honmaniFollow;
     // The reader took control: the mark moves with the audio, but no page is turned for it.
-    const range = follow.detached()
-      ? window.honmaniHighlights.rangeAt(message.start, message.end).range
-      : await follow.auto(() => reach(message.start, message.end, token));
+    // A passage already in the page needs no turn, so it does not count as our own scrolling.
+    const inPage = window.honmaniHighlights.rangeAt(message.start, message.end).range;
+    const range = inPage || follow.detached() ? inPage : await follow.auto(() => reach(message.start, message.end, token));
     if (token !== latest) return;
     if (follow.detached() && !range) return;
     if (!range) {

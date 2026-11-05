@@ -22,7 +22,9 @@
  * The reader can take control: a scroll or page turn that did not come from here (while a mark
  * is shown) detaches the view. The mark keeps moving, but keepOnScreen then does nothing, and
  * { type: 'follow.detached' } goes to the app. Our own turns run inside auto(fn) (keepOnScreen
- * does), and the moments around a resize count as ours too, so only the reader's gestures detach.
+ * does when it has to move the page), and the moments around a resize count as ours too, so only
+ * the reader's gestures detach. A voice reports several words a second: a mark that moves nothing
+ * must not go through auto(), or the reader's gesture always falls in its grace time.
  *
  *   window.honmaniFollow.auto(fn)       runs fn (async) as our own scrolling
  *   window.honmaniFollow.detached()     whether the reader has taken control
@@ -163,14 +165,17 @@
   }
 
   async function keepPaginated(range) {
-    for (let turns = 0; turns < MAX_TURNS && !startOnScreen(range); turns++) {
-      if (!range.startContainer.isConnected) return false;
-      const code = directionOf(range) > 0 ? 'ArrowDown' : 'ArrowUp';
-      window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
-      await nextFrame();
-      await nextFrame();
-    }
-    return startOnScreen(range);
+    if (startOnScreen(range)) return true;
+    return auto(async () => {
+      for (let turns = 0; turns < MAX_TURNS && !startOnScreen(range); turns++) {
+        if (!range.startContainer.isConnected) return false;
+        const code = directionOf(range) > 0 ? 'ArrowDown' : 'ArrowUp';
+        window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
+        await nextFrame();
+        await nextFrame();
+      }
+      return startOnScreen(range);
+    });
   }
 
   async function keepContinuous(range) {
@@ -184,21 +189,26 @@
     if (vertical) {
       const distance = innerWidth - rect.right;
       if (distance >= 0 && distance <= innerWidth * COMFORT_FRACTION && rect.left >= 0) return true;
-      // Text runs from the right edge to the left; scrolling left is negative (as keep-position.js).
-      scroller.scrollBy({ left: rect.right - innerWidth + innerWidth * MARGIN_FRACTION, behavior: 'instant' });
-    } else {
-      if (rect.top >= 0 && rect.top <= innerHeight * COMFORT_FRACTION && rect.bottom <= innerHeight) return true;
-      scroller.scrollBy({ top: rect.top - innerHeight * MARGIN_FRACTION, behavior: 'instant' });
+    } else if (rect.top >= 0 && rect.top <= innerHeight * COMFORT_FRACTION && rect.bottom <= innerHeight) {
+      return true;
     }
-    await nextFrame();
-    await nextFrame();
-    return startOnScreen(range);
+    return auto(async () => {
+      if (vertical) {
+        // Text runs from the right edge to the left; scrolling left is negative (as keep-position.js).
+        scroller.scrollBy({ left: rect.right - innerWidth + innerWidth * MARGIN_FRACTION, behavior: 'instant' });
+      } else {
+        scroller.scrollBy({ top: rect.top - innerHeight * MARGIN_FRACTION, behavior: 'instant' });
+      }
+      await nextFrame();
+      await nextFrame();
+      return startOnScreen(range);
+    });
   }
 
   /** Brings the start of the range into view. */
   async function keepOnScreen(range) {
     if (detachedNow || !range || !range.startContainer.isConnected) return false;
-    return auto(() => (isPaginated() ? keepPaginated(range) : keepContinuous(range)));
+    return isPaginated() ? keepPaginated(range) : keepContinuous(range);
   }
 
   window.honmaniFollow = Object.freeze({
