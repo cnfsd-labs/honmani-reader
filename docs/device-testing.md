@@ -1,306 +1,257 @@
 # Device testing
 
-Format: what to do -> expected. Tick off what a change touches; the "Release pass" is for every release.
+Format: do -> expect. Run what a change touches; the Release pass for every release.
 
 ## Getting the APK
 
-1. Latest green run of the **Android** workflow (GitHub, Actions) -> Artifacts -> **honmani-test-apks**.
-2. `app-internal.apk` ("Honmani internal", release code: use it for the checks and timing);
-   `app-debug.apk` (debuggable, WebView inspectable from `chrome://inspect`).
-3. Each CI run signs with a new throwaway key: uninstall the old build first (this clears its data,
-   including dictionaries).
-
-Timing: `adb logcat -s Honmani.lookup` prints each lookup's duration.
-
-**Reader looks wrong** (blank page, say): open the book, wait 5 s, back to the library, Settings ->
-**Share diagnostics**, send the text to cnfsd.labs@gmail.com or attach it to an issue (device and
-WebView versions, console messages, layout of the last book; nothing is sent automatically).
-
-## Test files
-
-- `docs/samples/tebukuro.epub` (新美南吉, with furigana; also offered on first start, Settings -> Sample
-  books has eight more). Known well-formed: no text means an app bug.
-- Any DRM-free Japanese EPUB, or an Aozora Bunko `.txt` (unzip the "テキストファイル(ルビあり)" zip).
+- Latest green **Android** workflow run -> Artifacts -> **honmani-test-apks**: `app-internal.apk`
+  (release code; use for checks and timing) and `app-debug.apk` (WebView inspectable from
+  `chrome://inspect`). Each run signs with a new key: uninstall the old build first (clears dictionaries).
+- Timing: `adb logcat -s Honmani.lookup` prints each lookup's duration.
+- **Reader looks wrong** (blank page): open the book, wait 5 s, back to the library, Settings -> **Share
+  diagnostics**, send to cnfsd.labs@gmail.com or an issue. Nothing is sent automatically.
+- Test files: `docs/samples/tebukuro.epub` (also on first start; Settings -> Sample books has eight
+  more; no text = app bug), any DRM-free Japanese EPUB, an Aozora `.txt` (unzip the ルビあり zip).
 
 ## Release pass (fresh install of the release build, ~10 min)
 
-- First start (uninstall first, or clear data; a blocked import worker only shows with nothing cached):
-  open the sample from the empty library -> text within a few seconds.
-- Tap words (conjugated, furigana); add your own EPUB and an Aozora `.txt`; tap an EPUB in the file
-  manager and in Chrome downloads -> Honmani offered under "Open with".
-- Vertical and horizontal; rotate; dark mode; volume down/up = next/previous page (changes volume in
-  the library); with the panel open a volume press only closes it, the next turns the page.
-- Long press a word (own long press, no native selection): the word is marked while held, the lookup
-  panel opens on release, no blue handles or Copy toolbar, panel offers "Copy word" / "Copy sentence";
-  moving the finger first cancels.
-- AnkiDroid card; Words -> export -> "Anki package", import the .apkg in desktop Anki (audio in the
-  chosen deck).
-- Force-stop and reopen -> books, dictionaries and position kept.
+- First start (uninstall first; a blocked import worker only shows with nothing cached): open the sample
+  from the empty library -> text within seconds.
+- Tap words (conjugated, furigana); add an EPUB and an Aozora `.txt`; tap an EPUB in the file manager and
+  Chrome downloads -> Honmani under "Open with".
+- Vertical/horizontal; rotate; dark mode; volume down/up = next/previous page (volume in the library);
+  with the panel open a volume press only closes it.
+- Long press a word (own long press, no native selection): word marked while held, panel opens on
+  release, no blue handles or Copy toolbar, panel has "Copy word" / "Copy sentence"; moving first cancels.
+- AnkiDroid card; Words -> export -> "Anki package", import in desktop Anki (audio in the chosen deck).
+- Force-stop, reopen -> books, dictionaries, position kept.
 
 ## Reader settings
 
-- **Immersive mode** (off by default): on -> status and navigation bars hidden while a book is open
-  (`dumpsys window | grep ITYPE_STATUS_BAR` shows `visible=false`), shown in library, tabs, Settings and
-  reader settings; swipe from the top edge shows them briefly over the page; position does not move
-  (ttu counter and bookmark unchanged on bar show, switch change, rotate, reopen); reader menu, panel,
-  volume and Back work; bars hidden again after leaving and returning.
-- **E-ink mode** (off): page black on white in any theme (`getComputedStyle(document.body).backgroundColor`,
-  `.book-content` colour via the DevTools socket), no animations/transitions/shadows, word marks flat
-  greys, lookup mark black with white text; panel still opens. Library keeps its colours. Off restores
-  the earlier theme exactly (`localStorage.theme` same before/during/after; Auto still follows system).
-- **Custom CSS** (empty): row opens a field with byte counter (max 20 KB), Save/Clear/Cancel; mismatched
-  braces/quotes or too much text -> error, Save off. `p { line-height: 3 }` -> `.book-content p`
-  gets it, ttu menu and footer do not; position kept after reload; lookup still works. Empty -> no
-  `<style id="honmani-custom-css">`. Clear in the native screen recovers from broken CSS. `url()` in
-  the CSS makes no network request (check with a local server behind `adb reverse`: background,
-  content, border-image, @font-face).
-- **Edge taps** (off): on -> tap in the outer 15 % turns the page (vertical: left = next, right =
-  previous; horizontal reverse); with the panel open the first edge tap only closes it; links, footer,
-  top bar, long press and page middle unchanged. Off -> edge taps look up. On also shows "Width of the
-  page edges" (Narrow 10 %, Medium 15 %, Wide 25 %: just outside looks up, just inside turns) and
-  "Both edges turn forward" (off: either edge -> next page, both text directions).
-- **Pictures** (cover or illustration, both directions): tap opens it full screen on black; pinch and
-  double-tap zoom (second double tap back to fit), drag stops at the edges; Back or close button
-  (TalkBack "Close picture") returns to the same page. Text beside it still looks up; the picture tap
-  never turns a page (also with edge taps) or looks up; tiny inline pictures and pictures in links do
-  nothing new.
-- **Lookup panel height**: short word, long word, kanji, non-word -> top edge stays at ~40 % of the
-  screen, content scrolls inside. Drag handle/header up -> ~88 %; tap handle toggles (TalkBack
-  "Expand"/"Collapse"); drag down shrinks, then closes. A new tap opens small; back/kanji keep the
-  size. Landscape usable.
-- **Reader bottom menu**: tap the thin strip under the text -> sheet: Contents, reading slider, Add
-  bookmark, Bookmarks, Highlights, Search in book, Reader settings, Words from this session, Show
-  progress (switch, page reloads), Close book. Strip easy to hit with the gesture bar; edge page turns
-  still work. A long swipe up (~1/4 screen, mostly straight) opens it too, in paged horizontal and
-  vertical text; not a short, diagonal or page-turn swipe, not with the panel open; in continuous
-  horizontal text it scrolls instead (vertical continuous opens it). Long press and tap unchanged.
+- **Immersive** (off): bars hidden in a book (`dumpsys window | grep ITYPE_STATUS_BAR` -> `visible=false`),
+  shown in library/tabs/Settings; top-edge swipe shows them briefly over the page; position does not move
+  (bar show, switch, rotate, reopen); menu, panel, volume, Back work; hidden again after leaving the app.
+- **E-ink** (off): page black on white in any theme (`getComputedStyle(document.body).backgroundColor`,
+  `.book-content` via DevTools socket), no animations/shadows, flat grey word marks, lookup mark black
+  with white text; panel opens. Library keeps colours. Off restores the theme exactly
+  (`localStorage.theme` unchanged; Auto follows system).
+- **Custom CSS** (empty): field with byte counter (max 20 KB), Save/Clear/Cancel; mismatched braces or
+  quotes, too much text -> error, Save off. `p { line-height: 3 }` -> `.book-content p` changes, ttu menu
+  and footer not; position kept; lookup works. Empty -> no `<style id="honmani-custom-css">`. Clear
+  recovers from broken CSS. `url()` makes no network request (local server behind `adb reverse`:
+  background, content, border-image, @font-face).
+- **Edge taps** (off): outer 15 % turns the page (vertical: left = next; horizontal reverse); with the
+  panel open the first edge tap only closes it; links, footer, top bar, long press, middle unchanged. Off
+  -> edge taps look up. "Width of the page edges" (10/15/25 %: just outside looks up, just inside turns);
+  "Both edges turn forward" (either edge -> next page).
+- **Pictures** (cover/illustration, both directions): tap -> full screen on black; pinch and double-tap
+  zoom (second double tap = fit), drag stops at edges; Back/close ("Close picture") -> same page. Text
+  beside it still looks up; picture tap never turns a page or looks up; tiny inline pictures and
+  pictures in links do nothing new.
+- **Lookup panel height**: short/long word, kanji, non-word -> top edge stays ~40 %, content scrolls.
+  Drag handle/header up -> ~88 %; tap handle toggles (TalkBack Expand/Collapse); drag down shrinks, then
+  closes. New tap opens small; back/kanji keep size. Landscape usable.
+- **Reader bottom menu**: tap the strip under the text -> Contents, slider, Add bookmark, Bookmarks,
+  Highlights, Search in book, Reader settings, Words from this session, Show progress (page reloads),
+  Close book. Strip easy to hit with the gesture bar; edge turns still work. Long swipe up (~1/4 screen,
+  straight) opens it in paged text; not short/diagonal/page-turn swipes, not with the panel open;
+  continuous horizontal scrolls instead (vertical continuous opens it).
 
 ## Lookup panel
 
-- **Don't count**: tap a never-looked-up word -> undo arrow "Don't count" beside the speaker (at the
-  largest font a 5-character match, e.g. 食べなかった shortened once, is not cut). Press -> panel
-  closes, the word is not in Words. On a saved word: lookup count, Learned mark, due card and progress
-  go back as they were. Same sentence within the hour changes nothing, no button. A starred or
-  Anki-added word is kept. Taps inside a definition and "Edit and look up" change nothing.
-- **Nested lookups** (book, search, shared text): tap a Japanese character in an example sentence
-  (Jitendex "More meanings") or a cross-reference -> that entry replaces the panel, back arrow shows.
-  Nest twice, Back (arrow or system) twice -> each step returns one entry, the first is as it was; once
-  more closes. English text does nothing. Nested words are not in Words, no progress.
-- **Ignore word**: panel ⋮ beside the star -> "Ignore word" (panel stays, shows "Stop ignoring"); in
-  Words expand a row -> "Ignore word" (snackbar Undo). Ignored: no tint (Learning or grey "+ New"), out
-  of Learning/Learned/All, card out of the review queue, not in book-sheet N%/M/"Words to learn". Words
-  ⋮ -> "Ignored words" lists them; "Stop ignoring" restores the earlier state (Learning, Known, card).
-  Lookup still works; backup keeps it.
+- **Don't count**: tap a new word -> undo arrow beside the speaker (largest font: a 5-character match
+  not cut). Press -> panel closes, word not in Words. On a saved word: lookup count, Learned mark, due
+  card, progress go back. Same sentence within the hour: no button. Starred/Anki-added kept. Taps inside
+  a definition and "Edit and look up" change nothing.
+- **Nested lookups**: tap a Japanese character in an example sentence or cross-reference -> that entry
+  replaces the panel, back arrow. Nest twice, Back twice -> one entry each, first as it was; once more
+  closes. English text does nothing. Not in Words, no progress.
+- **Ignore word**: panel ⋮ -> "Ignore word" (shows "Stop ignoring"); Words row -> "Ignore word" (Undo).
+  Ignored: no tint, out of Learning/Learned/All, card out of the queue, not in book-sheet N%/M/"Words to
+  learn". Words ⋮ -> "Ignored words"; "Stop ignoring" restores state. Lookup works; backup keeps it.
 
 ## Word marks and known words
 
-- **Tell Honmani what you already know** (Words ⋮, Settings, or the card atop Words -> Learning while
-  under 50 Known words; "Not now" hides it for good): marks as Known the top 500 to 5000 words (needs a
-  frequency dictionary, e.g. Jiten), a text/CSV word list (file or pasted; one word per line, optional
-  reading after tab or comma, `#` lines ignored, over 5 MB refused), or an Anki deck. Each shows a
-  preview (matched, new, already known, not found) before "Mark as known". "Earlier steps": Undo removes
-  what the step added and moves back what it moved from Learning, but keeps words looked up, starred,
-  moved or changed since. Check: top 1000 -> Known filter and a book's "% known" rise; Undo -> fall;
-  change one word first -> it stays.
-- **Quick quiz** (~45 words over the frequency ranks; I know it / I don't, Undo last answer) -> "You
-  seem to know about N words" with a slider; Continue shows the preview, nothing marked before "Mark as
-  known". "Don't know" answers are never marked, "know" answers always. Answer "know" to a point, then
-  "don't": the estimate lands near it; batch shows as "Quick quiz: about N words", Undo removes it.
-- **Mark words** (Reader settings): "Learning" (default): look up a word, turn a page -> it and its
-  forms (食べた, 食べない) have a light accent tint; "Learned" in Words removes it. Spelling variants are
-  one word: after 当たり前, 当り前 is tinted too (one unbroken mark, with or without furigana). "+ New"
-  adds a grey tint on never-met words (at first nearly everything); read once, it goes. "Off": none.
-  Dark pages (black, grey, dark system) use stronger tints. First marks after install or a dictionary
-  change take a few seconds (word list built once), then fade in within ~1 s of opening; a turned page
-  shows them at once.
-- Optional: hide furigana over known words (applies on reopening; a lookup brings it back); tint
-  sentences with exactly one unknown word.
-- **Mark words due for review** (on): a word with a card due today gets an amber tint instead (blue when
-  the accent is amber/yellow; WebView draws no underlines in highlights). Check on a light and a dark
-  page; off + reopen -> Learning tint; after answering the review -> Learning tint again.
-- **Book sheet of a graded book**: "You know N% of its words; M are new to you". N counts only Known
-  words (new user: 0 %); Learning words are neither known nor new. Mark a word Known -> N rises; "Words
-  to learn before reading" lists the M new words, most used first. Difficulty and cover badge unchanged.
+- **"Tell Honmani what you already know"** (Words ⋮, Settings, or the Learning card while under 50
+  Known; "Not now" hides it): top 500-5000 words (needs a frequency dictionary, e.g. Jiten), a text/CSV
+  list (one word per line, optional reading after tab/comma, `#` ignored, over 5 MB refused) or an Anki
+  deck -> preview (matched, new, already known, not found) before "Mark as known". "Earlier steps" Undo
+  removes what the step added, moves back what it moved, keeps words changed since. Top 1000 -> Known
+  filter and book "% known" rise; Undo -> fall.
+- **Quick quiz** (~45 words; I know it / I don't, Undo last) -> "You seem to know about N words" +
+  slider; Continue -> preview, nothing marked before "Mark as known". "Don't know" never marked, "know"
+  always. Know up to a point: estimate near it; batch "Quick quiz: about N words", Undo removes it.
+- **Mark words**: "Learning" (default): look up, turn a page -> word and forms (食べた, 食べない) tinted;
+  "Learned" removes it. Spelling variants are one word (当たり前 looked up -> 当り前 tinted, one unbroken
+  mark). "+ New": grey on never-met words; read once, gone. "Off": none. Dark pages: stronger tints.
+  First marks after install/dictionary change take seconds, then fade in within ~1 s; a turned page shows
+  them at once.
+- Optional: hide furigana over known words (on reopening; lookup brings it back); tint sentences with
+  exactly one unknown word.
+- **Mark words due for review** (on): due-today card -> amber tint (blue if the accent is amber/yellow;
+  WebView draws no underlines in highlights). Off + reopen -> Learning tint; answered -> Learning tint.
+- **Book sheet** of a graded book: "You know N% of its words; M are new to you": N counts only Known
+  (new user 0 %), Learning is neither. Mark Known -> N rises; "Words to learn before reading" lists the
+  M, most used first. Difficulty and cover badge unchanged.
 
 ## Anki
 
-- Words -> Learning: "Check against Anki" (beside "Add all N to Anki") forgets the "in Anki" mark of
-  cards deleted in AnkiDroid and marks words whose card exists. Only looks at Honmani's own note type of
-  the chosen "Card type" and at saved words. "Choose a deck" (also Settings -> Anki) marks saved words
-  found in a deck's word field as learned and every word on its notes as Known, also never-looked-up
-  ones; the confirm text shows both numbers. Decks of whole sentences match almost nothing.
-- Settings -> Anki -> Card type "Honmani" (default) or "Sentence": adding a word (panel, Learning, "Add
-  all N") creates the note type "Honmani Sentence": front = the whole source sentence with no mark on the
-  word, back = word, reading, meanings (no stored sentence: the word). "Check against Anki" then uses
-  that type. Export "Anki package" follows the choice; the text file always uses the Honmani type.
-- "My own" card type: the field mapping fills a note type the user already has; no field added, template
-  untouched.
-- Both Honmani note types end in `FuriganaPlain` (`飛[と]び 散[ち]る`, for `{{furigana:FuriganaPlain}}`),
-  shown by no template. The first card to an older note type adds the field without asking (once per
-  run; if AnkiDroid refuses, the card goes in without it). Changing a note type moves the collection's
-  `scm`, so the next AnkiWeb sync goes one way: sync all devices first. Importing an `.apkg` over an older
-  type leaves it and makes "Honmani Sentence+". Settings -> Anki -> Sentence ends: sentence-end
-  characters for new cards, sentence highlights and the sentence tint; old cards unchanged.
+- Words -> Learning "Check against Anki": forgets the "in Anki" mark of cards deleted in AnkiDroid, marks
+  words whose card exists; only the chosen "Card type" note type and saved words. "Choose a deck"
+  (also Settings -> Anki): saved words found in a deck's word field become learned, every word on its
+  notes Known (also never looked up); confirm shows both numbers. Sentence decks match almost nothing.
+- Settings -> Anki -> Card type "Honmani" (default) or "Sentence": adding a word creates "Honmani
+  Sentence": front = source sentence without mark on the word, back = word, reading, meanings (no
+  sentence: the word). "Check against Anki" uses it; export "Anki package" follows; the text file is
+  always Honmani type. "My own": mapping fills the user's note type; no field added, template untouched.
+- Both Honmani types end in `FuriganaPlain` (`飛[と]び 散[ち]る`, for `{{furigana:FuriganaPlain}}`), shown
+  by no template. The first card to an older type adds it without asking (once per run; if refused, the
+  card goes in without). Changing a note type moves `scm`: next AnkiWeb sync is one-way, sync all devices
+  first. Importing an `.apkg` over an older type makes "Honmani Sentence+". Settings -> Anki -> Sentence
+  ends: end characters for new cards, sentence highlights and tint; old cards unchanged.
 
 ## Dictionary search and radicals
 
-- Words -> "Search dictionaries": results while typing. 食べる, たべる, taberu, neko, "cat" (English: 猫
-  first); saved words in "In your words". Tap a result -> entry, query joins "Recent searches". Right
-  after a dictionary install a note says English search is getting ready (~1 min); Japanese and romaji
-  work at once. Launcher long-press "Search" opens Words with the field focused.
-- Radical search: button 部 at the end of the field -> sheet of radicals by stroke count. 木 + 日 ->
-  kanji containing both (東, 杳, ...); dead-end radicals dimmed; "Reset" clears. Tap a kanji -> inserted
-  at the cursor, sheet closes, search runs. Check at "Largest" font on a narrow phone (nothing clipped)
-  and TalkBack ("Radical 木, 4 strokes", checkboxes). Handwriting = keyboard (Gboard).
+- Words -> "Search dictionaries": results while typing: 食べる, たべる, taberu, neko, "cat" (猫 first);
+  saved words in "In your words". Tap a result -> entry, query joins "Recent searches". Right after a
+  dictionary install a note says English search is getting ready (~1 min); Japanese/romaji work at once.
+  Launcher long-press "Search" opens Words with the field focused.
+- Radicals: 部 at the end of the field -> sheet by stroke count. 木 + 日 -> kanji with both (東, 杳, ...),
+  dead ends dimmed, "Reset" clears. Tap a kanji -> inserted at the cursor, sheet closes, search runs.
+  Largest font on a narrow phone: nothing clipped; TalkBack "Radical 木, 4 strokes", checkboxes.
 
 ## Review
 
-- Look up words in a book; next day Words shows "Review · n due" and the icon a badge. Front = sentence
-  with the word marked; tap shows the answer; Forgot / Got it (or swipe left/right); Undo takes back the
-  last answer. Back mid-session keeps the answers.
-- ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field
-  per kanji part, kana only, Reset; same entry in the panel ⋮; changes only Honmani's built furigana:
-  panel headword, card reading, new Anki cards, never the book), Add/Edit note (max 500 chars, several
-  lines; back of the card under the meaning; empty removes it; survives re-lookup, remove and take
-  back, backup restore; Words shows it), Look up, Open in book (opens at the sentence; Back returns to
-  Words), Not a word, Remove.
-- Chips other than Due (This book, A book..., Starred, All learning) review early and ignore the limit.
-- Settings -> Flashcards -> "Reviews per day" (50 / 100 default / 200 / No limit): 120 due with 100 ->
-  Words and badge say 100, session asks 100, most overdue first, 20 carry over. After 30 answers 70 are
-  left (new words use "New words a day"); an Again returns today regardless. 200 / No limit shows all
-  120. The in-book due tint follows the same cards.
-- Settings -> Reading -> "Day starts at" (Midnight default, 1-6 am): with 4 am, reading and reviews at
-  02:00 count for the day before (statistics, goal, streak, new words a day, reviews today, due);
-  applies from the change, recorded days keep their date.
-- Stability >= 365 days retires the card for good (never due; badge and tint ignore it); looking it up
-  in a book after it is overdue lapses it, back the next day.
-- Reading counts: a due word read in a book moves later (once a day), a lookup makes it due; closing the
-  book shows how many due words you passed.
-- Book sheet -> "Words to learn before reading" -> "Learn n words": come with the book's sentences,
-  most used first; words already in Learning are not listed; "Top 20" ticks the 20 most used.
-- Largest font: chips wrap uncut, answer buttons and menu usable.
-- Progress shows reviews today, review time, retention, words in review. Progress -> Statistics ->
-  "Export for Refold (CSV)" offers a file holding only reading not exported before (today's so far
-  included; Refold adds rows up, so a second same-day export has only the new minutes); "Export
-  everything again" repeats all, only for a new account.
+- Look up words in a book; next day Words shows "Review · n due" and an icon badge. Front = sentence with
+  the word marked; tap = answer; Forgot / Got it (or swipe); Undo; Back mid-session keeps answers.
+- ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field per
+  kanji part, kana only, Reset; also in the panel ⋮; changes only Honmani's built furigana, never the
+  book), Add/Edit note (max 500 chars; back of the card; empty removes; survives re-lookup, remove and
+  take back, restore; Words shows it), Look up, Open in book (at the sentence; Back -> Words), Not a
+  word, Remove.
+- Chips other than Due (This book, A book..., Starred, All learning) review early, ignore the limit.
+- "Reviews per day" (50/100 default/200/No limit): 120 due, 100 chosen -> Words and badge say 100,
+  session asks 100, most overdue first, 20 carry over; after 30 answers 70 left (new words use "New
+  words a day"); an Again returns today. 200/No limit shows 120. Book due tint follows the same cards.
+- Settings -> Reading -> "Day starts at" (Midnight, 1-6 am): with 4 am, 02:00 reading/reviews count for
+  the day before (statistics, goal, streak, new words a day, reviews today, due); applies from the
+  change.
+- Stability >= 365 days retires a card (never due; badge/tint ignore it); a lookup after it is overdue
+  lapses it, back next day.
+- Reading counts: a due word read moves later (once a day), a lookup makes it due; closing the book shows
+  how many due words you passed.
+- Book sheet -> "Words to learn before reading" -> "Learn n words": with the book's sentences, most used
+  first; words in Learning not listed; "Top 20" ticks the 20 most used.
+- Largest font: chips wrap uncut, buttons and menu usable.
+- Progress: reviews today, review time, retention, words in review. Statistics -> "Export for Refold
+  (CSV)": only reading not exported before (today's included; Refold adds rows up, so a second same-day
+  export has only new minutes); "Export everything again" only for a new account.
 
 ## Search in the book
 
-Reader menu -> Search in book: a word occurring several times -> each match bold with surroundings and
-place (%), in reading order; furigana not matched. Tap a later match -> opens there, marked yellow
-briefly (also far down a long paragraph; vertical/horizontal, paged/continuous). Back returns to the
-earlier page. Check speed in a long book and that the keyboard does not cover the list.
+Reader menu -> Search in book: a repeated word -> matches in bold with surroundings and place (%), in
+reading order; furigana not matched. Tap a later match -> opens there, yellow briefly (also far down a
+long paragraph; vertical/horizontal, paged/continuous). Back -> earlier page. Check speed in a long book;
+keyboard does not cover the list.
 
 ## Read aloud
 
-Needs a Japanese voice (Android Settings, Text-to-speech); media volume audible. Reader menu -> Read
+Needs a Japanese voice (Android Settings, Text-to-speech) and audible media volume. Reader menu -> Read
 aloud, on a page with furigana.
 
-- Bar at the bottom (previous, play/pause, next, speed, close); first sentence marked grey, then spoken;
-  the mark follows the sentence, inside a long one the words; visible next to word marks and
-  highlights and in e-ink mode.
-- A ruby word is read as its furigana.
-- End of page: the book turns itself (a sentence crossing the break turns when the rest is off the page);
-  paged and continuous, both directions. Close and reopen: on the page reached.
-- Pause/play resumes from the sentence start; next/previous move one sentence, also paused. Speed cycles
-  0.75/1/1.25/1.5 and is kept per book. Fits at 360 dp and the largest font; TalkBack reads each button.
+- Bar (previous, play/pause, next, speed, close); first sentence marked grey, then spoken; the mark
+  follows the sentence, in a long one the words; visible beside word marks, highlights, in e-ink.
+- Ruby words are read as their furigana.
+- Page end: the book turns itself (a sentence crossing the break turns when the rest is off the page);
+  paged/continuous, both directions. Close and reopen: on the page reached.
+- Pause/play resumes at the sentence start; next/previous move a sentence, also paused. Speed
+  0.75/1/1.25/1.5, kept per book. Fits at 360 dp and the largest font; TalkBack reads each button.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
-- A call, other player or Home pauses it; screen stays on only while reading.
-- No Japanese voice: the bar says so and offers "Voice settings". End of book: it stops and says so.
-- Rotate, change font, close the book while reading: no crash, no voice left over.
-- Reader menu -> Pronunciations: add "text in the book" and "read as (kana)", Save; Read aloud speaks the
+- Call, other player, Home pauses it; the screen stays on only while reading.
+- No Japanese voice: bar says so, offers "Voice settings". Book end: it stops and says so.
+- Rotate, change font, close the book while reading: no crash, no voice left.
+- Reader menu -> Pronunciations: add "text in the book" + "read as (kana)", Save; Read aloud speaks the
   kana (logcat tag ReadAloud, "speak" line); delete shows Undo; removing the book removes its entries;
   backup restore brings them back (a restored phone keeps its own reading).
 
 ## Audiobook
 
-Needs an EPUB, an audio file and an SRT/WebVTT matching the book's text. Use a silent recording (media
-volume stays 0). Reader menu -> Audiobook: choose the audio, then the subtitles.
+Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent recording (media volume
+0). Reader menu -> Audiobook: pick audio, then subtitles.
 
-- Bar appears, "Matching the subtitles to the book..." briefly, then audio plays and the subtitle heard
-  is marked. Pages turn at the end of a page (both directions, paged and continuous). Turned pages
-  count as reading: with progress sync the position reaches the server (a far jump does not).
-- Subtitles not in the book change nothing (mark stays until the next found one); fewer than half found
-  -> the bar says so.
-- Next/previous move one subtitle (previous first restarts the current), also paused. Speed cycles
-  0.75/1/1.25/1.5 and is kept.
-- Pause, close the app: audio paused, screen no longer kept on, Play later continues. A call or other
-  player pauses; a word tap pauses while the panel is open.
-- Starting Read aloud stops the audiobook and vice versa.
-- Remove: pairing, subtitle copy and position gone. Delete the audio file, play -> "audio is gone" with
-  "Change files". Unplayable audio, empty subtitle file, non-EPUB book -> readable message, no crash.
+- Bar, "Matching the subtitles to the book..." briefly, audio plays, the heard subtitle is marked; pages
+  turn at page end (both directions, paged/continuous) and count as reading: with progress sync the
+  position reaches the server (a far jump does not).
+- Subtitles not in the book change nothing (mark stays); under half found -> the bar says so.
+- Next/previous move one subtitle (previous first restarts the current), also paused. Speed
+  0.75/1/1.25/1.5, kept.
+- Pause, close the app: audio paused, screen no longer kept on, Play continues. Call/other player
+  pauses; a word tap pauses while the panel is open.
+- Read aloud and the audiobook stop each other.
+- Remove: pairing, subtitle copy, position gone. Delete the audio file, play -> "audio is gone", "Change
+  files". Unplayable audio, empty subtitles, non-EPUB -> readable message, no crash.
 
 ## Bookmarks and the reading slider
 
-Reader menu top: slider with live label ("42% · 10,350 / 24,847"), Add bookmark, Bookmarks. Check paged
-and continuous, vertical and horizontal, EPUB and TXT:
-- Drag the slider: label follows, nothing moves until release; then the book reloads there and "Jumped
-  to N%" offers "Back to where you were" (exact earlier page).
-- Add bookmark: name prefilled from the text at the place, editable; place = current page. Bookmarks in
-  reading order with name and %; tap jumps, pencil renames, bin deletes with Undo. Removing the book
-  removes them.
+Reader menu top: slider with live label ("42% · 10,350 / 24,847"), Add bookmark, Bookmarks. Paged and
+continuous, vertical and horizontal, EPUB and TXT:
+- Drag: label follows, nothing moves until release; then reload there and "Jumped to N%" with "Back to
+  where you were" (exact earlier page).
+- Add bookmark: name prefilled from the text, editable; place = current page. List in reading order; tap
+  jumps, pencil renames, bin deletes (Undo). Removing the book removes them.
 - Backup then restore on a fresh install with the same book: bookmarks there; twice adds nothing.
-- With progress sync (EPUB): after a slider/bookmark jump nothing is sent until a page is turned; the
-  other device is not asked about a backward jump.
-- Long press and tap on text still look up after a jump.
+- Progress sync (EPUB): after a slider/bookmark jump nothing is sent until a page is turned; the other
+  device is not asked about a backward jump.
+- Long press and tap still look up after a jump.
 
 ## Highlights
 
-Needs an EPUB and "Look up selected text" on. Check on light, dark, sepia, black; vertical/horizontal;
+Needs an EPUB and "Look up selected text" on. Light, dark, sepia, black; vertical/horizontal;
 paged/continuous; with/without furigana:
-- Own long press on a word (no blue selection or handles): marked while the finger is down, the lookup
-  panel opens on release; moving first cancels. Panel: Selection / Sentence / Paragraph (Sentence
-  chosen) with the text in one line, and "Highlight" with four colours; one tap saves, closes the panel,
-  "Highlight saved" with Undo. A sentence ends at 。！？ or a line break and keeps a closing 」; a paragraph
-  can span pages (marks on both after a turn); furigana is part of neither.
+- Own long press on a word (no blue selection): marked while held, panel on release; moving first
+  cancels. Panel: Selection / Sentence / Paragraph (Sentence chosen) with its text in one line, and
+  "Highlight" with four colours; one tap saves, closes, "Highlight saved" (Undo). A sentence ends at
+  。！？ or a line break and keeps a closing 」; a paragraph can span pages; furigana is no part of either.
 - A new highlight replaces overlapping ones (any colour); Undo brings them back.
-- Reopen the book, change font size, rotate -> same text still highlighted.
-- Tap inside a highlight: lookup opens as usual with the colours (current ticked) and "Remove highlight";
-  another colour changes it; Remove deletes, with Undo.
+- Reopen, change font size, rotate -> same text highlighted.
+- Tap inside one: lookup opens with the colours (current ticked) and "Remove highlight"; another colour
+  changes it; Remove deletes (Undo).
 - Reader menu -> Highlights: passage, colour dot, place; tap jumps ("Back to where you were"), bin
-  removes with Undo. Removing the book removes its highlights.
-- Backup then restore on a fresh install with the same book: highlights there.
-- "Look up selected text" off: none can be made; existing ones still drawn, listed, removable. TXT
-  books offer no Highlight.
-- E-ink: four solid light greys (220, 200, 180, 160); a word mark is translucent black over them
-  (darker inside a highlight); lookup mark and search hit are solid and cover it.
-- Word mark, lookup mark and search hit lie over a highlight without hiding the text.
+  removes (Undo). Removing the book removes them. Backup/restore on a fresh install keeps them.
+- Selection lookup off: none can be made; existing ones drawn, listed, removable. TXT offers no Highlight.
+- E-ink: four solid light greys (220, 200, 180, 160); word mark translucent black over them; lookup mark
+  and search hit solid, cover it. Word mark, lookup mark, search hit never hide the text.
 
 ## Reading progress sync (KOReader)
 
 Setup: KOReader on an e-reader (or Calibre-Web Automated with its "CWA Progress Sync" plugin; in Honmani
-its plain address and Calibre-Web login suffice) on the same sync server; same EPUB on both. Settings
--> Reading progress sync, sign in, read a few pages, back to the library.
-- KOReader opens the book and offers Honmani's position (top of the shown page). Read on in KOReader,
-  open in Honmani -> "Continued at ...% from ..." at KOReader's page. Aozora-converted books match only
-  with the same EPUB on both.
-- Offline (mobile data with a home server, or flight mode): read in Honmani, back to the library,
-  reconnect (or restart on home Wi-Fi) -> without reopening the book KOReader offers Honmani's last
-  page. Conflict: read further offline in Honmani, open the book in KOReader at its older place and
-  close, reconnect, open in Honmani -> "Where to continue?"; "Stay at ..." keeps Honmani's page (KOReader
-  offers it next time), "Go to ..." jumps back.
-- Status: Settings shows "Last synced ... ago" or "Not synced yet". Server off or network gone, turn a
-  page or open a book -> "Last attempt failed ...: server unreachable" (other reasons: wrong login,
-  HTTP status); that book's reader menu starts with "Progress sync failed: ..."; other books show no
-  hint. Server back -> the next sync clears both.
+its plain address and Calibre-Web login suffice), same sync server, same EPUB on both. Settings ->
+Reading progress sync, sign in, read a few pages, back to the library.
+- KOReader offers Honmani's position (top of the shown page). Read on there, open in Honmani ->
+  "Continued at ...% from ..." at KOReader's page. Aozora-converted books match only with the same EPUB.
+- Offline: read in Honmani, back to the library, reconnect (or restart on home Wi-Fi) -> without
+  reopening the book KOReader offers the last page. Conflict: read on offline in Honmani, open in
+  KOReader at its older place and close, reconnect, open in Honmani -> "Where to continue?"; "Stay at
+  ..." keeps Honmani's page (KOReader offers it next), "Go to ..." jumps back.
+- Status: Settings shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
+  attempt failed ...: server unreachable" (or wrong login, HTTP status); that book's reader menu starts
+  with "Progress sync failed: ..."; other books no hint. Server back -> next sync clears both.
 
 ## Back up and restore
 
-- Settings -> Back up and restore -> Back up..., save the file. Uninstall, reinstall, get a dictionary,
-  Restore... -> accent colour, reader settings, Words (Learning/Known progress), Progress (level, streak,
-  calendar, milestones, skill) and Statistics return. Re-adding a book (same file or from the server):
-  old progress, opens at the old page, has its statistics. Restoring the same file twice changes
-  nothing. Review cards return with their due dates (answer after the backup, restore -> back at the
-  backup's date); Progress -> Overview shows the review tiles.
-- With progress sync signed in: read on in KOReader after the backup, restore, add the book -> opens at
+- Settings -> Back up and restore -> Back up..., save. Uninstall, reinstall, get a dictionary, Restore...
+  -> accent colour, reader settings, Words (progress), Progress (level, streak, calendar, milestones,
+  skill), Statistics return. Re-add a book: old progress, old page, its statistics. Same file twice
+  changes nothing. Review cards keep due dates (answer after the backup, restore -> backup's date);
+  Progress -> Overview shows the review tiles.
+- Progress sync signed in: read on in KOReader after the backup, restore, add the book -> opens at
   KOReader's page ("Continued at ..."), not the backup's.
 - Without a file: Honmani's own backup (rewritten on going to the background, at most every 6 h) rides
-  Android's Google backup or phone-to-phone transfer. The new phone's first start asks "Restore from your
-  previous phone?" (with the backup date); Restore = restore from file; Android already restored the
-  settings.
-- Android's backup without a Google account, over USB with the debug-only local transport (the phone's
-  backup setting is off by default; undo afterwards):
+  Android's Google backup or phone transfer. New phone's first start: "Restore from your previous
+  phone?" (with date); Restore = from file; settings already restored by Android.
+- Android's backup over USB without a Google account (debug-only local transport; the phone's backup
+  setting is off by default, undo afterwards):
 
 ```sh
 adb shell bmgr enable true
@@ -315,7 +266,7 @@ adb shell bmgr enable false
 
 ## Known limitations (no need to report)
 
-- Diagnostics show "Failed to register a ServiceWorker": ttu's offline cache, unneeded. Harmless.
+- Diagnostics show "Failed to register a ServiceWorker" (ttu's offline cache, unneeded).
 - ttu's Google Drive / OneDrive sync and backup downloads do not work.
 - Dictionary images are not shown.
-- Choosing one of ttu's web fonts in its settings brings back a 10 s wait on opening books (not bundled).
+- ttu's web fonts (chosen in its settings) bring back a 10 s wait on opening books (not bundled).

@@ -45,24 +45,21 @@ public: never copy those notes, personal details or discussions into it.
   workflow (tag `release/*`; run number = version code); other builds stay unsigned or debug-signed.
 - **Versions:** AGP 9.4 with built-in Kotlin (no `org.jetbrains.kotlin.android`), Gradle 9.8, Kotlin
   2.4.21, KSP 2.3 (move together), compileSdk 37, targetSdk 36 (raise deliberately).
-- **Reader settings:** ttu's localStorage is the only store (Honmani's own as `honmani*` keys), so
-  Honmani's screen and ttu's settings page never disagree. Theme follows the system until the reader
-  picks one (`honmaniAutoTheme`).
+- **Reader settings:** ttu's localStorage is the only store (Honmani's own as `honmani*` keys); theme
+  follows the system until the reader picks one (`honmaniAutoTheme`).
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
-  contradicts ranks below those it agrees with (誰が with だれ is 誰); deinflection rules are
-  Honmani's own (`lookup/Deinflector`). Glossaries are always stored deflated (`GlossaryPacker`).
+  contradicts ranks below those it agrees with; own deinflection (`lookup/Deinflector`); glossaries
+  stored deflated (`GlossaryPacker`).
 - **Saved words:** recorded on every lookup, ranked by a decayed score (half-life 14 days), never
   deleted for age. "Learned", not "Known". Anki cards are suggested, never pushed.
-- **Spelling variants** (`SpellingVariants`): forms with kanji, 2+ characters, listed together by one
-  dictionary entry count as one word for marks, book coverage and word progress; single kanji are
-  excluded (生 is also うぶ). Vocabulary estimate and grading keep exact forms. Cached in
-  `files/spelling-variants.txt` per dictionary set.
-- **Anki:** own client for AnkiDroid's content provider (not the LGPL library). Note types: "Honmani"
-  (deck "Honmani"), "Honmani Sentence" (`SentenceCard`; Settings -> Anki -> Card type, `anki_card_style`,
-  backed up) and "My own" (`CardMapping.kt`: per-field `CardSource` mapping as JSON by note type name,
-  presets Lapis/JPMN/generic): fills a user's note type, never adds a field or changes its template
-  (that would force a one-way AnkiWeb sync). `.apkg` (schema 11, fixed note type ids, guid from the
-  word) or a text file (Honmani type only) for desktop Anki. The Google Cloud key is
+- **Spelling variants** (`SpellingVariants`): kanji forms of 2+ characters listed together by one
+  dictionary entry count as one word for marks, coverage and progress; single kanji excluded; the
+  vocabulary estimate and grading keep exact forms.
+- **Anki:** own client for AnkiDroid's content provider (not the LGPL library). Note types "Honmani"
+  (deck "Honmani"), "Honmani Sentence" (`SentenceCard`, `anki_card_style`) and "My own" (`CardMapping.kt`:
+  per-field `CardSource` mapping as JSON, presets Lapis/JPMN/generic): fills a user's note type, never
+  adds a field or changes its template (that forces a one-way AnkiWeb sync). `.apkg` (schema 11, fixed
+  note type ids, guid from the word) or a text file (Honmani type only) for desktop Anki. The Google Cloud key is
   Keystore-encrypted and only sent in `X-Goog-Api-Key`.
 - **Credentials and servers:** OPDS 1.x only, own parser and `HttpURLConnection` client. Passwords are
   AES-GCM with a Keystore key (not androidx security-crypto). A login goes only to the server's own
@@ -82,19 +79,13 @@ public: never copy those notes, personal details or discussions into it.
 - `cd web-tests && npm ci && npx playwright install --with-deps chromium && npx playwright test`
   (needs `:app:buildTtu` output or `TTU_DIR=...`). No Chromium build for Ubuntu 26.04 yet: set
   `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64` for install and run.
-- Unit tests merge the app's assets, so even `testDebugUnitTest` runs `:app:buildTtu` (Node and pnpm
-  needed; `-x :app:buildTtu` fails).
-- Real-dictionary lookup check: `scripts/lookup-coverage/export_terms.py <honmani.db>` (debug build),
-  then `LookupCoverageCheck` writes `app/build/lookup-coverage/report.txt` (skipped without the export).
+- `testDebugUnitTest` also runs `:app:buildTtu` (Node and pnpm needed; `-x :app:buildTtu` fails).
 - CI (`.github/workflows/android.yml`) runs all of this on every push and cancels the running build:
   don't push while someone waits for an APK.
-- **Test APKs:** artifact `honmani-test-apks` of a green run -> `app-internal.apk`. Every run signs
-  with a new key: uninstall the old build first (deletes dictionaries). Give the direct link
-  `.../actions/runs/<run>/artifacts/<id>`. Local builds use the local debug key.
-- Cloud sandbox (Claude Code on the web): Google Maven is blocked, so CI is the only Android compiler;
-  pure Kotlin can be tested in a throwaway JVM Gradle project; ttu and Playwright run with Node 24
-  (`~/node24`) and the preinstalled Chromium. Linux's default CJK font has broken vertical metrics:
-  tests use `IPAGothic`.
+- **Test APKs:** artifact `honmani-test-apks` of a green run -> `app-internal.apk`; every run signs with
+  a new key (uninstall the old build first). Give the direct link `.../actions/runs/<run>/artifacts/<id>`.
+- Cloud sandbox: Google Maven is blocked, so CI is the only Android compiler. Linux's default CJK font
+  has broken vertical metrics: tests use `IPAGothic`.
 
 ## Lessons learned (each cost a CI or device round trip)
 
@@ -104,15 +95,11 @@ public: never copy those notes, personal details or discussions into it.
   `HeaderServer`). JUnit rejects test methods with a return value: a `= runBlocking { ... }` test must
   end in a statement. Assert the part of a UI state the test is about, not the whole object.
 - Room in-memory test DBs need `allowMainThreadQueries()` for raw queries. `MigrationTestHelper` fails
-  on Windows (path separators); passes on Linux CI.
+  on Windows; passes on Linux CI.
 - Android's ICU regex is stricter than the JVM's: escape `{` and `}`; parse bridge messages as JSON.
 - Lint fails on a literal BOM in source (write escapes). Overriding `ComponentActivity.dispatchKeyEvent`
   is a RestrictedApi error: use `onKeyDown`/`onKeyUp`. Kotlin block comments nest: never write `/*`
   inside KDoc.
-- AAPT drops asset directories starting with `_` (ttu's `_app/`): overridden in `app/build.gradle.kts`,
-  guarded by `check-apk.sh`.
-- `git apply` inside this repo silently skips paths for a work dir under it: `buildTtu` sets
-  `GIT_CEILING_DIRECTORIES`.
 - Android WebView differs from desktop Chromium (e.g. blank vertical pages without an explicit height):
   reproduce in Chromium by forcing the reported condition, fix, add a regression test with realistic
   books (paragraphs longer than a screen, mobile emulation, DPR 4). `Range.getClientRects()` gives
@@ -133,14 +120,12 @@ public: never copy those notes, personal details or discussions into it.
   WebView sends `touchcancel` once it selects. Honmani uses its own long press (mark while held, lookup
   on release); highlights take their extent from the lookup panel. Test selection features with more
   than one character.
-- Drag offsets: update plain state synchronously in the drag callback, not in a coroutine per move.
 - A continuation resumed from callbacks on other threads must resume at most once (`AtomicBoolean`).
   Catch exceptions from other apps' content providers.
 - Android 13+ shows no notifications without `POST_NOTIFICATIONS`, even a foreground service's; an
   Android 12 phone proves nothing. Ask when the work starts (`rememberWithNotifications`).
-- Android's restore gives restored files a 1970 modified date: read dates from file contents
-  (`AutoBackup` offers the backup's own `exportedAt`). Try backup with `bmgr` and the local transport
-  (`docs/device-testing.md`).
+- Restored files get a 1970 modified date: read dates from file contents (`exportedAt`). Try backup with
+  `bmgr` (`docs/device-testing.md`).
 
 ## Conventions
 
@@ -151,5 +136,3 @@ public: never copy those notes, personal details or discussions into it.
 - Strings in `res/values/strings.xml` (escape apostrophes as `\'`); user-facing errors are readable
   sentences.
 - Work goes to `main` (`git push origin HEAD:main`); no PRs unless asked.
-- Explain changes in plain terms; device testing is the real check. Ask for "Share diagnostics" when
-  the reader misbehaves.
