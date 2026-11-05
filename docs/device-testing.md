@@ -201,7 +201,12 @@ are matched, new, already known, not found with a few examples) before "Mark as 
 "Earlier steps" every step has Undo: it removes the words it added and moves back the ones it
 moved from Learning, but leaves any word you looked up, starred, moved or changed since. Check:
 mark the top 1000, see the Known filter and a book's "% known" rise; undo and see them fall;
-change one word first and see it stay. "Quick quiz" is a greyed placeholder.
+change one word first and see it stay. "Quick quiz" asks about 45 words
+spread over the frequency ranks (I know it / I don't know it, Undo last answer), then says "You seem to
+know about N words" with a slider; Continue shows the usual preview and nothing is marked before
+"Mark as known". Words answered "I don't know it" are never marked, words answered "I know it" always
+are. Check: answer all "know" up to a point and "don't know" beyond; the estimate lands near that
+point; the batch appears as "Quick quiz: about N words" and Undo removes it.
 
 Reader settings → Mark words. "Learning" (the default): look up a word, turn a page or two and
 come back: the word and its other forms (食べた, 食べない) have a light accent tint; after

@@ -25,20 +25,24 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
@@ -47,12 +51,17 @@ import app.honmani.reader.data.words.KnownBatchEntity
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.known.KnownPlan
+import app.honmani.reader.known.PlacementQuiz
+import app.honmani.reader.known.QuizAnswer
+import app.honmani.reader.known.QuizSetup
 import app.honmani.reader.known.TopNResult
 import app.honmani.reader.known.WordListTooLargeException
 import app.honmani.reader.known.WordListParser
 import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.exp
+import kotlin.math.ln
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -83,6 +92,12 @@ internal class KnownWordsFlow(
         data class Review(val plan: KnownPlan, val dictionary: String? = null) : Step
 
         data class Problem(val message: String) : Step
+
+        /** The quiz is asking word number `answers.size + 1`; [answers] are the answers so far (true = known). */
+        data class Quiz(val setup: QuizSetup, val answers: List<Boolean> = emptyList()) : Step
+
+        /** All asked: [estimate] is where the answers say the reader's vocabulary ends (a slider start). */
+        data class QuizResult(val setup: QuizSetup, val answers: List<Boolean>, val estimate: Int) : Step
     }
 
     var step by mutableStateOf<Step?>(null)
@@ -98,6 +113,41 @@ internal class KnownWordsFlow(
         when (val result = container.knownWords.planTopN(n)) {
             TopNResult.NoFrequencyDictionary -> Step.Problem(context.getString(R.string.known_no_frequency))
             is TopNResult.Ready -> Step.Review(result.plan, result.dictionary)
+        }
+    }
+
+    fun startQuiz() = work {
+        val setup = container.knownWords.prepareQuiz()
+        when {
+            setup == null -> Step.Problem(context.getString(R.string.known_no_frequency))
+            setup.questions.isEmpty() -> Step.Problem(context.getString(R.string.known_list_empty))
+            else -> Step.Quiz(setup)
+        }
+    }
+
+    fun answer(known: Boolean) {
+        val quiz = step as? Step.Quiz ?: return
+        val answers = quiz.answers + known
+        val questions = quiz.setup.questions
+        step = if (answers.size < questions.size) {
+            quiz.copy(answers = answers)
+        } else {
+            val estimate = PlacementQuiz.estimate(questions.zip(answers) { q, a -> QuizAnswer(q.rank, a) }, quiz.setup.size) ?: 0
+            Step.QuizResult(quiz.setup, answers, PlacementQuiz.tidy(estimate).coerceAtMost(quiz.setup.size))
+        }
+    }
+
+    fun undoAnswer() {
+        val quiz = step as? Step.Quiz ?: return
+        step = quiz.copy(answers = quiz.answers.dropLast(1))
+    }
+
+    /** From the slider to the usual review of what would be marked. */
+    fun quizReview(result: Step.QuizResult, n: Int) = work {
+        val answers = result.setup.questions.zip(result.answers)
+        when (val planned = container.knownWords.planQuiz(n, answers)) {
+            TopNResult.NoFrequencyDictionary -> Step.Problem(context.getString(R.string.known_no_frequency))
+            is TopNResult.Ready -> Step.Review(planned.plan, planned.dictionary)
         }
     }
 
@@ -222,10 +272,10 @@ fun KnownWordsSheet(onDismiss: () -> Unit) {
                 supportingContent = { Text(stringResource(R.string.known_anki_deck_details)) },
                 modifier = Modifier.clickable(onClick = knownFromAnki::start),
             )
-            // Not built yet; the batch list already understands its results (KnownSource.QUIZ).
             ListItem(
-                headlineContent = { Text(stringResource(R.string.known_quiz), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                supportingContent = { Text(stringResource(R.string.known_quiz_soon)) },
+                headlineContent = { Text(stringResource(R.string.known_quiz)) },
+                supportingContent = { Text(stringResource(R.string.known_quiz_details)) },
+                modifier = Modifier.clickable(onClick = flow::startQuiz),
             )
             if (batches.isNotEmpty()) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -258,7 +308,7 @@ private fun batchTitle(batch: KnownBatchEntity): String = when (batch.source) {
     KnownSource.TOP_N -> stringResource(R.string.known_batch_top, batch.detail)
     KnownSource.ANKI_DECK -> stringResource(R.string.known_batch_anki, batch.detail)
     KnownSource.WORD_LIST -> stringResource(R.string.known_batch_list, batch.detail)
-    KnownSource.QUIZ -> stringResource(R.string.known_batch_quiz)
+    KnownSource.QUIZ -> stringResource(R.string.known_batch_quiz, "%,d".format(batch.detail.toIntOrNull() ?: 0))
 }
 
 @Composable
@@ -291,6 +341,46 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                 dismissButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_cancel)) } },
             )
         }
+        is KnownWordsFlow.Step.Quiz -> {
+            val questions = step.setup.questions
+            val word = questions[step.answers.size].word
+            AlertDialog(
+                onDismissRequest = flow::cancel,
+                title = { Text(stringResource(R.string.known_quiz_title, step.answers.size + 1, questions.size)) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(word.expression, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                        if (word.reading != word.expression) Text(word.reading, style = MaterialTheme.typography.titleMedium)
+                        TextButton(onClick = flow::undoAnswer, enabled = step.answers.isNotEmpty()) {
+                            Text(stringResource(R.string.known_quiz_back))
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { flow.answer(true) }) { Text(stringResource(R.string.known_quiz_know)) } },
+                dismissButton = { TextButton(onClick = { flow.answer(false) }) { Text(stringResource(R.string.known_quiz_dont)) } },
+            )
+        }
+        is KnownWordsFlow.Step.QuizResult -> {
+            // The slider moves on a log scale: a step near 1,000 words matters more than one near 10,000.
+            var position by rememberSaveable { mutableFloatStateOf(ln(step.estimate.coerceAtLeast(10).toFloat())) }
+            val n = PlacementQuiz.tidy(exp(position).toInt()).coerceAtMost(step.setup.size)
+            AlertDialog(
+                onDismissRequest = flow::cancel,
+                title = { Text(stringResource(R.string.known_quiz_result, "%,d".format(n))) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.known_quiz_result_text))
+                        Slider(value = position, onValueChange = { position = it }, valueRange = ln(10f)..ln(step.setup.size.toFloat()))
+                    }
+                },
+                confirmButton = { TextButton(onClick = { flow.quizReview(step, n) }) { Text(stringResource(R.string.known_quiz_continue)) } },
+                dismissButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_cancel)) } },
+            )
+        }
         is KnownWordsFlow.Step.Problem -> AlertDialog(
             onDismissRequest = flow::cancel,
             text = { Text(step.message) },
@@ -307,6 +397,7 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                         Text(
                             when (plan.source) {
                                 KnownSource.TOP_N -> stringResource(R.string.known_review_top, plan.detail, step.dictionary.orEmpty())
+                                KnownSource.QUIZ -> stringResource(R.string.known_quiz_review, "%,d".format(plan.detail.toIntOrNull() ?: 0), step.dictionary.orEmpty())
                                 KnownSource.ANKI_DECK -> stringResource(R.string.known_review_anki, plan.detail)
                                 else -> stringResource(R.string.known_review_list, plan.detail)
                             },

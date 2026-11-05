@@ -476,7 +476,15 @@
     <string name="known_anki_deck">Anki deck</string>
     <string name="known_anki_deck_details">Every word of one of your AnkiDroid decks.</string>
     <string name="known_quiz">Quick quiz</string>
-    <string name="known_quiz_soon">Coming soon</string>
+    <string name="known_quiz_details">Answer about 45 words to estimate how many you know.</string>
+    <string name="known_quiz_title">Word %1$d of %2$d</string>
+    <string name="known_quiz_know">I know it</string>
+    <string name="known_quiz_dont">I don\'t know it</string>
+    <string name="known_quiz_back">Undo last answer</string>
+    <string name="known_quiz_result">You seem to know about %1$s words</string>
+    <string name="known_quiz_result_text">Move the slider if that looks wrong. Nothing is marked yet: you see the numbers first. Words you answered \"I don\'t know it\" are never marked.</string>
+    <string name="known_quiz_review">Based on your answers: the %1$s most common words by %2$s, leaving out the ones you don\'t know, plus the ones you know beyond that.</string>
+    <string name="known_quiz_continue">Continue</string>
     <string name="known_batches">Earlier steps</string>
     <string name="known_undo">Undo</string>
     <string name="known_working">Looking up the words</string>
@@ -490,7 +498,7 @@
     <string name="known_batch_top">The %1$s most common words</string>
     <string name="known_batch_anki">Anki deck %1$s</string>
     <string name="known_batch_list">Word list %1$s</string>
-    <string name="known_batch_quiz">Quick quiz</string>
+    <string name="known_batch_quiz">Quick quiz: about %1$s words</string>
     <plurals name="known_batch_words">
         <item quantity="one">%1$d word</item>
         <item quantity="other">%1$d words</item>

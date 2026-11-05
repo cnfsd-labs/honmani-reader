@@ -8,6 +8,7 @@ import app.honmani.reader.data.dictionary.index
 import app.honmani.reader.data.dictionary.writeZip
 import app.honmani.reader.data.difficulty.LexiconSources
 import app.honmani.reader.data.words.KnownBatchRepository
+import app.honmani.reader.data.words.KnownCandidate
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.WordRepository
@@ -16,6 +17,7 @@ import app.honmani.reader.lookup.DictionaryLookup
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -168,5 +170,31 @@ class KnownWordsTest {
         val (id, _) = known.confirm(plan)
         assertEquals(KnownSource.ANKI_DECK, database.knownBatchDao().batch(id!!)!!.source)
         assertEquals(WordStatus.LEARNED, statusOf("猫"))
+    }
+
+    @Test
+    fun quizPlanTakesTheCutoffWords_dropsDontKnowAnswers_addsKnownBeyondTheCutoff() = runTest {
+        jmdict()
+        jiten(Triple("の", "の", 1), Triple("猫", "ねこ", 2), Triple("犬", "いぬ", 3), Triple("食べる", "たべる", 4), Triple("高い", "たかい", 900))
+        val cat = QuizQuestion(2, KnownCandidate("猫", "ねこ", "cat"))
+        val tall = QuizQuestion(900, KnownCandidate("高い", "たかい", "high"))
+
+        val result = known.planQuiz(4, listOf(cat to false, tall to true)) as TopNResult.Ready
+
+        assertEquals(listOf("の", "犬", "食べる", "高い"), result.plan.resolved.words.map { it.expression })
+        assertEquals(KnownSource.QUIZ, result.plan.source)
+        assertEquals("4", result.plan.detail)
+        val (id, change) = known.confirm(result.plan)
+        assertEquals(4, change.created)
+        assertEquals(KnownSource.QUIZ, database.knownBatchDao().batch(id!!)!!.source)
+        assertEquals(4, known.batches.undo(id).removed)
+    }
+
+    @Test
+    fun quizNeedsAFrequencyDictionaryWithEnoughWords() = runTest {
+        jmdict()
+        assertNull(known.prepareQuiz())
+        jiten(Triple("の", "の", 1), Triple("猫", "ねこ", 2))
+        assertNull(known.prepareQuiz())
     }
 }
