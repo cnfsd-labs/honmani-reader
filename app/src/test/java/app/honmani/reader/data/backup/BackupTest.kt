@@ -23,6 +23,7 @@ import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.stats.perBookAndDay
 import app.honmani.reader.data.words.KnownBatchRepository
 import app.honmani.reader.data.words.KnownCandidate
 import app.honmani.reader.data.words.KnownSource
@@ -53,6 +54,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class BackupTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     @get:Rule
     val folder = TemporaryFolder()
 
@@ -182,6 +186,25 @@ class BackupTest {
         database.opdsCatalogDao().insert(
             OpdsCatalogEntity(title = "Home", url = "http://nas/opds", username = "me", passwordCipher = "secret", addedAt = 1),
         )
+    }
+
+    @Test
+    fun readingDaysOfEachPhoneStayApartAndAddUp() = runTest {
+        val old = Phone("old")
+        val book = old.addBook("hash-a")
+        old.read(book.id, "2026-11-01", 20 * 60, 100)
+        old.database.backupDao().putReadingDays(
+            listOf(ReadingDayEntity(book.id, "2026-11-01", seconds = 15 * 60, characters = 50, deviceId = "other")),
+        )
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(setOf("", "other"), new.days().map { it.deviceId }.toSet())
+        assertEquals(35 * 60L, new.days().perBookAndDay().single().seconds)
+        assertEquals(2, new.days().size)
     }
 
     @Test

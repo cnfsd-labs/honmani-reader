@@ -140,6 +140,8 @@ data class BackupReadingDay(
     val characters: Long,
     /** Seconds already handed out by the Refold export. */
     val refoldSeconds: Long = 0,
+    /** The phone that read (a sync file's installation id); empty = the phone that wrote the file. */
+    val device: String = "",
 )
 
 @Serializable

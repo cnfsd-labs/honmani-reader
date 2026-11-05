@@ -56,6 +56,8 @@ data class ReviewCardEntity(
     /** Hidden from the queue until then ("until tomorrow": the next local midnight). */
     @ColumnInfo(name = "buried_until") val buriedUntil: Long? = null,
     @ColumnInfo(name = "added_at") val addedAt: Long,
+    /** When the card last changed here (epoch ms; 0 = never stamped); the merge keeps the later edit. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
 )
 
 /**

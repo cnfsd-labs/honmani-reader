@@ -65,12 +65,13 @@ object Skill {
      * characters as the reading counts them, or null if not known (then all its reading counts).
      */
     fun estimate(
-        rows: List<ReadingDayEntity>,
+        phoneRows: List<ReadingDayEntity>,
         difficulty: (bookId: Long) -> Int?,
         today: LocalDate,
         weeks: Int = 12,
         length: (bookId: Long) -> Long? = { null },
     ): SkillEstimate {
+        val rows = phoneRows.perBookAndDay()
         var gradedSeconds = 0L
         var gradedCharacters = 0L
         val firstRead = firstReadShares(rows, length)

@@ -22,6 +22,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class ReviewSessionTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     private val zone = ZoneId.of("Europe/Berlin")
     private val day = ReviewRules.DAY_MS
     private var now = LocalDateTime.of(2026, 5, 1, 12, 0).atZone(zone).toInstant().toEpochMilli()

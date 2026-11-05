@@ -25,6 +25,8 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.FolderDao
+import app.honmani.reader.data.merge.TombstoneDao
+import app.honmani.reader.data.merge.TombstoneEntity
 import app.honmani.reader.data.library.FolderEntity
 import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.HighlightEntity
@@ -77,6 +79,7 @@ import app.honmani.reader.data.words.WordLookupEntity
         ReviewCardEntity::class,
         ReviewLogEntity::class,
         ReadDayEntity::class,
+        TombstoneEntity::class,
     ],
     version = 1,
     exportSchema = true,
@@ -112,6 +115,9 @@ abstract class HonmaniDatabase : RoomDatabase() {
     abstract fun finishedBookDao(): FinishedBookDao
 
     abstract fun reviewDao(): ReviewDao
+
+    /** Deletion markers for the sync merge. */
+    abstract fun tombstoneDao(): TombstoneDao
 
     /** Reads the dictionary tables for book grading; no tables of its own. */
     abstract fun difficultyDao(): DifficultyDao

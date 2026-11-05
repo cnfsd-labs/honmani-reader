@@ -22,7 +22,7 @@ object RefoldExport {
     val HEADER = listOf("activityId", "languageCode", "attributedDate", "duration", "startTime", "nickname", "savedAt")
 
     /** Seconds of one book on one day that a file holds; they are marked as exported once it is shared. */
-    data class Mark(val bookId: Long, val day: String, val seconds: Long)
+    data class Mark(val bookId: Long, val day: String, val seconds: Long, val deviceId: String = "")
 
     /** What an export holds: the file's [csv], its row count and the [marks] to store once it is offered. */
     data class Result(val csv: String, val rows: Int, val marks: List<Mark>)
@@ -41,7 +41,8 @@ object RefoldExport {
         titles: Map<Long, String>,
         again: Boolean = false,
     ): Result {
-        val chosen = days.mapNotNull { row ->
+        // Only this phone's reading: Refold adds every imported row up, and another phone exports its own.
+        val chosen = days.filter { it.deviceId.isEmpty() }.mapNotNull { row ->
             val day = runCatching { LocalDate.parse(row.day) }.getOrNull() ?: return@mapNotNull null
             val seconds = if (again) row.seconds else row.seconds - row.refoldSeconds
             if (seconds > 0) Row(row, day, nickname(titles[row.bookId]), seconds) else null
@@ -56,7 +57,7 @@ object RefoldExport {
                 append("\r\n")
             }
         }
-        return Result(csv, rows.size, chosen.map { Mark(it.entity.bookId, it.entity.day, it.entity.seconds) })
+        return Result(csv, rows.size, chosen.map { Mark(it.entity.bookId, it.entity.day, it.entity.seconds, it.entity.deviceId) })
     }
 
     private class Row(val entity: ReadingDayEntity, val date: LocalDate, val nickname: String, val seconds: Long)

@@ -21,6 +21,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class BookImporterTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     @get:Rule
     val folder = TemporaryFolder()
 

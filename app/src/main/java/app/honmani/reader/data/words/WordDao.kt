@@ -3,11 +3,15 @@ package app.honmani.reader.data.words
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface WordDao {
+interface WordDao : TombstoneWriter {
     /** Words being learned, highest score first. */
     @Query("SELECT * FROM word WHERE status = 'LEARNING' AND ignored = 0 ORDER BY rank_key DESC, id DESC")
     fun observeLearning(): Flow<List<WordEntity>>
@@ -36,8 +40,8 @@ interface WordDao {
     @Query("SELECT COUNT(*) FROM word WHERE ignored = 1")
     fun countIgnored(): Flow<Int>
 
-    @Query("UPDATE word SET ignored = :ignored WHERE id = :id")
-    suspend fun setIgnored(id: Long, ignored: Boolean)
+    @Query("UPDATE word SET ignored = :ignored, updated_at = :now WHERE id = :id")
+    suspend fun setIgnored(id: Long, ignored: Boolean, now: Long = UpdateClock.now())
 
     /**
      * Words suggested for Anki: being learned, not in Anki yet, and looked up more than once
@@ -87,7 +91,21 @@ interface WordDao {
     suspend fun deleteLookupEvent(id: Long)
 
     @Query("DELETE FROM word_lookup WHERE id = :id")
-    suspend fun deleteLookup(id: Long)
+    suspend fun deleteLookupRow(id: Long)
+
+    @Query("SELECT * FROM word_lookup WHERE id = :id")
+    suspend fun lookup(id: Long): WordLookupEntity?
+
+    /** Deletes the lookup and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun deleteLookup(id: Long) {
+        val lookup = lookup(id) ?: return
+        val word = find(lookup.wordId)
+        if (word != null) {
+            putTombstone(SyncKeys.WORD_LOOKUP, SyncKeys.wordLookup(word.expression, word.reading, lookup.lookedUpAt, lookup.surface))
+        }
+        deleteLookupRow(id)
+    }
 
     @Query("SELECT * FROM word WHERE id = :id")
     suspend fun find(id: Long): WordEntity?
@@ -96,26 +114,45 @@ interface WordDao {
     suspend fun find(expression: String, reading: String): WordEntity?
 
     @Insert
-    suspend fun insert(word: WordEntity): Long
+    suspend fun insertRow(word: WordEntity): Long
+
+    /** Adds the word, stamped now; a marker of a deleted word with the same spelling goes. */
+    @Transaction
+    suspend fun insert(word: WordEntity): Long {
+        clearTombstone(SyncKeys.WORD, SyncKeys.word(word.expression, word.reading))
+        return insertRow(word.copy(updatedAt = UpdateClock.now()))
+    }
 
     @Update
-    suspend fun update(word: WordEntity)
+    suspend fun updateRow(word: WordEntity)
 
-    @Query("UPDATE word SET gloss = :gloss WHERE id = :id")
-    suspend fun setGloss(id: Long, gloss: String)
+    /**
+     * Saves the word. Its [WordEntity.updatedAt] moves to now only when a field the reader sets
+     * (status, starred, ignored, note, furigana, gloss) changed; counters and dates from a lookup don't.
+     */
+    @Transaction
+    suspend fun update(word: WordEntity) {
+        val old = find(word.id) ?: return
+        val edited = old.status != word.status || old.starred != word.starred || old.ignored != word.ignored ||
+            old.note != word.note || old.furigana != word.furigana || old.gloss != word.gloss
+        updateRow(word.copy(updatedAt = if (edited) UpdateClock.now() else old.updatedAt))
+    }
 
-    @Query("UPDATE word SET note = :note WHERE id = :id")
-    suspend fun setNote(id: Long, note: String)
+    @Query("UPDATE word SET gloss = :gloss, updated_at = :now WHERE id = :id")
+    suspend fun setGloss(id: Long, gloss: String, now: Long = UpdateClock.now())
+
+    @Query("UPDATE word SET note = :note, updated_at = :now WHERE id = :id")
+    suspend fun setNote(id: Long, note: String, now: Long = UpdateClock.now())
 
     /** Words whose furigana the reader corrected: the suggestions for Read aloud pronunciations. */
     @Query("SELECT * FROM word WHERE furigana != '' AND ignored = 0 ORDER BY last_looked_up_at DESC")
     suspend fun withCorrectedFurigana(): List<WordEntity>
 
-    @Query("UPDATE word SET furigana = :furigana WHERE id = :id")
-    suspend fun setFurigana(id: Long, furigana: String)
+    @Query("UPDATE word SET furigana = :furigana, updated_at = :now WHERE id = :id")
+    suspend fun setFurigana(id: Long, furigana: String, now: Long = UpdateClock.now())
 
-    @Query("UPDATE word SET starred = :starred WHERE id = :id")
-    suspend fun setStarred(id: Long, starred: Boolean)
+    @Query("UPDATE word SET starred = :starred, updated_at = :now WHERE id = :id")
+    suspend fun setStarred(id: Long, starred: Boolean, now: Long = UpdateClock.now())
 
     @Query("UPDATE word SET anki_note_id = :noteId, scheduler = CASE WHEN :noteId IS NULL THEN 'HONMANI' ELSE 'ANKI' END WHERE id = :id")
     suspend fun setAnkiNote(id: Long, noteId: Long?)
@@ -124,15 +161,27 @@ interface WordDao {
     @Query("SELECT * FROM word WHERE anki_note_id IS NOT NULL AND expression IN (:expressions)")
     suspend fun inAnki(expressions: List<String>): List<WordEntity>
 
-    @Query("UPDATE word SET status = 'LEARNED' WHERE id = :id")
-    suspend fun markLearned(id: Long)
+    @Query("UPDATE word SET status = 'LEARNED', updated_at = :now WHERE id = :id")
+    suspend fun markLearned(id: Long, now: Long = UpdateClock.now())
 
-    @Query("UPDATE word SET status = 'LEARNING' WHERE id = :id")
-    suspend fun markLearning(id: Long)
+    @Query("UPDATE word SET status = 'LEARNING', updated_at = :now WHERE id = :id")
+    suspend fun markLearning(id: Long, now: Long = UpdateClock.now())
 
-    /** Deletes the word with its lookups. */
     @Query("DELETE FROM word WHERE id = :id")
-    suspend fun delete(id: Long)
+    suspend fun deleteRow(id: Long)
+
+    @Query("SELECT COUNT(*) FROM review_card WHERE word_id = :id")
+    suspend fun cardCount(id: Long): Int
+
+    /** Deletes the word with its lookups and card, and leaves markers for the word and its card, in one transaction. */
+    @Transaction
+    suspend fun delete(id: Long) {
+        val word = find(id) ?: return
+        val now = UpdateClock.now()
+        putTombstone(SyncKeys.WORD, SyncKeys.word(word.expression, word.reading), now)
+        if (cardCount(id) > 0) putTombstone(SyncKeys.REVIEW_CARD, SyncKeys.reviewCard(word.expression, word.reading), now)
+        deleteRow(id)
+    }
 
     @Insert
     suspend fun insertLookup(lookup: WordLookupEntity): Long

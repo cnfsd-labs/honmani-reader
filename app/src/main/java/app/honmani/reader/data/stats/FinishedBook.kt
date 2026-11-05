@@ -8,6 +8,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
 import app.honmani.reader.data.library.BookEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -25,12 +27,19 @@ data class FinishedBookEntity(
 )
 
 @Dao
-interface FinishedBookDao {
+interface FinishedBookDao : TombstoneWriter {
     @Query("SELECT * FROM finished_book")
     fun observeAll(): Flow<List<FinishedBookEntity>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertIfMissing(book: FinishedBookEntity)
+    suspend fun insertRowIfMissing(book: FinishedBookEntity)
+
+    /** Removes the marker of a forgotten record of the same book. */
+    @Transaction
+    suspend fun insertIfMissing(book: FinishedBookEntity) {
+        insertRowIfMissing(book)
+        clearTombstone(SyncKeys.FINISHED_BOOK, SyncKeys.finishedBook(book.contentHash))
+    }
 
     @Query("UPDATE finished_book SET finished_at = :finishedAt WHERE content_hash = :contentHash AND finished_at IS NULL")
     suspend fun setDateIfUnknown(contentHash: String, finishedAt: Long)
@@ -43,7 +52,17 @@ interface FinishedBookDao {
     }
 
     @Query("DELETE FROM finished_book WHERE content_hash = :contentHash")
-    suspend fun forget(contentHash: String)
+    suspend fun forgetRow(contentHash: String)
+
+    @Query("SELECT COUNT(*) FROM finished_book WHERE content_hash = :contentHash")
+    suspend fun count(contentHash: String): Int
+
+    /** Deletes the record and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun forget(contentHash: String) {
+        if (count(contentHash) > 0) putTombstone(SyncKeys.FINISHED_BOOK, SyncKeys.finishedBook(contentHash))
+        forgetRow(contentHash)
+    }
 }
 
 /** A finished book, in the library or only recorded: its content hash and the day it was finished, if known. */

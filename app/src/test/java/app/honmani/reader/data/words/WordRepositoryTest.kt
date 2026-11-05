@@ -15,6 +15,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class WordRepositoryTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     private lateinit var database: HonmaniDatabase
     private lateinit var repository: WordRepository
     private var now = 1_800_000_000_000L

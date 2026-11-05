@@ -136,7 +136,7 @@ class Backup(
         fun keyOf(id: Long): String = keys.getOrPut(id) {
             "book:${installationId()}:$id".also { books += BackupBook(it) }
         }
-        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.refoldSeconds) }
+        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.refoldSeconds, it.deviceId) }
         val lookupEvents = tables.events.map { BackupLookupEvent(it.lookedUpAt, it.bookId?.let(::keyOf)) }
         val progress = wordProgress.load()
         val lookups = tables.lookups.groupBy { it.wordId }
@@ -260,14 +260,15 @@ class Backup(
                 }
             }
 
-            val days = dao.readingDays().associateBy { it.bookId to it.day }
+            val days = dao.readingDays().associateBy { Triple(it.bookId, it.day, it.deviceId) }
             // A day that isn't a date would crash every screen that reads the days back.
             val changedDays = backup.readingDays.filter { runCatching { LocalDate.parse(it.day) }.isSuccess }.mapNotNull { day ->
                 val id = idOf(day.book)
-                val before = days[id to day.day]
+                val before = days[Triple(id, day.day, day.device)]
                 val after = ReadingDayEntity(
                     bookId = id,
                     day = day.day,
+                    deviceId = day.device,
                     seconds = maxOf(before?.seconds ?: 0, day.seconds),
                     characters = maxOf(before?.characters ?: 0, day.characters),
                     refoldSeconds = maxOf(before?.refoldSeconds ?: 0, day.refoldSeconds),

@@ -8,6 +8,10 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Transaction
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import kotlinx.coroutines.flow.Flow
 
 /** The longest bookmark name kept. */
@@ -28,27 +32,55 @@ data class BookmarkEntity(
     /** The characters in the whole book, so the place can be shown as a percentage without opening it. */
     val total: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** When the bookmark last changed here (epoch ms; 0 = never stamped); the merge keeps the later edit. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
 ) {
     /** Where in the book the place is, 0 to 100. */
     val percent: Int get() = if (total <= 0) 0 else (characters * 100 / total).toInt().coerceIn(0, 100)
 }
 
 @Dao
-interface BookmarkDao {
+interface BookmarkDao : TombstoneWriter {
     /** The book's bookmarks in reading order. */
     @Query("SELECT * FROM bookmark WHERE content_hash = :contentHash ORDER BY characters, id")
     fun observe(contentHash: String): Flow<List<BookmarkEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun put(bookmark: BookmarkEntity): Long
+    suspend fun putRow(bookmark: BookmarkEntity): Long
 
-    @Query("UPDATE bookmark SET name = :name WHERE id = :id")
-    suspend fun rename(id: Long, name: String)
+    /** Stamped now; removes the marker of a deleted bookmark at the same place. */
+    @Transaction
+    suspend fun put(bookmark: BookmarkEntity): Long {
+        clearTombstone(SyncKeys.BOOKMARK, SyncKeys.bookmark(bookmark.contentHash, bookmark.characters))
+        return putRow(bookmark.copy(updatedAt = UpdateClock.now()))
+    }
+
+    @Query("UPDATE bookmark SET name = :name, updated_at = :now WHERE id = :id")
+    suspend fun rename(id: Long, name: String, now: Long = UpdateClock.now())
+
+    @Query("SELECT * FROM bookmark WHERE id = :id")
+    suspend fun byId(id: Long): BookmarkEntity?
+
+    @Query("SELECT * FROM bookmark WHERE content_hash = :contentHash")
+    suspend fun forBook(contentHash: String): List<BookmarkEntity>
 
     @Query("DELETE FROM bookmark WHERE id = :id")
-    suspend fun delete(id: Long)
+    suspend fun deleteRow(id: Long)
+
+    @Query("DELETE FROM bookmark WHERE content_hash = :contentHash")
+    suspend fun deleteForBookRows(contentHash: String)
+
+    /** Deletes the bookmark and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun delete(id: Long) {
+        byId(id)?.let { putTombstone(SyncKeys.BOOKMARK, SyncKeys.bookmark(it.contentHash, it.characters)) }
+        deleteRow(id)
+    }
 
     /** With the book. */
-    @Query("DELETE FROM bookmark WHERE content_hash = :contentHash")
-    suspend fun deleteForBook(contentHash: String)
+    @Transaction
+    suspend fun deleteForBook(contentHash: String) {
+        for (b in forBook(contentHash)) putTombstone(SyncKeys.BOOKMARK, SyncKeys.bookmark(b.contentHash, b.characters))
+        deleteForBookRows(contentHash)
+    }
 }

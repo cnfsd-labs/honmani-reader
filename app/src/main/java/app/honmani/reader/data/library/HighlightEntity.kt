@@ -8,6 +8,10 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Transaction
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import kotlinx.coroutines.flow.Flow
 
 /** The longest passage text kept with a highlight (for the list; the range itself is the position). */
@@ -37,33 +41,61 @@ data class HighlightEntity(
     /** The characters in the whole book, so the place can be shown as a percentage without opening it. */
     val total: Long,
     @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** When the highlight last changed here (epoch ms; 0 = never stamped); the merge keeps the later edit. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
 ) {
     /** Where in the book the passage starts, 0 to 100. */
     val percent: Int get() = if (total <= 0) 0 else (start * 100 / total).toInt().coerceIn(0, 100)
 }
 
 @Dao
-interface HighlightDao {
+interface HighlightDao : TombstoneWriter {
     /** The book's highlights in reading order. */
     @Query("SELECT * FROM highlight WHERE content_hash = :contentHash ORDER BY start, id")
     fun observe(contentHash: String): Flow<List<HighlightEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun put(highlight: HighlightEntity): Long
+    suspend fun putRow(highlight: HighlightEntity): Long
+
+    /** Stamped now; removes the marker of a deleted highlight over the same range. */
+    @Transaction
+    suspend fun put(highlight: HighlightEntity): Long {
+        clearTombstone(SyncKeys.HIGHLIGHT, SyncKeys.highlight(highlight.contentHash, highlight.start, highlight.end))
+        return putRow(highlight.copy(updatedAt = UpdateClock.now()))
+    }
 
     /** The book's highlights that share at least one character with [start, end). */
     @Query("SELECT * FROM highlight WHERE content_hash = :contentHash AND start < :end AND end_position > :start")
     suspend fun overlapping(contentHash: String, start: Long, end: Long): List<HighlightEntity>
 
-    @Query("UPDATE highlight SET color = :color WHERE id = :id")
-    suspend fun setColor(id: Long, color: Int)
+    @Query("UPDATE highlight SET color = :color, updated_at = :now WHERE id = :id")
+    suspend fun setColor(id: Long, color: Int, now: Long = UpdateClock.now())
+
+    @Query("SELECT * FROM highlight WHERE id = :id")
+    suspend fun byId(id: Long): HighlightEntity?
+
+    @Query("SELECT * FROM highlight WHERE content_hash = :contentHash")
+    suspend fun forBook(contentHash: String): List<HighlightEntity>
 
     @Query("DELETE FROM highlight WHERE id = :id")
-    suspend fun delete(id: Long)
+    suspend fun deleteRow(id: Long)
+
+    @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
+    suspend fun deleteForBookRows(contentHash: String)
+
+    /** Deletes the highlight and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun delete(id: Long) {
+        byId(id)?.let { putTombstone(SyncKeys.HIGHLIGHT, SyncKeys.highlight(it.contentHash, it.start, it.end)) }
+        deleteRow(id)
+    }
 
     /** With the book. */
-    @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
-    suspend fun deleteForBook(contentHash: String)
+    @Transaction
+    suspend fun deleteForBook(contentHash: String) {
+        for (h in forBook(contentHash)) putTombstone(SyncKeys.HIGHLIGHT, SyncKeys.highlight(h.contentHash, h.start, h.end))
+        deleteForBookRows(contentHash)
+    }
 }
 
 /** A highlight just saved, with the ones it replaced (so Undo can bring them back). */

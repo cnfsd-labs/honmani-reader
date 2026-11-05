@@ -8,6 +8,9 @@ import androidx.room.Query
 import androidx.room.Relation
 import androidx.room.Transaction
 import androidx.room.Upsert
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import app.honmani.reader.data.words.WordEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -24,7 +27,7 @@ data class ReviewWord(val id: Long, val expression: String)
 data class ReviewedToday(val wordId: Long, val carried: Boolean)
 
 @Dao
-interface ReviewDao {
+interface ReviewDao : TombstoneWriter {
     /** Words in review under Honmani's own scheduler, the only ones reading can move. */
     @Query(
         "SELECT w.id AS id, w.expression AS expression FROM review_card c JOIN word w ON w.id = c.word_id " +
@@ -40,13 +43,41 @@ interface ReviewDao {
 
     /** Creates the card if the word has none; -1 if it already has one. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertIfMissing(card: ReviewCardEntity): Long
+    suspend fun insertCardRow(card: ReviewCardEntity): Long
+
+    @Query("SELECT * FROM word WHERE id = :id")
+    suspend fun wordById(id: Long): WordEntity?
+
+    /** Stamped now; a new card removes the marker of a deleted one. */
+    @Transaction
+    suspend fun insertIfMissing(card: ReviewCardEntity): Long {
+        val id = insertCardRow(card.copy(updatedAt = UpdateClock.now()))
+        if (id != -1L) clearCardTombstone(card.wordId)
+        return id
+    }
 
     @Upsert
-    suspend fun upsert(card: ReviewCardEntity)
+    suspend fun upsertRow(card: ReviewCardEntity)
+
+    /** Stamped now. */
+    @Transaction
+    suspend fun upsert(card: ReviewCardEntity) {
+        upsertRow(card.copy(updatedAt = UpdateClock.now()))
+        clearCardTombstone(card.wordId)
+    }
 
     @Query("DELETE FROM review_card WHERE word_id = :wordId")
-    suspend fun delete(wordId: Long)
+    suspend fun deleteCardRow(wordId: Long)
+
+    /** Deletes the card and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun delete(wordId: Long) {
+        val word = wordById(wordId)
+        if (word != null && find(wordId) != null) {
+            putTombstone(SyncKeys.REVIEW_CARD, SyncKeys.reviewCard(word.expression, word.reading))
+        }
+        deleteCardRow(wordId)
+    }
 
     /** Cards in review of Honmani's own scheduler that are due before [cutoff], not buried at [now] and not retired. */
     @Query("SELECT COUNT(*) FROM review_card c JOIN word w ON w.id = c.word_id WHERE $DUE")
@@ -120,10 +151,27 @@ interface ReviewDao {
     fun observeFirstReviewsSince(from: Long): Flow<Int>
 
     @Insert
-    suspend fun insertLog(log: ReviewLogEntity): Long
+    suspend fun insertLogRow(log: ReviewLogEntity): Long
+
+    @Transaction
+    suspend fun insertLog(log: ReviewLogEntity): Long {
+        wordById(log.wordId)?.let { clearTombstone(SyncKeys.REVIEW_LOG, SyncKeys.reviewLog(it.expression, it.reading, log.at, log.grade)) }
+        return insertLogRow(log)
+    }
+
+    @Query("SELECT * FROM review_log WHERE id = :id")
+    suspend fun logById(id: Long): ReviewLogEntity?
 
     @Query("DELETE FROM review_log WHERE id = :id")
-    suspend fun deleteLog(id: Long)
+    suspend fun deleteLogRow(id: Long)
+
+    /** The review Undo: deletes the log entry and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun deleteLog(id: Long) {
+        val log = logById(id) ?: return
+        wordById(log.wordId)?.let { putTombstone(SyncKeys.REVIEW_LOG, SyncKeys.reviewLog(it.expression, it.reading, log.at, log.grade)) }
+        deleteLogRow(id)
+    }
 
     @Query("SELECT COUNT(*) FROM review_log WHERE at >= :from")
     fun observeReviewsSince(from: Long): Flow<Int>
@@ -146,6 +194,11 @@ interface ReviewDao {
 
     @Query("SELECT COALESCE(SUM(count), 0) FROM read_day WHERE word_id = :wordId AND day = :day")
     suspend fun readsOn(wordId: Long, day: Long): Int
+}
+
+private suspend fun ReviewDao.clearCardTombstone(wordId: Long) {
+    val word = wordById(wordId) ?: return
+    clearTombstone(SyncKeys.REVIEW_CARD, SyncKeys.reviewCard(word.expression, word.reading))
 }
 
 /** Due: in review, Honmani's own, due before the cutoff, not buried, and not retired (stability under [ReviewRules.RETIRE_AFTER_DAYS]). */

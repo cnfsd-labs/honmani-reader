@@ -14,6 +14,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class BookmarkDaoTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     private lateinit var database: HonmaniDatabase
     private lateinit var dao: BookmarkDao
 

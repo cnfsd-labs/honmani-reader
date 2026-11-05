@@ -19,6 +19,7 @@ import app.honmani.reader.data.stats.ProgressionData
 import app.honmani.reader.data.stats.ReadingDayEntity
 import app.honmani.reader.data.stats.ReadingLevel
 import app.honmani.reader.data.stats.ReadingStats
+import app.honmani.reader.data.stats.perBookAndDay
 import app.honmani.reader.data.stats.Skill
 import app.honmani.reader.data.stats.SkillEstimate
 import app.honmani.reader.data.stats.SkillTracker
@@ -91,7 +92,7 @@ class ProgressViewModel(
             val today = today()
             val dayClock = DayClock(zone, startHour)
             val data = ProgressionData(
-                days = rows.map { DayTotal(LocalDate.parse(it.day), it.seconds, it.characters) },
+                days = rows.perBookAndDay().map { DayTotal(LocalDate.parse(it.day), it.seconds, it.characters) },
                 finished = FinishedBooks.merge(books, recorded).map { book ->
                     book.finishedAt?.let(dayClock::date)
                 },

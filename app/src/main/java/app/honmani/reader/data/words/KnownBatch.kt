@@ -8,6 +8,10 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
+import androidx.room.Transaction
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import androidx.room.withTransaction
 import app.honmani.reader.data.HonmaniDatabase
 import kotlinx.coroutines.flow.Flow
@@ -59,7 +63,7 @@ data class KnownBatchWordEntity(
 )
 
 @Dao
-interface KnownBatchDao {
+interface KnownBatchDao : TombstoneWriter {
     @Query("SELECT * FROM known_batch ORDER BY created_at DESC, id DESC")
     fun observeBatches(): Flow<List<KnownBatchEntity>>
 
@@ -70,7 +74,13 @@ interface KnownBatchDao {
     suspend fun words(batchId: Long): List<KnownBatchWordEntity>
 
     @Insert
-    suspend fun insertBatch(batch: KnownBatchEntity): Long
+    suspend fun insertBatchRow(batch: KnownBatchEntity): Long
+
+    @Transaction
+    suspend fun insertBatch(batch: KnownBatchEntity): Long {
+        clearTombstone(SyncKeys.KNOWN_BATCH, SyncKeys.knownBatch(batch.source.name, batch.detail, batch.createdAt))
+        return insertBatchRow(batch)
+    }
 
     @Insert
     suspend fun insertWords(words: List<KnownBatchWordEntity>)
@@ -79,7 +89,14 @@ interface KnownBatchDao {
     suspend fun setCount(id: Long, count: Int)
 
     @Query("DELETE FROM known_batch WHERE id = :id")
-    suspend fun deleteBatch(id: Long)
+    suspend fun deleteBatchRow(id: Long)
+
+    /** Deletes the batch (its words go with it) and leaves a marker, in one transaction. */
+    @Transaction
+    suspend fun deleteBatch(id: Long) {
+        batch(id)?.let { putTombstone(SyncKeys.KNOWN_BATCH, SyncKeys.knownBatch(it.source.name, it.detail, it.createdAt)) }
+        deleteBatchRow(id)
+    }
 }
 
 /** A word to mark as Known: its dictionary form, reading and first meaning. */

@@ -9,6 +9,9 @@ import androidx.room.Insert
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Transaction
+import app.honmani.reader.data.merge.SyncKeys
+import app.honmani.reader.data.merge.TombstoneWriter
+import app.honmani.reader.data.merge.UpdateClock
 import kotlinx.coroutines.flow.Flow
 
 /** The longest folder name kept. */
@@ -26,7 +29,7 @@ data class FolderEntity(
 )
 
 @Dao
-interface FolderDao {
+interface FolderDao : TombstoneWriter {
     @Query("SELECT * FROM folder ORDER BY name COLLATE NOCASE, id")
     fun observeAll(): Flow<List<FolderEntity>>
 
@@ -39,18 +42,51 @@ interface FolderDao {
 
     /** Returns the new row id. Throws if a folder with the same name exists. */
     @Insert
-    suspend fun insert(folder: FolderEntity): Long
+    suspend fun insertRow(folder: FolderEntity): Long
+
+    /** Removes the marker of a deleted folder of the same name. */
+    @Transaction
+    suspend fun insert(folder: FolderEntity): Long {
+        val id = insertRow(folder)
+        clearTombstone(SyncKeys.FOLDER, SyncKeys.folder(folder.name))
+        return id
+    }
+
+    @Query("SELECT * FROM folder WHERE id = :id")
+    suspend fun byId(id: Long): FolderEntity?
 
     @Query("UPDATE folder SET name = :name WHERE id = :id")
-    suspend fun setName(id: Long, name: String)
+    suspend fun setNameRow(id: Long, name: String)
+
+    /** The old name is a deleted folder to the others; the new one is not. */
+    @Transaction
+    suspend fun setName(id: Long, name: String) {
+        val old = byId(id)
+        setNameRow(id, name)
+        if (old != null && SyncKeys.folder(old.name) != SyncKeys.folder(name)) {
+            putTombstone(SyncKeys.FOLDER, SyncKeys.folder(old.name))
+        }
+        clearTombstone(SyncKeys.FOLDER, SyncKeys.folder(name))
+    }
+
+    @Query("DELETE FROM folder WHERE id = :id")
+    suspend fun deleteRow(id: Long)
+
+    /** Books in the folder change (they lose it), so they are stamped too. */
+    @Query("UPDATE book SET updated_at = :now WHERE folder_id = :id")
+    suspend fun touchBooksIn(id: Long, now: Long = UpdateClock.now())
 
     /** The books stay: their folder link goes with the folder (ON DELETE SET NULL). */
-    @Query("DELETE FROM folder WHERE id = :id")
-    suspend fun delete(id: Long)
+    @Transaction
+    suspend fun delete(id: Long) {
+        byId(id)?.let { putTombstone(SyncKeys.FOLDER, SyncKeys.folder(it.name)) }
+        touchBooksIn(id)
+        deleteRow(id)
+    }
 
     /** Moves the book into the folder; null takes it out of any. */
-    @Query("UPDATE book SET folder_id = :folderId WHERE id = :bookId")
-    suspend fun setBookFolder(bookId: Long, folderId: Long?)
+    @Query("UPDATE book SET folder_id = :folderId, updated_at = :now WHERE id = :bookId")
+    suspend fun setBookFolder(bookId: Long, folderId: Long?, now: Long = UpdateClock.now())
 
     @Transaction
     suspend fun createAndMove(bookId: Long, folder: FolderEntity): Long =

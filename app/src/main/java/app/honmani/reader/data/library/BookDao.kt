@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import app.honmani.reader.data.merge.UpdateClock
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -30,7 +31,11 @@ interface BookDao {
 
     /** Returns the new row id. Throws if a book with the same content hash exists. */
     @Insert
-    suspend fun insert(book: BookEntity): Long
+    suspend fun insertRow(book: BookEntity): Long
+
+    /** Stamped now (also an Undo re-insert, so the book's folder, hidden and finished state beat an older remote copy). */
+    @Transaction
+    suspend fun insert(book: BookEntity): Long = insertRow(book.copy(updatedAt = UpdateClock.now()))
 
     @Query("UPDATE book SET ttu_id = :ttuId, ttu_title = :ttuTitle WHERE id = :id")
     suspend fun setTtuBook(id: Long, ttuId: Long, ttuTitle: String)
@@ -59,19 +64,19 @@ interface BookDao {
     @Query("UPDATE book SET characters = :characters WHERE ttu_id = :ttuId")
     suspend fun setCharactersByTtuId(ttuId: Long, characters: Long)
 
-    @Query("UPDATE book SET finished_at = :finishedAt WHERE id = :id")
-    suspend fun setFinished(id: Long, finishedAt: Long)
+    @Query("UPDATE book SET finished_at = :finishedAt, updated_at = :now WHERE id = :id")
+    suspend fun setFinished(id: Long, finishedAt: Long, now: Long = UpdateClock.now())
 
     /** Marks the book ttu holds as [ttuId] finished, unless it already is. */
-    @Query("UPDATE book SET finished_at = :finishedAt WHERE ttu_id = :ttuId AND finished_at IS NULL")
-    suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long)
+    @Query("UPDATE book SET finished_at = :finishedAt, updated_at = :now WHERE ttu_id = :ttuId AND finished_at IS NULL")
+    suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long, now: Long = UpdateClock.now())
 
-    @Query("UPDATE book SET hidden = :hidden WHERE id = :id")
-    suspend fun setHidden(id: Long, hidden: Boolean)
+    @Query("UPDATE book SET hidden = :hidden, updated_at = :now WHERE id = :id")
+    suspend fun setHidden(id: Long, hidden: Boolean, now: Long = UpdateClock.now())
 
     /** Starting over also takes back "finished". */
-    @Query("UPDATE book SET progress = 0, characters = 0, finished_at = NULL WHERE id = :id")
-    suspend fun clearProgress(id: Long)
+    @Query("UPDATE book SET progress = 0, characters = 0, finished_at = NULL, updated_at = :now WHERE id = :id")
+    suspend fun clearProgress(id: Long, now: Long = UpdateClock.now())
 
     @Query("SELECT source_id FROM book WHERE source = :source AND source_id IS NOT NULL")
     suspend fun sourceIds(source: BookSource): List<String>

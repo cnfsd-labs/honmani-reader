@@ -127,7 +127,8 @@ class BookImporter(
                 addedAt = now(),
             )
             val added = try {
-                book.copy(id = dao.insert(book))
+                // As stored: the DAO stamps updated_at.
+                dao.insert(book).let { id -> dao.find(id) ?: book.copy(id = id) }
             } catch (_: SQLiteConstraintException) {
                 // Imports are serialized, so this only happens if the row appeared meanwhile.
                 return dao.findByHash(hash)?.let { Result.AlreadyInLibrary(it) } ?: Result.Unreadable

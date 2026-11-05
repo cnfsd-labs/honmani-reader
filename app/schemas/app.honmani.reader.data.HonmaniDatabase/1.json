@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "493d9f9458f9105d00be7f4d5a3b032d",
+    "identityHash": "43c56eb230f13a18c088cb0aa9948bd3",
     "entities": [
       {
         "tableName": "dictionary",
@@ -522,7 +522,7 @@
       },
       {
         "tableName": "book",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `format` TEXT NOT NULL, `file_name` TEXT NOT NULL, `cover_file_name` TEXT, `source` TEXT NOT NULL, `source_id` TEXT, `added_at` INTEGER NOT NULL, `last_opened_at` INTEGER, `ttu_id` INTEGER, `ttu_title` TEXT, `progress` REAL NOT NULL, `characters` INTEGER NOT NULL, `finished_at` INTEGER, `hidden` INTEGER NOT NULL, `folder_id` INTEGER, FOREIGN KEY(`folder_id`) REFERENCES `folder`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `title` TEXT NOT NULL, `author` TEXT, `format` TEXT NOT NULL, `file_name` TEXT NOT NULL, `cover_file_name` TEXT, `source` TEXT NOT NULL, `source_id` TEXT, `added_at` INTEGER NOT NULL, `last_opened_at` INTEGER, `ttu_id` INTEGER, `ttu_title` TEXT, `progress` REAL NOT NULL, `characters` INTEGER NOT NULL, `finished_at` INTEGER, `hidden` INTEGER NOT NULL, `folder_id` INTEGER, `updated_at` INTEGER NOT NULL DEFAULT 0, FOREIGN KEY(`folder_id`) REFERENCES `folder`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
         "fields": [
           {
             "fieldPath": "id",
@@ -623,6 +623,13 @@
             "fieldPath": "folderId",
             "columnName": "folder_id",
             "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -667,7 +674,7 @@
       },
       {
         "tableName": "bookmark",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `name` TEXT NOT NULL, `characters` INTEGER NOT NULL, `total` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `name` TEXT NOT NULL, `characters` INTEGER NOT NULL, `total` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -704,6 +711,13 @@
             "columnName": "created_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -727,7 +741,7 @@
       },
       {
         "tableName": "highlight",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `start` INTEGER NOT NULL, `end_position` INTEGER NOT NULL, `color` INTEGER NOT NULL, `text` TEXT NOT NULL, `total` INTEGER NOT NULL, `created_at` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `start` INTEGER NOT NULL, `end_position` INTEGER NOT NULL, `color` INTEGER NOT NULL, `text` TEXT NOT NULL, `total` INTEGER NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -776,6 +790,13 @@
             "columnName": "created_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -799,7 +820,7 @@
       },
       {
         "tableName": "pronunciation",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `text` TEXT NOT NULL, `reading` TEXT NOT NULL, `created_at` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content_hash` TEXT NOT NULL, `text` TEXT NOT NULL, `reading` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -830,6 +851,13 @@
             "columnName": "created_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -853,7 +881,7 @@
       },
       {
         "tableName": "word",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `ignored` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER, `scheduler` TEXT NOT NULL DEFAULT 'HONMANI', `note` TEXT NOT NULL DEFAULT '', `furigana` TEXT NOT NULL DEFAULT '')",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `expression` TEXT NOT NULL, `reading` TEXT NOT NULL, `gloss` TEXT NOT NULL, `status` TEXT NOT NULL, `starred` INTEGER NOT NULL, `ignored` INTEGER NOT NULL, `lookup_count` INTEGER NOT NULL, `first_looked_up_at` INTEGER NOT NULL, `last_looked_up_at` INTEGER NOT NULL, `rank_key` REAL NOT NULL, `last_sentence` TEXT NOT NULL, `last_surface_start` INTEGER NOT NULL, `last_surface_end` INTEGER NOT NULL, `last_book_title` TEXT, `anki_note_id` INTEGER, `scheduler` TEXT NOT NULL DEFAULT 'HONMANI', `note` TEXT NOT NULL DEFAULT '', `furigana` TEXT NOT NULL DEFAULT '', `updated_at` INTEGER NOT NULL DEFAULT 0)",
         "fields": [
           {
             "fieldPath": "id",
@@ -969,6 +997,13 @@
             "affinity": "TEXT",
             "notNull": true,
             "defaultValue": "''"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1354,7 +1389,7 @@
       },
       {
         "tableName": "reading_day",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`book_id` INTEGER NOT NULL, `day` TEXT NOT NULL, `seconds` INTEGER NOT NULL, `characters` INTEGER NOT NULL, `refold_seconds` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`book_id`, `day`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`book_id` INTEGER NOT NULL, `day` TEXT NOT NULL, `seconds` INTEGER NOT NULL, `characters` INTEGER NOT NULL, `refold_seconds` INTEGER NOT NULL DEFAULT 0, `device_id` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`book_id`, `day`, `device_id`))",
         "fields": [
           {
             "fieldPath": "bookId",
@@ -1386,13 +1421,21 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "deviceId",
+            "columnName": "device_id",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
           }
         ],
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
             "book_id",
-            "day"
+            "day",
+            "device_id"
           ]
         },
         "indices": [
@@ -1475,7 +1518,7 @@
       },
       {
         "tableName": "review_card",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `due` INTEGER NOT NULL, `stability` REAL NOT NULL, `difficulty` REAL NOT NULL, `reps` INTEGER NOT NULL, `lapses` INTEGER NOT NULL, `passed_reviews` INTEGER NOT NULL, `last_grade` INTEGER, `last_review_at` INTEGER, `review_stability` REAL NOT NULL DEFAULT 0, `buried_until` INTEGER, `added_at` INTEGER NOT NULL, PRIMARY KEY(`word_id`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`word_id` INTEGER NOT NULL, `state` TEXT NOT NULL, `due` INTEGER NOT NULL, `stability` REAL NOT NULL, `difficulty` REAL NOT NULL, `reps` INTEGER NOT NULL, `lapses` INTEGER NOT NULL, `passed_reviews` INTEGER NOT NULL, `last_grade` INTEGER, `last_review_at` INTEGER, `review_stability` REAL NOT NULL DEFAULT 0, `buried_until` INTEGER, `added_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(`word_id`), FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "wordId",
@@ -1552,6 +1595,13 @@
             "columnName": "added_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updated_at",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
           }
         ],
         "primaryKey": {
@@ -1692,11 +1742,42 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "tombstone",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`kind` TEXT NOT NULL, `key` TEXT NOT NULL, `deleted_at` INTEGER NOT NULL, PRIMARY KEY(`kind`, `key`))",
+        "fields": [
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "key",
+            "columnName": "key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "kind",
+            "key"
+          ]
+        }
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '493d9f9458f9105d00be7f4d5a3b032d')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '43c56eb230f13a18c088cb0aa9948bd3')"
     ]
   }
 }

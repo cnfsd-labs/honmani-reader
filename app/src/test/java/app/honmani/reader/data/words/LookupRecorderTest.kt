@@ -22,6 +22,9 @@ import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
 class LookupRecorderTest {
+    @get:org.junit.Rule
+    val fixedUpdateClock = app.honmani.reader.data.merge.FixedUpdateClock()
+
     private val day = ReviewRules.DAY_MS
     private var now = 1_800_000_000_000L
     private lateinit var database: HonmaniDatabase

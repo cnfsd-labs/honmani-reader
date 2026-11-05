@@ -52,6 +52,11 @@ data class WordEntity(
      * stays as it is, because (expression, reading) identifies the word.
      */
     @ColumnInfo(defaultValue = "''") val furigana: String = "",
+    /**
+     * When status, starred, ignored, note, furigana or gloss last changed here. A merge compares a
+     * word by max([updatedAt], [lastLookedUpAt]); counters and dates keep their max/min rules.
+     */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
 )
 
 enum class WordScheduler {

@@ -54,6 +54,8 @@ data class BookEntity(
     val hidden: Boolean = false,
     /** The folder the reader put the book in; null for none. Goes back to null if the folder is deleted. */
     @ColumnInfo(name = "folder_id") val folderId: Long? = null,
+    /** When folder, hidden or finished_at last changed here; the reading position merges by furthest, not by time. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
 )
 
 /**

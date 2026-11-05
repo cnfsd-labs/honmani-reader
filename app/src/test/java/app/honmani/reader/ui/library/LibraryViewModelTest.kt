@@ -481,7 +481,7 @@ private class FakeBookDao : BookDao {
     override fun observeSourceIds(source: BookSource): Flow<List<String>> =
         books.map { list -> list.filter { it.source == source }.mapNotNull { it.sourceId } }
 
-    override suspend fun insert(book: BookEntity): Long {
+    override suspend fun insertRow(book: BookEntity): Long {
         val id = nextId++
         books.update { it + book.copy(id = id) }
         return id
@@ -508,16 +508,16 @@ private class FakeBookDao : BookDao {
     override suspend fun setCharactersByTtuId(ttuId: Long, characters: Long) =
         change({ it.ttuId == ttuId }) { it.copy(characters = characters) }
 
-    override suspend fun setFinished(id: Long, finishedAt: Long) =
+    override suspend fun setFinished(id: Long, finishedAt: Long, now: Long) =
         change({ it.id == id }) { it.copy(finishedAt = finishedAt) }
 
-    override suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long) =
+    override suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long, now: Long) =
         change({ it.ttuId == ttuId && it.finishedAt == null }) { it.copy(finishedAt = finishedAt) }
 
-    override suspend fun setHidden(id: Long, hidden: Boolean) =
+    override suspend fun setHidden(id: Long, hidden: Boolean, now: Long) =
         change({ it.id == id }) { it.copy(hidden = hidden) }
 
-    override suspend fun clearProgress(id: Long) =
+    override suspend fun clearProgress(id: Long, now: Long) =
         change({ it.id == id }) { it.copy(progress = 0f, characters = 0, finishedAt = null) }
 
     val removed = MutableStateFlow<List<RemovedBookEntity>>(emptyList())

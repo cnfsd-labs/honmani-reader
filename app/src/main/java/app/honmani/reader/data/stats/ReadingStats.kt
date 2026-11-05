@@ -61,7 +61,7 @@ object ReadingStats {
     private const val MIN_SPEED_SECONDS = 600L
 
     fun period(rows: List<ReadingDayEntity>, today: LocalDate, period: StatsPeriod): PeriodSummary {
-        val byDay = rows.groupBy { LocalDate.parse(it.day) }.mapValues { (day, list) ->
+        val byDay = rows.perBookAndDay().groupBy { LocalDate.parse(it.day) }.mapValues { (day, list) ->
             DayTotal(day, list.sumOf { it.seconds }, list.sumOf { it.characters })
         }
         fun total(day: LocalDate) = byDay[day] ?: DayTotal(day, 0, 0)
@@ -116,7 +116,7 @@ object ReadingStats {
     }
 
     fun book(rows: List<ReadingDayEntity>): BookReading {
-        val days = rows.filter { it.seconds >= MIN_DAY_SECONDS || it.characters > 0 }.map { LocalDate.parse(it.day) }
+        val days = rows.perBookAndDay().filter { it.seconds >= MIN_DAY_SECONDS || it.characters > 0 }.map { LocalDate.parse(it.day) }
         val seconds = rows.sumOf { it.seconds }
         val characters = rows.sumOf { it.characters }
         return BookReading(
