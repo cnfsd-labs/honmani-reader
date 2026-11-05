@@ -294,4 +294,47 @@ class AudiobookControllerTest {
         assertEquals(null, AudiobookAlignment.parse("junk"))
         assertEquals(null, AudiobookAlignment.parse("honmani-audiobook-alignment 1\n1 2 x y\n"))
     }
+
+    @Test
+    fun aPageTurnByHandDetaches_followMarksTheHeardPassageAgainAndAttaches() {
+        start()
+        player.positionMs = 2100
+        controller.tick()
+        controller.viewDetached(true)
+        assertTrue(controller.state.value.detached)
+        // The audio goes on and the mark moves on, the controller still just tells the page.
+        player.positionMs = 3100
+        controller.tick()
+        assertEquals(""""start":9""", Regex(""""start":\d+""").find(marks().last())!!.value)
+        page.clear()
+        controller.follow()
+        assertFalse(controller.state.value.detached)
+        assertEquals(2, page.size)
+        assertTrue(page[0].contains("follow.attach"))
+        assertTrue(page[1].contains(""""start":9,"end":12"""))
+        assertTrue(controller.state.value.running)
+    }
+
+    @Test
+    fun detachedIsNotKept_onCloseRestartOrReloadedPage() {
+        start()
+        controller.viewDetached(true)
+        controller.pause()
+        assertTrue(controller.state.value.detached)
+        controller.close()
+        assertFalse(controller.state.value.detached)
+        controller.viewDetached(true)
+        assertFalse(controller.state.value.detached)
+        start()
+        assertFalse(controller.state.value.detached)
+        controller.viewDetached(true)
+        controller.pageReloaded()
+        assertFalse(controller.state.value.detached)
+        controller.viewDetached(true)
+        start()
+        assertFalse(controller.state.value.detached)
+        page.clear()
+        controller.follow()
+        assertTrue(page.isEmpty())
+    }
 }

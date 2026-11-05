@@ -159,9 +159,11 @@ keyboard does not cover the list.
 Needs a Japanese voice (Android Settings, Text-to-speech) and audible media volume. Reader menu -> Read
 aloud, on a page with furigana.
 
-- Bar (previous, play/pause, next, speed, close); first sentence marked grey, then spoken; the mark
+- Bar (close, previous, play/pause centred, next, speed); first sentence marked grey, then spoken; the mark
   follows the sentence, in a long one the words; visible beside word marks, highlights, in e-ink.
 - Ruby words are read as their furigana.
+- Volume buttons change the volume (no page turn) while the bar is up. A swipe or tap-zone turn detaches:
+  speech and mark go on, the page stays, "Follow" (above the bar) brings it back; closing the bar resets.
 - Page end: the book turns itself (a sentence crossing the break turns when the rest is off the page);
   paged/continuous, both directions. Close and reopen: on the page reached.
 - Pause/play resumes at the sentence start; next/previous move a sentence, also paused. Speed
@@ -184,6 +186,7 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
   turn at page end (both directions, paged/continuous) and count as reading: with progress sync the
   position reaches the server (a far jump does not).
 - Subtitles not in the book change nothing (mark stays); under half found -> the bar says so.
+- Same bar order, volume buttons and swipe-away/Follow as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
   0.75/1/1.25/1.5, kept.
 - Pause, close the app: audio paused, screen no longer kept on, Play continues. Call/other player

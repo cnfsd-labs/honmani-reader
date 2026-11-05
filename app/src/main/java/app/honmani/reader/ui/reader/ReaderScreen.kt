@@ -521,6 +521,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                             readAloud.onSentences(message.gen, message.items.map { SpokenSentence(it.i, it.text) }, message.end)
                         is BridgeMessage.ReadAloudLost -> readAloud.onLost(message.gen)
                         is BridgeMessage.AudiobookLost -> audiobook.controller.onLost(message.gen)
+                        is BridgeMessage.FollowState -> {
+                            readAloud.viewDetached(message.detached)
+                            audiobook.controller.viewDetached(message.detached)
+                        }
                         else -> Unit
                     }
                 },
@@ -528,7 +532,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     readAloud.pageReloaded()
                     audiobook.controller.pageReloaded()
                 },
-                volumeKeysTurnPages = appSettings.volumeKeys,
+                volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown),
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,
                 modifier = Modifier
@@ -591,6 +595,19 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
+                )
+            }
+            // Over the bar, not in it: the book keeps its size when the button comes and goes.
+            val following = readAloudBarShown && readAloudState.detached || audiobookBarShown && audiobookState.detached
+            if (following) {
+                FollowButton(
+                    onClick = {
+                        readAloud.follow()
+                        audiobook.controller.follow()
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = readAloudBarHeight + 8.dp),
                 )
             }
             val state = panel

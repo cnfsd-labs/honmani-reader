@@ -324,6 +324,7 @@
     <string name="read_aloud_close">Stop reading aloud</string>
     <string name="read_aloud_speed">Speed %1$s</string>
     <string name="read_aloud_speed_label">%1$s×</string>
+    <string name="read_aloud_follow">Follow</string>
     <string name="read_aloud_ended">End of the book</string>
     <string name="read_aloud_problem">Can\'t read aloud: %1$s</string>
     <string name="read_aloud_voice_settings">Voice settings</string>

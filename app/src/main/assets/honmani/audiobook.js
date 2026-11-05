@@ -58,14 +58,19 @@
 
   async function mark(message) {
     const token = ++latest;
-    const range = await reach(message.start, message.end, token);
+    const follow = window.honmaniFollow;
+    // The reader took control: the mark moves with the audio, but no page is turned for it.
+    const range = follow.detached()
+      ? window.honmaniHighlights.rangeAt(message.start, message.end).range
+      : await follow.auto(() => reach(message.start, message.end, token));
     if (token !== latest) return;
+    if (follow.detached() && !range) return;
     if (!range) {
       post({ type: 'audiobook.lost', gen: message.gen });
       return;
     }
-    window.honmaniFollow.mark(range);
-    await window.honmaniFollow.keepOnScreen(range);
+    follow.mark(range);
+    await follow.keepOnScreen(range);
   }
 
   function clear() {

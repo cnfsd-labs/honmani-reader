@@ -98,3 +98,34 @@ test('a section turned to by the keyboard is followed', async ({ page }) => {
   await expect.poll(() => marked(page)).toEqual(['どこで生']);
   expect(await page.evaluate(() => window.__messages.some((m) => m.type === 'audiobook.lost'))).toBe(false);
 });
+
+test('a scroll by hand detaches: the mark moves on, and follow.attach or clear follows again', async ({ page }) => {
+  await openBook(page, TWO_SECTIONS, { storage: { viewMode: 'continuous' }, css: 'height: 5000px;' });
+  await sections(page, A_B);
+  const detached = () => page.evaluate(() => window.honmaniFollow.detached());
+  const scrollByHand = async () => {
+    await page.waitForTimeout(700); // past the time our own scrolling may still cause scroll events
+    await page.evaluate(() => window.scrollTo(0, window.scrollY + 1000));
+    await expect.poll(detached).toBe(true);
+  };
+
+  await send(page, { type: 'audiobook.mark', gen: 1, start: 0, end: 3 });
+  await expect.poll(() => marked(page)).toEqual(['吾輩は']);
+  expect(await detached()).toBe(false);
+  await scrollByHand();
+  expect(await page.evaluate(() => window.__messages.filter((m) => m.type === 'follow.detached').length)).toBe(1);
+
+  const scrolled = await page.evaluate(() => window.scrollY);
+  await send(page, { type: 'audiobook.mark', gen: 2, start: 7, end: 10 });
+  await expect.poll(() => marked(page)).toEqual(['名前は']);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+
+  await send(page, { type: 'follow.attach' });
+  await expect.poll(detached).toBe(false);
+
+  await send(page, { type: 'audiobook.mark', gen: 3, start: 0, end: 3 });
+  await expect.poll(() => marked(page)).toEqual(['吾輩は']);
+  await scrollByHand();
+  await send(page, { type: 'audiobook.clear' });
+  await expect.poll(detached).toBe(false);
+});

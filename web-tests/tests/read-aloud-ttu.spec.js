@@ -140,8 +140,56 @@ for (const viewMode of ['paginated', 'continuous']) {
       });
       expect(nowFirst).not.toBe(sentence(1, 0).slice(0, 8));
       void firstPage;
+      // All those turns were our own: the view never counted as taken over by the reader.
+      expect(await page.evaluate(() => window.__messages.some((m) => m.type === 'follow.detached'))).toBe(false);
     });
   }
+}
+
+const firstOnScreen = (page) =>
+  page.evaluate(() => {
+    const first = window.honmaniText.firstCharOnScreen(document.querySelector('.book-content'), 'rt, rp', false);
+    return first.node.data.slice(first.offset, first.offset + 12);
+  });
+const detachedMessages = (page) => page.evaluate(() => window.__messages.filter((m) => m.type === 'follow.detached').length);
+
+for (const [viewMode, writingMode] of [['paginated', 'horizontal-tb'], ['paginated', 'vertical-rl'], ['continuous', 'horizontal-tb']]) {
+  test(`a page turned by hand stays while the mark moves on, until the reader follows again (${viewMode}, ${writingMode})`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await openBook(page, BOOK, viewMode, writingMode);
+    const { items } = await ask(page, 'begin', { count: 10 });
+    await speak(page, items[0].i);
+    await expect.poll(() => markedText(page)).toEqual([items[0].text]);
+    // Past the time our own turn may still cause scroll events.
+    await page.waitForTimeout(700);
+    expect(await detachedMessages(page)).toBe(0);
+
+    const before = await firstOnScreen(page);
+    if (viewMode === 'paginated') {
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true })));
+    } else {
+      await page.mouse.move(300, 300);
+      await page.mouse.wheel(0, 600);
+    }
+    await expect.poll(() => firstOnScreen(page), { timeout: 10_000 }).not.toBe(before);
+    await expect.poll(() => detachedMessages(page), { timeout: 10_000 }).toBe(1);
+    const turned = await firstOnScreen(page);
+
+    // The next sentence is back on the page before: the mark goes there, the view does not.
+    await page.evaluate(
+      ([gen, index]) => window.__listener({ data: JSON.stringify({ type: 'readAloud.mark', gen, index, offset: 0 }) }),
+      [gen, items[1].i],
+    );
+    await expect.poll(() => markedText(page)).toEqual([items[1].text]);
+    await page.waitForTimeout(700);
+    expect(await firstOnScreen(page)).toBe(turned);
+    expect(await detachedMessages(page)).toBe(1);
+
+    // Follow: the app attaches and sends the sentence again, which brings it on screen.
+    await page.evaluate(() => window.honmaniFollow.attach());
+    await speak(page, items[1].i);
+    expect(await page.evaluate(() => window.honmaniFollow.detached())).toBe(false);
+  });
 }
 
 for (const writingMode of ['horizontal-tb', 'vertical-rl']) {

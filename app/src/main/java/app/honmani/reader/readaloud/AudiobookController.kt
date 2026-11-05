@@ -27,6 +27,8 @@ data class AudiobookState(
     /** Subtitles found in the book, and all of them (0 before they are matched). */
     val matched: Int = 0,
     val total: Int = 0,
+    /** The reader took control (turned a page by hand): the mark moves on, the view stays; see [AudiobookController.follow]. */
+    val detached: Boolean = false,
 ) {
     /** The audio plays: the screen stays on and the button offers Pause. */
     val running: Boolean get() = phase == AudiobookPhase.PLAYING
@@ -186,6 +188,22 @@ class AudiobookController(
         if (phase == AudiobookPhase.PAUSED) savePosition(a.cues[index].startMs)
     }
 
+    /** The page says the reader turned a page or scrolled by hand ([detached]), or that it took the view along again. */
+    fun viewDetached(detached: Boolean) {
+        if (phase == AudiobookPhase.OFF || _state.value.detached == detached) return
+        _state.value = _state.value.copy(detached = detached)
+        log(if (detached) "view detached" else "view attached")
+    }
+
+    /** Brings the view back to the passage being heard and follows it again. */
+    fun follow() {
+        if (!_state.value.detached) return
+        _state.value = _state.value.copy(detached = false)
+        toPage("""{"type":"follow.attach"}""")
+        if (marked >= 0) show(marked)
+        log("view attached again at $marked")
+    }
+
     fun setRate(rate: Float) {
         _state.value = _state.value.copy(rate = rate)
         saveRate(rate)
@@ -237,6 +255,7 @@ class AudiobookController(
     fun pageReloaded() {
         if (phase == AudiobookPhase.OFF) return
         marked = -1
+        _state.value = _state.value.copy(detached = false)
         if (waitingForPage) {
             waitingForPage = false
             if (phase == AudiobookPhase.PLAYING) tick()

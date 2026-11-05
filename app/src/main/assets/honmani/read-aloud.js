@@ -389,8 +389,14 @@
       post({ type: 'readAloud.sentences', gen, items: [], end: 'book' });
       return;
     }
+    // The next section replaces this one's text, so the view has to go with it, detached or not.
+    window.honmaniFollow.reattach();
     const before = firstTokenOf(root);
     let last = startToken(root);
+    await window.honmaniFollow.auto(() => advanceTurns(message, gen, root, before, last));
+  }
+
+  async function advanceTurns(message, gen, root, before, last) {
     for (let turns = 0; turns < MAX_ADVANCE_TURNS; turns++) {
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true }));
       await nextFrame();

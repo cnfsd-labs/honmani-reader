@@ -25,6 +25,8 @@ data class ReadAloudState(
     val phase: ReadAloudPhase = ReadAloudPhase.OFF,
     val rate: Float = 1f,
     val problem: VoiceProblem? = null,
+    /** The reader took control (turned a page by hand): the mark moves on, the view stays; see [ReadAloudController.follow]. */
+    val detached: Boolean = false,
 ) {
     /** Speech is running or about to: the screen stays on and the button offers Pause. */
     val running: Boolean get() = phase == ReadAloudPhase.STARTING || phase == ReadAloudPhase.SPEAKING
@@ -74,6 +76,9 @@ class ReadAloudController(
     private var emptyAnswers = 0
     private var lastRange = -1
     private var resumeAfterPanel = false
+
+    /** Where in the sentence (as the book has it) the page was last told the voice is. */
+    private var markOffset = 0
 
     /** The sentences spoken with a replacement in them: where the voice's characters came from. */
     private val spoken = HashMap<Int, SpokenText>()
@@ -135,6 +140,22 @@ class ReadAloudController(
         }
     }
 
+    /** The page says the reader turned a page or scrolled by hand ([detached]), or that it took the view along again. */
+    fun viewDetached(detached: Boolean) {
+        if (phase == ReadAloudPhase.OFF || _state.value.detached == detached) return
+        _state.value = _state.value.copy(detached = detached)
+        log(if (detached) "view detached" else "view attached")
+    }
+
+    /** Brings the view back to the sentence being read and follows it again. */
+    fun follow() {
+        if (!_state.value.detached) return
+        _state.value = _state.value.copy(detached = false)
+        toPage(FOLLOW_ATTACH)
+        if (current >= 0) toPage(markMessage(current, markOffset))
+        log("view attached again at $current")
+    }
+
     fun setRate(rate: Float) {
         _state.value = _state.value.copy(rate = rate)
         saveRate(rate)
@@ -181,6 +202,7 @@ class ReadAloudController(
     fun pageReloaded() {
         if (phase != ReadAloudPhase.OFF) {
             resumeAfterPanel = false
+            _state.value = _state.value.copy(detached = false)
             pause()
         }
     }
@@ -223,7 +245,8 @@ class ReadAloudController(
         log("start ${id.sentence}+${id.offset}")
         if (id.offset == 0) onSpoken()
         spoken.keys.removeAll { it < id.sentence - 1 }
-        toPage(markMessage(id.sentence, originalOffset(id.sentence, id.offset)))
+        markOffset = originalOffset(id.sentence, id.offset)
+        toPage(markMessage(id.sentence, markOffset))
         if (!awaiting && pageEnd == null && lastReceived - id.sentence < 2) requestMore()
     }
 
@@ -233,7 +256,8 @@ class ReadAloudController(
         val offset = id.offset + start
         if (offset == lastRange || start == 0) return
         lastRange = offset
-        toPage(markMessage(id.sentence, originalOffset(id.sentence, offset)))
+        markOffset = originalOffset(id.sentence, offset)
+        toPage(markMessage(id.sentence, markOffset))
     }
 
     override fun onDone(utteranceId: String) {
@@ -340,6 +364,7 @@ class ReadAloudController(
     /** Starts from the page on screen. */
     private fun begin() {
         resetRun(0)
+        _state.value = _state.value.copy(detached = false)
         awaiting = false
         whenConnected {
             resetRun(0)
@@ -393,6 +418,7 @@ class ReadAloudController(
     companion object {
         /** Sentences asked of the page at a time; the engine always has one or two queued ahead. */
         const val LOOKAHEAD = 3
+        private const val FOLLOW_ATTACH = """{"type":"follow.attach"}"""
         private const val MAX_PIECE = 4_000
         private const val MAX_ERRORS = 3
         private const val MAX_EMPTY_ANSWERS = 50

@@ -1,6 +1,10 @@
 package app.honmani.reader.ui.reader
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -34,8 +39,8 @@ import app.honmani.reader.R
 import java.text.DecimalFormat
 
 /**
- * The control bar over the bottom of the reader while the book is followed aloud: play or pause,
- * the sentence before and after, the speed and close. It knows nothing about speech: the caller
+ * The control bar over the bottom of the reader while the book is followed aloud: close, the
+ * sentence before and after around play or pause (in the middle), and the speed. It knows nothing about speech: the caller
  * says whether it [playing], what speed to show and an optional [message] (with an optional
  * [onMessageAction] button), so other readers of the text, such as an audiobook, can use it.
  * Every button has a content description; the row fits 360 dp wide at the largest font size.
@@ -77,45 +82,71 @@ fun ReadAloudBar(
                     if (messageAction != null) TextButton(onClick = onMessageAction) { Text(messageAction) }
                 }
             }
+            // Five equal cells, so Pause sits exactly in the middle whatever the speed label is.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
             ) {
-                IconButton(onClick = onPrevious) {
-                    Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = previousDescription)
-                }
-                IconButton(onClick = onPlayPause) {
-                    if (playing) {
-                        Icon(painterResource(R.drawable.ic_pause), contentDescription = stringResource(R.string.read_aloud_pause))
-                    } else {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.read_aloud_play))
+                Cell {
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Filled.Close, contentDescription = closeDescription)
                     }
                 }
-                IconButton(onClick = onNext) {
-                    Icon(painterResource(R.drawable.ic_skip_next), contentDescription = nextDescription)
-                }
-                val shown = stringResource(R.string.read_aloud_speed_label, RATE_FORMAT.format(rate))
-                val described = stringResource(R.string.read_aloud_speed, shown)
-                val density = LocalDensity.current
-                // A speed label that grows with the font would push the close button off a narrow screen.
-                CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(MAX_LABEL_FONT_SCALE))) {
-                    TextButton(
-                        onClick = onSpeed,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier
-                            .heightIn(min = 48.dp)
-                            .widthIn(min = 56.dp)
-                            .semantics { contentDescription = described },
-                    ) {
-                        Text(shown, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                Cell {
+                    IconButton(onClick = onPrevious) {
+                        Icon(painterResource(R.drawable.ic_skip_previous), contentDescription = previousDescription)
                     }
                 }
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.Close, contentDescription = closeDescription)
+                Cell {
+                    IconButton(onClick = onPlayPause) {
+                        if (playing) {
+                            Icon(painterResource(R.drawable.ic_pause), contentDescription = stringResource(R.string.read_aloud_pause))
+                        } else {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = stringResource(R.string.read_aloud_play))
+                        }
+                    }
+                }
+                Cell {
+                    IconButton(onClick = onNext) {
+                        Icon(painterResource(R.drawable.ic_skip_next), contentDescription = nextDescription)
+                    }
+                }
+                Cell {
+                    val shown = stringResource(R.string.read_aloud_speed_label, RATE_FORMAT.format(rate))
+                    val described = stringResource(R.string.read_aloud_speed, shown)
+                    val density = LocalDensity.current
+                    // A speed label that grows with the font would not fit its cell on a narrow screen.
+                    CompositionLocalProvider(LocalDensity provides Density(density.density, density.fontScale.coerceAtMost(MAX_LABEL_FONT_SCALE))) {
+                        TextButton(
+                            onClick = onSpeed,
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .widthIn(min = 48.dp)
+                                .semantics { contentDescription = described },
+                        ) {
+                            Text(shown, maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RowScope.Cell(content: @Composable () -> Unit) {
+    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) { content() }
+}
+
+/** Shown over the bar while the reader has taken control of the page: brings the view back to what is read. */
+@Composable
+fun FollowButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.read_aloud_follow)
+    FilledTonalButton(onClick = onClick, modifier = modifier.semantics { contentDescription = label }) {
+        Icon(painterResource(R.drawable.ic_my_location), contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label)
     }
 }
 

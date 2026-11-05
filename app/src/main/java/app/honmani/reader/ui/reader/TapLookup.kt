@@ -81,6 +81,9 @@ sealed interface BridgeMessage {
     /** The audiobook's passage could not be brought on screen by turning pages (`assets/honmani/audiobook.js`). */
     data class AudiobookLost(val gen: Int) : BridgeMessage
 
+    /** The reader turned the page or scrolled by hand while a passage is followed, or the page took the view along again (`sentence-follow.js`). */
+    data class FollowState(val detached: Boolean) : BridgeMessage
+
     /** A paragraph's text without furigana, and the page's id for it. */
     @Serializable
     data class MarksBlock(val id: Long = 0, val text: String = "")
@@ -110,6 +113,8 @@ sealed interface BridgeMessage {
                 "readAloud.sentences" -> parseReadAloudSentences(message, obj)
                 "readAloud.lost" -> parseReadAloudLost(message, obj)
                 "audiobook.lost" -> parseAudiobookLost(message, obj)
+                "follow.detached" -> FollowState(true).takeIf { compact == FOLLOW_DETACHED_MESSAGE }
+                "follow.attached" -> FollowState(false).takeIf { compact == FOLLOW_ATTACHED_MESSAGE }
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
@@ -276,6 +281,8 @@ sealed interface BridgeMessage {
         private const val OPEN_SETTINGS_MESSAGE = """{"type":"reader.settings"}"""
         private const val OPEN_MENU_MESSAGE = """{"type":"reader.menu"}"""
         private const val OPEN_MENU_SWIPE_MESSAGE = """{"type":"reader.menuSwipe"}"""
+        private const val FOLLOW_DETACHED_MESSAGE = """{"type":"follow.detached"}"""
+        private const val FOLLOW_ATTACHED_MESSAGE = """{"type":"follow.attached"}"""
         private const val ACTIVITY_MESSAGE = """{"type":"reader.activity"}"""
     }
 }

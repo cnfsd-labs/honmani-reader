@@ -93,6 +93,9 @@ class TapLookupTest {
         assertEquals(BridgeMessage.AudiobookLost(3), BridgeMessage.parse("""{"type":"audiobook.lost","gen":3}"""))
         assertNull(BridgeMessage.parse("""{"type":"audiobook.lost"}"""))
         assertNull(BridgeMessage.parse("""{"type":"audiobook.lost","gen":-1}"""))
+        assertEquals(BridgeMessage.FollowState(true), BridgeMessage.parse("""{"type":"follow.detached"}"""))
+        assertEquals(BridgeMessage.FollowState(false), BridgeMessage.parse("""{ "type": "follow.attached" }"""))
+        assertNull(BridgeMessage.parse("""{"type":"follow.detached","x":1}"""))
     }
 
     @Test

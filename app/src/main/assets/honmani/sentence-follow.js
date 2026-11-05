@@ -18,6 +18,19 @@
  * ttu's keyboard shortcuts (ArrowDown forward, ArrowUp back, in both writing directions), so
  * ttu saves its bookmark and Honmani's statistics see a normal page turn; in continuous mode the
  * book's scroll box is scrolled so the start of the passage sits at the start edge.
+ *
+ * The reader can take control: a scroll or page turn that did not come from here (while a mark
+ * is shown) detaches the view. The mark keeps moving, but keepOnScreen then does nothing, and
+ * { type: 'follow.detached' } goes to the app. Our own turns run inside auto(fn) (keepOnScreen
+ * does), and the moments around a resize count as ours too, so only the reader's gestures detach.
+ *
+ *   window.honmaniFollow.auto(fn)       runs fn (async) as our own scrolling
+ *   window.honmaniFollow.detached()     whether the reader has taken control
+ *   window.honmaniFollow.attach()       follows again; { type: 'follow.attach' } from the app does the same
+ *                                       (the app then sends the passage again to bring it on screen)
+ *   window.honmaniFollow.reattach()     follows again, and tells the app ({ type: 'follow.attached' })
+ *
+ * clear() follows again too: closing or restarting starts attached.
  */
 (() => {
   'use strict';
@@ -34,6 +47,11 @@
   /** Continuous mode: a passage starting within this much of the screen's start edge is left be. */
   const COMFORT_FRACTION = 0.7;
 
+  /** Scroll events our own turn can still cause after it ended (an animated page turn). */
+  const AUTO_GRACE_MS = 500;
+  /** A resize (the bar appearing, a rotation) lays the book out again, with scroll events of its own. */
+  const RESIZE_GRACE_MS = 800;
+
   const hasApi = !!(window.CSS && CSS.highlights && window.Highlight);
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -47,8 +65,19 @@
     (document.head || document.documentElement).appendChild(style);
   }
 
+  let marked = false;
+  let detachedNow = false;
+  let autoDepth = 0;
+  let quietUntil = 0;
+
+  function post(message) {
+    const app = window.honmani;
+    if (app && typeof app.postMessage === 'function') app.postMessage(JSON.stringify(message));
+  }
+
   function mark(range) {
     if (!hasApi || !range) return;
+    marked = true;
     addStyle();
     const highlight = new Highlight(range);
     highlight.priority = PRIORITY;
@@ -56,7 +85,42 @@
   }
 
   function clear() {
+    marked = false;
+    detachedNow = false;
     if (hasApi) CSS.highlights.delete(HIGHLIGHT_NAME);
+  }
+
+  /** Runs `fn` as our own scrolling: it does not detach the view. */
+  async function auto(fn) {
+    autoDepth++;
+    try {
+      return await fn();
+    } finally {
+      autoDepth--;
+      quietUntil = Math.max(quietUntil, Date.now() + AUTO_GRACE_MS);
+    }
+  }
+
+  function onScroll() {
+    if (!marked || detachedNow || autoDepth > 0 || Date.now() < quietUntil) return;
+    detachedNow = true;
+    post({ type: 'follow.detached' });
+  }
+
+  function reattach() {
+    if (!detachedNow) return;
+    detachedNow = false;
+    post({ type: 'follow.attached' });
+  }
+
+  window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  window.addEventListener('resize', () => {
+    quietUntil = Math.max(quietUntil, Date.now() + RESIZE_GRACE_MS);
+  });
+  if (window.honmani && window.honmani.addEventListener) {
+    window.honmani.addEventListener('message', (event) => {
+      if (typeof event.data === 'string' && event.data.includes('"follow.attach"')) detachedNow = false;
+    });
   }
 
   function isPaginated() {
@@ -133,9 +197,13 @@
 
   /** Brings the start of the range into view. */
   async function keepOnScreen(range) {
-    if (!range || !range.startContainer.isConnected) return false;
-    return isPaginated() ? keepPaginated(range) : keepContinuous(range);
+    if (detachedNow || !range || !range.startContainer.isConnected) return false;
+    return auto(() => (isPaginated() ? keepPaginated(range) : keepContinuous(range)));
   }
 
-  window.honmaniFollow = Object.freeze({ HIGHLIGHT_NAME, mark, clear, keepOnScreen, startOnScreen });
+  window.honmaniFollow = Object.freeze({
+    HIGHLIGHT_NAME, mark, clear, keepOnScreen, startOnScreen, auto, reattach,
+    detached: () => detachedNow,
+    attach: () => { detachedNow = false; },
+  });
 })();

@@ -319,4 +319,48 @@ class ReadAloudControllerTest {
         repeat(60) { controller.onSentences(gen, emptyList(), null) }
         assertEquals(ReadAloudPhase.ENDED, controller.state.value.phase)
     }
+
+    @Test
+    fun aPageTurnByHandDetaches_followSendsTheViewBackToTheSpokenSentenceAndAttaches() {
+        startAndReceive()
+        controller.onStart(id(1))
+        controller.viewDetached(true)
+        assertTrue(controller.state.value.detached)
+        // Speech goes on and the mark moves; the controller keeps telling the page where it is.
+        controller.onStart(id(2))
+        assertTrue(controller.state.value.running)
+        assertEquals(""""index":2""", Regex(""""index":\d+""").find(sent.last())!!.value)
+        sent.clear()
+        controller.follow()
+        assertFalse(controller.state.value.detached)
+        assertEquals(listOf("follow.attach", "readAloud.mark"), types())
+        assertEquals(""""index":2""", Regex(""""index":\d+""").find(sent.last())!!.value)
+    }
+
+    @Test
+    fun followOnlyActsWhileDetached_andTheDetachedStateIsNotKept() {
+        startAndReceive()
+        controller.onStart(id(0))
+        sent.clear()
+        controller.follow()
+        assertTrue(sent.isEmpty())
+        controller.viewDetached(true)
+        controller.pause()
+        assertTrue(controller.state.value.detached)
+        controller.close()
+        assertFalse(controller.state.value.detached)
+        // The page's message after closing changes nothing.
+        controller.viewDetached(true)
+        assertFalse(controller.state.value.detached)
+        // A new start is attached, as is a page that was loaded again.
+        startAndReceive()
+        controller.onStart(id(0))
+        controller.viewDetached(true)
+        controller.pageReloaded()
+        assertFalse(controller.state.value.detached)
+        // Pause and Play stay detached: it is the same listening.
+        controller.viewDetached(true)
+        controller.start()
+        assertTrue(controller.state.value.detached)
+    }
 }
