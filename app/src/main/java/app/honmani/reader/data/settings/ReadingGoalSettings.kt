@@ -41,6 +41,9 @@ class ReadingGoalSettings(private val preferences: SharedPreferences) {
         const val KEY_ENABLED = "daily_goal_enabled"
         const val KEY_MINUTES = "daily_goal_minutes"
         const val MIN_MINUTES = 1
-        const val MAX_MINUTES = 600
+        const val MAX_MINUTES = 720
+
+        /** The minutes typed for a custom goal, or null when they are not a whole number in range. */
+        fun parseMinutes(text: String): Int? = text.trim().toIntOrNull()?.takeIf { it in MIN_MINUTES..MAX_MINUTES }
     }
 }

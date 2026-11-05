@@ -50,7 +50,25 @@ class ReadingGoalSettingsTest {
         settings.setMinutes(0)
         assertEquals(1, settings.minutes.value)
         settings.setMinutes(100_000)
-        assertEquals(600, ReadingGoalSettings(preferences()).minutes.value)
+        assertEquals(720, ReadingGoalSettings(preferences()).minutes.value)
+    }
+
+    @Test
+    fun aCustomGoalIsKept() {
+        val settings = ReadingGoalSettings(preferences())
+        settings.setMinutes(75)
+        assertEquals(75, settings.minutes.value)
+        assertEquals(75, ReadingGoalSettings(preferences()).minutes.value)
+    }
+
+    @Test
+    fun typedMinutesMustBeAWholeNumberInRange() {
+        assertEquals(75, ReadingGoalSettings.parseMinutes("75"))
+        assertEquals(1, ReadingGoalSettings.parseMinutes("1"))
+        assertEquals(720, ReadingGoalSettings.parseMinutes(" 720 "))
+        for (bad in listOf("", "0", "721", "abc", "7.5", "-5", "99999999999")) {
+            assertNull(bad, ReadingGoalSettings.parseMinutes(bad))
+        }
     }
 
     @Test

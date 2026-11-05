@@ -46,6 +46,9 @@
     <string name="settings_daily_goal">Daily reading goal</string>
     <string name="settings_daily_goal_details">Shows today\'s reading time against a goal, and the days in a row you reached it, in Progress</string>
     <string name="settings_daily_goal_minutes">%1$d min</string>
+    <string name="settings_daily_goal_other">Other…</string>
+    <string name="settings_daily_goal_custom_title">Daily goal in minutes</string>
+    <string name="settings_daily_goal_custom_range">%1$d to %2$d minutes</string>
     <string name="settings_day_start">Day starts at</string>
     <string name="settings_day_start_details">When a new reading and review day begins. Reading goal, streak, new words and reviews a day, and due cards use it. A change applies from now on; days already recorded stay as they are.</string>
     <string name="settings_day_start_midnight">Midnight</string>
