@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 /** A folder with plain files, and the failures a document provider can show. */
-private class FakeFolder : FolderTarget {
+internal class FakeFolder : FolderTarget {
     val files = mutableMapOf<String, ByteArray>()
     val granted = mutableSetOf<String>()
     var denyGrant = false
