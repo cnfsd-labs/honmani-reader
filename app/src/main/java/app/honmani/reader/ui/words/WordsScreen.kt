@@ -458,16 +458,6 @@ private fun WordsContent(
             Surface(color = TabRowDefaults.primaryContainerColor) {
                 Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
                 searchField()
-                // Nothing to show before the first word: the card would only say "nothing to review".
-                if (searchContent == null && (reviewDue + reviewNew > 0 || !uiState.learning.isNullOrEmpty())) {
-                    ReviewEntry(
-                        due = reviewDue,
-                        newWords = reviewNew,
-                        onStart = onStartReview,
-                        choice = reviewChoice,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
                 if (searchContent == null) Row(verticalAlignment = Alignment.CenterVertically) {
                     PrimaryTabRow(selectedTabIndex = pager.currentPage, modifier = Modifier.weight(1f)) {
                         WordFilter.entries.forEachIndexed { index, filter ->
@@ -500,7 +490,22 @@ private fun WordsContent(
                 }
             }
         },
-        bottomBar = bottomBar,
+        // In the bar's slot, so the list ends above the card and snackbars sit above it.
+        bottomBar = {
+            Column {
+                // Nothing to show before the first word: the card would only say "nothing to review".
+                if (searchContent == null && (reviewDue + reviewNew > 0 || !uiState.learning.isNullOrEmpty())) {
+                    ReviewEntry(
+                        due = reviewDue,
+                        newWords = reviewNew,
+                        onStart = onStartReview,
+                        choice = reviewChoice,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+                bottomBar()
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
@@ -602,8 +607,7 @@ private fun WordList(
                 .fillMaxSize()
                 .padding(32.dp),
         )
-        // Room at the end for the look-up button.
-        else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 88.dp), modifier = Modifier.fillMaxSize()) {
+        else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 8.dp), modifier = Modifier.fillMaxSize()) {
             if (filter == WordFilter.LEARNING) {
                 item(key = "ankiActions") {
                     // Wraps below the first button on a narrow screen or with large text.

@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -42,6 +43,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.SnackbarDuration
@@ -769,6 +772,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 val atTheSide = maxWidth > maxHeight
                 val bottomBar = @Composable {
                     if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
+                    // With the tabs at the side: what a screen pins above the bar stays clear of the system's.
+                    else Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                 }
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (atTheSide) HomeNavigationRail(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)

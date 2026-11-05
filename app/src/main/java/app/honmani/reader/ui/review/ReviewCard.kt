@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -45,8 +47,9 @@ class ReviewScopeChoice(
 )
 
 /**
- * The review's entrance at the top of Words: how many cards are due and how many new words the
- * session would start, and the chips for what to work on.
+ * The review's entrance, pinned at the bottom of Words within thumb's reach: how many cards are due
+ * and how many new words the session would start, Start, and the chips for what to work on. With
+ * large text it stops growing at [MAX_SCREEN_SHARE] of the screen and scrolls.
  */
 @Composable
 fun ReviewEntry(
@@ -66,17 +69,34 @@ fun ReviewEntry(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
         modifier = modifier.fillMaxWidth(),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(
-                if (due > 0) stringResource(R.string.review_card_title, due) else stringResource(R.string.review_card_title_none),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            val subtitle = when {
-                nothing -> stringResource(R.string.review_card_nothing)
-                newWords > 0 -> pluralStringResource(R.plurals.review_card_new, newWords, newWords)
-                else -> null
+        Column(
+            modifier = Modifier
+                .heightIn(max = (LocalConfiguration.current.screenHeightDp * MAX_SCREEN_SHARE).dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (due > 0) stringResource(R.string.review_card_title, due) else stringResource(R.string.review_card_title_none),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    val subtitle = when {
+                        nothing -> stringResource(R.string.review_card_nothing)
+                        newWords > 0 -> pluralStringResource(R.plurals.review_card_new, newWords, newWords)
+                        else -> null
+                    }
+                    if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium)
+                }
+                Button(
+                    onClick = onStart,
+                    enabled = !nothing,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .heightIn(min = 48.dp)
+                        .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
+                ) { Text(stringResource(R.string.review_start)) }
             }
-            if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodyMedium)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier
@@ -97,18 +117,6 @@ fun ReviewEntry(
                 chip(book ?: ReviewScope.Book(-1, ""), book?.title ?: stringResource(R.string.review_chip_a_book)) { pickBook = true }
                 chip(ReviewScope.Starred, stringResource(R.string.review_chip_starred))
                 chip(ReviewScope.AllLearning, stringResource(R.string.review_chip_all_learning))
-            }
-            Row(
-                horizontalArrangement = Arrangement.End,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Button(
-                    onClick = onStart,
-                    enabled = !nothing,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
-                ) { Text(stringResource(R.string.review_start)) }
             }
         }
     }
@@ -140,3 +148,5 @@ fun ReviewEntry(
         )
     }
 }
+
+private const val MAX_SCREEN_SHARE = 0.4f
