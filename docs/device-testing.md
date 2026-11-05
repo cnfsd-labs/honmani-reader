@@ -350,6 +350,9 @@ the media volume stays at 0. Reader menu, Audiobook: choose the audio, then the 
   start continues where it stopped. A call or another player pauses it. A tap on a word pauses it while
   the panel is open.
 - Starting Read aloud stops the audiobook and the other way round.
+- Reader menu, Pronunciations: add "text in the book" and "read as (kana)", Save; start Read aloud and the
+  text is spoken as the kana (logcat tag ReadAloud, "speak" line); delete shows Undo; removing the book
+  removes its entries; they come back with a backup restore (a restored phone keeps its own reading).
 - Reader menu, Audiobook, Remove: the pairing, the subtitle copy and the position are gone. Delete the
   audio file and play again: the bar says the audio is gone and offers "Change files".
 - An audio file the phone can't play, an empty subtitle file and a book that is not an EPUB each give a
