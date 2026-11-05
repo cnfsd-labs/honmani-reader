@@ -105,7 +105,7 @@ class TombstoneTest {
     }
 
     @Test
-    fun bookmarksHighlightsAndPronunciationsAreStampedAndMarkedOnDelete() = runTest {
+    fun bookmarksHighlightsAndPronunciationsAreStampedAndMarkedOnDeleteButNotWithTheirBook() = runTest {
         val bookmarks = db.bookmarkDao()
         val highlights = db.highlightDao()
         val readings = db.pronunciationDao()

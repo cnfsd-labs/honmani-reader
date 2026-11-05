@@ -255,7 +255,11 @@ Reading progress sync, sign in, read a few pages, back to the library.
   phone?" (with date); Restore = from file; settings already restored by Android.
 - Sync folder (Settings -> Back up and restore): pick a folder, press Home: `honmani-sync-<id>.zip` is
   there (no `.part` file); its JSON has `syncFormat`, `deviceId`, no `settings`/`catalogs`. Remove the
-  folder in the file app: "Folder unavailable: choose it again". Default off.
+  folder in the file app: "Folder unavailable: choose it again". Default off. Two phones, one folder
+  (copying the `honmani-sync-*.zip` by hand is enough; a folder app is not needed): a word, a word
+  deleted, a further position and reading on both reach the other phone on its next start ("Synced with
+  <phone>"): the reading adds up, and starting again changes nothing and doesn't rewrite the file. A
+  file from a newer Honmani: "<phone> has a newer Honmani".
 - Android's backup over USB without a Google account (debug-only local transport; the phone's backup
   setting is off by default, undo afterwards):
 
