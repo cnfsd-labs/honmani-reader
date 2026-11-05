@@ -295,6 +295,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var readerSettings by rememberSaveable { mutableStateOf(false) }
     // The open sub-screen came from the reader menu: Back returns there (a tap outside or a swipe down closes to the book).
     var openedFromMenu by rememberSaveable { mutableStateOf(false) }
+    // ttu's table of contents also opens from its own bar, so the menu's Contents keeps its own mark.
+    var contentsFromMenu by rememberSaveable { mutableStateOf(false) }
     // The words of this reading session, from the reader's bottom menu.
     var sessionShown by rememberSaveable { mutableStateOf(false) }
     // The search in the open book, from the reader's bottom menu; ttu's id of the book.
@@ -491,7 +493,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     readerSettings = true
                 },
                 onOpenMenu = viewModel::openMenu,
-                onContentsClosedByBack = { if (openedFromMenu) viewModel.openMenu() },
+                onContentsClosedByBack = {
+                    if (contentsFromMenu) viewModel.openMenu()
+                    contentsFromMenu = false
+                },
                 onImage = {
                     viewModel.dismiss()
                     picture = it
@@ -909,7 +914,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onContents = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
+                    contentsFromMenu = true
                     viewModel.ttuLibrary.openContents()
                 },
                 onSearch = {

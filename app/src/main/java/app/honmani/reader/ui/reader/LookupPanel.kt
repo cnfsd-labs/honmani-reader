@@ -284,6 +284,10 @@ fun LookupPanel(
         }
     }
 
+    // The match arrows float over the results, for a first lookup that has results to match.
+    val matchState = state as? LookupPanelState.Results
+    val pillShown = matchState != null && matchState.previous == null && (matchState.canShorten || matchState.canLengthen)
+    val sideRail = availableHeight < SIDE_RAIL_BELOW
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -418,7 +422,12 @@ fun LookupPanel(
                             }
                             .nestedScroll(listConnection),
                         // Room under the last lines for the match arrows (see [MatchPill]), when they are there.
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = if (state.previous == null && (state.canShorten || state.canLengthen)) PILL_CLEARANCE else 16.dp),
+                        // In a short (landscape) area the pill gets a rail on the right instead, so it never covers a word's buttons.
+                        contentPadding = PaddingValues(
+                            start = 20.dp,
+                            end = if (pillShown && sideRail) PILL_RAIL else 20.dp,
+                            bottom = if (pillShown && !sideRail) PILL_CLEARANCE else 16.dp,
+                        ),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         itemsIndexed(
@@ -496,8 +505,7 @@ fun LookupPanel(
                 }
             }
             // Over the results, at the bottom right where the thumb is: the match arrows (see [MatchPill]).
-            val matchState = state as? LookupPanelState.Results
-            if (matchState != null && matchState.previous == null && (matchState.canShorten || matchState.canLengthen)) {
+            if (matchState != null && pillShown) {
                 MatchPill(
                     canShorten = matchState.canShorten,
                     canLengthen = matchState.canLengthen,
@@ -693,6 +701,12 @@ private val HANDLE_AREA = 24.dp
 
 /** Bottom padding of the results while the match pill floats over them: the pill (56 dp) and its margin (12 dp), plus some air. */
 private val PILL_CLEARANCE = 80.dp
+
+/** Below this reader height (landscape) the pill sits in a rail of its own on the right, not over the results. */
+private val SIDE_RAIL_BELOW = 480.dp
+
+/** The rail's width: the pill (104 dp), its margin (12 dp) and some air. */
+private val PILL_RAIL = 132.dp
 
 /** In a short (landscape) area the collapsed panel is at least this tall, up to 60% of the area. */
 private val MIN_COLLAPSED = 220.dp
