@@ -22,6 +22,9 @@ interface BookDao {
     @Query("SELECT * FROM book WHERE ttu_id = :ttuId LIMIT 1")
     suspend fun findByTtuId(ttuId: Long): BookEntity?
 
+    @Query("SELECT * FROM book WHERE title = :title LIMIT 2")
+    suspend fun findByTitle(title: String): List<BookEntity>
+
     @Query("SELECT * FROM book WHERE content_hash = :contentHash")
     suspend fun findByHash(contentHash: String): BookEntity?
 

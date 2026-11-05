@@ -644,6 +644,7 @@ class ReaderViewModel(
                 surfaceStart = if (fromBook) start else 0,
                 surfaceEnd = if (fromBook) (start + group.source.length).coerceAtMost(tap.sentence.length) else 0,
                 bookTitle = awaitBook(book)?.title,
+                bookId = awaitBook(book)?.id,
                 pitches = group.pitches,
                 frequency = group.frequencies.firstOrNull()?.label,
                 furigana = state.furigana[key].orEmpty(),

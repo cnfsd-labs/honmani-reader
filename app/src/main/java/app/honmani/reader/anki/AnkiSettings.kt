@@ -62,6 +62,15 @@ class AnkiSettings(
         MutableStateFlow(SentenceSpeed.fromName(preferences.getString(KEY_SENTENCE_SPEED, null)))
     val sentenceSpeed: StateFlow<SentenceSpeed> = _sentenceSpeed.asStateFlow()
 
+    private val _audiobookSentences = MutableStateFlow(preferences.getBoolean(KEY_AUDIOBOOK_SENTENCES, true))
+
+    /**
+     * Whether a card's sentence audio is cut from the book's paired audiobook, where there is one
+     * and the sentence is found in it; otherwise (and if off) the chosen voice speaks it. On by
+     * default: it changes only cards from books the reader paired with an audiobook.
+     */
+    val audiobookSentences: StateFlow<Boolean> = _audiobookSentences.asStateFlow()
+
     private val _googleVoice = MutableStateFlow(preferences.getString(KEY_GOOGLE_VOICE, null))
 
     /** The chosen Google voice; null for [GoogleCloudVoice.PREFERRED_VOICE]. */
@@ -111,6 +120,11 @@ class AnkiSettings(
     fun setSentenceSpeed(speed: SentenceSpeed) {
         _sentenceSpeed.value = speed
         preferences.edit().putString(KEY_SENTENCE_SPEED, speed.name).apply()
+    }
+
+    fun setAudiobookSentences(on: Boolean) {
+        _audiobookSentences.value = on
+        preferences.edit().putBoolean(KEY_AUDIOBOOK_SENTENCES, on).apply()
     }
 
     fun setCardStyle(style: CardStyle) {
@@ -185,6 +199,7 @@ class AnkiSettings(
     fun reload() {
         _audio.value = CardAudio.fromName(preferences.getString(KEY_AUDIO, null))
         _sentenceSpeed.value = SentenceSpeed.fromName(preferences.getString(KEY_SENTENCE_SPEED, null))
+        _audiobookSentences.value = preferences.getBoolean(KEY_AUDIOBOOK_SENTENCES, true)
         _googleVoice.value = preferences.getString(KEY_GOOGLE_VOICE, null)
         _deck.value = preferences.getString(KEY_DECK, null) ?: AnkiCard.DECK
         _cardStyle.value = CardStyle.fromName(preferences.getString(KEY_CARD_STYLE, null))
@@ -217,6 +232,7 @@ class AnkiSettings(
 
     companion object {
         const val KEY_AUDIO = "anki_audio"
+        const val KEY_AUDIOBOOK_SENTENCES = "anki_audiobook_sentences"
         const val KEY_GOOGLE_KEY = "anki_google_key"
         const val KEY_GOOGLE_VOICE = "anki_google_voice"
         const val KEY_SENTENCE_SPEED = "anki_sentence_speed"

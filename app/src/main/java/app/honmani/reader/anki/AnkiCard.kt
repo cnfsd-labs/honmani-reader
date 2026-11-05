@@ -15,6 +15,8 @@ data class CardContent(
     val surfaceStart: Int,
     val surfaceEnd: Int,
     val bookTitle: String? = null,
+    /** The library book the sentence is from, if known; the sentence's audio is cut from its audiobook. */
+    val bookId: Long? = null,
     /** Pitch accent downsteps of [reading] (0: none); empty if unknown. */
     val pitches: List<Int> = emptyList(),
     /** How common the word is, as shown on the card ("Jiten #395"). */

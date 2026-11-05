@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -171,6 +172,60 @@ class AnkiExporterTest {
         assertTrue(exporter.add(first) is AnkiResult.Added)
         assertEquals(AnkiResult.AlreadyInAnki, exporter.add(first.copy(reading = "めいぜん")))
         assertEquals(listOf("名前", "name"), anki.notes.single().fields)
+    }
+
+    private fun withClip(clip: suspend (CardContent) -> File?) = AnkiExporter(
+        anki = anki,
+        settings = settings,
+        words = words,
+        phoneVoice = { voice },
+        audioDir = folder.root,
+        clip = clip,
+        details = { _, _ -> WordDetails() },
+    )
+
+    private val content = CardContent("名前", "なまえ", listOf(listOf("name")), sentence = "名前はまだ無い。", surfaceStart = 0, surfaceEnd = 2)
+
+    @Test
+    fun sentenceClip_replacesTheVoiceForTheSentence_andTheCacheFileStays() = runBlocking {
+        val cache = folder.newFile("book-srt-audio-1000-3000.mp3").apply { writeText("clip") }
+        val clipping = withClip { cache }
+
+        assertTrue(clipping.add(content) is AnkiResult.Added)
+
+        assertEquals(listOf("なまえ"), voice.spoken)
+        assertTrue(anki.notes.single().fields.any { it.startsWith("[sound:honmani_") && it.endsWith(".mp3]") })
+        assertTrue(cache.isFile)
+        assertEquals(1, folder.root.listFiles { f -> f.extension == "mp3" }!!.size)
+    }
+
+    @Test
+    fun sentenceClip_worksWithoutAVoice() = runBlocking {
+        settings.setAudio(CardAudio.OFF)
+        val cache = folder.newFile("clip.m4a").apply { writeText("clip") }
+
+        assertEquals(AnkiResult.Added(1, null), withClip { cache }.add(content).let { it as AnkiResult.Added }.copy(noteId = 1))
+
+        assertTrue(voice.spoken.isEmpty())
+        assertTrue(anki.notes.single().fields.any { it.endsWith(".m4a]") })
+    }
+
+    @Test
+    fun noClip_orTheSwitchOff_orAClipThatFails_fallsBackToTheVoice() = runBlocking {
+        assertTrue(withClip { null }.add(content) is AnkiResult.Added)
+        assertEquals(listOf("なまえ", "名前はまだ無い。"), voice.spoken)
+
+        voice.spoken.clear()
+        settings.setAudiobookSentences(false)
+        val cache = folder.newFile("clip.mp3").apply { writeText("clip") }
+        assertTrue(withClip { cache }.add(content.copy(expression = "見当", reading = "けんとう")) is AnkiResult.Added)
+        assertEquals(listOf("けんとう", "名前はまだ無い。"), voice.spoken)
+
+        voice.spoken.clear()
+        settings.setAudiobookSentences(true)
+        val result = withClip { error("the cutter broke") }.add(content.copy(expression = "吾輩", reading = "わがはい"))
+        assertNull((result as AnkiResult.Added).audioProblem)
+        assertEquals(listOf("わがはい", "名前はまだ無い。"), voice.spoken)
     }
 
     @Test

@@ -610,6 +610,8 @@
     <string name="reader_settings_font_licence">The downloadable fonts cover kana, kanji and Latin letters. Free fonts under the SIL Open Font License, from Google Fonts.</string>
     <string name="sentence_speed">Sentence speed</string>
     <string name="sentence_speed_details">How fast the example sentence on new cards is spoken. The word itself stays at normal speed.</string>
+    <string name="anki_audiobook_sentences">Use audiobook for sentence audio</string>
+    <string name="anki_audiobook_sentences_details">For books you paired with an audiobook, new cards get the sentence cut from the recording. Other cards, and sentences not found in it, use the voice above.</string>
     <string name="sentence_speed_normal">Normal</string>
     <string name="sentence_speed_slower">Slower</string>
     <string name="sentence_speed_slow">Slow</string>

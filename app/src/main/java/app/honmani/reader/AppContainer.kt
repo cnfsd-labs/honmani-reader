@@ -89,6 +89,9 @@ import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
+import app.honmani.reader.readaloud.ClipBook
+import app.honmani.reader.readaloud.MediaClipCutter
+import app.honmani.reader.readaloud.SentenceClips
 import app.honmani.reader.data.words.BookCoverage
 import app.honmani.reader.data.words.UnknownWords
 import app.honmani.reader.data.words.ReadStretchStore
@@ -344,6 +347,7 @@ class AppContainer(context: Context) {
             words = wordRepository,
             phoneVoice = { phoneVoice },
             audioDir = ankiAudioDir,
+            clip = { content -> sentenceClips.clip(content.bookId, content.bookTitle, content.sentence) },
             // Off the main thread: "Add all" and the text file look up every word.
             details = { expression, reading ->
                 withContext(Dispatchers.Default) {
@@ -453,6 +457,22 @@ class AppContainer(context: Context) {
     /** Each book's audiobook pairing and the subtitle matching, on this phone only (reader menu → Audiobook). */
     val audiobookStore: AudiobookStore by lazy { AudiobookStore(devicePreferences, File(appContext.filesDir, "audiobook")) }
     val audiobookLoader: AudiobookLoader by lazy { AudiobookLoader(audiobookStore) }
+
+    /** Sentence audio cut from a book's paired audiobook, for Anki cards (null: the voice speaks). */
+    val sentenceClips: SentenceClips by lazy {
+        SentenceClips(
+            store = audiobookStore,
+            loader = audiobookLoader,
+            cutter = MediaClipCutter(appContext),
+            book = { id, title ->
+                val book = id?.let { bookDao.find(it) }
+                    ?: title?.let { bookDao.findByTitle(it).singleOrNull() }
+                book?.let {
+                    ClipBook(it.contentHash, it.format == BookFormat.EPUB) { EpubPositions.countedText(bookImporter.bookFile(it)) }
+                }
+            },
+        )
+    }
 
     val bookGrader: BookGrader by lazy {
         BookGrader(

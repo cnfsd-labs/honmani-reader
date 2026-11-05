@@ -4,6 +4,7 @@ import app.honmani.reader.diagnostics.logWarning
 import android.media.MediaPlayer
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -126,6 +128,7 @@ private fun AnkiSettingsContent() {
     val voice by settings.googleVoice.collectAsStateWithLifecycle()
     val deck by settings.deck.collectAsStateWithLifecycle()
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
+    val audiobookSentences by settings.audiobookSentences.collectAsStateWithLifecycle()
     val cardStyle by settings.cardStyle.collectAsStateWithLifecycle()
     val sentenceEnds by settings.sentenceEnds.collectAsStateWithLifecycle()
     val customName by settings.customNoteTypeName.collectAsStateWithLifecycle()
@@ -355,6 +358,12 @@ private fun AnkiSettingsContent() {
                 )
             }
         }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.anki_audiobook_sentences)) },
+            supportingContent = { Text(stringResource(R.string.anki_audiobook_sentences_details)) },
+            trailingContent = { Switch(checked = audiobookSentences, onCheckedChange = null) },
+            modifier = Modifier.toggleable(audiobookSentences, role = Role.Switch, onValueChange = settings::setAudiobookSentences),
+        )
     }
 }
 

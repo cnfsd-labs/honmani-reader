@@ -29,6 +29,7 @@ class AudiobookStore(
         val hash = sha256(srtBytes)
         directory.mkdirs()
         deleteFiles(bookHash)
+        deleteClips(bookHash)
         File(directory, "${name(bookHash)}.srt").writeBytes(srtBytes)
         preferences.edit()
             .putString(key(bookHash, AUDIO), audio)
@@ -79,12 +80,24 @@ class AudiobookStore(
             .remove(key(bookHash, POSITION))
             .apply()
         deleteFiles(bookHash)
+        deleteClips(bookHash)
+    }
+
+    private fun deleteClips(bookHash: String) {
+        val prefix = name(bookHash) + "-"
+        clipDirectory.listFiles { file -> file.name.startsWith(prefix) }?.forEach { it.delete() }
     }
 
     private fun deleteFiles(bookHash: String) {
         val prefix = name(bookHash)
         directory.listFiles { file -> file.name == "$prefix.srt" || file.name.startsWith("$prefix-") }?.forEach { it.delete() }
     }
+
+    /** Where [app.honmani.reader.readaloud.SentenceClips] keeps the sentence clips cut from the audio; its own folder, never backed up. */
+    val clipDirectory: File get() = File(directory, "clips")
+
+    /** The book's hash as it starts the names of its files here. */
+    fun fileName(bookHash: String): String = name(bookHash)
 
     private fun key(bookHash: String, field: String) = "audiobook.${name(bookHash)}.$field"
 

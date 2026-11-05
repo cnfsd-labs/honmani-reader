@@ -476,6 +476,8 @@ private class FakeBookDao : BookDao {
 
     override suspend fun findByTtuId(ttuId: Long) = books.value.find { it.ttuId == ttuId }
 
+    override suspend fun findByTitle(title: String) = books.value.filter { it.title == title }.take(2)
+
     override suspend fun findByHash(contentHash: String) = books.value.find { it.contentHash == contentHash }
 
     override fun observeSourceIds(source: BookSource): Flow<List<String>> =

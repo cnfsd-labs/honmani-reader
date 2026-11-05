@@ -50,6 +50,11 @@ class AnkiExporter(
     private val phoneVoice: () -> CardVoice,
     /** Where audio waits until AnkiDroid has copied it (shared through the file provider). */
     private val audioDir: File,
+    /**
+     * The sentence of a card as a recording from the book's audiobook ([app.honmani.reader.readaloud.SentenceClips]),
+     * null if there is none. The file stays the cache's: it is copied, never deleted here.
+     */
+    private val clip: suspend (CardContent) -> File? = { null },
     /** What the installed dictionaries say about a word (senses from the best dictionary). */
     private val details: suspend (expression: String, reading: String) -> WordDetails,
 ) {
@@ -90,11 +95,19 @@ class AnkiExporter(
                         val media = mutableListOf<File>()
                         var wordAudio = ""
                         var sentenceAudio = ""
+                        findClip(content)?.let { file ->
+                            val copy = File(dir, clipName(file) + "." + file.extension)
+                            if (!copy.exists()) file.copyTo(copy)
+                            media += copy
+                            sentenceAudio = "[sound:${copy.name}]"
+                        }
                         if (voice != null && problem == null) {
                             try {
                                 wordAudio = packageSound(voice, content.reading.ifEmpty { content.expression }, dir, media)
                                 // Too long for the voice: this card's sentence goes without audio, the rest go on.
-                                if (content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength) {
+                                if (sentenceAudio.isEmpty() && content.sentence.isNotBlank() &&
+                                    content.sentence.length <= voice.maxInputLength
+                                ) {
                                     val rate = settings.sentenceSpeed.value.rate
                                     sentenceAudio = packageSound(voice, content.sentence, dir, media, rate)
                                 }
@@ -127,6 +140,8 @@ class AnkiExporter(
         val start = lookup?.surfaceStart ?: word.lastSurfaceStart
         val end = lookup?.surfaceEnd ?: word.lastSurfaceEnd
         val book = if (lookup != null) lookup.bookTitle else word.lastBookTitle
+        // A saved word keeps only the title of its latest lookup's book; the clips find the book by it.
+        val bookId = lookup?.bookId
         val found = try {
             details(word.expression, word.reading)
         } catch (e: CancellationException) {
@@ -143,6 +158,7 @@ class AnkiExporter(
             surfaceStart = start,
             surfaceEnd = end,
             bookTitle = book,
+            bookId = bookId,
             pitches = found.pitches,
             frequency = found.frequency,
             furigana = word.furigana,
@@ -195,10 +211,14 @@ class AnkiExporter(
         var audioProblem: VoiceProblem? = null
         val made = mutableListOf<File>()
         try {
-            // A note type of the reader's own may have no audio field: then nothing is spoken.
-            val voice = settings.voice(phoneVoice)?.takeIf { custom == null || custom.usesWordAudio || custom.usesSentenceAudio }
             var wordAudio = ""
             var sentenceAudio = ""
+            // The audiobook's recording needs no voice. No clip (or one AnkiDroid won't take) is not a problem: the voice speaks.
+            if (custom == null || custom.usesSentenceAudio) {
+                sentenceAudio = clipSound(content, made)
+            }
+            // A note type of the reader's own may have no audio field: then nothing is spoken.
+            val voice = settings.voice(phoneVoice)?.takeIf { custom == null || custom.usesWordAudio || custom.usesSentenceAudio }
             if (voice != null) {
                 try {
                     // The reading, not the written form: a voice can misread kanji, never kana.
@@ -206,7 +226,7 @@ class AnkiExporter(
                         wordAudio = sound(voice, content.reading.ifEmpty { content.expression }, made)
                     }
                     // A sentence too long for the voice goes without audio; the card still gets its word.
-                    if ((custom == null || custom.usesSentenceAudio) &&
+                    if ((custom == null || custom.usesSentenceAudio) && sentenceAudio.isEmpty() &&
                         content.sentence.isNotBlank() && content.sentence.length <= voice.maxInputLength
                     ) {
                         sentenceAudio = sound(voice, content.sentence, made, settings.sentenceSpeed.value.rate)
@@ -233,6 +253,40 @@ class AnkiExporter(
         voice.speak(text, file, rate)
         return anki.addSound(file, name) ?: throw VoiceException(VoiceProblem.FAILED)
     }
+
+    /** The clip for [content]'s sentence if the switch is on and there is one; any failure means none. */
+    private suspend fun findClip(content: CardContent): File? {
+        if (!settings.audiobookSentences.value || content.sentence.isBlank()) return null
+        return try {
+            clip(content)?.takeIf { it.isFile }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "Finding the sentence recording failed", e)
+            null
+        }
+    }
+
+    /** Hands the clip of [content] to AnkiDroid through a copy in [audioDir]; the `[sound:…]` or "" if none. */
+    private suspend fun clipSound(content: CardContent, made: MutableList<File>): String {
+        val file = findClip(content) ?: return ""
+        val name = clipName(file)
+        val copy = File(audioDir, "$name.${file.extension}")
+        return try {
+            audioDir.mkdirs()
+            file.copyTo(copy, overwrite = true)
+            made += copy
+            anki.addSound(copy, name) ?: ""
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logWarning("Honmani.anki", "Handing the sentence recording to AnkiDroid failed", e)
+            ""
+        }
+    }
+
+    /** The clip's file name says book, audio and range, so the name is unique per clip (Anki keeps the first file of a name). */
+    private fun clipName(file: File) = "honmani_" + shortHash(file.nameWithoutExtension)
 
     /** The rate is part of the name: Anki keeps the first file of a name. */
     private fun soundName(voice: CardVoice, text: String, rate: Double) =
