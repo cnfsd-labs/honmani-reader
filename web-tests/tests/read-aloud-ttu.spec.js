@@ -59,7 +59,7 @@ async function openBook(page, epub, viewMode, writingMode) {
     },
     [viewMode, writingMode],
   );
-  for (const script of ['ttu-defaults.js', 'library-bridge.js', 'reading-activity.js', 'sentence-follow.js', 'read-aloud.js']) {
+  for (const script of ['ttu-defaults.js', 'keep-position.js', 'library-bridge.js', 'reading-activity.js', 'sentence-follow.js', 'read-aloud.js']) {
     await page.addInitScript({ path: path.join(ASSETS, script) });
   }
   await page.route('**/honmani-books/*', (route) => route.fulfill({ status: 200, body: epub, contentType: 'application/octet-stream' }));
@@ -295,3 +295,40 @@ test('continuous mode reads through every chapter to the end of the book', async
   expect(all.length).toBe(3 * 25 * 6);
   expect(all[all.length - 1].text).toBe(sentence(3, 149));
 });
+
+// The bar appearing resizes the reader while the first mark takes the page away from where the
+// reader was. keep-position.js turned all the way back to that place, outside the time a resize
+// counts as ours: the view detached before any swipe, and the page never went to the passage.
+for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
+  test(`a resize just after the mark moved the page far does not detach or take the page back (${writingMode})`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 360, height: 640 }); // a phone: many pages in one section
+    await openBook(page, BOOK, 'paginated', writingMode);
+    await page.evaluate(() => {
+      const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node && !node.data.trim()) node = walker.nextNode();
+      window.__passage = document.createRange();
+      window.__passage.setStart(node, 0);
+      window.__passage.setEnd(node, 1);
+    });
+    for (let turn = 0; turn < 12; turn++) {
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true })));
+      await page.waitForTimeout(50);
+    }
+    await page.waitForTimeout(500); // keep-position.js has remembered this page
+    expect(await page.evaluate(() => window.__passage.startContainer.isConnected)).toBe(true); // still this section
+    expect(await page.evaluate(() => window.honmaniFollow.startOnScreen(window.__passage))).toBe(false);
+
+    await page.evaluate(async () => {
+      window.honmaniFollow.mark(window.__passage);
+      await window.honmaniFollow.keepOnScreen(window.__passage);
+    });
+    await page.setViewportSize({ width: 360, height: 612 });
+    await page.waitForTimeout(2000);
+
+    expect(await page.evaluate(() => window.honmaniFollow.detached())).toBe(false);
+    expect(await page.evaluate(() => window.__messages.filter((m) => m.type === 'follow.detached').length)).toBe(0);
+    expect(await page.evaluate(() => window.honmaniFollow.startOnScreen(window.__passage))).toBe(true);
+  });
+}

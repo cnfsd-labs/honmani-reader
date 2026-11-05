@@ -8,6 +8,10 @@
  * resize, brings that character back: in paginated mode by turning pages with ttu's keyboard
  * shortcuts (which keeps ttu's bookmark and statistics consistent), in continuous mode by
  * scrolling it to the start of the screen.
+ *
+ * While a passage is followed (read aloud, audiobook; sentence-follow.js) the passage decides where
+ * the page is, not the place the reader was at before: a resize brings the passage back instead,
+ * and these page turns count as our own scrolling, so they never look like the reader's.
  */
 (() => {
   'use strict';
@@ -111,6 +115,17 @@
   }
 
   async function restore() {
+    const follow = window.honmaniFollow;
+    if (follow && follow.following()) {
+      await follow.keepMarkOnScreen();
+      anchor = firstCharOnScreen();
+      return;
+    }
+    if (follow) await follow.auto(bringAnchorBack);
+    else await bringAnchorBack();
+  }
+
+  async function bringAnchorBack() {
     if (!anchor || !anchor.node.isConnected || charOnScreen(anchor)) return;
     restoring = true;
     try {

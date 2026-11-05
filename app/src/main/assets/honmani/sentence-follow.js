@@ -31,6 +31,8 @@
  *   window.honmaniFollow.attach()       follows again; { type: 'follow.attach' } from the app does the same
  *                                       (the app then sends the passage again to bring it on screen)
  *   window.honmaniFollow.reattach()     follows again, and tells the app ({ type: 'follow.attached' })
+ *   window.honmaniFollow.following()    whether a mark is shown and the view still goes with it
+ *   window.honmaniFollow.keepMarkOnScreen()  brings the current mark back after a new layout
  *
  * clear() follows again too: closing or restarting starts attached.
  */
@@ -68,6 +70,7 @@
   }
 
   let marked = false;
+  let markedRange = null;
   let detachedNow = false;
   let autoDepth = 0;
   let quietUntil = 0;
@@ -80,6 +83,7 @@
   function mark(range) {
     if (!hasApi || !range) return;
     marked = true;
+    markedRange = range;
     addStyle();
     const highlight = new Highlight(range);
     highlight.priority = PRIORITY;
@@ -88,6 +92,7 @@
 
   function clear() {
     marked = false;
+    markedRange = null;
     detachedNow = false;
     if (hasApi) CSS.highlights.delete(HIGHLIGHT_NAME);
   }
@@ -214,6 +219,8 @@
   window.honmaniFollow = Object.freeze({
     HIGHLIGHT_NAME, mark, clear, keepOnScreen, startOnScreen, auto, reattach,
     detached: () => detachedNow,
+    following: () => marked && !detachedNow,
+    keepMarkOnScreen: () => keepOnScreen(markedRange),
     attach: () => { detachedNow = false; },
   });
 })();
