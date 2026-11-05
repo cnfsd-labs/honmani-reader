@@ -114,6 +114,9 @@ complete bundled reader, and no Play-restricted permissions.
   books, which are named by content hash (review cards, logs and read days ride on their word, matched
   by spelling and reading); a restore merges and keeps what books not in the library had until the same
   file is added again.
+- **Sync folder (writing only so far).** Settings -> Sync folder: this phone's own
+  `honmani-sync-<id>.zip` (backup format plus edit times and deletion markers, no settings or
+  passwords) in a folder you pick, written when the app goes to the background (`SyncFolder`).
 
 ## Licence
 

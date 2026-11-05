@@ -250,6 +250,9 @@ Reading progress sync, sign in, read a few pages, back to the library.
 - Without a file: Honmani's own backup (rewritten on going to the background, at most every 6 h) rides
   Android's Google backup or phone transfer. New phone's first start: "Restore from your previous
   phone?" (with date); Restore = from file; settings already restored by Android.
+- Sync folder (Settings -> Back up and restore): pick a folder, press Home: `honmani-sync-<id>.zip` is
+  there (no `.part` file); its JSON has `syncFormat`, `deviceId`, no `settings`/`catalogs`. Remove the
+  folder in the file app: "Folder unavailable: choose it again". Default off.
 - Android's backup over USB without a Google account (debug-only local transport; the phone's backup
   setting is off by default, undo afterwards):
 
