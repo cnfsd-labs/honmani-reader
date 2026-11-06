@@ -20,7 +20,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Tap words (conjugated, furigana); add an EPUB and an Aozora `.txt`; tap an EPUB in the file manager and
   Chrome downloads -> Honmani under "Open with".
 - Vertical/horizontal; rotate; dark mode; volume down/up = next/previous page (volume in the library);
-  with the panel open a volume press only closes it.
+  with the panel open a volume press only closes it; after Listen or Read sentence in the panel the
+  buttons are volume until it closes.
 - Long press a word (own long press, no native selection): word marked while held, panel opens on
   release, no blue handles or Copy toolbar, panel has "Copy word" / "Copy sentence"; moving first cancels.
   Dragging after the mark extends it either way, across ruby and columns (page stays still); the panel's
@@ -64,7 +65,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - **Don't count**: tap a new word -> undo arrow beside the speaker (largest font: a 5-character match
   not cut). Press -> panel closes, word not in Words. On a saved word: lookup count, Learned mark, due
   card, progress go back. Same sentence within the hour: no button. Starred/Anki-added kept. Taps inside
-  a definition and "Edit and look up" change nothing.
+  a definition and "Edit and look up" change nothing. A long press counts nothing and has no button: word
+  not in Words, no lookup row, no lapse; Star or Add to Anki in that panel saves the word.
 - **Nested lookups**: tap a Japanese character in an example sentence or cross-reference -> that entry
   replaces the panel, back arrow. Nest twice, Back twice -> one entry each, first as it was; once more
   closes. English text does nothing. Not in Words, no progress.
@@ -114,7 +116,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 
 ## Dictionary search and radicals
 
-- Words -> "Search dictionaries": results while typing: 食べる, たべる, taberu, neko, "cat" (猫 first);
+- Words -> Dictionary: results while typing, from the top, the first one larger: 食べる, たべる, taberu,
+  neko, "cat" (猫 first);
   saved words in "In your words". Tap a result -> entry, query joins "Recent searches". Right after a
   dictionary install a note says English search is getting ready (~1 min); Japanese/romaji work at once.
   Launcher long-press "Search" opens Words with the field focused.
@@ -124,14 +127,16 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 
 ## Review
 
-- Look up words in a book; next day Words shows "Review · n due" and an icon badge. Front = sentence with
+- Look up words in a book; next day the Review tab (first in Words) shows "Review · n" and an icon badge.
+  Page: small stats on top, chips and a large Start low down. Front = sentence with
   the word marked; tap = answer; Forgot / Got it (or swipe); Undo; Back mid-session keeps answers.
 - ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field per
   kanji part, kana only, Reset; also in the panel ⋮; changes only Honmani's built furigana, never the
   book), Add/Edit note (max 500 chars; back of the card; empty removes; survives re-lookup, remove and
   take back, restore; Words shows it), Look up, Open in book (at the sentence; Back -> Words), Not a
   word, Remove.
-- Chips other than Due (This book, A book..., Starred, All learning) review early, ignore the limit.
+- "Reviews only": due cards, no new ones. Chips other than these two (This book, A book..., Starred, All
+  learning) review early, ignore the limit.
 - "Reviews per day" (50/100 default/200/No limit): 120 due, 100 chosen -> Words and badge say 100,
   session asks 100, most overdue first, 20 carry over; after 30 answers 70 left (new words use "New
   words a day"); an Again returns today. 200/No limit shows 120. Book due tint follows the same cards.
@@ -170,6 +175,7 @@ aloud, on a page with furigana.
   paged/continuous, both directions. Close and reopen: on the page reached.
 - Pause/play resumes at the sentence start; next/previous move a sentence, also paused. Speed
   0.5/0.75/1/1.25/1.5, kept per book. Fits at 360 dp and the largest font; TalkBack reads each button.
+- Back ends read aloud, the book stays open; a second Back leaves the book.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
 - Call, other player, Home pauses it; the screen stays on only while reading.
@@ -214,10 +220,9 @@ continuous, vertical and horizontal, EPUB and TXT:
 
 Needs an EPUB and "Look up selected text" on. Light, dark, sepia, black; vertical/horizontal;
 paged/continuous; with/without furigana:
-- Own long press on a word (no blue selection): marked while held, panel on release; moving first
-  cancels. Panel: Selection / Sentence / Paragraph (Sentence chosen) with its text in one line, and
-  "Highlight" with four colours; one tap saves, closes, "Highlight saved" (Undo). A sentence ends at
-  。！？ or a line break and keeps a closing 」; a paragraph can span pages; furigana is no part of either.
+- Long press (see Release pass) -> panel: Selection / Sentence / Paragraph (Sentence at first, then the
+  last one chosen, also after a force-stop) with its text in one line, and "Highlight" with four colours; one tap saves, closes, "Highlight saved" (Undo). A sentence ends at
+  。！？ or a line break and keeps a closing 」; a paragraph can span pages; furigana is no part of either and is not coloured.
 - A new highlight replaces overlapping ones (any colour); Undo brings them back.
 - Reopen, change font size, rotate -> same text highlighted.
 - Tap inside one: lookup opens with the colours (current ticked) and "Remove highlight"; another colour
@@ -288,8 +293,14 @@ adb shell bmgr enable false
   hash). Force-stop and open again: the folder is still watched.
 - Delete the folder in the file app (or revoke access): the row says "Cannot read ..." in red, the
   library shows no error. "Stop watching" keeps every imported book.
-- The seen list is `no_backup/watched-folder-seen.tsv`; the folder itself is `watched_folder` in the
-  `device` preferences (never backed up).
+
+## Tabs, Progress, Appearance
+
+- Tapping the open tab: Words and Progress go to their next page and wrap; Settings returns to its list.
+- Progress -> Milestones: the calendar fits the width, arrows step through older weeks, a swipe on it
+  turns the page. Level and milestones each have their own info text.
+- Settings -> Appearance -> random accent: Every launch changes on a cold start only, Every day with the
+  day ("Day starts at"), never the same twice; choosing a colour by hand turns it off.
 
 ## Known limitations (no need to report)
 

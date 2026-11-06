@@ -34,7 +34,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Marks in the book on words you are learning or have not met yet, and a list of the words a book holds
   that you don't know; "Ignore word" sets aside names and wrongly split words (no mark, no card, not
   counted), with a list in Words to undo it
-- Every lookup is saved with its sentence ("Don't count" in the panel takes it back); send words to Anki
+- Every tapped word is saved with its sentence ("Don't count" in the panel takes it back; a long press
+  to select text saves nothing); send words to Anki
   (AnkiDroid or an `.apkg` for Anki on a computer). Cards use Honmani's own note type, a sentence-first
   variant, or your own note type (Lapis, Marvin's Mining Note or any other): you choose which field gets
   what, and Honmani never adds fields to it or changes its template
@@ -49,7 +50,9 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   later than midnight (Settings, Goal and time); reading time per day and book can be exported as a CSV
   for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
-- Your own book server (OPDS, such as Calibre-Web): browse, search, download
+- Your own book server (OPDS, such as Calibre-Web): browse, search, download. A folder on the phone: add
+  it once, or watch it (Settings, Books and sync) and its new books join when the library opens
+- Accent colours, or a random one every day or every launch (Settings, Appearance)
 - Reading progress sync with KOReader (e-readers, Calibre-Web Automated), to the character, with the
   last sync and error shown in Settings
 - Back up settings, progress, statistics, saved words and flashcard reviews to one file, for a new
@@ -100,7 +103,7 @@ complete bundled reader, and no Play-restricted permissions.
   `app/src/test/resources/`) over Yomitan dictionaries imported into Room (`data/dictionary/`,
   definitions stored compressed). The panel draws Yomitan's structured content natively. Optional
   Tatoeba example sentences (`data/examples/`) show as a collapsed "Examples (n)" row.
-- **Words and Anki.** Every lookup is saved and ranked by a decayed score (`data/words/`); cards go to
+- **Words and Anki.** Every tapped word is saved and ranked by a decayed score (`data/words/`); cards go to
   AnkiDroid through its content provider or into an Anki package (`anki/`). Spellings one dictionary
   entry lists together (当たり前, 当り前) count as one word for marks and progress (`SpellingVariants`).
 - **Book servers and sync.** OPDS 1.x catalogues with Basic or Digest login (`data/opds/`), and
@@ -114,9 +117,10 @@ complete bundled reader, and no Play-restricted permissions.
   books, which are named by content hash (review cards, logs and read days ride on their word, matched
   by spelling and reading); a restore merges and keeps what books not in the library had until the same
   file is added again.
-- **Sync folder (writing only so far).** Settings -> Backup -> Sync folder: this phone's own
-  `honmani-sync-<id>.zip` (backup format plus edit times and deletion markers, no settings or
-  passwords) in a folder you pick, written when the app goes to the background (`SyncFolder`).
+- **Sync folder.** Settings -> Backup -> Sync folder: each phone writes its own
+  `honmani-sync-<id>.zip` (backup format plus edit times and deletion markers, no passwords) to a folder
+  you pick when the app goes to the background, and merges the other phones' files on its next start
+  (`SyncFolder`, `SyncMerge`).
 
 ## Licence
 

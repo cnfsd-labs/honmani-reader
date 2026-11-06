@@ -29,7 +29,8 @@ public: never copy those notes, personal details or discussions into it.
   `web-tests/support/ttu-server.js`); links leave the reader only on a tap.
 - **Network use** is listed in `docs/privacy-policy.md`, which must change with any new network use.
 - **Library:** Honmani owns the book files (app storage, named by SHA-256); ttu's IndexedDB is a
-  rebuildable cache fed through ttu's import input (`library-bridge.js`).
+  rebuildable cache fed through ttu's import input (`library-bridge.js`). Watched folder: one, rescanned
+  when the library opens, no background work; a book removed from it stays away (`removed_book`).
 - **Database:** one Room database, schema version 1 in `app/schemas`, manual DI in `AppContainer`
   (no Hilt). Until the first public release the schema is edited in place (commit the regenerated
   JSON); an install from before a schema change must be uninstalled (identity-hash crash, "Room cannot
@@ -50,7 +51,8 @@ public: never copy those notes, personal details or discussions into it.
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
   contradicts ranks below those it agrees with; own deinflection (`lookup/Deinflector`); glossaries
   stored deflated (`GlossaryPacker`).
-- **Saved words:** recorded on every lookup, ranked by a decayed score (half-life 14 days), never
+- **Saved words:** recorded on every tap lookup (a long press records nothing until a panel action saves
+  the word), ranked by a decayed score (half-life 14 days), never
   deleted for age. "Learned", not "Known". Anki cards are suggested, never pushed.
 - **Spelling variants** (`SpellingVariants`): kanji forms of 2+ characters listed together by one
   dictionary entry count as one word for marks, coverage and progress; single kanji excluded; the
