@@ -1,9 +1,9 @@
 package app.honmani.reader.ui.words
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -126,11 +126,9 @@ fun ReviewPage(
                 .heightIn(min = 48.dp)
                 .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
         ) { Text(stringResource(R.string.review_start)) }
-        Row(
+        FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth(),
         ) {
             @Composable
             fun chip(scope: ReviewScope, label: String, onClick: () -> Unit = { choice.onChange(scope) }) {
