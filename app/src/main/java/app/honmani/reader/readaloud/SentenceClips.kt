@@ -21,7 +21,7 @@ class ClipBook(
 /**
  * The audiobook's own voice for a sentence of a book: [clip] cuts the part of the audio that holds
  * the sentence, found through the subtitles ([CueLocator]), and keeps it in [AudiobookStore.clipDirectory]
- * (named by book, subtitle copy, audio and range; never backed up; the oldest go when it passes
+ * (named by book, subtitle copy, audio with its size and date, and range; never backed up; the oldest go when it passes
  * [LIMIT_BYTES]). The store drops a book's clips when its pairing goes. Null means no clip, for any
  * reason (no pairing, a book that isn't an EPUB, a sentence not found, audio that can't be cut):
  * the caller uses text-to-speech instead. The returned file belongs to the cache: copy it, don't delete it.
@@ -32,6 +32,8 @@ class SentenceClips(
     private val cutter: ClipCutter,
     /** The book with this library id, or else the only book with this title; null if there is none. */
     private val book: suspend (id: Long?, title: String?) -> ClipBook?,
+    /** A cheap fingerprint of the audio file (size, modified time) so clips of replaced audio are not reused; "" if unknown. */
+    private val audioStamp: (audio: String) -> String = { "" },
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val mutex = Mutex()
@@ -60,7 +62,7 @@ class SentenceClips(
         val memo = known ?: load(found, pairing) ?: return null
         val range = CueLocator.locate(memo.alignment, memo.text, sentence) ?: return null
         val directory = store.clipDirectory
-        val name = "${store.fileName(found.hash)}-${pairing.srtHash}-${shortHash(pairing.audio)}-${range.startMs}-${range.endMs}"
+        val name = "${store.fileName(found.hash)}-${pairing.srtHash}-${shortHash(pairing.audio + "|" + audioStamp(pairing.audio))}-${range.startMs}-${range.endMs}"
         EXTENSIONS.map { File(directory, "$name.$it") }.firstOrNull { it.isFile && it.length() > 0 }?.let {
             it.setLastModified(System.currentTimeMillis())
             return it

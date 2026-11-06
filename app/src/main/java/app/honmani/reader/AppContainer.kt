@@ -1,7 +1,10 @@
 package app.honmani.reader
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.util.Log
 import androidx.room.withTransaction
 import app.honmani.reader.anki.AnkiDroid
@@ -464,6 +467,7 @@ class AppContainer(context: Context) {
             store = audiobookStore,
             loader = audiobookLoader,
             cutter = MediaClipCutter(appContext),
+            audioStamp = ::audioStamp,
             book = { id, title ->
                 val book = id?.let { bookDao.find(it) }
                     ?: title?.let { bookDao.findByTitle(it).singleOrNull() }
@@ -472,6 +476,17 @@ class AppContainer(context: Context) {
                 }
             },
         )
+    }
+
+    /** The audio file's size and modified time as "size-modified" ("" if the provider tells neither). */
+    private fun audioStamp(audio: String): String = try {
+        appContext.contentResolver.query(
+            Uri.parse(audio),
+            arrayOf(OpenableColumns.SIZE, DocumentsContract.Document.COLUMN_LAST_MODIFIED),
+            null, null, null,
+        )?.use { c -> if (c.moveToFirst()) "${c.getLong(0)}-${c.getLong(1)}" else "" } ?: ""
+    } catch (e: Exception) {
+        ""
     }
 
     val bookGrader: BookGrader by lazy {
