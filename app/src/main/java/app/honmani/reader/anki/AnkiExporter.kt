@@ -5,6 +5,7 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
 import app.honmani.reader.data.words.WordRepository
 import java.io.File
+import java.io.IOException
 import java.io.OutputStream
 import java.security.MessageDigest
 import kotlin.coroutines.cancellation.CancellationException
@@ -97,9 +98,15 @@ class AnkiExporter(
                         var sentenceAudio = ""
                         findClip(content)?.let { file ->
                             val copy = File(dir, clipName(file) + "." + file.extension)
-                            if (!copy.exists()) file.copyTo(copy)
-                            media += copy
-                            sentenceAudio = "[sound:${copy.name}]"
+                            try {
+                                if (!copy.exists()) file.copyTo(copy)
+                                media += copy
+                                sentenceAudio = "[sound:${copy.name}]"
+                            } catch (e: IOException) {
+                                // A vanished clip or a full disk: this card goes without the recording.
+                                logWarning("Honmani.anki", "Copying the sentence recording failed", e)
+                                copy.delete()
+                            }
                         }
                         if (voice != null && problem == null) {
                             try {
