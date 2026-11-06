@@ -44,6 +44,23 @@ class CueLocatorTest {
     }
 
     @Test
+    fun aShortSentenceInsideALongerOneIsTakenFromWhereItStandsAlone() {
+        val longer = "今日は晴れですが明日は雨でしょう。"
+        val short = "明日は雨でしょう。"
+        val text = fold(longer + "間。" + short)
+        val inLonger = fold(longer).size
+        val shortStart = text.size - fold(short).size
+        val alignment = AudiobookAlignment(
+            listOf(cue(0, 20000, 0, inLonger), cue(21000, 22000, inLonger, shortStart), cue(23000, 25000, shortStart, text.size)),
+        )
+
+        assertEquals(ClipRange(23000, 25000), CueLocator.locate(alignment, text, short))
+        // Without a stand-alone occurrence the longer sentence's cues are all there is.
+        val onlyLonger = AudiobookAlignment(listOf(cue(0, 20000, 0, inLonger)))
+        assertEquals(ClipRange(0, 20000), CueLocator.locate(onlyLonger, text, short))
+    }
+
+    @Test
     fun aSentenceNotInTheBook_orTooShort_orWithoutMatchedCues_givesNothing() {
         val alignment = AudiobookAlignment(listOf(cue(1000, 3000, 0, a), AlignedCue(4000, 6000, null)))
 
