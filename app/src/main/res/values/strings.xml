@@ -924,7 +924,7 @@
     <string name="progress_kind_days">Days of reading</string>
     <string name="progress_kind_words">Words learned</string>
     <string name="progress_kind_anki">Anki</string>
-    <string name="progress_kind_speed">Speed over 2 weeks</string>
+    <string name="progress_kind_speed">Best speed over 2 weeks</string>
     <string name="progress_first_card">First card</string>
     <string name="progress_reached_on">Reached %1$s</string>
     <plurals name="milestone_characters">
