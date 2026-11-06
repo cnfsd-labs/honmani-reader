@@ -7,6 +7,9 @@ sealed interface ReviewScope {
     /** The cards due today, then new words up to the day's limit. */
     data object Due : ReviewScope
 
+    /** The cards due today only: no new words are started. */
+    data object DueOnly : ReviewScope
+
     /** Words that come up in the book being read. */
     data object ThisBook : ReviewScope
 
@@ -20,7 +23,7 @@ sealed interface ReviewScope {
 }
 
 /**
- * The words a scope other than [ReviewScope.Due] takes ([accepts]), and how new cards are
+ * The words a scope other than [ReviewScope.Due] and [ReviewScope.DueOnly] takes ([accepts]), and how new cards are
  * ordered ([score] of a word by how it is written; null: as without a scope).
  */
 class ReviewFilter(val score: ((String) -> Double)? = null, val accepts: (WordEntity) -> Boolean)

@@ -14,6 +14,7 @@ import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.review.ReviewSentence
 import app.honmani.reader.data.review.ReviewSentences
 import app.honmani.reader.data.review.ReviewSession
+import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.words.WordRepository
@@ -69,6 +70,8 @@ class ReviewViewModel(
     private val settings: ReviewSettings,
     /** The words the session takes (the Review card's chip); null: due cards, then new ones. */
     private val filter: suspend () -> ReviewFilter? = { null },
+    /** False for the Reviews only chip: the session holds due cards and no new ones. */
+    private val withNew: () -> Boolean = { true },
 ) : ViewModel() {
     private val _state = MutableStateFlow(ReviewUiState(showSentence = settings.showSentence.value))
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
@@ -88,7 +91,7 @@ class ReviewViewModel(
                 val next = ReviewSession(
                     reviews, words, settings.newPerDay.value, settings.knownAfterDays.value, settings.reviewsPerDay.value,
                 )
-                next.start(filter())
+                next.start(filter(), withNew())
                 session = next
                 publish(next)
             }
@@ -169,9 +172,13 @@ class ReviewViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
-                ReviewViewModel(container.reviewRepository, container.wordRepository, container.reviewSettings) {
-                    container.reviewFilter(container.reviewScope.value)
-                }
+                ReviewViewModel(
+                    container.reviewRepository,
+                    container.wordRepository,
+                    container.reviewSettings,
+                    filter = { container.reviewFilter(container.reviewScope.value) },
+                    withNew = { container.reviewScope.value != ReviewScope.DueOnly },
+                )
             }
         }
     }

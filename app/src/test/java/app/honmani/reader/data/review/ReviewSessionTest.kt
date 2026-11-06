@@ -129,6 +129,19 @@ class ReviewSessionTest {
     }
 
     @Test
+    fun reviewsOnlyHoldsTheDueCardsAndNoNewOnes() = runTest {
+        word("新", rank = 9.0)
+        val due = dueWord("旧")
+        val session = ReviewSession(reviews, words, newPerDay = 10).also { it.start(withNew = false) }
+        assertEquals(1, session.remaining)
+        assertEquals(due, session.current!!.word.id)
+        session.answer(Grade.GOOD)
+        assertEquals(null, session.current)
+        // The new word was not introduced either: a normal session still finds it.
+        assertEquals(1, session(newPerDay = 10).remaining)
+    }
+
+    @Test
     fun newCardsStopAtTheDailyLimitAcrossSessions() = runTest {
         repeat(5) { word("語$it", rank = it.toDouble()) }
         val first = session(newPerDay = 2)

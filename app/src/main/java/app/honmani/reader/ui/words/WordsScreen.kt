@@ -292,7 +292,8 @@ fun WordsScreen(
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val pager = rememberPagerState { WordsPage.entries.size }
+    // Review is the first tab, but the screen opens on the Words list.
+    val pager = rememberPagerState(initialPage = WordsPage.WORDS.ordinal) { WordsPage.entries.size }
     val scope = rememberCoroutineScope()
     // The field takes focus once the Dictionary page is there: a tap on its tab or the launcher's shortcut.
     var focusWanted by remember { mutableStateOf(false) }
@@ -323,7 +324,7 @@ fun WordsScreen(
     // A tap on the Words tab while it is open: back to the Words page.
     val firstScrollToTop = remember { scrollToTop }
     LaunchedEffect(scrollToTop) {
-        if (scrollToTop != firstScrollToTop && pager.currentPage != 0) pager.animateScrollToPage(0)
+        if (scrollToTop != firstScrollToTop && pager.currentPage != WordsPage.WORDS.ordinal) pager.animateScrollToPage(WordsPage.WORDS.ordinal)
     }
     LaunchedEffect(searchPanel) {
         searchPanel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
@@ -332,7 +333,9 @@ fun WordsScreen(
         searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
     // Back from Review or Dictionary goes to Words, as Progress's sections go to the first.
-    BackHandler(enabled = panel == null && pager.currentPage != 0) { scope.launch { pager.animateScrollToPage(0) } }
+    BackHandler(enabled = panel == null && pager.currentPage != WordsPage.WORDS.ordinal) {
+        scope.launch { pager.animateScrollToPage(WordsPage.WORDS.ordinal) }
+    }
     val searchWords = remember(searchQuery, uiState.learning, uiState.known) {
         searchWords(uiState.learning.orEmpty() + uiState.known.orEmpty(), searchQuery).take(MAX_WORDS_IN_SEARCH)
     }
@@ -346,7 +349,7 @@ fun WordsScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
-        // No title (the bottom bar names the tab): Words, Review and Dictionary, as tabs to tap or
+        // No title (the bottom bar names the tab): Review, Words and Dictionary, as tabs to tap or
         // swipe between like Progress's sections.
         topBar = {
             Surface(color = TabRowDefaults.primaryContainerColor) {
@@ -478,8 +481,8 @@ fun WordsScreen(
 
 /** The pages of Words, in tab order. */
 private enum class WordsPage(val label: Int) {
-    WORDS(R.string.nav_words),
     REVIEW(R.string.review_title),
+    WORDS(R.string.nav_words),
     DICTIONARY(R.string.words_tab_dictionary),
 }
 

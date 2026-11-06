@@ -271,9 +271,9 @@ class AppContainer(context: Context) {
     /** What the next review session draws from (the Review card's chips); not kept across starts of the app. */
     val reviewScope = MutableStateFlow<ReviewScope>(ReviewScope.Due)
 
-    /** The words [scope] takes; null for [ReviewScope.Due]. A book not graded yet takes none. */
+    /** The words [scope] takes; null for [ReviewScope.Due] and [ReviewScope.DueOnly]. A book not graded yet takes none. */
     suspend fun reviewFilter(scope: ReviewScope): ReviewFilter? = when (scope) {
-        ReviewScope.Due -> null
+        ReviewScope.Due, ReviewScope.DueOnly -> null
         ReviewScope.ThisBook -> openBook()?.let { bookFilter(it) } ?: ReviewFilter { false }
         is ReviewScope.Book -> bookDao.find(scope.id)?.let { bookFilter(it) } ?: ReviewFilter { false }
         ReviewScope.Starred -> ReviewFilter { it.starred }

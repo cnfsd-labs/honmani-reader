@@ -16,6 +16,17 @@ class ReviewPageStateTest {
     }
 
     @Test
+    fun reviewsOnlyIgnoresNewWords() {
+        val state = reviewPageState(ReviewScope.DueOnly, due = 3, newWords = 5, starredLearning = 0)
+        assertEquals(ReviewPageMode.Due, state.mode)
+        assertTrue(state.canStart)
+        // New words alone give nothing to do.
+        val none = reviewPageState(ReviewScope.DueOnly, due = 0, newWords = 5, starredLearning = 0)
+        assertEquals(ReviewPageMode.Nothing, none.mode)
+        assertFalse(none.canStart)
+    }
+
+    @Test
     fun nothingDueCannotStart() {
         val state = reviewPageState(ReviewScope.Due, due = 0, newWords = 0, starredLearning = 5)
         assertEquals(ReviewPageMode.Nothing, state.mode)

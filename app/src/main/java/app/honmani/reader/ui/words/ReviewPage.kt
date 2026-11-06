@@ -69,8 +69,8 @@ class ReviewPageState(val mode: ReviewPageMode, val canStart: Boolean)
 
 /** The page for the chosen [scope]; [starredLearning] counts the starred words in Learning. */
 fun reviewPageState(scope: ReviewScope, due: Int, newWords: Int, starredLearning: Int): ReviewPageState = when {
-    scope == ReviewScope.Due ->
-        if (due + newWords == 0) ReviewPageState(ReviewPageMode.Nothing, false) else ReviewPageState(ReviewPageMode.Due, true)
+    scope == ReviewScope.Due || scope == ReviewScope.DueOnly ->
+        if (due + (if (scope == ReviewScope.DueOnly) 0 else newWords) == 0) ReviewPageState(ReviewPageMode.Nothing, false) else ReviewPageState(ReviewPageMode.Due, true)
     scope == ReviewScope.Starred && starredLearning == 0 -> ReviewPageState(ReviewPageMode.NoStarred, false)
     else -> ReviewPageState(ReviewPageMode.Ahead, true)
 }
@@ -91,12 +91,14 @@ fun ReviewPage(
     progress: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
 ) {
     val state = reviewPageState(choice.scope, due, newWords, starredLearning)
+    // Reviews only starts no new word.
+    val newShown = if (choice.scope == ReviewScope.DueOnly) 0 else newWords
     val summary = progress.uiState.collectAsStateWithLifecycle().value?.reviews
     var pickBook by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     // Under another chip the counts would be wrong: the button reads plain "Start".
     val startDescription =
-        if (state.mode == ReviewPageMode.Due) stringResource(R.string.review_start_description, due, newWords) else null
+        if (state.mode == ReviewPageMode.Due) stringResource(R.string.review_start_description, due, newShown) else null
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -110,7 +112,7 @@ fun ReviewPage(
                 Text(due.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
                 Text(pluralStringResource(R.plurals.review_page_due, due), style = MaterialTheme.typography.titleMedium)
                 Text(
-                    pluralStringResource(R.plurals.review_card_new, newWords, newWords),
+                    pluralStringResource(R.plurals.review_card_new, newShown, newShown),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -146,6 +148,7 @@ fun ReviewPage(
                 )
             }
             chip(ReviewScope.Due, stringResource(R.string.review_chip_due))
+            chip(ReviewScope.DueOnly, stringResource(R.string.review_chip_due_only))
             chip(ReviewScope.ThisBook, stringResource(R.string.review_chip_this_book))
             val book = choice.scope as? ReviewScope.Book
             chip(book ?: ReviewScope.Book(-1, ""), book?.title ?: stringResource(R.string.review_chip_a_book)) { pickBook = true }

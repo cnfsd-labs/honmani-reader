@@ -860,6 +860,7 @@
     <string name="review_start">Start</string>
     <string name="review_start_description">Start the review: %1$d due, %2$d new</string>
     <string name="review_chip_due">Due</string>
+    <string name="review_chip_due_only">Reviews only</string>
     <string name="review_chip_this_book">This book</string>
     <string name="review_chip_a_book">A book…</string>
     <string name="review_chip_starred">Starred</string>

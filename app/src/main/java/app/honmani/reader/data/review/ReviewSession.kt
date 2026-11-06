@@ -51,9 +51,9 @@ class ReviewSession(
     /**
      * Builds the queue: due cards (most overdue first), then new cards. With a [filter] (a
      * chip other than Due) only its words, and after them its Learning words not due yet,
-     * soonest due first, to review early.
+     * soonest due first, to review early. Without [withNew] no new card is started: due cards only.
      */
-    suspend fun start(filter: ReviewFilter? = null) {
+    suspend fun start(filter: ReviewFilter? = null, withNew: Boolean = true) {
         queue.clear()
         actions.clear()
         // A chip other than Due is a choice of words: the daily limit does not apply to it.
@@ -61,7 +61,7 @@ class ReviewSession(
             .filter { filter == null || filter.accepts(it.word) }
         val left = newPerDay - reviews.newWordsToday()
         queue.addAll(due)
-        queue.addAll(reviews.introduceNew(left, filter).filter { fresh -> due.none { it.word.id == fresh.word.id } })
+        if (withNew) queue.addAll(reviews.introduceNew(left, filter).filter { fresh -> due.none { it.word.id == fresh.word.id } })
         if (filter != null) {
             val taken = queue.mapTo(HashSet()) { it.word.id }
             queue.addAll(reviews.notDueLearningCards().filter { it.word.id !in taken && filter.accepts(it.word) })
