@@ -23,8 +23,9 @@
  *                           and buttons, on the footer and the top bar are not affected)
  *
  * A long press on book text (a finger held still for 400 ms) marks the word under it with the
- * lookup mark and, when the finger lifts, looks it up in the same message, with "selection": true:
- * "text" is the word, up to SCAN_LENGTH characters. Android's own selection (a selection that
+ * lookup mark; dragging then extends the mark, and when the finger lifts it is looked up in the same
+ * message, with "selection": true: "text" is the marked text from its start, up to SCAN_LENGTH
+ * characters. Android's own selection (a selection that
  * settles for 250 ms) is looked up the same way and deselected. localStorage
  * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns both off and leaves the book
  * text natively selectable (otherwise it is not: user-select: none). A selection message also
@@ -686,14 +687,18 @@
    * Honmani's own long press, instead of Android's text selection (whose blue highlight, handles and
    * toolbar differ between WebView versions). A finger held still on book text for LONG_PRESS_TIME
    * marks the word under it (Intl.Segmenter) in the lookup mark's colour, so the reader sees what
-   * is chosen; lifting the finger looks it up as a selection lookup ("selection": true, with the
-   * highlight extents). Moving more than LONG_PRESS_SLOP, scrolling, a second finger or a cancelled
-   * touch drops the mark and looks nothing up: a drag cannot extend the word. While the switch
-   * honmaniSelectionLookup is on, the book text cannot be selected natively (user-select: none, no
-   * callout, no context menu); with it off, Android's selection is left alone.
+   * is chosen. A drag then extends the mark, either way and across nodes, without scrolling the
+   * page; lifting the finger looks it up from its start as a selection lookup ("selection": true,
+   * with the highlight extents). Before the mark appears, moving more than LONG_PRESS_SLOP or
+   * scrolling gives up. A second finger drops the mark. The browser cancelling the touch counts as
+   * lifting: a WebView may take a held finger away, and the reader did choose that text. While the
+   * switch honmaniSelectionLookup is on, the book text cannot be selected natively (user-select:
+   * none, no callout, no context menu); with it off, Android's selection is left alone.
    */
   const LONG_PRESS_TIME = 400;
   const LONG_PRESS_SLOP = 12;
+  /** ttu's swipe turns the page if the finger lifts sooner than this after touching down. */
+  const PAGE_SWIPE_TIME = 500;
   const NO_SELECT_ID = 'honmani-noselect';
   const WORD_WINDOW = 40;
   let noSelectElement = null;
@@ -795,13 +800,14 @@
     if (!selectionLookupOn() || !(target instanceof Element)) return;
     const root = target.closest(BOOK_ROOT_SELECTOR);
     if (!root || target.closest(INTERACTIVE_SELECTOR) || pictureAt(target)) return;
-    const current = { x: event.clientX, y: event.clientY, target, root, range: null, timer: 0 };
+    const current = { x: event.clientX, y: event.clientY, time: event.timeStamp, target, root, word: null, range: null, timer: 0 };
     current.timer = setTimeout(() => {
       current.timer = 0;
       if (hold !== current) return;
       const range = wordRangeAt(current.x, current.y, target, root);
       const ranges = range ? textRanges(range, root) : [];
       if (ranges.length === 0) return;
+      current.word = range;
       current.range = range;
       const selection = window.getSelection();
       if (selection) selection.removeAllRanges();
@@ -811,10 +817,38 @@
     hold = current;
   }
 
-  /** The finger went up on a long press: look the marked word up. Returns whether there was one. */
+  /** The finger moved on a marked word: the mark now runs from the word to the character under it. */
+  function extendHold(current, x, y) {
+    const element = document.elementFromPoint(x, y);
+    const hit = (element && rubyBaseOf(element)) || charAt(x, y);
+    if (!hit || !current.root.contains(hit.node)) return;
+    const range = current.word.cloneRange();
+    if (current.word.comparePoint(hit.node, hit.index) < 0) {
+      // A word starts no lookup on punctuation or a space: wait for the finger to reach a letter.
+      if (/^[\s\p{P}\p{S}]/u.test(hit.node.data.slice(hit.index))) return;
+      range.setStart(hit.node, hit.index);
+    } else {
+      const end = hit.index + String.fromCodePoint(hit.node.data.codePointAt(hit.index)).length;
+      if (current.word.comparePoint(hit.node, end) > 0) range.setEnd(hit.node, end);
+    }
+    const ranges = textRanges(range, current.root);
+    if (ranges.length === 0) return;
+    current.range = range;
+    showMark(ranges, null);
+  }
+
+  /**
+   * The finger went up on a long press, or the browser took it away: look the marked text up.
+   * Returns whether there was any. A flick lifted in time for ttu's swipe is that swipe instead.
+   */
   function endHold(event) {
     const current = hold;
-    if (!current || !current.range) {
+    const swiped =
+      current &&
+      event.type === 'pointerup' &&
+      event.timeStamp - current.time < PAGE_SWIPE_TIME &&
+      Math.hypot(event.clientX - current.x, event.clientY - current.y) > LONG_PRESS_SLOP;
+    if (!current || !current.range || swiped) {
       cancelHold();
       return false;
     }
@@ -1005,11 +1039,28 @@
   window.addEventListener(
     'pointermove',
     (event) => {
-      if (hold && event.isPrimary && Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > LONG_PRESS_SLOP) {
-        cancelHold();
-      }
+      if (!hold || !event.isPrimary) return;
+      if (hold.range) extendHold(hold, event.clientX, event.clientY);
+      else if (Math.hypot(event.clientX - hold.x, event.clientY - hold.y) > LONG_PRESS_SLOP) cancelHold();
     },
     true,
+  );
+  // Once a word is marked the finger belongs to the mark: the page must not scroll under it.
+  // Not passive, or the browser would not wait for the answer.
+  window.addEventListener(
+    'touchmove',
+    (event) => {
+      if (hold && hold.range && event.cancelable) event.preventDefault();
+    },
+    { capture: true, passive: false },
+  );
+  // reader-menu.js's swipe up leaves a touch alone whose end is cancelled.
+  window.addEventListener(
+    'touchend',
+    (event) => {
+      if (lastLongPress && event.cancelable) event.preventDefault();
+    },
+    { capture: true, passive: false },
   );
   window.addEventListener(
     'pointerup',
@@ -1026,16 +1077,18 @@
     },
     true,
   );
-  window.addEventListener('pointercancel', () => {
+  window.addEventListener('pointercancel', (event) => {
     tapStart = null;
-    cancelHold();
+    endHold(event);
   }, true);
 
   // The fallback mark follows the text: capture catches scrolls of ttu's inner containers too.
   const redrawOverlay = () => {
     if (overlayMark) drawOverlay();
   };
-  window.addEventListener('scroll', cancelHold, true);
+  window.addEventListener('scroll', () => {
+    if (hold && !hold.range) cancelHold();
+  }, true);
   window.addEventListener('scroll', redrawOverlay, true);
   window.addEventListener('resize', redrawOverlay);
 })();

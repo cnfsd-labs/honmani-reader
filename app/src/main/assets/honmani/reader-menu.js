@@ -96,6 +96,8 @@
       swipeStart = null;
       const touch = event.changedTouches[0];
       if (!start || !touch || event.touches.length > 0 || event.changedTouches.length !== 1) return;
+      // The end of a long press (tap-bridge.js): that drag chose text.
+      if (event.defaultPrevented) return;
       if (!window.location.pathname.startsWith('/b')) return;
       if (event.timeStamp - start.time > SWIPE_MAX_TIME) return;
       if (!isMenuSwipe(touch.clientX - start.x, touch.clientY - start.y, window.innerHeight)) return;

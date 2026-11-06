@@ -771,11 +771,134 @@ test.describe('long press (own selection)', () => {
     expect(await messages(page)).toEqual([]);
   });
 
-  test('moving after the mark appeared drops it, with no lookup', async ({ page }) => {
-    const { cdp, x, y } = await touchDown(page, '#v2', '生');
+  /** Holds a character until it is marked, then drags in steps to another, as a finger does. */
+  async function holdAndDrag(page, selector, from, to, toSelector = selector) {
+    const { cdp, x, y } = await touchDown(page, selector, from);
     await page.waitForTimeout(600);
     expect(await marked(page)).toBe(true);
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 60, y }] });
+    const end = await charCenter(page, toSelector, to);
+    for (let step = 1; step <= 4; step++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: x + ((end.x - x) * step) / 4, y: y + ((end.y - y) * step) / 4 }],
+      });
+    }
+    return cdp;
+  }
+
+  test('a drag in vertical text extends the mark, and the lookup starts at its start', async ({ page }) => {
+    const cdp = await holdAndDrag(page, '#v2', 'と', 'が');
+    expect(await markedText(page)).toBe('とんと見当が');
+    expect(await messages(page)).toEqual([]);
+    await touchUp(cdp);
+    const lookups = await messages(page);
+    expect(lookups.length).toBe(1);
+    expect(lookups[0]).toMatchObject({ type: 'lookup', selection: true, text: 'とんと見当が' });
+  });
+
+  test('a drag in horizontal text extends the mark across ruby, leaving the furigana out', async ({ page }) => {
+    const cdp = await holdAndDrag(page, '#h1', '本', 'ま');
+    expect(await markedText(page)).toBe('本を読みま');
+    await touchUp(cdp);
+    expect((await messages(page))[0]).toMatchObject({ selection: true, text: '本を読みま' });
+  });
+
+  test('a drag onto furigana counts as its base', async ({ page }) => {
+    const { cdp, x, y } = await touchDown(page, '#h3', 'と');
+    await page.waitForTimeout(600);
+    const box = await page.evaluate(() => {
+      const rect = document.querySelectorAll('#h3 rt')[2].getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + 2, y: y + 2 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [box] });
+    expect(await markedText(page)).toBe('と東京');
+    await touchUp(cdp);
+  });
+
+  test('a drag backwards moves the start, and the lookup starts there', async ({ page }) => {
+    const cdp = await holdAndDrag(page, '#v2', 'た', '生');
+    expect((await markedText(page)).startsWith('生れた')).toBe(true);
+    await touchUp(cdp);
+    expect((await messages(page))[0].text.startsWith('生れた')).toBe(true);
+  });
+
+  test('a drag backwards stops short of punctuation, so the lookup still has a word to start on', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v1', '名');
+    await page.waitForTimeout(600);
+    const stop = await charCenter(page, '#v1', '。');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [stop] });
+    expect((await markedText(page)).startsWith('名')).toBe(true);
+    await touchUp(cdp);
+    expect((await messages(page))[0].text.startsWith('名')).toBe(true);
+  });
+
+  test('a drag can leave the paragraph; the lookup text stays in the first', async ({ page }) => {
+    const cdp = await holdAndDrag(page, '#v1', '無', 'ど', '#v2');
+    expect(await markedText(page)).toContain('無い。」');
+    expect(await markedText(page)).toContain('ど');
+    await touchUp(cdp);
+    const [message] = await messages(page);
+    expect(message.text.startsWith('無い。」')).toBe(true);
+    expect(message.text).not.toContain('ど');
+  });
+
+  test('a drag does not scroll the page, and only a marked hold stops scrolling', async ({ page }) => {
+    await page.evaluate(() => {
+      window.__moves = [];
+      window.addEventListener('touchmove', (event) => window.__moves.push(event.defaultPrevented));
+    });
+    const cdp = await holdAndDrag(page, '#v2', 'と', 'が');
+    await touchUp(cdp);
+    const moves = await page.evaluate(() => window.__moves);
+    expect(moves.length).toBeGreaterThan(0);
+    expect(moves.every(Boolean)).toBe(true);
+
+    await page.evaluate(() => (window.__moves = []));
+    const { cdp: second, x, y } = await touchDown(page, '#v2', '生');
+    await second.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 60 }] });
+    await touchUp(second);
+    expect((await page.evaluate(() => window.__moves)).some(Boolean)).toBe(false);
+  });
+
+  test('the end of a long press is cancelled for the swipe up, a plain swipe is not', async ({ page }) => {
+    await page.evaluate(() => {
+      window.__ends = [];
+      window.addEventListener('touchend', (event) => window.__ends.push(event.defaultPrevented));
+    });
+    const cdp = await holdAndDrag(page, '#v2', 'と', 'が');
+    await touchUp(cdp);
+    const { cdp: second, x, y } = await touchDown(page, '#v2', '生');
+    await second.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + 60 }] });
+    await touchUp(second);
+    expect(await page.evaluate(() => window.__ends)).toEqual([true, false]);
+  });
+
+  test('when the browser cancels a held touch, the marked word is still looked up', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(600);
+    expect(await marked(page)).toBe(true);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await expect.poll(() => messages(page)).toHaveLength(1);
+    expect((await messages(page))[0]).toMatchObject({ type: 'lookup', selection: true });
+  });
+
+  test('a touch cancelled before the mark looks nothing up', async ({ page }) => {
+    const { cdp } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(100);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await page.waitForTimeout(500);
+    expect(await marked(page)).toBe(false);
+    expect(await messages(page)).toEqual([]);
+  });
+
+  test('a second finger drops the mark', async ({ page }) => {
+    const { cdp, x, y } = await touchDown(page, '#v2', '生');
+    await page.waitForTimeout(600);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x, y, id: 0 }, { x: x + 80, y, id: 1 }],
+    });
     expect(await marked(page)).toBe(false);
     await touchUp(cdp);
     expect(await messages(page)).toEqual([]);

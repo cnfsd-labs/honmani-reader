@@ -20,20 +20,27 @@ internal data class SelectionBubble(
  */
 internal fun selectionBubble(state: LookupPanelState): SelectionBubble? {
     val selected = state.tap.bySelection
+    // The tap's text stops at the scan length and at the paragraph; a selection may go on.
+    val selection = state.tap.selected?.selection?.text ?: state.tap.text
     return when (state) {
-        is LookupPanelState.Results -> when {
-            state.previous != null -> null
-            selected || state.canShorten || state.canLengthen -> SelectionBubble(
-                text = state.tap.text.take(state.highlight.length),
-                canShorten = state.canShorten,
-                canLengthen = state.canLengthen,
-                canCopy = selected,
-            )
-            else -> null
+        is LookupPanelState.Results -> {
+            val match = state.tap.text.take(state.highlight.length)
+            when {
+                state.previous != null -> null
+                // More was chosen than the match: its arrows would change nothing the bubble shows.
+                selected && selection.length > match.length -> SelectionBubble(selection, canCopy = true)
+                selected || state.canShorten || state.canLengthen -> SelectionBubble(
+                    text = match,
+                    canShorten = state.canShorten,
+                    canLengthen = state.canLengthen,
+                    canCopy = selected,
+                )
+                else -> null
+            }
         }
-        is LookupPanelState.Kanji -> if (selected && state.previous == null) SelectionBubble(state.tap.text, canCopy = true) else null
+        is LookupPanelState.Kanji -> if (selected && state.previous == null) SelectionBubble(selection, canCopy = true) else null
         is LookupPanelState.NothingFound, is LookupPanelState.NoDictionaries ->
-            if (selected) SelectionBubble(state.tap.text, canCopy = true) else null
+            if (selected) SelectionBubble(selection, canCopy = true) else null
     }
 }
 

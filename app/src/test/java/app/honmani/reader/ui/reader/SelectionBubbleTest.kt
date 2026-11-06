@@ -44,6 +44,17 @@ class SelectionBubbleTest {
     }
 
     @Test
+    fun aSelectionLongerThanTheMatchShowsAllOfItToCopyWithoutArrows() {
+        val whole = "食べました。そして寝ました。"
+        val long = selection.copy(selected = HighlightExtents(SelectedPassage(10, 24, whole)))
+        val bubble = selectionBubble(results(tap = long, shortest = 1, longest = 5))!!
+        assertEquals(whole, bubble.text)
+        assertTrue(bubble.canCopy)
+        assertFalse(bubble.hasArrows)
+        assertEquals(whole, selectionBubble(LookupPanelState.NothingFound(long))!!.text)
+    }
+
+    @Test
     fun aSelectionAlwaysHasABubbleToCopyFrom() {
         val fixed = selectionBubble(results(tap = selection))!!
         assertTrue(fixed.canCopy)
