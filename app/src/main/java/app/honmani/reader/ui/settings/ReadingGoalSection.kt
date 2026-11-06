@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -27,6 +28,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,11 +83,14 @@ fun ReadingGoalSection() {
     }
 }
 
-/** Asks for a goal in whole minutes; OK stays off until the number is in range. */
+/** Asks for a goal in whole minutes; OK and the keyboard's Done accept a number in range and otherwise say what is expected. */
 @Composable
 private fun GoalMinutesDialog(onChosen: (Int) -> Unit, onDismiss: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     val chosen = ReadingGoalSettings.parseMinutes(text)
+    var tried by rememberSaveable { mutableStateOf(false) }
+    val invalid = chosen == null && (text.isNotEmpty() || tried)
+    val submit = { if (chosen != null) onChosen(chosen) else tried = true }
     val focus = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -95,23 +100,24 @@ private fun GoalMinutesDialog(onChosen: (Int) -> Unit, onDismiss: () -> Unit) {
                 value = text,
                 onValueChange = { typed -> text = typed.filter(Char::isDigit).take(MAX_TYPED_DIGITS) },
                 singleLine = true,
-                isError = text.isNotEmpty() && chosen == null,
+                isError = invalid,
                 supportingText = {
                     Text(
                         stringResource(
-                            R.string.settings_daily_goal_custom_range,
+                            if (invalid) R.string.settings_daily_goal_custom_error else R.string.settings_daily_goal_custom_range,
                             ReadingGoalSettings.MIN_MINUTES,
                             ReadingGoalSettings.MAX_MINUTES,
                         ),
                     )
                 },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
                 modifier = Modifier.focusRequester(focus),
             )
             LaunchedEffect(Unit) { focus.requestFocus() }
         },
         confirmButton = {
-            TextButton(enabled = chosen != null, onClick = { chosen?.let(onChosen) }) {
+            TextButton(onClick = { submit() }) {
                 Text(stringResource(android.R.string.ok))
             }
         },
