@@ -832,7 +832,7 @@
     <string name="review_from_book">From %1$s</string>
     <string name="review_done_title">Done for now</string>
     <string name="review_done_counts">Forgot %1$d, got it %2$d.</string>
-    <string name="review_done_empty">Nothing more is due. New words come after you add words to Learning.</string>
+    <string name="review_done_empty">Nothing more is due right now. Words in Learning show up here as new words, except those you sent to Anki.</string>
     <string name="review_done_close">Close</string>
     <string name="review_bury">Bury until tomorrow</string>
     <string name="review_mark_known">Mark known</string>
