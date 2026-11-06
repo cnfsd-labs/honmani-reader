@@ -69,6 +69,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -278,6 +279,7 @@ fun LibraryScreen(
             onSaveCopy = saveCopy,
             onFilter = viewModel::setFilter,
             onSelectFolder = viewModel::selectFolder,
+            onSetFoldersOpen = viewModel::setFoldersOpen,
             onCreateFolder = viewModel::createFolder,
             onRenameFolder = viewModel::renameFolder,
             onDeleteFolder = viewModel::deleteFolder,
@@ -398,6 +400,7 @@ private fun LibraryContent(
     onSaveCopy: (LibraryBook) -> Unit = {},
     onShowHidden: (Boolean) -> Unit = {},
     onSelectFolder: (Long?) -> Unit = {},
+    onSetFoldersOpen: (Boolean) -> Unit = {},
     /** Makes a folder (and puts the book in it); the last argument gets what came of the name. */
     onCreateFolder: (name: String, bookId: Long?, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
     onRenameFolder: (id: Long, name: String, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
@@ -417,6 +420,7 @@ private fun LibraryContent(
     var detailsFor by rememberSaveable { mutableStateOf<Long?>(null) }
     var renamingFolder by remember { mutableStateOf<LibraryFolder?>(null) }
     var deletingFolder by remember { mutableStateOf<LibraryFolder?>(null) }
+    var creatingFolder by remember { mutableStateOf(false) }
     var searching by rememberSaveable { mutableStateOf(false) }
     val books = uiState.books
     val gridState = rememberLazyGridState()
@@ -468,7 +472,9 @@ private fun LibraryContent(
                         lastContinue[0]?.let { book -> ContinueBubble(book, onOpen = { onOpen(book.id) }, onDismiss = onDismissContinue) }
                     }
                     // Only once there is a folder: without one the library looks as it always did.
-                    if (uiState.totalBooks > 0 && uiState.folders.isNotEmpty() && !uiState.showHidden) {
+                    // Closed, the chosen folder still shows as one small chip: a filter is never invisible.
+                    val foldersShown = uiState.totalBooks > 0 && uiState.folders.isNotEmpty() && !uiState.showHidden
+                    if (foldersShown && uiState.foldersOpen) {
                         FolderBar(
                             folders = uiState.folders,
                             chosen = uiState.folderId,
@@ -476,7 +482,12 @@ private fun LibraryContent(
                             onChoose = onSelectFolder,
                             onRename = { renamingFolder = it },
                             onDelete = { deletingFolder = it },
+                            onNew = { creatingFolder = true },
                         )
+                    } else if (foldersShown) {
+                        uiState.folders.firstOrNull { it.id == uiState.folderId }?.let { folder ->
+                            ActiveFolderChip(folder.name) { onSelectFolder(null) }
+                        }
                     }
                     if (uiState.totalBooks > 0) {
                         LibraryToolbar(
@@ -495,6 +506,7 @@ private fun LibraryContent(
                             onShowHidden = onShowHidden,
                             onAdd = onAdd,
                             onSort = onSort,
+                            onToggleFolders = { onSetFoldersOpen(!uiState.foldersOpen) },
                         )
                     }
                 }
@@ -624,6 +636,16 @@ private fun LibraryContent(
         )
     }
 
+    if (creatingFolder) {
+        FolderNameDialog(
+            title = stringResource(R.string.folder_new_title),
+            initial = "",
+            confirm = stringResource(R.string.folder_create),
+            onSave = { name, done -> onCreateFolder(name, null, done) },
+            onDismiss = { creatingFolder = false },
+        )
+    }
+
     renamingFolder?.let { folder ->
         FolderNameDialog(
             title = stringResource(R.string.folder_rename),
@@ -727,6 +749,7 @@ private fun LibraryToolbar(
     onShowHidden: (Boolean) -> Unit,
     onAdd: () -> Unit,
     onSort: (LibrarySort) -> Unit = {},
+    onToggleFolders: () -> Unit = {},
 ) {
     Box {
         if (searching) {
@@ -757,7 +780,7 @@ private fun LibraryToolbar(
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -796,6 +819,23 @@ private fun LibraryToolbar(
                 }
                 // 48 dp touch targets already keep 8 dp between the 40 dp buttons.
                 Row {
+                    if (uiState.folders.isNotEmpty() && !uiState.showHidden) {
+                        // Tinted while a folder is chosen, open row or not.
+                        val active = uiState.folderId != null
+                        FilledTonalIconButton(
+                            onClick = onToggleFolders,
+                            colors = if (active) {
+                                IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            } else {
+                                IconButtonDefaults.filledTonalIconButtonColors()
+                            },
+                        ) {
+                            Icon(painterResource(R.drawable.ic_folder), contentDescription = stringResource(R.string.library_folders))
+                        }
+                    }
                     SortButton(uiState.sort, uiState.skill, onSort)
                     FilledTonalIconButton(onClick = onStartSearch) {
                         Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search))
@@ -916,7 +956,7 @@ private fun StatusFilters(uiState: LibraryUiState, onFilter: (ReadingStatus?) ->
                         .background(
                             if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
                         )
-                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                        .padding(horizontal = 8.dp, vertical = 10.dp),
                 ) {
                     Icon(
                         painter = statusIcon(status),

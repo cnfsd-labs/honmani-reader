@@ -68,6 +68,7 @@ import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
+import app.honmani.reader.data.settings.LibraryFolderView
 import app.honmani.reader.data.settings.SearchHistory
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
@@ -209,6 +210,7 @@ class AppContainer(context: Context) {
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
+    val libraryFolderView: LibraryFolderView by lazy { LibraryFolderView(devicePreferences) }
 
     val booksDir = File(appContext.filesDir, "books")
 

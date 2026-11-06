@@ -16,10 +16,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -49,7 +53,7 @@ import app.honmani.reader.data.library.FolderResult
 
 /**
  * The folders as a row of chips above the toolbar (scrolling when there are many): All, then each
- * folder with its books; the chosen folder has a menu to rename or delete it.
+ * folder with its books, then "New folder"; the chosen folder has a menu to rename or delete it.
  */
 @Composable
 internal fun FolderBar(
@@ -59,6 +63,7 @@ internal fun FolderBar(
     onChoose: (Long?) -> Unit,
     onRename: (LibraryFolder) -> Unit,
     onDelete: (LibraryFolder) -> Unit,
+    onNew: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         LazyRow(
@@ -93,6 +98,16 @@ internal fun FolderBar(
                     },
                 )
             }
+            item(key = "new") {
+                AssistChip(
+                    colors = AssistChipDefaults.assistChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    onClick = onNew,
+                    label = { Text(stringResource(R.string.folder_new_title), maxLines = 1) },
+                    leadingIcon = {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+                    },
+                )
+            }
         }
         val current = folders.firstOrNull { it.id == chosen }
         if (current != null) {
@@ -121,6 +136,34 @@ internal fun FolderBar(
                 }
             }
         }
+    }
+}
+
+/**
+ * The chosen folder as one small chip while the folder row is closed, so a filter is never
+ * invisible; the cross shows all books again.
+ */
+@Composable
+internal fun ActiveFolderChip(name: String, onClear: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp)) {
+        FilterChip(
+            colors = FilterChipDefaults.filterChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            selected = true,
+            onClick = onClear,
+            label = {
+                Text(text = name, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
+            },
+            leadingIcon = {
+                Icon(painterResource(R.drawable.ic_folder), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize))
+            },
+            trailingIcon = {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.library_show_all),
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                )
+            },
+        )
     }
 }
 

@@ -23,6 +23,7 @@ import app.honmani.reader.data.library.DocumentTree
 import app.honmani.reader.data.library.ExportNames
 import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.data.library.Folders
+import app.honmani.reader.data.settings.LibraryFolderView
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.ResolverDocumentTree
 import app.honmani.reader.data.library.SampleBook
@@ -90,6 +91,8 @@ data class LibraryUiState(
     val folders: List<LibraryFolder> = emptyList(),
     /** Only books in this folder; null for all. */
     val folderId: Long? = null,
+    /** The row of folder chips is open (it stays closed, and the chosen folder shows as one chip, otherwise). */
+    val foldersOpen: Boolean = false,
     /** How many books (not hidden, in the chosen folder) have each status, for the filter buttons. */
     val counts: Map<ReadingStatus, Int> = emptyMap(),
     /** Only books with this status; null for all. */
@@ -228,12 +231,15 @@ class LibraryViewModel(
     private val folders: Folders? = null,
     /** Opens a folder the user picked (a tree address) for the folder import and the export. */
     private val openTree: (Uri) -> DocumentTree? = { null },
+    /** Keeps the chosen folder and the open folder row over a restart; null: kept in memory only. */
+    private val folderView: LibraryFolderView? = null,
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
     private val batch = MutableStateFlow<BatchProgress?>(null)
     private var batchJob: Job? = null
-    private val shelf = MutableStateFlow(Shelf())
+    private val shelf = MutableStateFlow(Shelf(folderId = folderView?.chosen))
+    private val foldersOpen = MutableStateFlow(folderView?.open ?: false)
     private val folderList = folders?.observeAll() ?: flowOf(emptyList())
 
     private val query = MutableStateFlow("")
@@ -264,9 +270,9 @@ class LibraryViewModel(
             },
             combine(adding, batch) { adding, batch -> adding to batch },
             opening,
-            combine(shelf, folderList) { shelf, folders -> shelf to folders },
+            combine(shelf, folderList, foldersOpen) { shelf, folders, open -> Triple(shelf, folders, open) },
             searchTerms,
-        ) { (entities, grades, sort, skill, dismissed), (adding, batch), opening, (shelf, folders), terms ->
+        ) { (entities, grades, sort, skill, dismissed), (adding, batch), opening, (shelf, folders, open), terms ->
             val (query, readings) = terms
             val books = sort.apply(entities.map(::toLibraryBook), skill) { book ->
                 grades[book.contentHash]?.difficulty?.score?.takeIf { it > 0 }
@@ -286,6 +292,7 @@ class LibraryViewModel(
                 totalBooks = books.size,
                 folders = folders.map { LibraryFolder(it.id, it.name, inFolders[it.id] ?: 0) },
                 folderId = folderId,
+                foldersOpen = open,
                 counts = inFolder.groupingBy { it.status }.eachCount(),
                 filter = shelf.status,
                 showHidden = shelf.hidden,
@@ -316,7 +323,7 @@ class LibraryViewModel(
             folderList.collect { all ->
                 // The chosen folder was deleted: back to all books.
                 val chosen = shelf.value.folderId
-                if (chosen != null && all.none { it.id == chosen }) shelf.value = shelf.value.copy(folderId = null)
+                if (chosen != null && all.none { it.id == chosen }) selectFolder(null)
             }
         }
         viewModelScope.launch {
@@ -555,6 +562,13 @@ class LibraryViewModel(
     /** Shows only the books in folder [id]; null shows all. */
     fun selectFolder(id: Long?) {
         shelf.value = shelf.value.copy(folderId = id)
+        folderView?.chosen = id
+    }
+
+    /** Opens or closes the row of folder chips. */
+    fun setFoldersOpen(open: Boolean) {
+        foldersOpen.value = open
+        folderView?.open = open
     }
 
     /** Makes a folder, and puts book [bookId] in it if there is one; [done] gets the outcome (a refused name, say). */
@@ -741,6 +755,7 @@ class LibraryViewModel(
                     autoImport = container.opdsAutoImport.status,
                     grades = container.difficultyStore.grades,
                     folders = container.folders,
+                    folderView = container.libraryFolderView,
                     openTree = { uri ->
                         try {
                             ResolverDocumentTree(application.contentResolver, uri)

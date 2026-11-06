@@ -8,6 +8,7 @@ import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.data.library.Folders
+import app.honmani.reader.data.settings.LibraryFolderView
 import app.honmani.reader.ui.reader.TtuLibrary
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,7 @@ import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -204,5 +206,57 @@ class LibraryFoldersTest {
         viewModel.moveToFolder(neko, null)
         state { it.folders.all { f -> f.count == 0 } }
         assertNull(database.bookDao().find(neko)!!.folderId)
+    }
+
+    private fun viewModelKeeping(view: LibraryFolderView) = LibraryViewModel(
+        dao = database.bookDao(),
+        importer = BookImporter(database.bookDao(), File(files.root, "books"), File(files.root, "covers")),
+        ttu = TtuLibrary(pageTimeoutMs = 2_000, importTimeoutMs = 2_000),
+        openFile = { null },
+        now = { 42L },
+        folders = folders,
+        folderView = view,
+    )
+
+    private fun folderView() = LibraryFolderView(
+        ApplicationProvider.getApplicationContext<android.content.Context>()
+            .getSharedPreferences("folder-view-test", android.content.Context.MODE_PRIVATE),
+    )
+
+    @Test
+    fun theChosenFolderAndTheOpenRow_areKeptForTheNextStart() = runBlocking {
+        val novels = folder("Novels")
+        folder("Manga")
+        val view = folderView()
+        val first = viewModelKeeping(view)
+        assertFalse(first.uiState.first { it.folders.size == 2 }.foldersOpen)
+
+        first.selectFolder(novels)
+        first.setFoldersOpen(true)
+
+        val second = viewModelKeeping(folderView())
+        val restarted = withTimeout(5_000) { second.uiState.first { it.folders.size == 2 } }
+        assertEquals(novels, restarted.folderId)
+        assertTrue(restarted.foldersOpen)
+
+        second.selectFolder(null)
+        second.setFoldersOpen(false)
+        val cleared = viewModelKeeping(folderView())
+        val state = withTimeout(5_000) { cleared.uiState.first { it.folders.size == 2 } }
+        assertNull(state.folderId)
+        assertFalse(state.foldersOpen)
+    }
+
+    @Test
+    fun aKeptFolderThatIsGone_fallsBackToAll_andIsForgotten() = runBlocking {
+        val view = folderView()
+        view.chosen = 9_999L
+
+        val library = viewModelKeeping(view)
+        val state = withTimeout(5_000) { library.uiState.first { it.totalBooks == 0 } }
+        assertNull(state.folderId)
+        // The fallback is kept, so a later folder that reuses the number is not chosen by mistake.
+        withTimeout(5_000) { while (view.chosen != null) kotlinx.coroutines.delay(10) }
+        assertNull(view.chosen)
     }
 }
