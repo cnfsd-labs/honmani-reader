@@ -813,6 +813,7 @@
       if (selection) selection.removeAllRanges();
       clearHighlight();
       showMark(ranges, null);
+      post({ type: 'reader.longPress' });
     }, LONG_PRESS_TIME);
     hold = current;
   }

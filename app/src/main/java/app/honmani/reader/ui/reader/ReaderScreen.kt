@@ -236,6 +236,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The window flag, not View.keepScreenOn: that one is only passed on at the next frame, which
     // a stopped or still screen never draws.
     val keepScreenOn = readAloudState.running || audiobookState.running
+    // Interface sounds keep quiet over speech.
+    DisposableEffect(keepScreenOn) {
+        container.uiSounds.readerSpeaking = keepScreenOn
+        onDispose { container.uiSounds.readerSpeaking = false }
+    }
     DisposableEffect(rootView, keepScreenOn) {
         val window = rootView.context.findActivity()?.window
         if (keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

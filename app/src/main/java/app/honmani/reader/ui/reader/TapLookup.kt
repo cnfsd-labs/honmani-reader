@@ -49,6 +49,9 @@ sealed interface BridgeMessage {
     /** The reader touched or scrolled the book (`assets/honmani/reading-activity.js`). */
     data object Activity : BridgeMessage
 
+    /** A long press just marked its first word (`assets/honmani/tap-bridge.js`): the phone ticks once. */
+    data object LongPressMark : BridgeMessage
+
     /** The book page's background colour, opaque ARGB (`assets/honmani/book-frame.js`). */
     data class Background(val color: Int) : BridgeMessage
 
@@ -116,6 +119,7 @@ sealed interface BridgeMessage {
                 "follow.detached" -> FollowState(true).takeIf { compact == FOLLOW_DETACHED_MESSAGE }
                 "follow.attached" -> FollowState(false).takeIf { compact == FOLLOW_ATTACHED_MESSAGE }
                 "reader.activity" -> Activity.takeIf { compact == ACTIVITY_MESSAGE }
+                "reader.longPress" -> LongPressMark.takeIf { compact == LONG_PRESS_MESSAGE }
                 "pageShown" -> SettingsShown.takeIf { compact == SETTINGS_SHOWN_MESSAGE }
                 "reader.settings" -> OpenSettings.takeIf { compact == OPEN_SETTINGS_MESSAGE }
                 "reader.menu" -> OpenMenu.takeIf { compact == OPEN_MENU_MESSAGE }
@@ -284,6 +288,7 @@ sealed interface BridgeMessage {
         private const val FOLLOW_DETACHED_MESSAGE = """{"type":"follow.detached"}"""
         private const val FOLLOW_ATTACHED_MESSAGE = """{"type":"follow.attached"}"""
         private const val ACTIVITY_MESSAGE = """{"type":"reader.activity"}"""
+        private const val LONG_PRESS_MESSAGE = """{"type":"reader.longPress"}"""
     }
 }
 

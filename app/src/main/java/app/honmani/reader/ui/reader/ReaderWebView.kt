@@ -9,6 +9,8 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Looper
+import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.webkit.ConsoleMessage
 import android.webkit.RenderProcessGoneDetail
@@ -363,6 +365,11 @@ fun ReaderWebView(
                                 if (uncover[0] != null) uncoverAfter(UNCOVER_SETTLE_MS)
                             is BridgeMessage.ReadAloudSentences, is BridgeMessage.ReadAloudLost, is BridgeMessage.AudiobookLost, is BridgeMessage.FollowState -> currentOnReadAloud(message)
                             BridgeMessage.Activity -> currentOnActivity()
+                            // Predefined effect: follows the system's touch-feedback setting, needs no permission.
+                            BridgeMessage.LongPressMark -> webViewRef.view?.let {
+                                Log.d("Honmani.haptic", "long press mark")
+                                it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                            }
                             is BridgeMessage.Position -> currentOnPage(message.id, message.characters, message.progress)
                             BridgeMessage.OpenSettings -> currentOnOpenSettings()
                             BridgeMessage.OpenMenu -> currentOnOpenMenu()

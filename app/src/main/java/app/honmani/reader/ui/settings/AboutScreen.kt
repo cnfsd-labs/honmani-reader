@@ -141,6 +141,12 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
             }
             item {
                 ListItem(
+                    headlineContent = { Text(stringResource(R.string.about_sounds)) },
+                    supportingContent = { Text(stringResource(R.string.about_sounds_details)) },
+                )
+            }
+            item {
+                ListItem(
                     headlineContent = { Text(stringResource(R.string.about_sample_book)) },
                     supportingContent = { Text(stringResource(R.string.about_sample_book_details)) },
                 )

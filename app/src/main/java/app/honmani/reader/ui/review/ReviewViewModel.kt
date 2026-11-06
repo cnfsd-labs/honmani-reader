@@ -60,6 +60,9 @@ data class ReviewUiState(
     val showSentence: Boolean = true,
 )
 
+/** An answer the screen should let the reader feel (and, if switched on, hear); [finished] when it was the session's last card. */
+data class ReviewCue(val gotIt: Boolean, val finished: Boolean)
+
 /** A line for the snackbar; [undoable] adds the Undo button. */
 class ReviewNotice(@StringRes val message: Int, val word: String, val undoable: Boolean = true)
 
@@ -78,6 +81,9 @@ class ReviewViewModel(
 
     private val _notices = Channel<ReviewNotice>(Channel.BUFFERED)
     val notices: Flow<ReviewNotice> = _notices.receiveAsFlow()
+
+    private val _cues = Channel<ReviewCue>(Channel.BUFFERED)
+    val cues: Flow<ReviewCue> = _cues.receiveAsFlow()
 
     // The session isn't thread safe: one action at a time.
     private val lock = Mutex()
@@ -100,7 +106,7 @@ class ReviewViewModel(
 
     fun reveal() = _state.update { if (it.card != null) it.copy(revealed = true) else it }
 
-    fun answer(grade: Grade) = act { it.answer(grade) }
+    fun answer(grade: Grade) = act(answered = true, gotIt = grade != Grade.AGAIN) { it.answer(grade) }
 
     fun forgot() = answer(Grade.AGAIN)
 
@@ -127,13 +133,14 @@ class ReviewViewModel(
     /** The book of the current card's sentence, if it has one. */
     val currentBookId: Long? get() = _state.value.card?.sentence?.bookId
 
-    private fun act(notice: Int? = null, keepRevealed: Boolean = false, action: suspend (ReviewSession) -> Any?) {
+    private fun act(notice: Int? = null, keepRevealed: Boolean = false, answered: Boolean = false, gotIt: Boolean = true, action: suspend (ReviewSession) -> Any?) {
         viewModelScope.launch {
             lock.withLock {
                 val active = session ?: return@withLock
                 val word = active.current?.word?.expression.orEmpty()
                 action(active)
                 publish(active, keepRevealed)
+                if (answered) _cues.send(ReviewCue(gotIt, finished = active.current == null))
                 if (notice != null && word.isNotEmpty()) _notices.send(ReviewNotice(notice, word))
             }
         }

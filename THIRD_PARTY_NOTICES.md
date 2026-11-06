@@ -55,6 +55,12 @@ exports: Japanese sentences with English translations and the word index of the 
 (https://creativecommons.org/licenses/by/2.0/fr/). The file is published as a release asset of
 https://github.com/cnfsd-labs/honmani-reader (tag `examples-1`) under the same licence.
 
+## Interface sounds
+
+`app/src/main/res/raw/ui_*.wav` are made by `scripts/sounds/make_sounds.py` from plain sine tones
+(no samples, nothing third-party); they share the app's licence, GPL-3.0-or-later. They only play
+when the reader switches on Settings → Appearance → Sounds.
+
 ## Planned (not yet included)
 
 Kuromoji or Sudachi (Apache-2.0) with their dictionary licenses, AnkiDroid Instant-Add API

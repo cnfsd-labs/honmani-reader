@@ -200,6 +200,7 @@ class TapLookupTest {
         assertNull(BridgeMessage.parse("""{"type":"turnPage","next":"true"}"""))
         assertNull(BridgeMessage.parse("""{"type":"turnPage"}"""))
         assertEquals(BridgeMessage.Activity, BridgeMessage.parse("""{"type":"reader.activity"}"""))
+        assertEquals(BridgeMessage.LongPressMark, BridgeMessage.parse("""{"type":"reader.longPress"}"""))
         assertEquals(BridgeMessage.OpenSettings, BridgeMessage.parse("""{"type":"reader.settings"}"""))
         assertEquals(BridgeMessage.OpenMenu, BridgeMessage.parse("""{"type":"reader.menu"}"""))
         assertNull(BridgeMessage.parse("""{"type":"reader.menu","extra":1}"""))

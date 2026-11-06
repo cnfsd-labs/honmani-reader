@@ -173,6 +173,16 @@ class AppearanceSettings(
     /** The library's order, as a `LibrarySort` name; null for the default. */
     val librarySort: StateFlow<String?> = _librarySort.asStateFlow()
 
+    private val _sounds = MutableStateFlow(preferences.getBoolean(KEY_SOUNDS, false))
+
+    /** Whether short interface sounds play (reviews, milestones); off until switched on. */
+    val sounds: StateFlow<Boolean> = _sounds.asStateFlow()
+
+    fun setSounds(on: Boolean) {
+        _sounds.value = on
+        preferences.edit().putBoolean(KEY_SOUNDS, on).apply()
+    }
+
     fun setLibrarySort(name: String) {
         _librarySort.value = name
         preferences.edit().putString(KEY_LIBRARY_SORT, name).apply()
@@ -208,6 +218,7 @@ class AppearanceSettings(
         _showPreviousSentence.value = preferences.getBoolean(KEY_SHOW_PREVIOUS_SENTENCE, false)
         _showWordFrequency.value = preferences.getBoolean(KEY_SHOW_WORD_FREQUENCY, true)
         _showExamples.value = preferences.getBoolean(KEY_SHOW_EXAMPLES, false)
+        _sounds.value = preferences.getBoolean(KEY_SOUNDS, false)
     }
 
     companion object {
@@ -220,6 +231,7 @@ class AppearanceSettings(
         const val KEY_SHOW_PREVIOUS_SENTENCE = "show_previous_sentence"
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
         const val KEY_SHOW_EXAMPLES = "show_examples"
+        const val KEY_SOUNDS = "ui_sounds"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"
 

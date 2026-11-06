@@ -13,6 +13,7 @@ import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.anki.AnkiSync
 import app.honmani.reader.anki.PhoneVoice
 import app.honmani.reader.anki.WordAudio
+import app.honmani.reader.audio.UiSounds
 import app.honmani.reader.anki.WordDetails
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.backup.AutoBackup
@@ -342,6 +343,8 @@ class AppContainer(context: Context) {
      * The lookup panel's listen button: the card voice, or the phone's when card audio is off;
      * its read-aloud button for the sentence always uses the phone's voice.
      */
+    val uiSounds: UiSounds by lazy { UiSounds(appContext, appearanceSettings.sounds, wordAudio) }
+
     val wordAudio: WordAudio by lazy {
         WordAudio(
             voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice },

@@ -116,4 +116,13 @@ class AppearanceSettingsTest {
 
         assertEquals(true, AppearanceSettings(preferences(), device()).showPreviousSentence.value)
     }
+
+    @Test
+    fun soundsAreOffByDefault_andSwitchOnIsRemembered() {
+        assertEquals(false, AppearanceSettings(preferences(), device()).sounds.value)
+
+        AppearanceSettings(preferences(), device()).setSounds(true)
+
+        assertEquals(true, AppearanceSettings(preferences(), device()).sounds.value)
+    }
 }

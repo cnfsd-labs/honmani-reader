@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.review
 
 import androidx.activity.compose.BackHandler
+import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,7 +62,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -80,7 +83,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.review.ReviewSentence
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.FuriganaOverride
@@ -121,6 +126,22 @@ fun ReviewScreen(
                 duration = SnackbarDuration.Short,
             )
             if (result == SnackbarResult.ActionPerformed) viewModel.undo()
+        }
+    }
+    // Predefined haptic effects follow the system's touch-feedback setting; the sounds are off by default.
+    val haptics = LocalHapticFeedback.current
+    val uiSounds = remember { (context.applicationContext as HonmaniApplication).container.uiSounds }
+    LaunchedEffect(viewModel) {
+        viewModel.cues.collect { cue ->
+            Log.d("Honmani.haptic", "review " + if (cue.gotIt) "confirm" else "reject")
+            haptics.performHapticFeedback(if (cue.gotIt) HapticFeedbackType.Confirm else HapticFeedbackType.Reject)
+            uiSounds.play(
+                when {
+                    cue.finished -> UiSound.SESSION_DONE
+                    cue.gotIt -> UiSound.GOT_IT
+                    else -> UiSound.FORGOT
+                },
+            )
         }
     }
     LaunchedEffect(panelModel) {

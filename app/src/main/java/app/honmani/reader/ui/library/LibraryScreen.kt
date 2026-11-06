@@ -3,6 +3,7 @@ package app.honmani.reader.ui.library
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import android.util.LruCache
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -110,7 +111,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -128,6 +131,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.ui.ProgressBar
@@ -235,8 +239,14 @@ fun LibraryScreen(
         }
     }
     val viewProgress = stringResource(R.string.action_view_progress)
+    val haptics = LocalHapticFeedback.current
+    val appContext = LocalContext.current.applicationContext
+    val uiSounds = remember { (appContext as HonmaniApplication).container.uiSounds }
     LaunchedEffect(milestoneText) {
         if (milestoneText != null) {
+            Log.d("Honmani.haptic", "milestone")
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            uiSounds.play(UiSound.MILESTONE)
             val showing = milestones
             val result = snackbarHostState.showSnackbar(milestoneText, actionLabel = viewProgress, duration = SnackbarDuration.Long)
             // Only once seen: leaving the library first keeps them for next time.

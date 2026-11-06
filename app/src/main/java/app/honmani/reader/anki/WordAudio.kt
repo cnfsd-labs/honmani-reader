@@ -31,6 +31,9 @@ class WordAudio(
     private val mutex = Mutex()
     private var player: MediaPlayer? = null
 
+    /** A recording is playing right now (UI sounds keep quiet meanwhile). */
+    val playing: Boolean get() = player != null
+
     /** Plays [text]; returns why it couldn't, or null once it plays. */
     suspend fun play(text: String): VoiceProblem? = play(text, voice(), keep = true)
 
