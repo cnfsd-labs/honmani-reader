@@ -61,7 +61,7 @@
   let requested = false;
   /** Section root element -> its text index (see indexOf). */
   const indexes = new Map();
-  /** The pieces drawn: { id, range }. */
+  /** The pieces drawn: { id, ranges } (see baseRanges). */
   let drawn = [];
 
   function count(text) {
@@ -170,6 +170,55 @@
     return range;
   }
 
+  /**
+   * The parts of `range` that are base text: one Range per run of text without a reading (<rt>, <rp>)
+   * inside, so a highlight never colours furigana. The range itself if it holds none.
+   */
+  function baseRanges(range) {
+    const root = range.commonAncestorContainer;
+    if (root.nodeType === Node.TEXT_NODE || !root.querySelector('rt, rp')) return [range];
+    const isReading = (node) => node.nodeName === 'RT' || node.nodeName === 'RP';
+    const isBase = (node) => node.nodeType === Node.TEXT_NODE && !node.parentElement.closest('rt, rp');
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => {
+        if (node.nodeType === Node.TEXT_NODE) return isBase(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        return isReading(node) || isGaiji(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      },
+    });
+    const ranges = [];
+    let run = [];
+    const close = () => {
+      if (run.length > 0) {
+        const piece = document.createRange();
+        const first = run[0];
+        const last = run[run.length - 1];
+        if (first.nodeType === Node.TEXT_NODE) piece.setStart(first, first === range.startContainer ? range.startOffset : 0);
+        else piece.setStartBefore(first);
+        if (last.nodeType === Node.TEXT_NODE) piece.setEnd(last, last === range.endContainer ? range.endOffset : last.data.length);
+        else piece.setEndAfter(last);
+        ranges.push(piece);
+      }
+      run = [];
+    };
+    let node = null;
+    if (range.startContainer.nodeType === Node.TEXT_NODE) {
+      walker.currentNode = range.startContainer;
+      node = isBase(range.startContainer) ? range.startContainer : walker.nextNode();
+    } else {
+      node = walker.nextNode();
+    }
+    for (; node; node = walker.nextNode()) {
+      if (!range.intersectsNode(node)) {
+        if (range.comparePoint(node, 0) > 0) break;
+        continue;
+      }
+      if (isReading(node)) close();
+      else if (node.nodeType !== Node.TEXT_NODE || (node === range.endContainer ? range.endOffset : node.data.length) > (node === range.startContainer ? range.startOffset : 0)) run.push(node);
+    }
+    close();
+    return ranges.length > 0 ? ranges : [range];
+  }
+
   function darkPage() {
     for (const element of [document.body, document.documentElement]) {
       if (!element) continue;
@@ -235,8 +284,10 @@
         if (to <= from) continue;
         const range = rangeOf(index, from, Math.min(to, index.total));
         if (!range) continue;
-        highlights[Math.min(COLORS - 1, Math.max(0, item.color))].add(range);
-        drawn.push({ id: item.id, range });
+        const ranges = baseRanges(range);
+        const highlight = highlights[Math.min(COLORS - 1, Math.max(0, item.color))];
+        for (const piece of ranges) highlight.add(piece);
+        drawn.push({ id: item.id, ranges });
       }
     }
   }
@@ -319,9 +370,9 @@
   /** The id of the highlight that covers the point, or null (the last drawn wins where they overlap). */
   function idAt(node, offset) {
     for (let i = drawn.length - 1; i >= 0; i--) {
-      const { id, range } = drawn[i];
+      const { id, ranges } = drawn[i];
       try {
-        if (range.isPointInRange(node, offset)) return id;
+        if (ranges.some((range) => range.isPointInRange(node, offset))) return id;
       } catch (error) {
         // The point is in another document or a removed node.
       }

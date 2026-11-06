@@ -91,11 +91,14 @@ for (const viewMode of ['paginated', 'continuous']) {
       );
       await expect
         .poll(() => page.evaluate(() => [...(CSS.highlights.get('honmani-hl-1') ?? [])].map((range) => range.toString())), { timeout: 10_000 })
-        .toEqual(['鍵穴かぎあなから光']); // the furigana in between is part of the range, not counted
+        .toEqual(['鍵穴', 'から光']); // the furigana in between is not drawn
 
       // The page's own measurement of the same text agrees with the table.
       const measured = await page.evaluate(() => {
-        const range = [...CSS.highlights.get('honmani-hl-1')][0];
+        const pieces = [...CSS.highlights.get('honmani-hl-1')];
+        const range = document.createRange();
+        range.setStart(pieces[0].startContainer, pieces[0].startOffset);
+        range.setEnd(pieces[pieces.length - 1].endContainer, pieces[pieces.length - 1].endOffset);
         return window.honmaniHighlights.measure(range);
       });
       expect(measured).toMatchObject({ start: TARGET_START, end: TARGET_END });

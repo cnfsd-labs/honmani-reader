@@ -118,9 +118,33 @@ test('a new answer replaces what was drawn, and an empty one clears it', async (
 test('furigana: positions skip the readings, and a highlight over a ruby base takes it whole', async ({ page }) => {
   await openBook(page, '<div id="ttu-a"><p>吾輩は<ruby>猫<rt>ねこ</rt></ruby>である。</p></div>');
   await send(page, [['ttu-a', 0]], [{ id: 1, start: 3, end: 6, color: 0 }]);
-  // 猫 is the 4th counted character; the reading is not counted.
-  await expect.poll(() => drawn(page, 0)).toEqual(['猫ねこであ']);
+  // 猫 is the 4th counted character; the reading is not counted, and not drawn.
+  await expect.poll(() => drawn(page, 0)).toEqual(['猫', 'であ']);
   expect(await measureText(page, '猫', 'で')).toEqual({ start: 3, end: 5, text: '猫で' });
+});
+
+test('a highlight never colours furigana: one range per run of base text, none touching an rt or rp', async ({ page }) => {
+  await openBook(
+    page,
+    '<div id="ttu-a"><p>吾輩は<ruby>猫<rp>(</rp><rt>ねこ</rt><rp>)</rp></ruby>で<ruby>名<rt>な</rt>前<rt>まえ</rt></ruby>はまだ無い。</p></div>',
+  );
+  await send(page, [['ttu-a', 0]], [{ id: 1, start: 1, end: 10, color: 0 }]);
+  await expect.poll(() => drawn(page, 0)).toEqual(['輩は猫', 'で名', '前', 'はまだ']);
+  expect(
+    await page.evaluate(() => {
+      const ranges = [...CSS.highlights.get('honmani-hl-0')];
+      const readings = [...document.querySelectorAll('rt, rp')];
+      return ranges.filter((range) => readings.some((node) => range.intersectsNode(node))).length;
+    }),
+  ).toBe(0);
+  // The point under a base character is still the highlight; one under its reading is not.
+  expect(
+    await page.evaluate(() => {
+      const base = document.querySelector('ruby').firstChild;
+      const reading = document.querySelector('rt').firstChild;
+      return [window.honmaniHighlights.idAt(base, 0), window.honmaniHighlights.idAt(reading, 1)];
+    }),
+  ).toEqual([1, null]);
 });
 
 test('a gaiji picture counts as one character', async ({ page }) => {
