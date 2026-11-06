@@ -84,6 +84,7 @@ import app.honmani.reader.data.stats.ReadingLevel
 import app.honmani.reader.ui.InfoButton
 import app.honmani.reader.ui.InfoDialog
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.nextPageInCycle
 import app.honmani.reader.ui.stats.StatTile
 import app.honmani.reader.ui.stats.StatisticsContent
 import app.honmani.reader.ui.stats.duration
@@ -104,9 +105,14 @@ private enum class ProgressSection(val label: Int) {
 
 /** The Progress tab: level, goal and skill; the milestones; and the reading statistics. Swipe between them. */
 @Composable
-fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = {}) {
+fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = {}, pageCycle: Int = 0) {
     val pager = rememberPagerState { ProgressSection.entries.size }
     val scope = rememberCoroutineScope()
+    // A tap on the Progress tab while it is open: on to the next section, the first after the last.
+    val firstPageCycle = remember { pageCycle }
+    LaunchedEffect(pageCycle) {
+        if (pageCycle != firstPageCycle) pager.animateScrollToPage(nextPageInCycle(pager.currentPage, ProgressSection.entries.size))
+    }
     // Back from Milestones or Statistics goes to the overview first, then on to the Library.
     BackHandler(enabled = pager.currentPage != 0) { scope.launch { pager.animateScrollToPage(0) } }
     Scaffold(

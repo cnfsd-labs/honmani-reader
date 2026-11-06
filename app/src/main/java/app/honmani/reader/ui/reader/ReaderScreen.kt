@@ -769,14 +769,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         } else if (atLibrary) {
             // Opaque, and on top: the tabs take all touches while ttu's list stays loaded below.
             BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
-            // Tapping the open tab again scrolls its list to the top.
+            // Tapping the open tab again scrolls the Library to its top and goes to the next page of Words and Progress;
+            // Settings return to their main list below.
             var libraryTaps by remember { mutableIntStateOf(0) }
             var wordsTaps by remember { mutableIntStateOf(0) }
+            var progressTaps by remember { mutableIntStateOf(0) }
             val onSelectTab = { selected: HomeTab ->
                 if (selected == tab) {
                     when (selected) {
                         HomeTab.LIBRARY -> libraryTaps++
                         HomeTab.WORDS -> wordsTaps++
+                        HomeTab.PROGRESS -> progressTaps++
                         else -> Unit
                     }
                 }
@@ -813,7 +816,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                             )
                             HomeTab.WORDS -> WordsScreen(
                                 bottomBar = bottomBar,
-                                scrollToTop = wordsTaps,
+                                pageCycle = wordsTaps,
                                 focusSearch = focusSearch,
                                 onSearchFocused = { focusSearch = false },
                                 reviewDue = reviewDue,
@@ -824,7 +827,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                     container.reviewScope.value = it
                                 },
                             )
-                            HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open)
+                            HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open, pageCycle = progressTaps)
                             HomeTab.SETTINGS -> SettingsScreen(
                                 bottomBar = bottomBar,
                                 showingDictionaries = dictionariesShown,

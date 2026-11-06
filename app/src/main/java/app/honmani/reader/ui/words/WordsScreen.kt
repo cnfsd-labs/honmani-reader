@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
 import app.honmani.reader.ui.review.ReviewScopeChoice
+import app.honmani.reader.ui.nextPageInCycle
 import app.honmani.reader.ui.search.SearchContent
 import app.honmani.reader.ui.search.SearchViewModel
 import androidx.compose.foundation.clickable
@@ -146,8 +147,8 @@ private const val ADD_ALL_WITHOUT_ASKING = 10
 @Composable
 fun WordsScreen(
     bottomBar: @Composable () -> Unit,
-    /** Counts taps on the Words tab while it is open: each one scrolls the list to the top. */
-    scrollToTop: Int = 0,
+    /** Counts taps on the Words tab while it is open: each one goes to the next page, the first after the last. */
+    pageCycle: Int = 0,
     /** The launcher's "Search" shortcut asks for the search field; [onSearchFocused] once it has it. */
     focusSearch: Boolean = false,
     onSearchFocused: () -> Unit = {},
@@ -321,10 +322,10 @@ fun WordsScreen(
             }
         }
     }
-    // A tap on the Words tab while it is open: back to the Words page.
-    val firstScrollToTop = remember { scrollToTop }
-    LaunchedEffect(scrollToTop) {
-        if (scrollToTop != firstScrollToTop && pager.currentPage != WordsPage.WORDS.ordinal) pager.animateScrollToPage(WordsPage.WORDS.ordinal)
+    // A tap on the Words tab while it is open: on to the next page.
+    val firstPageCycle = remember { pageCycle }
+    LaunchedEffect(pageCycle) {
+        if (pageCycle != firstPageCycle) pager.animateScrollToPage(nextPageInCycle(pager.currentPage, WordsPage.entries.size))
     }
     LaunchedEffect(searchPanel) {
         searchPanel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
@@ -391,7 +392,6 @@ fun WordsScreen(
                     padding = padding,
                     onFilter = viewModel::setFilter,
                     onQuery = viewModel::setQuery,
-                    scrollToTop = scrollToTop,
                     onToggleExpanded = viewModel::toggleExpanded,
                     onToggleReadWord = viewModel::toggleReadWord,
                     onSetStarred = viewModel::setStarred,
@@ -509,7 +509,6 @@ private fun WordsContent(
     onExportPackage: () -> Unit,
     onShowIgnored: () -> Unit = {},
     onQuery: (String) -> Unit = {},
-    scrollToTop: Int = 0,
     onExportCsv: () -> Unit = {},
     onShowSession: () -> Unit = {},
     onShowHelp: () -> Unit = {},
@@ -609,10 +608,6 @@ private fun WordsContent(
             }
         }
         val listStates = WordFilter.entries.map { rememberLazyListState() }
-        val firstScrollToTop = remember { scrollToTop }
-        LaunchedEffect(scrollToTop) {
-            if (scrollToTop != firstScrollToTop) listStates[uiState.filter.ordinal].animateScrollToItem(0)
-        }
         val filter = uiState.filter
         WordList(
             filter = filter,
