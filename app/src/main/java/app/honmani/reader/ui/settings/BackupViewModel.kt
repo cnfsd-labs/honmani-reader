@@ -104,6 +104,7 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         container.readingGoalSettings.reload()
         container.readingTimeSettings.reload()
         container.readAloudSettings.reload()
+        container.highlightSettings.reload()
         container.ankiSettings.reload()
         container.reviewSettings.reload()
         container.daySettings.reload()

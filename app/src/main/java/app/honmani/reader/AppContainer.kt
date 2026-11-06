@@ -67,6 +67,7 @@ import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
+import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.LibraryFolderView
 import app.honmani.reader.data.settings.SearchHistory
@@ -196,6 +197,9 @@ class AppContainer(context: Context) {
 
     /** The read aloud speed (reader menu → Read aloud). */
     val readAloudSettings: ReadAloudSettings by lazy { ReadAloudSettings(settingsPreferences) }
+
+    /** The highlight extent chosen last (the lookup panel's Selection / Sentence / Paragraph chips). */
+    val highlightSettings: HighlightSettings by lazy { HighlightSettings(settingsPreferences) }
 
     /** Where the Refold export left off (Progress). */
     val refoldExportSettings: RefoldExportSettings by lazy { RefoldExportSettings(settingsPreferences) }

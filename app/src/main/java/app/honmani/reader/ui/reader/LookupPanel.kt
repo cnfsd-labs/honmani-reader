@@ -509,6 +509,9 @@ data class HighlightControls(
     val onRemove: (() -> Unit)?,
     /** For a new highlight: the extents to choose from with their text; empty for a tapped one. */
     val extents: Map<HighlightExtent, String> = emptyMap(),
+    /** The extent the reader chose last (see [HighlightExtent.initial]) and what remembers a chip they tap. */
+    val rememberedExtent: String? = null,
+    val onExtentChosen: (HighlightExtent) -> Unit = {},
 )
 
 /** A label, the four colours and (for a highlight that exists) "Remove highlight". */
@@ -518,9 +521,9 @@ private fun HighlightBar(controls: HighlightControls) {
     val names = listOf(
         R.string.highlight_yellow, R.string.highlight_green, R.string.highlight_blue, R.string.highlight_pink,
     ).map { stringResource(it) }
-    // What a new highlight covers; a sentence unless the page found none.
+    // What a new highlight covers: the reader's last choice if offered, else a sentence unless the page found none.
     var extent by remember(controls.extents.keys) {
-        mutableStateOf(if (HighlightExtent.Sentence in controls.extents) HighlightExtent.Sentence else HighlightExtent.Selection)
+        mutableStateOf(HighlightExtent.initial(controls.extents.keys, controls.rememberedExtent))
     }
     if (controls.extents.size > 1) {
         Row(
@@ -530,7 +533,10 @@ private fun HighlightBar(controls: HighlightControls) {
             for (option in controls.extents.keys) {
                 FilterChip(
                     selected = extent == option,
-                    onClick = { extent = option },
+                    onClick = {
+                        extent = option
+                        controls.onExtentChosen(option)
+                    },
                     label = {
                         Text(
                             stringResource(

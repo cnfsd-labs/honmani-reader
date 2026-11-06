@@ -291,7 +291,20 @@ sealed interface BridgeMessage {
 data class SelectedPassage(val start: Long, val end: Long, val text: String)
 
 /** What a highlight made from a long press can cover; [Selection] is what was selected. */
-enum class HighlightExtent { Selection, Sentence, Paragraph }
+enum class HighlightExtent {
+    Selection, Sentence, Paragraph;
+
+    companion object {
+        /**
+         * The chip chosen when the panel opens: the one the reader chose last ([remembered], a name) if this
+         * lookup offers it, else a sentence if the page found one, else the selection. A [remembered]
+         * extent that is not offered is not forgotten: it applies again where it is.
+         */
+        fun initial(available: Set<HighlightExtent>, remembered: String?): HighlightExtent =
+            entries.firstOrNull { it.name == remembered && it in available }
+                ?: if (Sentence in available) Sentence else Selection
+    }
+}
 
 /**
  * The places a highlight of a long press can take: the [selection] itself and, when the page could

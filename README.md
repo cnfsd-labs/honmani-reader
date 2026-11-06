@@ -24,8 +24,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Named bookmarks (reader menu): as many places per book as you like, jump from a list, rename or delete
   (Undo); a slider over the book shows the place as % and characters and jumps on release. After a jump,
   "Back to where you were" returns. Bookmarks are in the backup
-- Highlights in four colours (EPUB): long press a word, choose what to mark (selection, sentence, the
-  default, or paragraph) and a colour in the lookup panel; a new highlight replaces any it overlaps. They
+- Highlights in four colours (EPUB): long press a word, choose what to mark (selection, sentence, or paragraph; a sentence
+  at first, then the one you chose last) and a colour in the lookup panel; a new highlight replaces any it overlaps. They
   show in every theme; a tap on one offers its colours and "Remove highlight" (Undo); the reader menu
   lists them and jumps to one. In the backup. Making them needs "Look up selected text" (existing ones
   stay when it is off)

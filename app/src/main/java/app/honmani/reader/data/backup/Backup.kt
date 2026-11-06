@@ -18,6 +18,7 @@ import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.DaySettings
+import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
@@ -534,6 +535,7 @@ class Backup(
             AppearanceSettings.KEY_SHOW_PREVIOUS_SENTENCE to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_SHOW_WORD_FREQUENCY to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_SHOW_EXAMPLES to BackupValue.BOOLEAN,
+            HighlightSettings.KEY_EXTENT to BackupValue.STRING,
             ReviewSettings.KEY_NEW_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,

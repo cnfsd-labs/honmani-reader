@@ -658,6 +658,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 return HighlightControls(
                     current = null,
                     extents = extents.available.mapValues { it.value.text },
+                    rememberedExtent = container.highlightSettings.extent.value,
+                    onExtentChosen = { container.highlightSettings.setExtent(it.name) },
                     onPick = { color, extent ->
                         val passage = extents[extent]
                         viewModel.dismiss()
