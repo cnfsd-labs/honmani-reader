@@ -202,6 +202,10 @@
         <item quantity="one">Exported %d book</item>
         <item quantity="other">Exported %d books</item>
     </plurals>
+    <plurals name="library_watched_added">
+        <item quantity="one">%d new book from the watched folder</item>
+        <item quantity="other">%d new books from the watched folder</item>
+    </plurals>
     <string name="library_folder_duplicates">%d already in the library</string>
     <string name="library_folder_failed">%d failed</string>
     <string name="library_folder_nothing_new">Nothing was added.</string>
@@ -233,6 +237,15 @@
     <string name="settings_appearance_summary">Accent colour, difficulty on covers</string>
     <string name="settings_flashcards_summary">Anki cards, review, known words</string>
     <string name="settings_goal_summary">Daily goal, day starts at, reading time</string>
+    <string name="settings_watched_title">Watched folder</string>
+    <string name="settings_watched_none">Optional. New EPUB and text files in a folder you choose are added when the library opens. Books you remove are not added again.</string>
+    <string name="settings_watched_watching">Watching %1$s (and its subfolders). New books are added when the library opens.</string>
+    <string name="settings_watched_unavailable">Cannot read %1$s. Choose the folder again, or stop watching.</string>
+    <string name="settings_watched_choose">Choose a folder</string>
+    <string name="settings_watched_change">Choose another folder</string>
+    <string name="settings_watched_stop">Stop watching</string>
+    <string name="settings_watched_stop_details">Books already added stay in the library</string>
+    <string name="settings_watched_failed">That folder could not be kept. Try another one.</string>
     <string name="settings_books_summary">Auto-import and reading progress sync</string>
     <string name="settings_backup_summary">Save and restore your data</string>
     <string name="settings_help_summary">Diagnostics, network activity, version</string>

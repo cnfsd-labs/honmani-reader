@@ -182,6 +182,8 @@ fun LibraryScreen(
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
         if (it != null) viewModel.exportLibrary(it)
     }
+    // Books that appeared in the watched folder since the library was last open.
+    LaunchedEffect(viewModel) { viewModel.scanWatchedFolder() }
     LaunchedEffect(addBookOnStart) {
         when (addBookOnStart) {
             AddBookStart.FILES -> picker.launch(BOOK_MIME_TYPES)
@@ -367,6 +369,15 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
             ),
         ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
         batchSentence(sentence, notice.stopped, false)
+    }
+    is LibraryNotice.WatchedFolderAdded -> {
+        val resources = LocalContext.current.resources
+        BatchSummary.sentence(
+            listOf(
+                notice.imported to { n -> resources.getQuantityString(R.plurals.library_watched_added, n, n) },
+                notice.failed to { n -> resources.getString(R.string.library_folder_failed, n) },
+            ),
+        )
     }
     LibraryNotice.NoBooksInFolder -> stringResource(R.string.library_folder_no_books)
     LibraryNotice.NothingToExport -> stringResource(R.string.library_export_empty)

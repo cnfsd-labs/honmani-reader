@@ -5,8 +5,17 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import app.honmani.reader.diagnostics.logWarning
 
-/** One entry of a folder in a [DocumentTree]: [id] is the document id inside the tree. */
-data class TreeEntry(val id: String, val name: String, val isFolder: Boolean)
+/**
+ * One entry of a folder in a [DocumentTree]: [id] is the document id inside the tree. [size] and
+ * [modified] are what the provider reports (-1 / 0 if it does not), to tell a changed file apart.
+ */
+data class TreeEntry(
+    val id: String,
+    val name: String,
+    val isFolder: Boolean,
+    val size: Long = -1,
+    val modified: Long = 0,
+)
 
 /**
  * A folder the user picked, with its subfolders: what the folder import and the library export
@@ -38,6 +47,8 @@ class ResolverDocumentTree(private val resolver: ContentResolver, private val tr
             DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
         )
         resolver.query(uri, columns, null, null, null)?.use { cursor ->
             buildList {
@@ -48,6 +59,8 @@ class ResolverDocumentTree(private val resolver: ContentResolver, private val tr
                             id = id,
                             name = cursor.getString(1).orEmpty(),
                             isFolder = cursor.getString(2) == DocumentsContract.Document.MIME_TYPE_DIR,
+                            size = if (cursor.isNull(3)) -1 else cursor.getLong(3),
+                            modified = if (cursor.isNull(4)) 0 else cursor.getLong(4),
                         ),
                     )
                 }

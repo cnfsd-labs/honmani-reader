@@ -387,6 +387,7 @@ private fun SettingsContent(
                             modifier = Modifier.toggleable(catalog.autoImport, role = Role.Switch) { onAutoImportChange(catalog, it) },
                         )
                     }
+                    item { WatchedFolderSection() }
                     item { sync() }
                 }
                 SettingsPage.BACKUP -> item { backup() }

@@ -59,8 +59,8 @@ data class BookEntity(
 )
 
 /**
- * A catalogue book that left the library (removed by the reader, or unusable), so automatic
- * imports don't bring it back.
+ * A catalogue or watched-folder book that left the library (removed by the reader, or unusable),
+ * so automatic imports don't bring it back.
  */
 @Entity(tableName = "removed_book", primaryKeys = ["source", "source_id"])
 data class RemovedBookEntity(
@@ -79,4 +79,7 @@ enum class BookSource {
 
     /** Downloaded from a book catalogue; the source id is the OPDS entry id. */
     OPDS,
+
+    /** Found in the watched folder ([WatchedFolder]); a removed one is listed by its content hash. */
+    FOLDER,
 }

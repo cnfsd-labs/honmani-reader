@@ -7,6 +7,8 @@ import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.FakeDocumentTree
+import app.honmani.reader.data.library.FakeFolderTarget
+import app.honmani.reader.data.library.WatchedFolder
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.file
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
 import app.honmani.reader.data.stats.FinishedBookEntity
@@ -29,6 +31,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -212,6 +215,7 @@ class LibraryViewModelTest {
         tree: FakeDocumentTree,
         written: MutableMap<String, ByteArray> = HashMap(),
         onOpen: () -> Unit = {},
+        watched: WatchedFolder? = null,
     ) = LibraryViewModel(
         dao = dao,
         importer = importer,
@@ -226,6 +230,7 @@ class LibraryViewModelTest {
             written[uri.toString()] = file.readBytes()
         },
         openTree = { tree },
+        watchedFolder = watched,
     )
 
     @Test
@@ -251,6 +256,103 @@ class LibraryViewModelTest {
         assertEquals(listOf("A", "B", "C"), dao.books.value.map { it.title })
         assertTrue(dao.books.value.all { it.ttuId != null })
         assertNull(viewModel.uiState.value.batch)
+    }
+
+    private fun watchedFolder(permitted: Boolean = true): WatchedFolder {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        val preferences = context.getSharedPreferences("watched-vm-test", android.content.Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        return WatchedFolder(preferences, File(folder.root, "seen.tsv"), FakeFolderTarget()) { permitted }
+            .also { it.choose("content://tree/root") }
+    }
+
+    @Test
+    fun theWatchedFolderAddsNewBooksOnceAndStaysQuietWhenThereAreNone() = runBlocking {
+        val tree = FakeDocumentTree(
+            mapOf("root" to listOf(file("root/a.epub").copy(size = 1, modified = 1), file("root/readme.pdf"))),
+        )
+        files["root/a.epub"] = TestBooks.epub(title = "A")
+        var opened = 0
+        val watched = watchedFolder()
+        viewModel = viewModelOn(tree, onOpen = { opened++ }, watched = watched)
+
+        viewModel.scanWatchedFolder()
+
+        assertEquals(LibraryNotice.WatchedFolderAdded(1, 0), withTimeout(5_000) { viewModel.notices.first() })
+        assertEquals(listOf(BookSource.FOLDER), dao.books.value.map { it.source })
+        assertTrue(dao.books.value.single().ttuId != null)
+        assertEquals(WatchedFolder.State.Watching("root"), watched.state())
+
+        // The next library open: nothing new, nothing opened, no notice.
+        opened = 0
+        delay(100)
+        viewModel.scanWatchedFolder()
+        delay(200)
+        assertEquals(0, opened)
+        assertEquals(1, dao.books.value.size)
+        assertNull(withTimeoutOrNull(300) { withTimeout(5_000) { viewModel.notices.first() } })
+    }
+
+    @Test
+    fun aFileAddedLaterIsPickedUpOnTheNextScan() = runBlocking {
+        val entries = mutableListOf(file("root/a.epub").copy(size = 1, modified = 1))
+        val tree = FakeDocumentTree(mapOf("root" to entries))
+        files["root/a.epub"] = TestBooks.epub(title = "A")
+        files["root/b.epub"] = TestBooks.epub(title = "B")
+        viewModel = viewModelOn(tree, watched = watchedFolder())
+        viewModel.scanWatchedFolder()
+        assertEquals(LibraryNotice.WatchedFolderAdded(1, 0), withTimeout(5_000) { viewModel.notices.first() })
+
+        entries += file("root/b.epub").copy(size = 2, modified = 2)
+        // The first scan's job may still be finishing, and a scan is skipped while one runs.
+        eventually {
+            viewModel.scanWatchedFolder()
+            delay(50)
+            dao.books.value.takeIf { it.size == 2 }
+        }
+
+        assertEquals(LibraryNotice.WatchedFolderAdded(1, 0), withTimeout(5_000) { viewModel.notices.first() })
+        assertEquals(listOf("A", "B"), dao.books.value.map { it.title })
+    }
+
+    @Test
+    fun aBookRemovedFromTheLibraryStaysAwayFromTheWatchedFolder() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to listOf(file("root/a.epub").copy(size = 1, modified = 1))))
+        val bytes = TestBooks.epub(title = "A")
+        files["root/a.epub"] = bytes
+        val watched = watchedFolder()
+        viewModel = viewModelOn(tree, watched = watched)
+        viewModel.scanWatchedFolder()
+        withTimeout(5_000) { viewModel.notices.first() }
+        val book = dao.books.value.single()
+
+        viewModel.remove(book.id)
+        eventually { dao.books.value.takeIf { it.isEmpty() } }
+        assertEquals(listOf(RemovedBookEntity(BookSource.FOLDER, book.contentHash, 42L)), dao.removed.value)
+
+        // The file changed (new modified time) but its content is the removed book's.
+        val changed = FakeDocumentTree(mapOf("root" to listOf(file("root/a.epub").copy(size = 1, modified = 9))))
+        viewModel = viewModelOn(changed, watched = watched)
+        viewModel.scanWatchedFolder()
+        delay(300)
+        assertTrue(dao.books.value.isEmpty())
+    }
+
+    @Test
+    fun aMissingPermissionOrFolderGivesTheUnavailableStateWithoutANotice() = runBlocking {
+        val noPermission = watchedFolder(permitted = false)
+        viewModel = viewModelOn(FakeDocumentTree(mapOf("root" to emptyList())), watched = noPermission)
+        viewModel.scanWatchedFolder()
+        delay(200)
+        assertEquals(WatchedFolder.State.Unavailable("root"), noPermission.state())
+        assertNull(withTimeoutOrNull(300) { withTimeout(5_000) { viewModel.notices.first() } })
+
+        val gone = watchedFolder()
+        viewModel = viewModelOn(FakeDocumentTree(emptyMap()), watched = gone)
+        viewModel.scanWatchedFolder()
+        delay(200)
+        assertEquals(WatchedFolder.State.Unavailable("root"), gone.state())
+        assertTrue(dao.books.value.isEmpty())
     }
 
     @Test

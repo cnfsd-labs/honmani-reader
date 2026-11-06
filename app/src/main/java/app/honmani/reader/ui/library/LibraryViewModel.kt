@@ -28,6 +28,8 @@ import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.ResolverDocumentTree
 import app.honmani.reader.data.library.SampleBook
 import app.honmani.reader.data.library.TreeWalker
+import app.honmani.reader.data.library.WatchedFolder
+import app.honmani.reader.data.library.WatchedFolderScan
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.FinishedBooks
@@ -142,6 +144,9 @@ sealed interface LibraryNotice {
 
     data class CopyFailed(val title: String) : LibraryNotice
 
+    /** The watched folder had new books ([imported] added, [failed] unreadable); sent only if there were any. */
+    data class WatchedFolderAdded(val imported: Int, val failed: Int) : LibraryNotice
+
     /** A folder import ended ([stopped]: cancelled; [incomplete]: too many files or too deep). */
     data class FolderImported(
         val imported: Int,
@@ -233,11 +238,14 @@ class LibraryViewModel(
     private val openTree: (Uri) -> DocumentTree? = { null },
     /** Keeps the chosen folder and the open folder row over a restart; null: kept in memory only. */
     private val folderView: LibraryFolderView? = null,
+    /** The folder looked at for new books when the library opens; null: none. */
+    private val watchedFolder: WatchedFolder? = null,
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
     private val batch = MutableStateFlow<BatchProgress?>(null)
     private var batchJob: Job? = null
+    private var watchJob: Job? = null
     private val shelf = MutableStateFlow(Shelf(folderId = folderView?.chosen))
     private val foldersOpen = MutableStateFlow(folderView?.open ?: false)
     private val folderList = folders?.observeAll() ?: flowOf(emptyList())
@@ -399,7 +407,73 @@ class LibraryViewModel(
         }
     }
 
-    private suspend fun addQuietly(picked: PickedFile): BookAdder.Result = picked.input.use { adder.add(it, picked.name) }
+    private suspend fun addQuietly(picked: PickedFile, source: BookSource = BookSource.FILE): BookAdder.Result =
+        picked.input.use { adder.add(it, picked.name, source) }
+
+    /**
+     * Adds the books that are new in the watched folder since the last look (called when the
+     * library opens). Quiet unless something was added; an unreadable folder only sets the state
+     * the settings row shows.
+     */
+    fun scanWatchedFolder() {
+        val watched = watchedFolder ?: return
+        if (watchJob?.isActive == true) return
+        val folder = watched.folder ?: return
+        watchJob = viewModelScope.launch {
+            val documents = if (watched.isPermitted()) {
+                try {
+                    openTree(Uri.parse(folder))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                null
+            }
+            if (documents == null) {
+                watched.setProblem(true)
+                return@launch
+            }
+            val removedHashes = dao.removedSourceIds(BookSource.FOLDER).toSet()
+            val scan = withContext(Dispatchers.IO) {
+                WatchedFolderScan.find(documents, watched.seen, removedHashes) { entry ->
+                    try {
+                        openFile(documents.uriOf(entry.id))?.input?.use(WatchedFolderScan::sha256)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+            }
+            if (scan.files.isEmpty() && scan.unreadableFolders > 0) {
+                watched.setProblem(true)
+                return@launch
+            }
+            watched.setProblem(false)
+            var imported = 0
+            var failed = 0
+            try {
+                for (file in scan.files) {
+                    val result = addMutex.withLock {
+                        val picked = withContext(Dispatchers.IO) { openFile(documents.uriOf(file.id)) }
+                        picked?.let { addQuietly(it, BookSource.FOLDER) }
+                    }
+                    when (result) {
+                        is BookAdder.Result.Added -> imported++
+                        is BookAdder.Result.AlreadyInLibrary -> Unit
+                        else -> failed++
+                    }
+                    // A file that could not be opened or handed to the reader is tried again next time.
+                    if (result != null && result !is BookAdder.Result.ReaderFailed) watched.seen.mark(file)
+                }
+            } finally {
+                watched.seen.save()
+            }
+            if (imported > 0 || failed > 0) _notices.trySend(LibraryNotice.WatchedFolderAdded(imported, failed))
+        }
+    }
 
     /**
      * Adds every EPUB and text file in the folder [tree] and its subfolders, one after another,
@@ -700,6 +774,10 @@ class LibraryViewModel(
             forgetBookmarks(book.contentHash)
             forgetHighlights(book.contentHash)
             forgetPronunciations(book.contentHash)
+            // A book from the watched folder stays removed, by its content hash.
+            if (book.source == BookSource.FOLDER) {
+                dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, book.contentHash, now()))
+            }
             // A book from a catalogue stays removed: automatic imports skip it from now on.
             book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
                 dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
@@ -756,6 +834,7 @@ class LibraryViewModel(
                     grades = container.difficultyStore.grades,
                     folders = container.folders,
                     folderView = container.libraryFolderView,
+                    watchedFolder = container.watchedFolder,
                     openTree = { uri ->
                         try {
                             ResolverDocumentTree(application.contentResolver, uri)

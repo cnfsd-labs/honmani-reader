@@ -42,6 +42,7 @@ import app.honmani.reader.data.examples.ExampleSentences
 import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.BookDao
+import app.honmani.reader.data.library.WatchedFolder
 import app.honmani.reader.data.library.BookmarkDao
 import app.honmani.reader.data.library.HighlightDao
 import app.honmani.reader.data.library.PronunciationDao
@@ -216,6 +217,18 @@ class AppContainer(context: Context) {
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
     val libraryFolderView: LibraryFolderView by lazy { LibraryFolderView(devicePreferences) }
+
+    /** Settings → Books and sync: the folder the library looks in for new books when it opens. */
+    val watchedFolder: WatchedFolder by lazy {
+        WatchedFolder(
+            preferences = devicePreferences,
+            seenFile = File(appContext.noBackupFilesDir, "watched-folder-seen.tsv"),
+            target = ContentFolderTarget(appContext.contentResolver),
+            permitted = { folder ->
+                appContext.contentResolver.persistedUriPermissions.any { it.uri.toString() == folder && it.isReadPermission }
+            },
+        )
+    }
 
     val booksDir = File(appContext.filesDir, "books")
 

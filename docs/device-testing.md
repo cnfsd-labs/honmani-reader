@@ -276,6 +276,21 @@ adb shell bmgr transport com.google.android.gms/.backup.BackupTransportService
 adb shell bmgr enable false
 ```
 
+## Watched folder
+
+- Settings -> Books and sync -> Watched folder (default none, no network, no background work). Push
+  a few EPUBs into a new folder (`adb push x.epub /sdcard/Documents/honmani-watch/`; Android 11+
+  refuses the root of Downloads), choose it, open the library: the books appear, one summary line
+  ("N new books from the watched folder"); opening the library again shows nothing and does not read
+  the files again.
+- Push another file: it appears on the next library open. Remove one of the books in Honmani: it stays
+  away on the next open although its file is still there (`removed_book` row, source FOLDER, the book's
+  hash). Force-stop and open again: the folder is still watched.
+- Delete the folder in the file app (or revoke access): the row says "Cannot read ..." in red, the
+  library shows no error. "Stop watching" keeps every imported book.
+- The seen list is `no_backup/watched-folder-seen.tsv`; the folder itself is `watched_folder` in the
+  `device` preferences (never backed up).
+
 ## Known limitations (no need to report)
 
 - Diagnostics show "Failed to register a ServiceWorker" (ttu's offline cache, unneeded).
