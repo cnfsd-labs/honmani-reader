@@ -30,6 +30,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val container = (application as HonmaniApplication).container
         val appearance = container.appearanceSettings
+        // A new start of the app (not a rotation) may pick a new random accent, before the first frame.
+        if (savedInstanceState == null) appearance.refreshRandomAccent(container.dayClock.today().toEpochDay(), newLaunch = true)
         // Once per app start (not on rotation): new books from catalogues with automatic import,
         // new versions of installed dictionaries (offered in Dictionaries, not installed), and
         // grading books that have no difficulty yet.
@@ -58,6 +60,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // A day that changed while the app was in the background gives "every day" a new colour.
+        val container = (application as HonmaniApplication).container
+        container.appearanceSettings.refreshRandomAccent(container.dayClock.today().toEpochDay(), newLaunch = false)
         // Whatever the reader's other phones wrote into the sync folder (if turned on) comes in.
         (application as HonmaniApplication).container.syncWithFolder()
     }

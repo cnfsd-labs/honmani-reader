@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.random.Random
 
 /**
  * The app's accent colour. [SYSTEM] takes Material You colours from the wallpaper (Android 12+);
@@ -32,6 +33,40 @@ enum class Accent(val color: Long?) {
     }
 }
 
+/** How often the accent colour changes by itself (Settings → Appearance); off by default. */
+enum class AccentRandom {
+    OFF,
+    DAILY,
+    LAUNCH,
+    ;
+
+    companion object {
+        fun fromName(name: String?): AccentRandom = entries.firstOrNull { it.name == name } ?: OFF
+    }
+}
+
+/** The pure rule of the random accent: when it is due and which colour it takes. */
+object RandomAccent {
+    /** The colours a pick may take: the named ones, not System and not Custom. */
+    val CHOICES: List<Accent> = Accent.entries.filter { it.color != null }
+
+    /**
+     * The next accent, or null when none is due. Every launch is due on a new start of the app
+     * ([newLaunch]), every day when the day of the last pick ([lastDay], null if never) is not
+     * [today]. Never the [current] colour again; [roll] gives a number below its argument.
+     */
+    fun next(mode: AccentRandom, current: Accent, lastDay: Long?, today: Long, newLaunch: Boolean, roll: (Int) -> Int): Accent? {
+        val due = when (mode) {
+            AccentRandom.OFF -> false
+            AccentRandom.DAILY -> lastDay != today
+            AccentRandom.LAUNCH -> newLaunch
+        }
+        if (!due) return null
+        val options = CHOICES.filter { it != current }
+        return options[roll(options.size)]
+    }
+}
+
 /**
  * The custom accent for a [hue] in degrees: saturation and lightness are fixed near the preset
  * colours', so every hue stays readable in the light and the dark theme.
@@ -56,10 +91,22 @@ fun customAccentColor(hue: Float): Long {
 private const val CUSTOM_SATURATION = 0.8f
 private const val CUSTOM_LIGHTNESS = 0.62f
 
-/** How the app looks. Stored in shared preferences; read once at start, then kept in memory. */
-class AppearanceSettings(private val preferences: SharedPreferences) {
+/**
+ * How the app looks. Stored in shared preferences; read once at start, then kept in memory.
+ * The random accent's mode and the colour it picked are settings (backed up, like the accent they
+ * replace); the day of its last pick is tied to this phone's clock and lives in [devicePreferences].
+ */
+class AppearanceSettings(
+    private val preferences: SharedPreferences,
+    private val devicePreferences: SharedPreferences,
+) {
     private val _accent = MutableStateFlow(Accent.fromName(preferences.getString(KEY_ACCENT, null)))
     val accent: StateFlow<Accent> = _accent.asStateFlow()
+
+    private val _randomAccent = MutableStateFlow(AccentRandom.fromName(preferences.getString(KEY_ACCENT_RANDOM, null)))
+
+    /** Whether the accent changes by itself, and how often. */
+    val randomAccent: StateFlow<AccentRandom> = _randomAccent.asStateFlow()
 
     private val _customHue = MutableStateFlow(preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE))
 
@@ -92,9 +139,28 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
      */
     val showExamples: StateFlow<Boolean> = _showExamples.asStateFlow()
 
+    /** The reader chose [accent] by hand: the random accent turns off. */
     fun setAccent(accent: Accent) {
         _accent.value = accent
-        preferences.edit().putString(KEY_ACCENT, accent.name).apply()
+        _randomAccent.value = AccentRandom.OFF
+        preferences.edit().putString(KEY_ACCENT, accent.name).putString(KEY_ACCENT_RANDOM, AccentRandom.OFF.name).apply()
+    }
+
+    /** Sets how often the accent changes; a random mode picks a colour now, on day [today]. */
+    fun setRandomAccent(mode: AccentRandom, today: Long, roll: (Int) -> Int = Random::nextInt) {
+        if (mode == _randomAccent.value) return
+        _randomAccent.value = mode
+        preferences.edit().putString(KEY_ACCENT_RANDOM, mode.name).apply()
+        refreshRandomAccent(today, newLaunch = true, roll)
+    }
+
+    /** Picks a new accent if the mode says one is due ([RandomAccent.next]); [today] is the day by `DayClock`. */
+    fun refreshRandomAccent(today: Long, newLaunch: Boolean, roll: (Int) -> Int = Random::nextInt) {
+        val lastDay = if (devicePreferences.contains(KEY_ACCENT_RANDOM_DAY)) devicePreferences.getLong(KEY_ACCENT_RANDOM_DAY, 0L) else null
+        val next = RandomAccent.next(_randomAccent.value, _accent.value, lastDay, today, newLaunch, roll) ?: return
+        _accent.value = next
+        preferences.edit().putString(KEY_ACCENT, next.name).apply()
+        devicePreferences.edit().putLong(KEY_ACCENT_RANDOM_DAY, today).apply()
     }
 
     fun setCustomHue(hue: Float) {
@@ -135,6 +201,7 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
+        _randomAccent.value = AccentRandom.fromName(preferences.getString(KEY_ACCENT_RANDOM, null))
         _customHue.value = preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE)
         _showDifficulty.value = preferences.getBoolean(KEY_SHOW_DIFFICULTY, true)
         _librarySort.value = preferences.getString(KEY_LIBRARY_SORT, null)
@@ -145,6 +212,10 @@ class AppearanceSettings(private val preferences: SharedPreferences) {
 
     companion object {
         const val KEY_ACCENT = "accent"
+        const val KEY_ACCENT_RANDOM = "accent_random"
+
+        /** In the device preferences: the day (epoch day) the random accent last picked. */
+        const val KEY_ACCENT_RANDOM_DAY = "accent_random_day"
         const val KEY_SHOW_DIFFICULTY = "show_difficulty"
         const val KEY_SHOW_PREVIOUS_SENTENCE = "show_previous_sentence"
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"

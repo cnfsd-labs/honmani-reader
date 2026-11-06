@@ -187,7 +187,7 @@ class AppContainer(context: Context) {
      */
     private val devicePreferences by lazy { appContext.getSharedPreferences(DEVICE_SETTINGS, Context.MODE_PRIVATE) }
 
-    val appearanceSettings: AppearanceSettings by lazy { AppearanceSettings(settingsPreferences) }
+    val appearanceSettings: AppearanceSettings by lazy { AppearanceSettings(settingsPreferences, devicePreferences) }
 
     /** The daily reading goal (Settings; shown in the statistics). */
     val readingGoalSettings: ReadingGoalSettings by lazy { ReadingGoalSettings(settingsPreferences) }

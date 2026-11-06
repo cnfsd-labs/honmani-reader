@@ -13,6 +13,11 @@
     <string name="nav_progress">Progress</string>
     <string name="nav_settings">Settings</string>
     <string name="settings_accent">Accent colour</string>
+    <string name="settings_accent_random">Random accent colour</string>
+    <string name="settings_accent_random_details">Picks one of the named colours, never the same twice in a row. Choosing a colour yourself turns it off.</string>
+    <string name="settings_accent_random_off">Off</string>
+    <string name="settings_accent_random_daily">Every day</string>
+    <string name="settings_accent_random_launch">Every launch</string>
     <string name="accent_purple">Purple</string>
     <string name="accent_blue">Blue</string>
     <string name="accent_teal">Teal</string>

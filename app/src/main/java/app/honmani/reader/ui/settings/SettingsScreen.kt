@@ -356,6 +356,7 @@ private fun SettingsContent(
                             supportingContent = { AccentPicker(accent, onAccentChange, customHue, onCustomHueChange) },
                         )
                     }
+                    item { RandomAccentSection() }
                     item {
                         ListItem(
                             headlineContent = { Text(stringResource(R.string.settings_cover_difficulty)) },

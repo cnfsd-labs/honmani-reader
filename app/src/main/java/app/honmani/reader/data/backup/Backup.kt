@@ -529,6 +529,7 @@ class Backup(
         /** The `settings` preferences a backup brings back, and their types. Add new settings here. */
         val SETTING_TYPES = mapOf(
             AppearanceSettings.KEY_ACCENT to BackupValue.STRING,
+            AppearanceSettings.KEY_ACCENT_RANDOM to BackupValue.STRING,
             AppearanceSettings.KEY_CUSTOM_HUE to BackupValue.FLOAT,
             AppearanceSettings.KEY_SHOW_DIFFICULTY to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_LIBRARY_SORT to BackupValue.STRING,
