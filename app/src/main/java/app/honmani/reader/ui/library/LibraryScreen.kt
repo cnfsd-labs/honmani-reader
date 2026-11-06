@@ -175,6 +175,12 @@ fun LibraryScreen(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         if (it.isNotEmpty()) viewModel.add(it)
     }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
+        if (it != null) viewModel.importFolder(it)
+    }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
+        if (it != null) viewModel.exportLibrary(it)
+    }
     LaunchedEffect(addBookOnStart) {
         when (addBookOnStart) {
             AddBookStart.FILES -> picker.launch(BOOK_MIME_TYPES)
@@ -263,6 +269,7 @@ fun LibraryScreen(
             autoImport = autoImport,
             snackbarHostState = snackbarHostState,
             onAdd = { choosingSource = true },
+            onCancelBatch = viewModel::cancelBatch,
             onOpen = viewModel::open,
             onRemove = viewModel::remove,
             onResetProgress = viewModel::resetProgress,
@@ -304,6 +311,14 @@ fun LibraryScreen(
                 choosingSource = false
                 opds.startAdding()
             },
+            onPickFolder = {
+                choosingSource = false
+                folderPicker.launch(null)
+            },
+            onExport = {
+                choosingSource = false
+                exportPicker.launch(null)
+            },
             onDismiss = { choosingSource = false },
         )
     }
@@ -330,6 +345,37 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.CopySaved -> stringResource(R.string.library_copy_saved, notice.title)
     is LibraryNotice.CopyFailed -> stringResource(R.string.library_copy_failed, notice.title)
     is LibraryNotice.PassedWhileReading -> pluralStringResource(R.plurals.passed_while_reading, notice.count, notice.count)
+    is LibraryNotice.FolderImported -> {
+        val resources = LocalContext.current.resources
+        val sentence = BatchSummary.sentence(
+            listOf(
+                notice.imported to { n -> resources.getQuantityString(R.plurals.library_folder_imported, n, n) },
+                notice.duplicates to { n -> resources.getString(R.string.library_folder_duplicates, n) },
+                notice.failed to { n -> resources.getString(R.string.library_folder_failed, n) },
+            ),
+        ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
+        batchSentence(sentence, notice.stopped, notice.incomplete)
+    }
+    is LibraryNotice.LibraryExported -> {
+        val resources = LocalContext.current.resources
+        val sentence = BatchSummary.sentence(
+            listOf(
+                notice.exported to { n -> resources.getQuantityString(R.plurals.library_exported, n, n) },
+                notice.failed to { n -> resources.getString(R.string.library_folder_failed, n) },
+            ),
+        ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
+        batchSentence(sentence, notice.stopped, false)
+    }
+    LibraryNotice.NoBooksInFolder -> stringResource(R.string.library_folder_no_books)
+    LibraryNotice.NothingToExport -> stringResource(R.string.library_export_empty)
+    LibraryNotice.FolderUnusable -> stringResource(R.string.library_folder_unusable)
+}
+
+@Composable
+private fun batchSentence(sentence: String, stopped: Boolean, incomplete: Boolean): String = buildString {
+    if (stopped) append(stringResource(R.string.library_batch_stopped)).append(' ')
+    append(sentence)
+    if (incomplete) append(' ').append(stringResource(R.string.library_folder_incomplete))
 }
 
 @Composable
@@ -338,6 +384,7 @@ private fun LibraryContent(
     snackbarHostState: SnackbarHostState,
     autoImport: AutoImportStatus? = null,
     onAdd: () -> Unit,
+    onCancelBatch: () -> Unit = {},
     onOpen: (id: Long) -> Unit,
     /** Removes a book; its reading statistics too if the flag is set. */
     onRemove: (id: Long, deleteStatistics: Boolean) -> Unit,
@@ -467,6 +514,7 @@ private fun LibraryContent(
                 .padding(top = padding.calculateTopPadding()),
         ) {
             uiState.adding?.let { AddingRow(stringResource(R.string.library_adding, it)) }
+            uiState.batch?.let { BatchRow(it, onCancelBatch) }
             autoImport?.let {
                 AddingRow(
                     text = stringResource(R.string.library_auto_importing, it.catalogTitle, it.bookTitle),
@@ -1005,6 +1053,37 @@ internal fun statusLabel(status: ReadingStatus): Int = when (status) {
     ReadingStatus.NOT_STARTED -> R.string.library_filter_not_started
     ReadingStatus.READING -> R.string.library_filter_reading
     ReadingStatus.FINISHED -> R.string.library_filter_finished
+}
+
+/** Progress of a folder import or the library export, with a way to stop it. */
+@Composable
+private fun BatchRow(batch: BatchProgress, onCancel: () -> Unit) {
+    val total = batch.total
+    val text = when {
+        total == null -> stringResource(if (batch.exporting) R.string.library_exporting_start else R.string.library_folder_searching)
+        batch.exporting -> stringResource(R.string.library_exporting, batch.done + 1, total, batch.current)
+        else -> stringResource(R.string.library_folder_importing, batch.done + 1, total, batch.current)
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (total != null && total > 0) {
+            ProgressBar(progress = { batch.done.toFloat() / total }, modifier = Modifier.fillMaxWidth())
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+            )
+            TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
+        }
+    }
 }
 
 @Composable

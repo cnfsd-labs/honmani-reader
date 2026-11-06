@@ -29,6 +29,8 @@ import app.honmani.reader.data.opds.OpdsCatalog
 fun AddBookSheet(
     catalogs: List<OpdsCatalog>,
     onPickFiles: () -> Unit,
+    onPickFolder: () -> Unit,
+    onExport: () -> Unit,
     onOpenCatalog: (OpdsCatalog) -> Unit,
     onEditCatalog: (OpdsCatalog) -> Unit,
     onAddCatalog: () -> Unit,
@@ -43,6 +45,13 @@ fun AddBookSheet(
                 supportingContent = { Text(stringResource(R.string.add_book_files_details)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onPickFiles),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.add_book_folder)) },
+                supportingContent = { Text(stringResource(R.string.add_book_folder_details)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onPickFolder),
             )
             for (catalog in catalogs) {
                 ListItem(
@@ -67,6 +76,13 @@ fun AddBookSheet(
                 supportingContent = { Text(stringResource(R.string.add_book_catalog_details)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onAddCatalog),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.library_export)) },
+                supportingContent = { Text(stringResource(R.string.library_export_details)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onExport),
             )
         }
     }

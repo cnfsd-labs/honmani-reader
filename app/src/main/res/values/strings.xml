@@ -169,6 +169,30 @@
     <string name="action_search">Search</string>
     <string name="action_done">Done</string>
     <string name="action_close">Close</string>
+    <string name="add_book_folder">A folder on this phone</string>
+    <string name="add_book_folder_details">Adds every EPUB and text file in it and its subfolders</string>
+    <string name="library_export">Export library</string>
+    <string name="library_export_details">Saves a copy of every book in a folder you choose</string>
+    <string name="library_folder_searching">Looking for books…</string>
+    <string name="library_folder_importing">Importing %1$d of %2$d: %3$s</string>
+    <string name="library_exporting_start">Getting ready to export…</string>
+    <string name="library_exporting">Exporting %1$d of %2$d: %3$s</string>
+    <plurals name="library_folder_imported">
+        <item quantity="one">Imported %d book</item>
+        <item quantity="other">Imported %d books</item>
+    </plurals>
+    <plurals name="library_exported">
+        <item quantity="one">Exported %d book</item>
+        <item quantity="other">Exported %d books</item>
+    </plurals>
+    <string name="library_folder_duplicates">%d already in the library</string>
+    <string name="library_folder_failed">%d failed</string>
+    <string name="library_folder_nothing_new">Nothing was added.</string>
+    <string name="library_batch_stopped">Stopped.</string>
+    <string name="library_folder_incomplete">The folder is large or deep: some books may not have been looked at. Run the import again to continue.</string>
+    <string name="library_folder_no_books">No EPUB or text files found in that folder.</string>
+    <string name="library_export_empty">There are no books to export.</string>
+    <string name="library_folder_unusable">That folder could not be used. Try another one.</string>
     <string name="library_auto_importing">Importing from %1$s: %2$s</string>
     <plurals name="library_auto_imported">
         <item quantity="one">%d new book added so far</item>

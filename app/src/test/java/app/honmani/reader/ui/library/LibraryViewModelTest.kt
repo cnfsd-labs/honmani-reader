@@ -6,6 +6,9 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
+import app.honmani.reader.data.library.FakeDocumentTree
+import app.honmani.reader.data.library.FakeDocumentTree.Companion.file
+import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.TestBooks
@@ -203,6 +206,120 @@ class LibraryViewModelTest {
         viewModel.saveCopy(book.id, Uri.parse("content://readonly/neko.epub"))
         assertEquals(LibraryNotice.CopyFailed("吾輩は猫である"), viewModel.notices.first())
         assertEquals("a_b.txt", LibraryViewModel.copyFileName("a/b", BookFormat.TXT))
+    }
+
+    private fun viewModelOn(
+        tree: FakeDocumentTree,
+        written: MutableMap<String, ByteArray> = HashMap(),
+        onOpen: () -> Unit = {},
+    ) = LibraryViewModel(
+        dao = dao,
+        importer = importer,
+        ttu = ttu,
+        openFile = { uri ->
+            onOpen()
+            files[uri.path!!.removePrefix("/")]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) }
+        },
+        now = { 42L },
+        writeDocument = { file, uri ->
+            if (uri.toString().endsWith("bad.epub")) throw java.io.IOException("full")
+            written[uri.toString()] = file.readBytes()
+        },
+        openTree = { tree },
+    )
+
+    @Test
+    fun importingAFolderAddsTheBooksInAllSubfolders() = runBlocking {
+        val tree = FakeDocumentTree(
+            mapOf(
+                "root" to listOf(file("root/a.epub"), file("root/readme.pdf"), folder("root/s"), folder("root/empty")),
+                "root/s" to listOf(file("root/s/b.epub"), file("root/s/copy-of-a.epub"), file("root/s/broken.epub"), folder("root/s/t")),
+                "root/s/t" to listOf(file("root/s/t/c.epub")),
+                "root/empty" to emptyList(),
+            ),
+        )
+        files["root/a.epub"] = TestBooks.epub(title = "A")
+        files["root/s/b.epub"] = TestBooks.epub(title = "B")
+        files["root/s/copy-of-a.epub"] = TestBooks.epub(title = "A")
+        files["root/s/broken.epub"] = "not a zip".toByteArray()
+        files["root/s/t/c.epub"] = TestBooks.epub(title = "C")
+        viewModel = viewModelOn(tree)
+
+        viewModel.importFolder(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.FolderImported(3, 1, 1, stopped = false, incomplete = false), viewModel.notices.first())
+        assertEquals(listOf("A", "B", "C"), dao.books.value.map { it.title })
+        assertTrue(dao.books.value.all { it.ttuId != null })
+        assertNull(viewModel.uiState.value.batch)
+    }
+
+    @Test
+    fun importingAFolderWithoutBooksSaysSo() = runBlocking {
+        viewModel = viewModelOn(FakeDocumentTree(mapOf("root" to listOf(file("root/x.pdf")))))
+
+        viewModel.importFolder(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.NoBooksInFolder, viewModel.notices.first())
+    }
+
+    @Test
+    fun cancellingAFolderImportKeepsWhatWasAdded() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to (1..40).map { file("root/b$it.epub") }))
+        for (i in 1..40) files["root/b$i.epub"] = TestBooks.epub(title = "Book $i")
+        var opened = 0
+        // The user taps Cancel while the third file is being opened.
+        viewModel = viewModelOn(tree, onOpen = { if (++opened == 3) viewModel.cancelBatch() })
+
+        viewModel.importFolder(Uri.parse("content://tree/root"))
+
+        val notice = viewModel.notices.first() as LibraryNotice.FolderImported
+        assertEquals(LibraryNotice.FolderImported(2, 0, 0, stopped = true, incomplete = false), notice)
+        assertEquals(2, dao.books.value.size)
+        assertNull(eventually { viewModel.uiState.value.takeIf { it.batch == null } }.batch)
+    }
+
+    @Test
+    fun exportingTheLibraryWritesEveryBookNamedByTitle() = runBlocking {
+        val written = HashMap<String, ByteArray>()
+        val tree = FakeDocumentTree(mapOf("root" to listOf(file("root/Neko.epub"))))
+        viewModel = viewModelOn(tree, written)
+        val first = TestBooks.epub(title = "Neko")
+        val second = TestBooks.epub(title = "Neko", author = "someone else")
+        val third = TestBooks.epub(title = "a/b")
+        addAndWait("1.epub", first)
+        addAndWait("2.epub", second)
+        addAndWait("3.epub", third)
+
+        viewModel.exportLibrary(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.LibraryExported(3, 0, stopped = false), viewModel.notices.first())
+        assertEquals(
+            setOf("content://tree/root/Neko (2).epub", "content://tree/root/Neko (3).epub", "content://tree/root/a_b.epub"),
+            written.keys,
+        )
+        assertTrue(first.contentEquals(written.getValue("content://tree/root/Neko (2).epub")))
+    }
+
+    @Test
+    fun aFailedExportRemovesItsHalfWrittenFileAndIsCounted() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to emptyList()))
+        viewModel = viewModelOn(tree)
+        addAndWait("1.epub", TestBooks.epub(title = "bad"))
+        addAndWait("2.epub", TestBooks.epub(title = "good"))
+
+        viewModel.exportLibrary(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.LibraryExported(1, 1, stopped = false), viewModel.notices.first())
+        assertEquals(listOf(Uri.parse("content://tree/root/bad.epub")), tree.deleted)
+    }
+
+    @Test
+    fun exportingAnEmptyLibrarySaysSo() = runBlocking {
+        viewModel = viewModelOn(FakeDocumentTree(mapOf("root" to emptyList())))
+
+        viewModel.exportLibrary(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.NothingToExport, viewModel.notices.first())
     }
 
     @Test
