@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -93,6 +94,8 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -143,6 +146,8 @@ fun WordsScreen(
     /** The review's entrance under the search field: cards due, new words the session would start. */
     reviewDue: Int = 0,
     reviewNew: Int = 0,
+    /** Ids of the words due today, marked with a dot in the list. */
+    dueIds: Set<Long> = emptySet(),
     onStartReview: () -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
@@ -369,6 +374,7 @@ fun WordsScreen(
         onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
         reviewDue = reviewDue,
         reviewNew = reviewNew,
+        dueIds = dueIds,
         onStartReview = onStartReview,
         reviewChoice = reviewChoice,
     )
@@ -442,6 +448,7 @@ private fun WordsContent(
     searchContent: (@Composable (Modifier) -> Unit)? = null,
     reviewDue: Int = 0,
     reviewNew: Int = 0,
+    dueIds: Set<Long> = emptySet(),
     onStartReview: () -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
 ) {
@@ -552,6 +559,7 @@ private fun WordsContent(
                     knownByReading = if (filter == WordFilter.KNOWN) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
                     uiState = uiState,
                     now = now,
+                    dueIds = dueIds,
                     onToggleExpanded = onToggleExpanded,
                     onToggleReadWord = onToggleReadWord,
                     onSetStarred = onSetStarred,
@@ -581,6 +589,7 @@ private fun WordList(
     knownByReading: List<Pair<String, Int>>,
     uiState: WordsUiState,
     now: Long,
+    dueIds: Set<Long>,
     onToggleExpanded: (id: Long) -> Unit,
     onToggleReadWord: (expression: String) -> Unit,
     onSetStarred: (id: Long, starred: Boolean) -> Unit,
@@ -642,26 +651,15 @@ private fun WordList(
             if (filter == WordFilter.LEARNING) {
                 item(key = "knownCard") { KnownWordsCard() }
             }
-            item(key = "hint") {
-                Text(
-                    text = stringResource(
-                        if (filter == WordFilter.LEARNING) R.string.words_learning_hint else R.string.words_known_hint,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
             items(words, key = { it.id }) { word ->
                 val expanded = word.id == uiState.expanded
                 WordRow(
                     word = word,
                     now = now,
-                    // Known words are listed by name only; details on a tap.
-                    compact = filter == WordFilter.KNOWN && !expanded,
                     steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
                     memory = if (filter == WordFilter.LEARNING) uiState.memory[word.id] else null,
                     frequency = uiState.frequencies[word.id],
+                    due = word.id in dueIds,
                     expanded = expanded,
                     lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
                     onToggleExpanded = { onToggleExpanded(word.id) },
@@ -926,12 +924,16 @@ private fun emptyText(filter: WordFilter) = when (filter) {
     WordFilter.KNOWN -> R.string.words_empty_known
 }
 
+/**
+ * One saved word. Collapsed: the word, its reading and one line of the first meaning, with a star
+ * if starred and a dot if due for review. A tap opens the rest (sentences, when and where it was
+ * looked up, progress) and the row of actions.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun WordRow(
     word: WordEntity,
     now: Long,
-    compact: Boolean,
     expanded: Boolean,
     lookups: List<WordLookupEntity>,
     /** Progress towards known, shown in the learning list. */
@@ -940,6 +942,8 @@ private fun WordRow(
     memory: Float? = null,
     /** How common the word is, if the setting is on and a frequency dictionary knows it. */
     frequency: Frequency? = null,
+    /** The word's card is due today. */
+    due: Boolean = false,
     onToggleExpanded: () -> Unit,
     onSetStarred: (Boolean) -> Unit,
     onMarkLearned: () -> Unit,
@@ -955,9 +959,9 @@ private fun WordRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggleExpanded)
-            .padding(start = 16.dp, top = 4.dp, bottom = if (compact) 4.dp else 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             // The reading follows the word, or moves below it when both don't fit on one line.
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -974,112 +978,140 @@ private fun WordRow(
                             .padding(bottom = 3.dp),
                     )
                 }
-                frequency?.let { FrequencyBadge(it) }
+                if (expanded) frequency?.let { FrequencyBadge(it) }
             }
-            AnkiButton(inAnki = word.ankiNoteId != null, adding = adding, onClick = { onAddToAnki(null) })
-            IconToggleButton(
-                checked = word.starred,
-                onCheckedChange = onSetStarred,
-                modifier = Modifier.size(ACTION_SIZE),
-            ) {
+            if (word.starred) {
                 Icon(
-                    imageVector = if (word.starred) Icons.Filled.Star else Icons.Outlined.Star,
-                    contentDescription = stringResource(
-                        if (word.starred) R.string.action_unstar_word else R.string.action_star_word,
-                    ),
-                    tint = if (word.starred) highlight else muted,
+                    Icons.Filled.Star,
+                    contentDescription = stringResource(R.string.word_starred),
+                    tint = highlight,
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(16.dp),
                 )
             }
-            if (word.status == WordStatus.LEARNED) {
-                IconButton(onClick = onMarkLearning, modifier = Modifier.size(ACTION_SIZE)) {
-                    Icon(
-                        Icons.Filled.Refresh,
-                        contentDescription = stringResource(R.string.action_mark_learning),
-                        tint = muted,
-                    )
-                }
-            } else {
-                IconButton(onClick = onMarkLearned, modifier = Modifier.size(ACTION_SIZE)) {
-                    Icon(
-                        Icons.Filled.Check,
-                        contentDescription = stringResource(R.string.action_mark_learned),
-                        tint = muted,
-                    )
-                }
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(ACTION_SIZE)) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = muted)
+            if (due) {
+                val description = stringResource(R.string.word_due)
+                Box(
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(8.dp)
+                        .background(highlight, CircleShape)
+                        .semantics { contentDescription = description },
+                )
             }
         }
-        if (!compact) {
-            Column(modifier = Modifier.padding(end = 16.dp)) {
-                if (word.gloss.isNotEmpty()) {
-                    Text(
-                        text = word.gloss,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = if (expanded) Int.MAX_VALUE else 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (expanded && word.note.isNotEmpty()) {
-                    Text(
-                        text = stringResource(R.string.word_note_line, word.note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = muted,
-                    )
-                }
-                if (expanded && lookups.isNotEmpty()) {
-                    for (lookup in lookups) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                Sentence(
-                                    sentence = sentenceText(
-                                        lookup.sentence,
-                                        lookup.surfaceStart,
-                                        lookup.surfaceEnd,
-                                        highlight,
-                                    ),
-                                    source = lookup.bookTitle,
-                                    maxLines = Int.MAX_VALUE,
+        if (word.gloss.isNotEmpty()) {
+            Text(
+                text = word.gloss,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = if (expanded) Int.MAX_VALUE else 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (expanded) {
+            if (word.note.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.word_note_line, word.note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                )
+            }
+            if (lookups.isNotEmpty()) {
+                for (lookup in lookups) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            Sentence(
+                                sentence = sentenceText(
+                                    lookup.sentence,
+                                    lookup.surfaceStart,
+                                    lookup.surfaceEnd,
+                                    highlight,
+                                ),
+                                source = lookup.bookTitle,
+                                maxLines = Int.MAX_VALUE,
+                            )
+                        }
+                        // A card with this sentence instead of the latest one.
+                        if (word.ankiNoteId == null && lookups.size > 1) {
+                            IconButton(
+                                onClick = { onAddToAnki(lookup) },
+                                enabled = !adding,
+                                modifier = Modifier.size(ACTION_SIZE),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_add_card),
+                                    contentDescription = stringResource(R.string.action_add_to_anki_with_sentence),
+                                    tint = muted,
                                 )
-                            }
-                            // A card with this sentence instead of the latest one.
-                            if (word.ankiNoteId == null && lookups.size > 1) {
-                                IconButton(
-                                    onClick = { onAddToAnki(lookup) },
-                                    enabled = !adding,
-                                    modifier = Modifier.size(ACTION_SIZE),
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_add_card),
-                                        contentDescription = stringResource(R.string.action_add_to_anki_with_sentence),
-                                        tint = muted,
-                                    )
-                                }
                             }
                         }
                     }
-                } else {
-                    Sentence(
-                        sentence = sentenceText(word.lastSentence, word.lastSurfaceStart, word.lastSurfaceEnd, highlight),
-                        source = null,
-                        maxLines = 2,
-                    )
                 }
-                if (memory != null) MemoryRing(memory) else steps?.let { StepsBar(it) }
-                Text(
-                    text = details(word, now),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = muted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp),
+            } else {
+                Sentence(
+                    sentence = sentenceText(word.lastSentence, word.lastSurfaceStart, word.lastSurfaceEnd, highlight),
+                    source = null,
+                    maxLines = Int.MAX_VALUE,
                 )
             }
-        }
-        if (expanded) {
-            // Names and wrong splits: no marks, no counts, no review (see WordEntity.ignored).
-            TextButton(onClick = onIgnore) { Text(stringResource(R.string.action_ignore_word)) }
+            if (memory != null) MemoryRing(memory) else steps?.let { StepsBar(it) }
+            Text(
+                text = details(word, now),
+                style = MaterialTheme.typography.labelSmall,
+                color = muted,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+            ) {
+                AnkiButton(inAnki = word.ankiNoteId != null, adding = adding, onClick = { onAddToAnki(null) })
+                IconToggleButton(
+                    checked = word.starred,
+                    onCheckedChange = onSetStarred,
+                    modifier = Modifier.size(ACTION_SIZE),
+                ) {
+                    Icon(
+                        imageVector = if (word.starred) Icons.Filled.Star else Icons.Outlined.Star,
+                        contentDescription = stringResource(
+                            if (word.starred) R.string.action_unstar_word else R.string.action_star_word,
+                        ),
+                        tint = if (word.starred) highlight else muted,
+                    )
+                }
+                if (word.status == WordStatus.LEARNED) {
+                    IconButton(onClick = onMarkLearning, modifier = Modifier.size(ACTION_SIZE)) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = stringResource(R.string.action_mark_learning),
+                            tint = muted,
+                        )
+                    }
+                } else {
+                    IconButton(onClick = onMarkLearned, modifier = Modifier.size(ACTION_SIZE)) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = stringResource(R.string.action_mark_learned),
+                            tint = muted,
+                        )
+                    }
+                }
+                // Names and wrong splits: no marks, no counts, no review (see WordEntity.ignored).
+                IconButton(onClick = onIgnore, modifier = Modifier.size(ACTION_SIZE)) {
+                    Icon(
+                        painterResource(R.drawable.ic_hidden),
+                        contentDescription = stringResource(R.string.action_ignore_word),
+                        tint = muted,
+                    )
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(ACTION_SIZE)) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete), tint = muted)
+                }
+            }
         }
     }
 }
@@ -1103,8 +1135,8 @@ private fun AnkiButton(inAnki: Boolean, adding: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** Word actions are a little smaller than the usual 48 dp so the four fit beside long words. */
-private val ACTION_SIZE = 40.dp
+/** The word actions' touch size. */
+private val ACTION_SIZE = 48.dp
 
 @Composable
 private fun Sentence(sentence: AnnotatedString, source: String?, maxLines: Int) {

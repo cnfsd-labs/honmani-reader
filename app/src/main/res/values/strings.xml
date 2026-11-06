@@ -270,9 +270,7 @@
     <string name="words_filter_known">Known (%1$d)</string>
     <string name="words_empty_learning">Words you look up while reading appear here by themselves, starred ones first, then the ones you look up most. Each time you read a word it moves up a step (pages flicked past or skipped don\'t count); after 9 reads without looking it up it is known. A lookup takes it back two steps.</string>
     <string name="words_empty_known">Words you have read 9 times without looking them up appear here, and words you mark as learned (✓).</string>
-    <string name="words_learning_hint">After 9 reads without a lookup a word is known; a lookup takes it back two steps.</string>
     <string name="words_read_no_entry">Your dictionaries have no entry for this word.</string>
-    <string name="words_known_hint">Known from reading in books with a difficulty, and words you marked as learned.</string>
     <string name="word_progress">%1$d%%</string>
     <string name="word_memory">Memory %1$d%%</string>
     <plurals name="word_read_times">
@@ -286,6 +284,8 @@
     </plurals>
     <string name="action_star_word">Star</string>
     <string name="action_unstar_word">Remove star</string>
+    <string name="word_starred">Starred</string>
+    <string name="word_due">Due for review</string>
     <string name="action_ignore_word">Ignore word</string>
     <string name="action_unignore_word">Stop ignoring</string>
     <string name="ignored_words_open">Ignored words</string>

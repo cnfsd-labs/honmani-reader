@@ -800,6 +800,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 onSearchFocused = { focusSearch = false },
                                 reviewDue = reviewDue,
                                 reviewNew = reviewNew,
+                                dueIds = dueToday.mapTo(HashSet()) { it.id },
                                 onStartReview = { reviewShown = true },
                                 reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
                                     container.reviewScope.value = it
