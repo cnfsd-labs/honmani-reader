@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -163,11 +164,16 @@ fun SearchContent(
     // Each query's results get their own list position, starting at the top: one shared state
     // would follow a keyed row of the previous results wherever it moved.
     val listState = rememberSaveable(results.query, saver = LazyListState.Saver) { LazyListState() }
-    // Reversed: the first result sits right above the field, within the thumb's reach, so the
-    // items go bottom to top (a section's title after its rows).
-    LazyColumn(modifier = modifier, state = listState, reverseLayout = true) {
+    // From the top: the first result is the most relevant one (the order of [LookupGroups]).
+    LazyColumn(modifier = modifier, state = listState) {
         if (query.isBlank()) {
             if (history.isNotEmpty()) {
+                item(key = "history") {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
+                        SectionTitle(stringResource(R.string.search_history), Modifier.weight(1f))
+                        TextButton(onClick = onForgetAll) { Text(stringResource(R.string.search_history_clear)) }
+                    }
+                }
                 items(history, key = { "h:$it" }) { text ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -192,12 +198,6 @@ fun SearchContent(
                         }
                     }
                 }
-                item(key = "history") {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
-                        SectionTitle(stringResource(R.string.search_history), Modifier.weight(1f))
-                        TextButton(onClick = onForgetAll) { Text(stringResource(R.string.search_history_clear)) }
-                    }
-                }
             }
             return@LazyColumn
         }
@@ -210,23 +210,25 @@ fun SearchContent(
             item(key = "english") { Message(stringResource(R.string.search_english_pending)) }
         }
         // The last results stay until the next ones are ready: no flicker while typing.
-        items(results.groups, key = { "d:${it.expression}:${it.reading}" }) { group ->
+        // The most relevant result, the first, is shown larger.
+        itemsIndexed(results.groups, key = { _, it -> "d:${it.expression}:${it.reading}" }) { index, group ->
             ResultRow(
                 expression = group.expression,
                 reading = group.reading,
                 meaning = group.sections.firstOrNull()?.senses.orEmpty().take(MEANINGS).joinToString("; ") { it.glosses.joinToString(", ") },
                 onClick = { onOpenGroup(group) },
+                prominent = index == 0,
             )
         }
         if (words.isNotEmpty()) {
-            items(words, key = { "w:${it.id}" }) { word ->
-                ResultRow(word.expression, word.reading, word.gloss) { onOpenWord(word) }
-            }
             item(key = "words") {
                 Column {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SectionTitle(stringResource(R.string.search_in_your_words), Modifier.padding(horizontal = 16.dp))
                 }
+            }
+            items(words, key = { "w:${it.id}" }) { word ->
+                ResultRow(word.expression, word.reading, word.gloss) { onOpenWord(word) }
             }
         }
     }
@@ -254,9 +256,9 @@ private fun Message(text: String) {
     )
 }
 
-/** A word: written form and reading on one line, its first meanings below. */
+/** A word: written form and reading on one line, its first meanings below; [prominent] for the best match. */
 @Composable
-private fun ResultRow(expression: String, reading: String, meaning: String, onClick: () -> Unit) {
+private fun ResultRow(expression: String, reading: String, meaning: String, prominent: Boolean = false, onClick: () -> Unit) {
     Column(
         verticalArrangement = Arrangement.spacedBy(2.dp),
         modifier = Modifier
@@ -265,11 +267,11 @@ private fun ResultRow(expression: String, reading: String, meaning: String, onCl
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(expression, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Text(expression, style = if (prominent) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             if (reading.isNotEmpty() && reading != expression) {
                 Text(
                     reading,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = if (prominent) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -279,7 +281,7 @@ private fun ResultRow(expression: String, reading: String, meaning: String, onCl
         if (meaning.isNotEmpty()) {
             Text(
                 meaning,
-                style = MaterialTheme.typography.bodyMedium,
+                style = if (prominent) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
