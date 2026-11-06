@@ -39,6 +39,9 @@ class UiSounds(
     private val ids = HashMap<UiSound, Int>()
     private val loaded = HashSet<Int>()
 
+    /** Asked for before its clip had loaded (the first sound after a start): plays once it has. */
+    private var waiting: Int? = null
+
     /** Read aloud or the audiobook is running in the reader; set by the reader screen. */
     @Volatile
     var readerSpeaking: Boolean = false
@@ -54,9 +57,8 @@ class UiSounds(
         Log.d(TAG, "${sound.name.lowercase()} ${if (allowed) "play" else "skipped (speech or media active)"}")
         if (!allowed) return
         val active = pool ?: create()
-        val id = ids[sound]
-        if (id == null || id !in loaded) return // Still loading: this one is lost, the next plays.
-        active.play(id, 1f, 1f, 1, 0, 1f)
+        val id = ids[sound] ?: return
+        if (id in loaded) active.play(id, 1f, 1f, 1, 0, 1f) else waiting = id
     }
 
     private fun create(): SoundPool {
@@ -69,7 +71,13 @@ class UiSounds(
                     .build(),
             )
             .build()
-        created.setOnLoadCompleteListener { _, sampleId, status -> if (status == 0) loaded.add(sampleId) }
+        created.setOnLoadCompleteListener { loadedPool, sampleId, status ->
+            if (status == 0) loaded.add(sampleId)
+            if (sampleId == waiting) {
+                waiting = null
+                if (status == 0) loadedPool.play(sampleId, 1f, 1f, 1, 0, 1f)
+            }
+        }
         for (sound in UiSound.entries) ids[sound] = created.load(appContext, sound.resource, 1)
         pool = created
         return created
@@ -80,6 +88,7 @@ class UiSounds(
         pool = null
         ids.clear()
         loaded.clear()
+        waiting = null
     }
 
     private companion object {
