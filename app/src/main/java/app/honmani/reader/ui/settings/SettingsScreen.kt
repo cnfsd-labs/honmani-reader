@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.settings
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +25,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Icon
@@ -67,14 +71,15 @@ import app.honmani.reader.data.library.SampleBook
 import app.honmani.reader.data.opds.OpdsCatalog
 import app.honmani.reader.data.settings.Accent
 import app.honmani.reader.data.settings.customAccentColor
+import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.dictionaries.DictionariesScreen
 import app.honmani.reader.ui.known.KnownWordsSettingsRow
 import app.honmani.reader.ui.theme.HonmaniTheme
 import kotlinx.coroutines.launch
 
 /**
- * Settings: the accent colour, book servers, Anki cards, the way into ttu's reader settings,
- * backups and diagnostics.
+ * Settings: a list of groups (reading, appearance, dictionaries, flashcards, goal and time, books and
+ * sync, backup, help and about), each opening its own page; Back from a page returns to the list.
  */
 @Composable
 fun SettingsScreen(
@@ -104,26 +109,33 @@ fun SettingsScreen(
             .getOrNull()
             .orEmpty()
     }
-    var showingAbout by rememberSaveable { mutableStateOf(false) }
-    if (showingAbout) {
-        AboutScreen(version, onBack = { showingAbout = false })
-        return
-    }
-    var showingNetwork by rememberSaveable { mutableStateOf(false) }
-    if (showingNetwork) {
-        NetworkActivityScreen(onBack = { showingNetwork = false })
-        return
-    }
-    var showingAnki by rememberSaveable { mutableStateOf(false) }
-    if (showingAnki) {
-        AnkiSettingsScreen(onBack = { showingAnki = false })
-        return
+    var page by rememberSaveable { mutableStateOf(SettingsPage.MAIN) }
+    val back = { page = page.parent ?: SettingsPage.MAIN }
+    when (page) {
+        SettingsPage.ABOUT -> {
+            AboutScreen(version, onBack = back)
+            return
+        }
+        SettingsPage.NETWORK -> {
+            NetworkActivityScreen(onBack = back)
+            return
+        }
+        SettingsPage.ANKI -> {
+            AnkiSettingsScreen(onBack = back)
+            return
+        }
+        else -> Unit
     }
     if (showingDictionaries) {
         DictionariesScreen(onBack = { onShowDictionaries(false) })
         return
     }
+    // Back from a group returns to the list; from the list it is the caller's.
+    BackHandler(enabled = page != SettingsPage.MAIN, onBack = back)
     SettingsContent(
+        page = page,
+        onBack = back,
+        onOpenPage = { page = it },
         version = version,
         accent = accent,
         onAccentChange = appearance::setAccent,
@@ -148,11 +160,9 @@ fun SettingsScreen(
         onOpenDictionaries = { onShowDictionaries(true) },
         onOpenReaderSettings = onOpenReaderSettings,
         onShareDiagnostics = onShareDiagnostics,
-        onOpenAbout = { showingAbout = true },
-        onOpenNetworkActivity = { showingNetwork = true },
         onOpenSample = onOpenSample,
         review = { ReviewSettingsSection() },
-        anki = { AnkiSettingsRow(onClick = { showingAnki = true }) },
+        anki = { AnkiSettingsRow(onClick = { page = SettingsPage.ANKI }) },
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
         goal = { ReadingGoalSection() },
@@ -164,6 +174,9 @@ fun SettingsScreen(
 
 @Composable
 private fun SettingsContent(
+    page: SettingsPage,
+    onBack: () -> Unit,
+    onOpenPage: (SettingsPage) -> Unit,
     version: String,
     accent: Accent,
     onAccentChange: (Accent) -> Unit,
@@ -183,8 +196,6 @@ private fun SettingsContent(
     onOpenDictionaries: () -> Unit,
     onOpenReaderSettings: () -> Unit,
     onShareDiagnostics: () -> Unit,
-    onOpenAbout: () -> Unit,
-    onOpenNetworkActivity: () -> Unit = {},
     onOpenSample: (SampleBook) -> Unit = {},
     review: @Composable () -> Unit = {},
     anki: @Composable () -> Unit = {},
@@ -205,8 +216,11 @@ private fun SettingsContent(
             onDismiss = { showingSamples = false },
         )
     }
-    // No title: the bottom bar names the tab.
+    // The list has no title (the bottom bar names the tab); a group has a title and Back.
     Scaffold(
+        topBar = {
+            if (page != SettingsPage.MAIN) HonmaniTopAppBar(title = stringResource(page.title), onBack = onBack)
+        },
         bottomBar = bottomBar,
     ) { padding ->
         LazyColumn(
@@ -215,135 +229,211 @@ private fun SettingsContent(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            item { SectionHeading(R.string.settings_section_reading) }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_reader)) },
-                    supportingContent = { Text(stringResource(R.string.settings_reader_details)) },
-                    modifier = Modifier.clickable(onClick = onOpenReaderSettings),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.dictionaries_title)) },
-                    supportingContent = {
-                        if (dictionaryUpdates > 0) {
-                            Text(
-                                pluralStringResource(R.plurals.settings_dictionary_updates, dictionaryUpdates, dictionaryUpdates),
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        } else if (dictionaries == 0) {
-                            Text(stringResource(R.string.settings_dictionaries_none))
-                        } else {
-                            Text(pluralStringResource(R.plurals.settings_dictionaries_installed, dictionaries, dictionaries))
-                        }
-                    },
-                    trailingContent = { if (dictionaryUpdates > 0) Badge() },
-                    modifier = Modifier.clickable(onClick = onOpenDictionaries),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_previous_sentence)) },
-                    supportingContent = { Text(stringResource(R.string.settings_previous_sentence_details)) },
-                    trailingContent = { Switch(checked = showPreviousSentence, onCheckedChange = null) },
-                    modifier = Modifier.toggleable(
-                        showPreviousSentence,
-                        role = Role.Switch,
-                        onValueChange = onShowPreviousSentenceChange,
-                    ),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_word_frequency)) },
-                    supportingContent = { Text(stringResource(R.string.settings_word_frequency_details)) },
-                    trailingContent = { Switch(checked = showWordFrequency, onCheckedChange = null) },
-                    modifier = Modifier.toggleable(
-                        showWordFrequency,
-                        role = Role.Switch,
-                        onValueChange = onShowWordFrequencyChange,
-                    ),
-                )
-            }
-            item { examples() }
-            item { goal() }
-            item { dayStart() }
-            item { readingTime() }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_sample_books)) },
-                    supportingContent = { Text(stringResource(R.string.settings_sample_books_details)) },
-                    modifier = Modifier.clickable { showingSamples = true },
-                )
-            }
-            item { SectionHeading(R.string.settings_section_appearance) }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_accent)) },
-                    supportingContent = { AccentPicker(accent, onAccentChange, customHue, onCustomHueChange) },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.settings_cover_difficulty)) },
-                    supportingContent = { Text(stringResource(R.string.settings_cover_difficulty_details)) },
-                    trailingContent = { Switch(checked = showDifficulty, onCheckedChange = null) },
-                    modifier = Modifier.toggleable(showDifficulty, role = Role.Switch, onValueChange = onShowDifficultyChange),
-                )
-            }
-            item { SectionHeading(R.string.settings_section_flashcards) }
-            item { review() }
-            item { anki() }
-            item { KnownWordsSettingsRow() }
-            item { SectionHeading(R.string.settings_section_books) }
-            items(catalogs, key = { it.id }) { catalog ->
-                ListItem(
-                    headlineContent = { Text(catalog.title) },
-                    supportingContent = { Text(stringResource(R.string.catalog_auto_import_details)) },
-                    trailingContent = {
-                        Switch(checked = catalog.autoImport, onCheckedChange = null)
-                    },
-                    modifier = Modifier.toggleable(catalog.autoImport, role = Role.Switch) { onAutoImportChange(catalog, it) },
-                )
-            }
-            item { sync() }
-            item { SectionHeading(R.string.settings_section_data) }
-            item { backup() }
-            item { SectionHeading(R.string.settings_section_help) }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.action_share_diagnostics)) },
-                    supportingContent = { Text(stringResource(R.string.settings_diagnostics_details)) },
-                    modifier = Modifier.clickable(onClick = onShareDiagnostics),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.network_activity_title)) },
-                    supportingContent = { Text(stringResource(R.string.network_activity_summary)) },
-                    modifier = Modifier.clickable(onClick = onOpenNetworkActivity),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text(stringResource(R.string.about_title)) },
-                    supportingContent = { Text(stringResource(R.string.settings_about_details, version)) },
-                    modifier = Modifier.clickable(onClick = onOpenAbout),
-                )
+            when (page) {
+                SettingsPage.MAIN -> {
+                    item {
+                        GroupRow(
+                            icon = { Icon(painterResource(R.drawable.ic_reading), contentDescription = null) },
+                            title = R.string.settings_section_reading,
+                            summary = { Text(stringResource(R.string.settings_reading_summary)) },
+                            onClick = { onOpenPage(SettingsPage.READING) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
+                            title = R.string.settings_section_appearance,
+                            summary = { Text(stringResource(R.string.settings_appearance_summary)) },
+                            onClick = { onOpenPage(SettingsPage.APPEARANCE) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            title = R.string.dictionaries_title,
+                            summary = {
+                                if (dictionaryUpdates > 0) {
+                                    Text(
+                                        pluralStringResource(R.plurals.settings_dictionary_updates, dictionaryUpdates, dictionaryUpdates),
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                } else if (dictionaries == 0) {
+                                    Text(stringResource(R.string.settings_dictionaries_none))
+                                } else {
+                                    Text(pluralStringResource(R.plurals.settings_dictionaries_installed, dictionaries, dictionaries))
+                                }
+                            },
+                            trailing = { if (dictionaryUpdates > 0) Badge() },
+                            onClick = onOpenDictionaries,
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(painterResource(R.drawable.ic_add_card), contentDescription = null) },
+                            title = R.string.settings_section_flashcards,
+                            summary = { Text(stringResource(R.string.settings_flashcards_summary)) },
+                            onClick = { onOpenPage(SettingsPage.FLASHCARDS) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                            title = R.string.settings_section_goal,
+                            summary = { Text(stringResource(R.string.settings_goal_summary)) },
+                            onClick = { onOpenPage(SettingsPage.GOAL) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(painterResource(R.drawable.ic_cloud), contentDescription = null) },
+                            title = R.string.settings_section_books,
+                            summary = { Text(stringResource(R.string.settings_books_summary)) },
+                            onClick = { onOpenPage(SettingsPage.BOOKS) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(painterResource(R.drawable.ic_export), contentDescription = null) },
+                            title = R.string.settings_section_data,
+                            summary = { Text(stringResource(R.string.settings_backup_summary)) },
+                            onClick = { onOpenPage(SettingsPage.BACKUP) },
+                        )
+                    }
+                    item {
+                        GroupRow(
+                            icon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                            title = R.string.settings_section_help,
+                            summary = { Text(stringResource(R.string.settings_help_summary)) },
+                            onClick = { onOpenPage(SettingsPage.HELP) },
+                        )
+                    }
+                }
+                SettingsPage.READING -> {
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_reader)) },
+                            supportingContent = { Text(stringResource(R.string.settings_reader_details)) },
+                            modifier = Modifier.clickable(onClick = onOpenReaderSettings),
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_previous_sentence)) },
+                            supportingContent = { Text(stringResource(R.string.settings_previous_sentence_details)) },
+                            trailingContent = { Switch(checked = showPreviousSentence, onCheckedChange = null) },
+                            modifier = Modifier.toggleable(
+                                showPreviousSentence,
+                                role = Role.Switch,
+                                onValueChange = onShowPreviousSentenceChange,
+                            ),
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_word_frequency)) },
+                            supportingContent = { Text(stringResource(R.string.settings_word_frequency_details)) },
+                            trailingContent = { Switch(checked = showWordFrequency, onCheckedChange = null) },
+                            modifier = Modifier.toggleable(
+                                showWordFrequency,
+                                role = Role.Switch,
+                                onValueChange = onShowWordFrequencyChange,
+                            ),
+                        )
+                    }
+                    item { examples() }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_sample_books)) },
+                            supportingContent = { Text(stringResource(R.string.settings_sample_books_details)) },
+                            modifier = Modifier.clickable { showingSamples = true },
+                        )
+                    }
+                }
+                SettingsPage.APPEARANCE -> {
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_accent)) },
+                            supportingContent = { AccentPicker(accent, onAccentChange, customHue, onCustomHueChange) },
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.settings_cover_difficulty)) },
+                            supportingContent = { Text(stringResource(R.string.settings_cover_difficulty_details)) },
+                            trailingContent = { Switch(checked = showDifficulty, onCheckedChange = null) },
+                            modifier = Modifier.toggleable(showDifficulty, role = Role.Switch, onValueChange = onShowDifficultyChange),
+                        )
+                    }
+                }
+                SettingsPage.FLASHCARDS -> {
+                    item { review() }
+                    item { anki() }
+                    item { KnownWordsSettingsRow() }
+                }
+                SettingsPage.GOAL -> {
+                    item { goal() }
+                    item { dayStart() }
+                    item { readingTime() }
+                }
+                SettingsPage.BOOKS -> {
+                    items(catalogs, key = { it.id }) { catalog ->
+                        ListItem(
+                            headlineContent = { Text(catalog.title) },
+                            supportingContent = { Text(stringResource(R.string.catalog_auto_import_details)) },
+                            trailingContent = {
+                                Switch(checked = catalog.autoImport, onCheckedChange = null)
+                            },
+                            modifier = Modifier.toggleable(catalog.autoImport, role = Role.Switch) { onAutoImportChange(catalog, it) },
+                        )
+                    }
+                    item { sync() }
+                }
+                SettingsPage.BACKUP -> item { backup() }
+                SettingsPage.HELP -> {
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.action_share_diagnostics)) },
+                            supportingContent = { Text(stringResource(R.string.settings_diagnostics_details)) },
+                            modifier = Modifier.clickable(onClick = onShareDiagnostics),
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.network_activity_title)) },
+                            supportingContent = { Text(stringResource(R.string.network_activity_summary)) },
+                            modifier = Modifier.clickable { onOpenPage(SettingsPage.NETWORK) },
+                        )
+                    }
+                    item {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.about_title)) },
+                            supportingContent = { Text(stringResource(R.string.settings_about_details, version)) },
+                            modifier = Modifier.clickable { onOpenPage(SettingsPage.ABOUT) },
+                        )
+                    }
+                }
+                // Shown by SettingsScreen on their own, without the list.
+                SettingsPage.ANKI, SettingsPage.NETWORK, SettingsPage.ABOUT -> Unit
             }
         }
     }
 }
 
-/** A group's title in the settings list. */
+/** A row of the main list: an icon, the group's name and a one-line summary. */
 @Composable
-private fun SectionHeading(@StringRes title: Int) {
-    Text(
-        text = stringResource(title),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+private fun GroupRow(
+    icon: @Composable () -> Unit,
+    @StringRes title: Int,
+    summary: @Composable () -> Unit,
+    onClick: () -> Unit,
+    trailing: @Composable (() -> Unit)? = null,
+) {
+    ListItem(
+        leadingContent = icon,
+        headlineContent = { Text(stringResource(title)) },
+        supportingContent = summary,
+        trailingContent = trailing,
+        modifier = Modifier.clickable(onClick = onClick),
     )
 }
 
@@ -512,6 +602,9 @@ private fun Accent.label(): Int = when (this) {
 private fun SettingsPreview() {
     HonmaniTheme {
         SettingsContent(
+            page = SettingsPage.MAIN,
+            onBack = {},
+            onOpenPage = {},
             version = "0.1",
             accent = Accent.PURPLE,
             onAccentChange = {},
@@ -531,7 +624,6 @@ private fun SettingsPreview() {
             onOpenDictionaries = {},
             onOpenReaderSettings = {},
             onShareDiagnostics = {},
-            onOpenAbout = {},
         )
     }
 }
