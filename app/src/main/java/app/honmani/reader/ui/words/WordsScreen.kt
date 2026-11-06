@@ -16,10 +16,8 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
-import app.honmani.reader.ui.review.ReviewEntry
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.search.SearchContent
-import app.honmani.reader.ui.search.SearchField
 import app.honmani.reader.ui.search.SearchViewModel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +40,15 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.focusRequester
+import app.honmani.reader.ui.search.SearchResults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -280,16 +287,41 @@ fun WordsScreen(
     val searchResults by search.results.collectAsStateWithLifecycle()
     val history by search.history.collectAsStateWithLifecycle()
     val panel by searchPanel.panel.collectAsStateWithLifecycle()
-    var fieldFocused by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    val pager = rememberPagerState { WordsPage.entries.size }
+    val scope = rememberCoroutineScope()
+    // The field takes focus once the Dictionary page is there: a tap on its tab or the launcher's shortcut.
+    var focusWanted by remember { mutableStateOf(false) }
     LaunchedEffect(focusSearch) {
         if (focusSearch) {
-            focus.requestFocus()
-            keyboard?.show()
+            pager.scrollToPage(WordsPage.DICTIONARY.ordinal)
+            focusWanted = true
             onSearchFocused()
         }
+    }
+    LaunchedEffect(focusWanted) {
+        if (focusWanted) {
+            snapshotFlow { pager.currentPage == WordsPage.DICTIONARY.ordinal && !pager.isScrollInProgress }.first { it }
+            focus.requestFocus()
+            keyboard?.show()
+            focusWanted = false
+        }
+    }
+    // Leaving the Dictionary page closes the keyboard.
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.currentPage }.collect {
+            if (it != WordsPage.DICTIONARY.ordinal) {
+                focusManager.clearFocus()
+                keyboard?.hide()
+            }
+        }
+    }
+    // A tap on the Words tab while it is open: back to the Words page.
+    val firstScrollToTop = remember { scrollToTop }
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop != firstScrollToTop && pager.currentPage != 0) pager.animateScrollToPage(0)
     }
     LaunchedEffect(searchPanel) {
         searchPanel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
@@ -297,10 +329,8 @@ fun WordsScreen(
     LaunchedEffect(searchPanel) {
         searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
-    BackHandler(enabled = panel == null && (searchQuery.isNotEmpty() || fieldFocused)) {
-        search.setQuery("")
-        focusManager.clearFocus()
-    }
+    // Back from Review or Dictionary goes to Words, as Progress's sections go to the first.
+    BackHandler(enabled = panel == null && pager.currentPage != 0) { scope.launch { pager.animateScrollToPage(0) } }
     val searchWords = remember(searchQuery, uiState.learning, uiState.known) {
         searchWords(uiState.learning.orEmpty() + uiState.known.orEmpty(), searchQuery).take(MAX_WORDS_IN_SEARCH)
     }
@@ -310,74 +340,105 @@ fun WordsScreen(
         focusManager.clearFocus()
         show()
     }
-    val searching = searchQuery.isNotEmpty() || (fieldFocused && history.isNotEmpty())
+    var showHelp by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    WordsContent(
-        searchField = {
-            SearchField(
-                query = searchQuery,
-                onQuery = search::setQuery,
-                focusRequester = focus,
-                onFocusChanged = { fieldFocused = it },
-                onSearch = {
-                    search.remember()
-                    keyboard?.hide()
-                },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+    Scaffold(
+        // No title (the bottom bar names the tab): Words, Review and Dictionary, as tabs to tap or
+        // swipe between like Progress's sections.
+        topBar = {
+            Surface(color = TabRowDefaults.primaryContainerColor) {
+                PrimaryTabRow(
+                    selectedTabIndex = pager.currentPage,
+                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+                ) {
+                    WordsPage.entries.forEachIndexed { index, page ->
+                        Tab(
+                            selected = index == pager.currentPage,
+                            onClick = {
+                                if (page == WordsPage.DICTIONARY) focusWanted = true
+                                scope.launch { pager.animateScrollToPage(index) }
+                            },
+                            text = {
+                                Text(
+                                    if (page == WordsPage.REVIEW && reviewDue > 0) {
+                                        stringResource(R.string.words_tab_review_due, reviewDue)
+                                    } else {
+                                        stringResource(page.label)
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                        )
+                    }
+                }
+            }
         },
-        searchContent = if (searching) {
-            { modifier ->
-                SearchContent(
+        bottomBar = bottomBar,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+    ) { padding ->
+        HorizontalPager(state = pager, modifier = Modifier.padding(padding).fillMaxSize()) { index ->
+            when (WordsPage.entries[index]) {
+                WordsPage.WORDS -> WordsContent(
+                    uiState = uiState,
+                    now = remember(uiState.learning, uiState.known) { System.currentTimeMillis() },
+                    padding = padding,
+                    onFilter = viewModel::setFilter,
+                    onQuery = viewModel::setQuery,
+                    scrollToTop = scrollToTop,
+                    onToggleExpanded = viewModel::toggleExpanded,
+                    onToggleReadWord = viewModel::toggleReadWord,
+                    onSetStarred = viewModel::setStarred,
+                    onMarkLearned = viewModel::markLearned,
+                    onMarkLearning = viewModel::markLearning,
+                    onDelete = viewModel::delete,
+                    onIgnore = viewModel::ignore,
+                    onShowIgnored = { showIgnored = true },
+                    onAddToAnki = { word, lookup -> anki.whenReady { viewModel.addToAnki(word, lookup) } },
+                    onAddAllToAnki = {
+                        if (uiState.notInAnki > ADD_ALL_WITHOUT_ASKING) confirmAddAll = true else anki.whenReady(viewModel::addAllToAnki)
+                    },
+                    onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
+                    onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
+                    onExportCsv = { exportCsv.launch(resources.getString(R.string.csv_words_file_name)) },
+                    onShowSession = { showSession = true },
+                    onShowHelp = { showHelp = true },
+                    onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
+                    offerKnown = offerKnown,
+                    onOfferKnown = knownFromAnki::start,
+                    onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
+                    dueIds = dueIds,
+                )
+                WordsPage.REVIEW -> ReviewPage(
+                    due = reviewDue,
+                    newWords = reviewNew,
+                    starredLearning = uiState.learning.orEmpty().count { it.starred },
+                    onStart = onStartReview,
+                    choice = reviewChoice,
+                )
+                WordsPage.DICTIONARY -> DictionaryPage(
+                    padding = padding,
                     query = searchQuery,
                     results = searchResults,
                     words = searchWords,
                     history = history,
+                    focusRequester = focus,
+                    onQuery = search::setQuery,
+                    onSearch = {
+                        search.remember()
+                        keyboard?.hide()
+                    },
                     onOpenGroup = { open { searchPanel.showSearched(it) } },
                     onOpenWord = { open { searchPanel.showSearched(it.expression, it.reading) } },
                     onHistory = search::setQuery,
                     onForget = search::forget,
                     onForgetAll = search::forgetAll,
-                    modifier = modifier,
                 )
             }
-        } else {
-            null
-        },
-        uiState = uiState,
-        now = remember(uiState.learning, uiState.known) { System.currentTimeMillis() },
-        snackbarHostState = snackbarHostState,
-        bottomBar = bottomBar,
-        onFilter = viewModel::setFilter,
-        onQuery = viewModel::setQuery,
-        scrollToTop = scrollToTop,
-        onToggleExpanded = viewModel::toggleExpanded,
-        onToggleReadWord = viewModel::toggleReadWord,
-        onSetStarred = viewModel::setStarred,
-        onMarkLearned = viewModel::markLearned,
-        onMarkLearning = viewModel::markLearning,
-        onDelete = viewModel::delete,
-        onIgnore = viewModel::ignore,
-        onShowIgnored = { showIgnored = true },
-        onAddToAnki = { word, lookup -> anki.whenReady { viewModel.addToAnki(word, lookup) } },
-        onAddAllToAnki = {
-            if (uiState.notInAnki > ADD_ALL_WITHOUT_ASKING) confirmAddAll = true else anki.whenReady(viewModel::addAllToAnki)
-        },
-        onExport = { exportFile.launch(resources.getString(R.string.anki_export_file_name)) },
-        onExportPackage = { exportPackage.launch(resources.getString(R.string.anki_package_file_name)) },
-        onExportCsv = { exportCsv.launch(resources.getString(R.string.csv_words_file_name)) },
-        onShowSession = { showSession = true },
-        onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
-        offerKnown = offerKnown,
-        onOfferKnown = knownFromAnki::start,
-        onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
-        reviewDue = reviewDue,
-        reviewNew = reviewNew,
-        dueIds = dueIds,
-        onStartReview = onStartReview,
-        reviewChoice = reviewChoice,
-    )
+        }
+    }
+    if (showHelp) HowItWorksScreen(onBack = { showHelp = false })
     val state = panel
     if (state != null) {
         BackHandler { if (!searchPanel.back()) searchPanel.dismiss() }
@@ -411,6 +472,13 @@ fun WordsScreen(
     }
 }
 
+/** The pages of Words, in tab order. */
+private enum class WordsPage(val label: Int) {
+    WORDS(R.string.nav_words),
+    REVIEW(R.string.review_title),
+    DICTIONARY(R.string.words_tab_dictionary),
+}
+
 /** Saved words a search lists under the dictionaries' at most. */
 private const val MAX_WORDS_IN_SEARCH = 50
 private const val SCRIM_ALPHA = 0.32f
@@ -419,8 +487,7 @@ private const val SCRIM_ALPHA = 0.32f
 private fun WordsContent(
     uiState: WordsUiState,
     now: Long,
-    snackbarHostState: SnackbarHostState,
-    bottomBar: @Composable () -> Unit,
+    padding: PaddingValues,
     onFilter: (WordFilter) -> Unit,
     onToggleExpanded: (id: Long) -> Unit,
     onToggleReadWord: (expression: String) -> Unit,
@@ -438,144 +505,129 @@ private fun WordsContent(
     scrollToTop: Int = 0,
     onExportCsv: () -> Unit = {},
     onShowSession: () -> Unit = {},
+    onShowHelp: () -> Unit = {},
     onCheckAnki: () -> Unit = {},
     offerKnown: Boolean = false,
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
-    /** The dictionary search field, above the tabs. */
-    searchField: @Composable () -> Unit = {},
-    /** While searching: the results, in place of the tabs and lists. */
-    searchContent: (@Composable (Modifier) -> Unit)? = null,
-    reviewDue: Int = 0,
-    reviewNew: Int = 0,
     dueIds: Set<Long> = emptySet(),
-    onStartReview: () -> Unit = {},
-    reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
 ) {
-    val pager = rememberPagerState(initialPage = uiState.filter.ordinal) { WordFilter.entries.size }
-    val scope = rememberCoroutineScope()
-    // The list on screen is the one exports take.
-    LaunchedEffect(pager) {
-        snapshotFlow { pager.currentPage }.collect { onFilter(WordFilter.entries[it]) }
-    }
-    Scaffold(
-        // No title (the bottom bar names the tab): Learning and Known, as tabs to tap or swipe
-        // between like Progress's sections, and the export beside them.
-        topBar = {
-            Surface(color = TabRowDefaults.primaryContainerColor) {
-                Column(modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)) {
-                searchField()
-                if (searchContent == null) Row(verticalAlignment = Alignment.CenterVertically) {
-                    PrimaryTabRow(selectedTabIndex = pager.currentPage, modifier = Modifier.weight(1f)) {
-                        WordFilter.entries.forEachIndexed { index, filter ->
-                            Tab(
-                                selected = index == pager.currentPage,
-                                onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            filterLabel(filter),
-                                            if (filter == WordFilter.LEARNING) uiState.learning?.size ?: 0 else uiState.knownCount,
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                    val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
-                    WordsMenu(
-                        onShowSession = onShowSession,
-                        onShowIgnored = onShowIgnored,
-                        onExport = onExport,
-                        onExportPackage = onExportPackage,
-                        onExportCsv = onExportCsv,
-                        exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
-                    )
-                }
-                }
-            }
-        },
-        // In the bar's slot, so the list ends above the card and snackbars sit above it.
-        bottomBar = {
-            Column {
-                // Nothing to show before the first word: the card would only say "nothing to review".
-                if (searchContent == null && (reviewDue + reviewNew > 0 || !uiState.learning.isNullOrEmpty())) {
-                    ReviewEntry(
-                        due = reviewDue,
-                        newWords = reviewNew,
-                        onStart = onStartReview,
-                        choice = reviewChoice,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                    )
-                }
-                bottomBar()
-            }
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
+    // Above the keyboard when the filter field is typed in.
+    Column(modifier = Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding()) {
+        var searchOpen by rememberSaveable { mutableStateOf(uiState.query.isNotEmpty()) }
+        val closeSearch = {
+            searchOpen = false
+            onQuery("")
+        }
+        BackHandler(enabled = searchOpen, onBack = closeSearch)
+        // One quiet row: Learning and Known as chips, a magnifier for the filter, the menu.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp),
         ) {
-            val progress = uiState.ankiProgress
-            if (progress != null) {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Text(
-                        text = stringResource(
-                            if (uiState.savingPackage) R.string.anki_package_progress else R.string.anki_adding_progress,
-                            progress.first + 1,
-                            progress.second,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    ProgressBar(
-                        progress = { progress.first.toFloat() / progress.second.coerceAtLeast(1) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 6.dp),
-                    )
+            if (searchOpen) {
+                val focus = remember { FocusRequester() }
+                LaunchedEffect(Unit) { focus.requestFocus() }
+                OutlinedTextField(
+                    value = uiState.query,
+                    onValueChange = onQuery,
+                    singleLine = true,
+                    placeholder = { Text(stringResource(R.string.words_search_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    trailingIcon = {
+                        IconButton(onClick = closeSearch) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_close))
+                        }
+                    },
+                    modifier = Modifier.weight(1f).padding(vertical = 4.dp).focusRequester(focus),
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                    WordFilter.entries.forEach { filter ->
+                        val selected = uiState.filter == filter
+                        FilterChip(
+                            selected = selected,
+                            onClick = { onFilter(filter) },
+                            label = {
+                                Text(
+                                    stringResource(
+                                        filterLabel(filter),
+                                        if (filter == WordFilter.LEARNING) uiState.learning?.size ?: 0 else uiState.knownCount,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            },
+                            leadingIcon = if (selected) {
+                                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            } else {
+                                null
+                            },
+                        )
+                    }
+                }
+                IconButton(onClick = { searchOpen = true }) {
+                    Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.words_search_open))
                 }
             }
-            val listStates = WordFilter.entries.map { rememberLazyListState() }
-            val firstScrollToTop = remember { scrollToTop }
-            LaunchedEffect(scrollToTop) {
-                if (scrollToTop != firstScrollToTop) listStates[pager.currentPage].animateScrollToItem(0)
-            }
-            if (searchContent != null) {
-                // Above the keyboard: the results end where it starts.
-                searchContent(Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding())
-                return@Column
-            }
-            HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                val filter = WordFilter.entries[page]
-                WordList(
-                    filter = filter,
-                    listState = listStates[page],
-                    words = (if (filter == WordFilter.LEARNING) uiState.learning else uiState.known)
-                        ?.let { filterWords(it, uiState.query) },
-                    knownByReading = if (filter == WordFilter.KNOWN) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
-                    uiState = uiState,
-                    now = now,
-                    dueIds = dueIds,
-                    onToggleExpanded = onToggleExpanded,
-                    onToggleReadWord = onToggleReadWord,
-                    onSetStarred = onSetStarred,
-                    onMarkLearned = onMarkLearned,
-                    onMarkLearning = onMarkLearning,
-                    onDelete = onDelete,
-                    onIgnore = onIgnore,
-                    onAddToAnki = onAddToAnki,
-                    onAddAllToAnki = onAddAllToAnki,
-                    onCheckAnki = onCheckAnki,
-                    offerKnown = offerKnown,
-                    onOfferKnown = onOfferKnown,
-                    onDismissOffer = onDismissOffer,
+            val shown = if (uiState.filter == WordFilter.LEARNING) uiState.learning else uiState.known
+            WordsMenu(
+                onShowHelp = onShowHelp,
+                onShowSession = onShowSession,
+                onShowIgnored = onShowIgnored,
+                onExport = onExport,
+                onExportPackage = onExportPackage,
+                onExportCsv = onExportCsv,
+                exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
+            )
+        }
+        val progress = uiState.ankiProgress
+        if (progress != null) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(
+                    text = stringResource(
+                        if (uiState.savingPackage) R.string.anki_package_progress else R.string.anki_adding_progress,
+                        progress.first + 1,
+                        progress.second,
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                ProgressBar(
+                    progress = { progress.first.toFloat() / progress.second.coerceAtLeast(1) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
                 )
             }
         }
+        val listStates = WordFilter.entries.map { rememberLazyListState() }
+        val firstScrollToTop = remember { scrollToTop }
+        LaunchedEffect(scrollToTop) {
+            if (scrollToTop != firstScrollToTop) listStates[uiState.filter.ordinal].animateScrollToItem(0)
+        }
+        val filter = uiState.filter
+        WordList(
+            filter = filter,
+            listState = listStates[filter.ordinal],
+            words = (if (filter == WordFilter.LEARNING) uiState.learning else uiState.known)
+                ?.let { filterWords(it, uiState.query) },
+            knownByReading = if (filter == WordFilter.KNOWN) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
+            uiState = uiState,
+            now = now,
+            dueIds = dueIds,
+            onToggleExpanded = onToggleExpanded,
+            onToggleReadWord = onToggleReadWord,
+            onSetStarred = onSetStarred,
+            onMarkLearned = onMarkLearned,
+            onMarkLearning = onMarkLearning,
+            onDelete = onDelete,
+            onIgnore = onIgnore,
+            onAddToAnki = onAddToAnki,
+            onAddAllToAnki = onAddAllToAnki,
+            onCheckAnki = onCheckAnki,
+            offerKnown = offerKnown,
+            onOfferKnown = onOfferKnown,
+            onDismissOffer = onDismissOffer,
+        )
     }
 }
 
@@ -793,6 +845,7 @@ private fun MemoryRing(memory: Float) {
 /** The top bar's overflow menu (three dots): this session's words and the exports. */
 @Composable
 private fun WordsMenu(
+    onShowHelp: () -> Unit,
     onShowSession: () -> Unit,
     onShowIgnored: () -> Unit,
     onExport: () -> Unit,
@@ -813,6 +866,18 @@ private fun WordsMenu(
             shape = RoundedCornerShape(24.dp),
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.how_open), style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                colors = MenuDefaults.itemColors(leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                onClick = {
+                    open = false
+                    onShowHelp()
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.session_open), style = MaterialTheme.typography.bodyLarge) },
                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
@@ -1219,8 +1284,7 @@ private fun WordsPreview() {
                 notInAnki = 2,
             ),
             now = now,
-            snackbarHostState = remember { SnackbarHostState() },
-            bottomBar = {},
+            padding = PaddingValues(),
             onFilter = {},
             onToggleExpanded = {},
             onToggleReadWord = {},

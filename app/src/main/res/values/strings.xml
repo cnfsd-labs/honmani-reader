@@ -814,13 +814,39 @@
     <string name="shortcut_review_long">Review words</string>
     <!-- Review: flashcards from the words to learn -->
     <string name="review_title">Review</string>
-    <string name="review_card_title">Review · %1$d due</string>
-    <string name="review_card_title_none">Review</string>
     <plurals name="review_card_new">
         <item quantity="one">%1$d new word to start</item>
         <item quantity="other">%1$d new words to start</item>
     </plurals>
-    <string name="review_card_nothing">Nothing to review today.</string>
+    <string name="words_tab_dictionary">Dictionary</string>
+    <string name="words_tab_review_due">Review · %1$d</string>
+    <string name="words_search_open">Search saved words</string>
+    <string name="words_search_close">Close search</string>
+    <string name="how_open">How it works</string>
+    <string name="how_title">How it works</string>
+    <string name="how_saved_title">Saved words</string>
+    <string name="how_saved_body">Every word you look up while reading is saved with the sentence, the book and the date. Words you look up often, and recently, come first; a word you stop looking up slowly moves down but is never deleted by age. You can star, ignore or delete a word, and tap a word in the list to see where you met it.</string>
+    <string name="how_steps_title">Learning steps</string>
+    <string name="how_steps_body">Each time you read a saved word in a book without looking it up, it moves up a step. After 9 reads without a lookup the word is known and moves to Known. A lookup takes it back two steps. Pages you flick past or skip don\'t count. The bar in an open word shows how far along it is.</string>
+    <string name="how_marks_title">Marks in the book</string>
+    <string name="how_marks_body">In the reader settings, Mark words tints the words you are still learning, and optionally the ones that are new to you, right in the text. A word you know loses its mark.</string>
+    <string name="how_review_title">Review and Known</string>
+    <string name="how_review_body">The Review page asks for the words in Learning like flashcards: a few new ones and the cards that are due each day. A card you get right comes back later and later. When you can wait 21 days between reviews, the word counts as known. You can change the days and the daily limits under Review settings. Words you mark as learned (the tick) are known at once.</string>
+    <string name="how_starred_title">Starred words</string>
+    <string name="how_starred_body">A star puts a word at the top of the list and lets you review just the starred words. Use it for words you really want to remember.</string>
+    <string name="how_ignored_title">Ignored words</string>
+    <string name="how_ignored_body">Ignore a name or a wrong split and it gets no marks in books and is left out of counts and review. Lookups still work. You can bring an ignored word back from the menu, under Ignored words.</string>
+    <plurals name="review_page_due">
+        <item quantity="one">card due today</item>
+        <item quantity="other">cards due today</item>
+    </plurals>
+    <string name="review_page_nothing_title">All caught up</string>
+    <string name="review_page_nothing_body">Nothing to review today. Words you look up while reading join the review by themselves.</string>
+    <string name="review_page_ahead_title">Review ahead</string>
+    <string name="review_page_ahead_body">Practise the chosen words now, whether their cards are due or not.</string>
+    <string name="review_page_no_starred_title">No starred words</string>
+    <string name="review_page_no_starred_body">None of the words you are learning is starred. Star a word in your Words list or in the lookup panel, then come back.</string>
+    <string name="review_page_settings">Review settings</string>
     <string name="review_start">Start</string>
     <string name="review_start_description">Start the review: %1$d due, %2$d new</string>
     <string name="review_chip_due">Due</string>

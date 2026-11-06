@@ -2,7 +2,12 @@ package app.honmani.reader.ui.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,7 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -55,7 +59,6 @@ fun SearchField(
     query: String,
     onQuery: (String) -> Unit,
     focusRequester: FocusRequester,
-    onFocusChanged: (Boolean) -> Unit,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -81,36 +84,52 @@ fun SearchField(
         }
     }
     var picking by rememberSaveable { mutableStateOf(false) }
-    OutlinedTextField(
-        value = field,
-        onValueChange = ::change,
-        singleLine = true,
-        placeholder = { Text(stringResource(R.string.search_hint), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-        trailingIcon = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (field.text.isNotEmpty()) {
-                    IconButton(onClick = {
-                        change(TextFieldValue(""))
-                        focusRequester.requestFocus()
-                    }) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
-                    }
+    // A thin pill: the page puts it at the bottom, within the thumb's reach.
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 48.dp).padding(start = 16.dp)) {
+            Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                if (field.text.isEmpty()) {
+                    Text(
+                        stringResource(R.string.search_hint),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                val radicalSearch = stringResource(R.string.radical_search)
-                IconButton(onClick = { picking = true }, modifier = Modifier.semantics { contentDescription = radicalSearch }) {
-                    // 部, as in 部首 (radical): no icon says it better.
-                    Text("部", style = MaterialTheme.typography.titleMedium)
+                BasicTextField(
+                    value = field,
+                    onValueChange = ::change,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester),
+                )
+            }
+            if (field.text.isNotEmpty()) {
+                IconButton(onClick = {
+                    change(TextFieldValue(""))
+                    focusRequester.requestFocus()
+                }) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.words_search_clear))
                 }
             }
-        },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        modifier = modifier
-            .fillMaxWidth()
-            .focusRequester(focusRequester)
-            .onFocusChanged { onFocusChanged(it.isFocused) },
-    )
+            val radicalSearch = stringResource(R.string.radical_search)
+            IconButton(onClick = { picking = true }, modifier = Modifier.semantics { contentDescription = radicalSearch }) {
+                // 部, as in 部首 (radical): no icon says it better.
+                Text("部", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
     if (picking) {
         RadicalPicker(
             onPick = { kanji ->
@@ -125,7 +144,7 @@ fun SearchField(
 }
 
 /**
- * Below the field while searching: the dictionaries' words, then the saved words that match
+ * Above the field while searching: the dictionaries' words, then the saved words that match
  * ([words], "In your words"); with an empty field, the last searches.
  */
 @Composable
@@ -144,15 +163,11 @@ fun SearchContent(
     // Each query's results get their own list position, starting at the top: one shared state
     // would follow a keyed row of the previous results wherever it moved.
     val listState = rememberSaveable(results.query, saver = LazyListState.Saver) { LazyListState() }
-    LazyColumn(modifier = modifier, state = listState) {
+    // Reversed: the first result sits right above the field, within the thumb's reach, so the
+    // items go bottom to top (a section's title after its rows).
+    LazyColumn(modifier = modifier, state = listState, reverseLayout = true) {
         if (query.isBlank()) {
             if (history.isNotEmpty()) {
-                item(key = "history") {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
-                        SectionTitle(stringResource(R.string.search_history), Modifier.weight(1f))
-                        TextButton(onClick = onForgetAll) { Text(stringResource(R.string.search_history_clear)) }
-                    }
-                }
                 items(history, key = { "h:$it" }) { text ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -177,6 +192,12 @@ fun SearchContent(
                         }
                     }
                 }
+                item(key = "history") {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
+                        SectionTitle(stringResource(R.string.search_history), Modifier.weight(1f))
+                        TextButton(onClick = onForgetAll) { Text(stringResource(R.string.search_history_clear)) }
+                    }
+                }
             }
             return@LazyColumn
         }
@@ -198,14 +219,14 @@ fun SearchContent(
             )
         }
         if (words.isNotEmpty()) {
+            items(words, key = { "w:${it.id}" }) { word ->
+                ResultRow(word.expression, word.reading, word.gloss) { onOpenWord(word) }
+            }
             item(key = "words") {
                 Column {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                     SectionTitle(stringResource(R.string.search_in_your_words), Modifier.padding(horizontal = 16.dp))
                 }
-            }
-            items(words, key = { "w:${it.id}" }) { word ->
-                ResultRow(word.expression, word.reading, word.gloss) { onOpenWord(word) }
             }
         }
     }

@@ -236,7 +236,7 @@ private fun LevelCard(state: ProgressUiState) {
 
 /** Reviews today, the time they took, retention over the last 30 days and the words in review. */
 @Composable
-private fun ReviewTiles(reviews: ReviewSummary) {
+internal fun ReviewTiles(reviews: ReviewSummary) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
         StatTile(
             label = stringResource(R.string.progress_reviews_today),
