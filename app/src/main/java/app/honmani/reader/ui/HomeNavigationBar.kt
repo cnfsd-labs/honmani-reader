@@ -62,14 +62,15 @@ private fun HomeTab.TabIcon() {
     }
 }
 
-/** A dot for [dot], or a number for a [count] above 0 (the words due for review, say). */
+/**
+ * A plain dot for [dot], or for a [count] above 0 (the words due for review, say): the dot says
+ * "something is waiting", the Review page says how much. TalkBack still reads the count.
+ */
 @Composable
 private fun TabBadge(dot: Boolean, count: Int) {
     if (count > 0) {
         val description = stringResource(R.string.review_nav_badge, count)
-        Badge(modifier = Modifier.semantics { contentDescription = description }) {
-            Text(if (count > 99) "99+" else count.toString())
-        }
+        Badge(modifier = Modifier.semantics { contentDescription = description })
     } else if (dot) {
         Badge()
     }
@@ -97,7 +98,7 @@ private fun TabLabel(tab: HomeTab, count: Int) {
 
 /**
  * [badges]: tabs with something new, such as dictionary updates, marked with a dot. [counts]: a
- * number on a tab, hidden at 0.
+ * dot on a tab with a count above 0, announced with the number.
  */
 @Composable
 fun HomeNavigationBar(selected: HomeTab, onSelect: (HomeTab) -> Unit, badges: Set<HomeTab> = emptySet(), counts: Map<HomeTab, Int> = emptyMap()) {
