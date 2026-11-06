@@ -542,6 +542,7 @@ class Backup(
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
             ReadingTimeSettings.KEY_COUNT_DURING_LOOKUP to BackupValue.BOOLEAN,
+            AnkiSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             AnkiSettings.KEY_AUDIO to BackupValue.STRING,
             AnkiSettings.KEY_SENTENCE_SPEED to BackupValue.STRING,
             AnkiSettings.KEY_AUDIOBOOK_SENTENCES to BackupValue.BOOLEAN,

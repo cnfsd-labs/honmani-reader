@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.LookupPanel
@@ -76,6 +77,7 @@ fun LookupScreen(
     val context = LocalContext.current
     val panel by viewModel.panel.collectAsStateWithLifecycle()
     val anki = rememberAnkiAccess()
+    val ankiEnabled = rememberAnkiEnabled()
     var query by rememberSaveable { mutableStateOf(initialText) }
     // The text looked up and where in it; -1 before the first lookup.
     var looked by rememberSaveable { mutableStateOf(initialText) }
@@ -162,6 +164,7 @@ fun LookupScreen(
                     state = state,
                     onClose = onDone,
                     onAddToAnki = { group -> anki.whenReady { viewModel.addToAnki(group) } },
+                    showAnki = ankiEnabled,
                     onSetStarred = viewModel::setStarred,
                 onSetIgnored = viewModel::setIgnored,
                     onListen = viewModel::listen,

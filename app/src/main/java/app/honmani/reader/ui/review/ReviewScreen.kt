@@ -85,6 +85,7 @@ import app.honmani.reader.data.review.ReviewSentence
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.FuriganaOverride
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.reader.FuriganaDialog
 import app.honmani.reader.ui.reader.LookupPanel
@@ -110,6 +111,7 @@ fun ReviewScreen(
     val resources = LocalResources.current
     val snackbar = remember { SnackbarHostState() }
     val anki = rememberAnkiAccess()
+    val ankiEnabled = rememberAnkiEnabled()
     LaunchedEffect(viewModel) { viewModel.start() }
     LaunchedEffect(viewModel) {
         viewModel.notices.collect { notice ->
@@ -199,6 +201,7 @@ fun ReviewScreen(
                 onClose = panelModel::dismiss,
                 onOpenDictionaries = panelModel::dismiss,
                 onAddToAnki = { group -> anki.whenReady { panelModel.addToAnki(group) } },
+                showAnki = ankiEnabled,
                 onSetStarred = panelModel::setStarred,
                 onListen = panelModel::listen,
                 onLookupWord = panelModel::lookupWord,

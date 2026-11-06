@@ -69,6 +69,7 @@ import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,11 +91,22 @@ fun AnkiSettingsRow(onClick: () -> Unit) {
     val settings = remember { (context.applicationContext as HonmaniApplication).container.ankiSettings }
     val audio by settings.audio.collectAsStateWithLifecycle()
     val deck by settings.deck.collectAsStateWithLifecycle()
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.settings_anki)) },
-        supportingContent = { Text(stringResource(R.string.settings_anki_summary, deck, stringResource(audio.label()))) },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
+    val enabled = rememberAnkiEnabled()
+    Column {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_anki_cards)) },
+            supportingContent = { Text(stringResource(R.string.settings_anki_cards_details)) },
+            trailingContent = { Switch(checked = enabled, onCheckedChange = null) },
+            modifier = Modifier.toggleable(enabled, role = Role.Switch, onValueChange = settings::setEnabled),
+        )
+        if (enabled) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_anki)) },
+                supportingContent = { Text(stringResource(R.string.settings_anki_summary, deck, stringResource(audio.label()))) },
+                modifier = Modifier.clickable(onClick = onClick),
+            )
+        }
+    }
 }
 
 /**

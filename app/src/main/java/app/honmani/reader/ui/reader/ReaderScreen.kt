@@ -104,6 +104,7 @@ import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.library.AddBookStart
@@ -180,6 +181,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val resources = LocalResources.current
     val shareTitle = stringResource(R.string.action_share_diagnostics)
     val anki = rememberAnkiAccess()
+    val ankiEnabled = rememberAnkiEnabled()
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val dictionaryUpdates by remember { container.dictionaryUpdateChecker.updates }.collectAsStateWithLifecycle(emptyList())
     // Reading time counts while a book is on screen and the app is in front.
@@ -693,6 +695,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     state = state,
                     onClose = viewModel::dismiss,
                     onAddToAnki = { group -> anki.whenReady { viewModel.addToAnki(group) } },
+                    showAnki = ankiEnabled,
                     onSetStarred = viewModel::setStarred,
                     onSetIgnored = viewModel::setIgnored,
                     onSetFurigana = viewModel::setFurigana,

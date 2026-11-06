@@ -62,6 +62,22 @@ class AnkiSettings(
         MutableStateFlow(SentenceSpeed.fromName(preferences.getString(KEY_SENTENCE_SPEED, null)))
     val sentenceSpeed: StateFlow<SentenceSpeed> = _sentenceSpeed.asStateFlow()
 
+    private val _enabledChoice = MutableStateFlow(readEnabledChoice())
+
+    /**
+     * Whether the reader chose to use Anki cards; null while they haven't (see [isEnabled]).
+     * It is read as "contains", so an absent value stays "not chosen yet".
+     */
+    val enabledChoice: StateFlow<Boolean?> = _enabledChoice.asStateFlow()
+
+    fun setEnabled(on: Boolean) {
+        _enabledChoice.value = on
+        preferences.edit().putBoolean(KEY_ENABLED, on).apply()
+    }
+
+    private fun readEnabledChoice(): Boolean? =
+        if (preferences.contains(KEY_ENABLED)) preferences.getBoolean(KEY_ENABLED, true) else null
+
     private val _audiobookSentences = MutableStateFlow(preferences.getBoolean(KEY_AUDIOBOOK_SENTENCES, true))
 
     /**
@@ -197,6 +213,7 @@ class AnkiSettings(
 
     /** Reads the reader's choices again (a backup was restored). */
     fun reload() {
+        _enabledChoice.value = readEnabledChoice()
         _audio.value = CardAudio.fromName(preferences.getString(KEY_AUDIO, null))
         _sentenceSpeed.value = SentenceSpeed.fromName(preferences.getString(KEY_SENTENCE_SPEED, null))
         _audiobookSentences.value = preferences.getBoolean(KEY_AUDIOBOOK_SENTENCES, true)
@@ -231,6 +248,13 @@ class AnkiSettings(
     }
 
     companion object {
+        /**
+         * Whether Add-to-Anki shows: the reader's [choice] if they made one, otherwise whether
+         * AnkiDroid is [installed] (desktop Anki users turn it on themselves).
+         */
+        fun isEnabled(choice: Boolean?, installed: Boolean): Boolean = choice ?: installed
+
+        const val KEY_ENABLED = "anki_enabled"
         const val KEY_AUDIO = "anki_audio"
         const val KEY_AUDIOBOOK_SENTENCES = "anki_audiobook_sentences"
         const val KEY_GOOGLE_KEY = "anki_google_key"

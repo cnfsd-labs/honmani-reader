@@ -95,4 +95,20 @@ class AnkiSettingsTest {
             all.forEach { (key, value) -> if (value is String) editor.putString(key, value) }
             editor.commit()
         }
+
+    @Test
+    fun ankiCards_followAnkiDroidUntilTheReaderChooses_thenTheChoiceWins() {
+        assertTrue(AnkiSettings.isEnabled(null, installed = true))
+        assertFalse(AnkiSettings.isEnabled(null, installed = false))
+        assertFalse(AnkiSettings.isEnabled(false, installed = true))
+        assertTrue(AnkiSettings.isEnabled(true, installed = false))
+
+        val settings = AnkiSettings(choices, plainCipher, device)
+        assertEquals(null, settings.enabledChoice.value)
+        settings.setEnabled(false)
+        assertEquals(false, AnkiSettings(choices, plainCipher, device).enabledChoice.value)
+        // The choice is backed up with the other settings, not kept on this phone only.
+        assertEquals(setOf("anki_enabled"), choices.all.keys)
+        assertTrue(device.all.isEmpty())
+    }
 }

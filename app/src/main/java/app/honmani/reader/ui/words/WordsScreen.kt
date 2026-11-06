@@ -125,6 +125,7 @@ import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
+import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
 import app.honmani.reader.ui.known.KnownWordsCard
@@ -185,6 +186,7 @@ fun WordsScreen(
     val context = LocalContext.current
     val resources = LocalResources.current
     val anki = rememberAnkiAccess()
+    val ankiEnabled = rememberAnkiEnabled()
     val exportFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) viewModel.exportToFile(uri.toString())
     }
@@ -405,7 +407,8 @@ fun WordsScreen(
                     onShowSession = { showSession = true },
                     onShowHelp = { showHelp = true },
                     onCheckAnki = { anki.whenReady(viewModel::checkAgainstAnki) },
-                    offerKnown = offerKnown,
+                    offerKnown = offerKnown && ankiEnabled,
+                    ankiEnabled = ankiEnabled,
                     onOfferKnown = knownFromAnki::start,
                     onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
                     dueIds = dueIds,
@@ -455,6 +458,7 @@ fun WordsScreen(
                 onClose = searchPanel::dismiss,
                 onOpenDictionaries = searchPanel::dismiss,
                 onAddToAnki = { group -> anki.whenReady { searchPanel.addToAnki(group) } },
+                showAnki = ankiEnabled,
                 onSetStarred = searchPanel::setStarred,
                 onSetIgnored = searchPanel::setIgnored,
                 onSetFurigana = searchPanel::setFurigana,
@@ -508,6 +512,7 @@ private fun WordsContent(
     onShowHelp: () -> Unit = {},
     onCheckAnki: () -> Unit = {},
     offerKnown: Boolean = false,
+    ankiEnabled: Boolean = true,
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
     dueIds: Set<Long> = emptySet(),
@@ -577,6 +582,7 @@ private fun WordsContent(
                 onExport = onExport,
                 onExportPackage = onExportPackage,
                 onExportCsv = onExportCsv,
+                ankiEnabled = ankiEnabled,
                 exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
             )
         }
@@ -625,6 +631,7 @@ private fun WordsContent(
             onAddAllToAnki = onAddAllToAnki,
             onCheckAnki = onCheckAnki,
             offerKnown = offerKnown,
+            ankiEnabled = ankiEnabled,
             onOfferKnown = onOfferKnown,
             onDismissOffer = onDismissOffer,
         )
@@ -653,6 +660,7 @@ private fun WordList(
     onAddAllToAnki: () -> Unit,
     onCheckAnki: () -> Unit = {},
     offerKnown: Boolean = false,
+    ankiEnabled: Boolean = true,
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
 ) {
@@ -669,7 +677,7 @@ private fun WordList(
                 .padding(32.dp),
         )
         else -> LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 8.dp), modifier = Modifier.fillMaxSize()) {
-            if (filter == WordFilter.LEARNING) {
+            if (filter == WordFilter.LEARNING && ankiEnabled) {
                 item(key = "ankiActions") {
                     // Wraps below the first button on a narrow screen or with large text.
                     FlowRow(
@@ -721,6 +729,7 @@ private fun WordList(
                     onDelete = { onDelete(word.id) },
                     onIgnore = { onIgnore(word) },
                     onAddToAnki = { lookup -> onAddToAnki(word, lookup) },
+                    ankiEnabled = ankiEnabled,
                     adding = word.id in uiState.addingToAnki,
                 )
                 HorizontalDivider()
@@ -852,6 +861,7 @@ private fun WordsMenu(
     onExportPackage: () -> Unit,
     onExportCsv: () -> Unit,
     exportEnabled: Boolean,
+    ankiEnabled: Boolean = true,
 ) {
     var open by remember { mutableStateOf(false) }
     var showKnown by remember { mutableStateOf(false) }
@@ -921,7 +931,7 @@ private fun WordsMenu(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
             )
-            ExportItem(
+            if (ankiEnabled) ExportItem(
                 title = R.string.export_package,
                 detail = R.string.export_package_detail,
                 icon = R.drawable.ic_add_card,
@@ -931,7 +941,7 @@ private fun WordsMenu(
                     onExportPackage()
                 },
             )
-            ExportItem(
+            if (ankiEnabled) ExportItem(
                 title = R.string.export_text,
                 detail = R.string.export_text_detail,
                 icon = R.drawable.ic_export,
@@ -1015,6 +1025,7 @@ private fun WordRow(
     onMarkLearning: () -> Unit,
     onDelete: () -> Unit,
     onAddToAnki: (WordLookupEntity?) -> Unit,
+    ankiEnabled: Boolean = true,
     adding: Boolean = false,
     onIgnore: () -> Unit = {},
 ) {
@@ -1098,7 +1109,7 @@ private fun WordRow(
                             )
                         }
                         // A card with this sentence instead of the latest one.
-                        if (word.ankiNoteId == null && lookups.size > 1) {
+                        if (ankiEnabled && word.ankiNoteId == null && lookups.size > 1) {
                             IconButton(
                                 onClick = { onAddToAnki(lookup) },
                                 enabled = !adding,
@@ -1134,7 +1145,7 @@ private fun WordRow(
                     .fillMaxWidth()
                     .padding(top = 4.dp),
             ) {
-                AnkiButton(inAnki = word.ankiNoteId != null, adding = adding, onClick = { onAddToAnki(null) })
+                if (ankiEnabled) AnkiButton(inAnki = word.ankiNoteId != null, adding = adding, onClick = { onAddToAnki(null) })
                 IconToggleButton(
                     checked = word.starred,
                     onCheckedChange = onSetStarred,

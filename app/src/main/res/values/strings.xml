@@ -616,6 +616,8 @@
     <string name="voice_problem_quota">the Google Cloud quota is used up for now</string>
     <string name="voice_problem_network">no connection to Google</string>
 
+    <string name="settings_anki_cards">Anki cards</string>
+    <string name="settings_anki_cards_details">Add words to Anki from the dictionary and the word list. On by default if AnkiDroid is installed; if you use Anki on a computer, turn it on to export your words.</string>
     <string name="settings_anki">Anki</string>
     <string name="settings_anki_summary">Deck “%1$s” · %2$s</string>
     <string name="settings_anki_details">Cards go to AnkiDroid, with the sentence from your book, reading, meaning and audio. Choose the deck and the card type below.</string>

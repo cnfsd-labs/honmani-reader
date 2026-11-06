@@ -8,7 +8,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import app.honmani.reader.HonmaniApplication
@@ -16,6 +21,7 @@ import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCheck
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiResult
+import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.anki.CustomProblem
 import app.honmani.reader.anki.VoiceProblem
 
@@ -58,6 +64,23 @@ fun rememberAnkiAccess(): AnkiAccess {
             launcher.launch(AnkiDroid.PERMISSION)
         }
     }
+}
+
+/**
+ * Whether Add-to-Anki shows: the reader's choice in the settings, or until they chose, whether
+ * AnkiDroid is installed (looked up again when the screen resumes).
+ */
+@Composable
+fun rememberAnkiEnabled(): Boolean {
+    val context = LocalContext.current
+    val container = remember { (context.applicationContext as HonmaniApplication).container }
+    val choice by container.ankiSettings.enabledChoice.collectAsStateWithLifecycle()
+    var installed by remember { mutableStateOf(container.ankiDroid.packageName() != null) }
+    LifecycleResumeEffect(Unit) {
+        installed = container.ankiDroid.packageName() != null
+        onPauseOrDispose {}
+    }
+    return AnkiSettings.isEnabled(choice, installed)
 }
 
 /** Tells the reader how adding [expression] went. */
