@@ -485,12 +485,12 @@ fun LookupPanel(
                     )
                     is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
                         Message(
-                            stringResource(R.string.lookup_nothing_found, state.tap.text.take(MAX_SHOWN_TEXT)),
+                            stringResource(R.string.lookup_nothing_found, nothingFoundText(state.tap.text)),
                             bottomPadding = 0.dp,
                         )
                         // After a long press the copy buttons are already above.
                         CopyActions(
-                            word = state.tap.text.take(MAX_SHOWN_TEXT),
+                            word = nothingFoundText(state.tap.text),
                             sentence = state.tap.sentence,
                             showCopy = !state.tap.bySelection,
                             onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
@@ -519,6 +519,18 @@ fun LookupPanel(
 }
 
 private const val MAX_SHOWN_TEXT = 8
+
+/** The start of the tapped text for "No entry for": up to [MAX_SHOWN_TEXT] characters, cut before the first punctuation mark or space. */
+internal fun nothingFoundText(text: String): String {
+    val head = text.take(MAX_SHOWN_TEXT)
+    val end = head.indexOfFirst { it.isWhitespace() || Character.getType(it) in PUNCTUATION_TYPES }
+    return if (end > 0) head.substring(0, end) else head
+}
+
+private val PUNCTUATION_TYPES = setOf(
+    Character.CONNECTOR_PUNCTUATION, Character.DASH_PUNCTUATION, Character.START_PUNCTUATION, Character.END_PUNCTUATION,
+    Character.INITIAL_QUOTE_PUNCTUATION, Character.FINAL_QUOTE_PUNCTUATION, Character.OTHER_PUNCTUATION,
+).map { it.toInt() }.toSet()
 
 /**
  * What the lookup panel offers for highlighting. [current] is the colour (0-3, see [HIGHLIGHT_SWATCHES])
