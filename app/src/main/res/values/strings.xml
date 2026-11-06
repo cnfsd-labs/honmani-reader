@@ -929,6 +929,9 @@
         <item quantity="one">%1$d day of reading in the last year</item>
         <item quantity="other">%1$d days of reading in the last year</item>
     </plurals>
+    <string name="progress_calendar_older">Older weeks</string>
+    <string name="progress_calendar_newer">Newer weeks</string>
+    <string name="progress_calendar_range">%1$s – %2$s</string>
     <string name="progress_calendar_legend">Lighter: a few minutes; darker: up to an hour or more.</string>
     <string name="progress_skill">Skill</string>
     <string name="skill_value">Skill %1$d</string>
@@ -965,7 +968,9 @@
     <string name="progress_next">Next milestones</string>
     <string name="progress_milestones">Milestones</string>
     <string name="progress_of_goal">%1$s of %2$s</string>
-    <string name="progress_how">Your level grows with every character you read and never goes down. Milestones are dated from your reading; words learned and Anki cards from the day Honmani first saw them.</string>
+    <string name="progress_level_title">Level</string>
+    <string name="progress_level_how">Your level grows with every character you read and never goes down.</string>
+    <string name="progress_milestones_how">Milestones are dated from your reading; words learned and Anki cards from the day Honmani first saw them.</string>
     <string name="progress_kind_characters">Characters read</string>
     <string name="progress_kind_hours">Hours of reading</string>
     <string name="progress_kind_books">Books finished</string>

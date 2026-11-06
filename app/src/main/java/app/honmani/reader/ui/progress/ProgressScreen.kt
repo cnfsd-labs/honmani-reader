@@ -9,7 +9,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -31,8 +30,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
@@ -48,6 +52,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -65,6 +70,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -193,6 +199,14 @@ private fun MilestonesContent(
 @Composable
 private fun LevelCard(state: ProgressUiState) {
     val level = state.level
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    if (explaining) {
+        InfoDialog(
+            stringResource(R.string.progress_level_title),
+            stringResource(R.string.progress_level_how),
+            onDismiss = { explaining = false },
+        )
+    }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -202,7 +216,7 @@ private fun LevelCard(state: ProgressUiState) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 LevelRing(level)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
                     Text(
                         stringResource(R.string.progress_level, level.level),
                         style = MaterialTheme.typography.headlineMedium,
@@ -215,6 +229,7 @@ private fun LevelCard(state: ProgressUiState) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                InfoButton(onClick = { explaining = true })
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
@@ -336,7 +351,7 @@ private fun AllMilestones(milestones: List<Milestone>, recentSince: LocalDate) {
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT) }
     var explaining by rememberSaveable { mutableStateOf(false) }
     if (explaining) {
-        InfoDialog(stringResource(R.string.progress_milestones), stringResource(R.string.progress_how), onDismiss = { explaining = false })
+        InfoDialog(stringResource(R.string.progress_milestones), stringResource(R.string.progress_milestones_how), onDismiss = { explaining = false })
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -444,14 +459,19 @@ private fun Modifier.recentGlow(color: Color): Modifier {
 
 /**
  * Reading days of the last year, a column per week (Monday on top), darker the longer the day's
- * reading; it opens at the current week and scrolls back.
+ * reading. As many weeks as fit the width are shown (no sideways scrolling: that would block the
+ * page swipe); the arrows step to older and newer weeks.
  */
 @Composable
 private fun ReadingCalendar(calendar: Map<LocalDate, Long>, today: LocalDate) {
-    val firstMonday = today.with(DayOfWeek.MONDAY).minusWeeks(CALENDAR_WEEKS - 1L)
+    val thisMonday = today.with(DayOfWeek.MONDAY)
+    val firstMonday = thisMonday.minusWeeks(CALENDAR_WEEKS - 1L)
     val empty = MaterialTheme.colorScheme.surfaceContainerHighest
     val fill = MaterialTheme.colorScheme.primary
     val days = calendar.count { (day, seconds) -> day >= firstMonday && seconds >= 60 }
+    // How many weeks the newest shown week is from this one.
+    var newerBy by rememberSaveable { mutableIntStateOf(0) }
+    val monthFormat = remember { DateTimeFormatter.ofPattern("MMM yyyy") }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
@@ -459,33 +479,54 @@ private fun ReadingCalendar(calendar: Map<LocalDate, Long>, today: LocalDate) {
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val scroll = rememberScrollState()
-            LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
-            Canvas(
-                modifier = Modifier
-                    .horizontalScroll(scroll)
-                    .size(width = (CELL + GAP) * CALENDAR_WEEKS, height = (CELL + GAP) * 7),
-            ) {
-                val cell = CELL.toPx()
-                val step = (CELL + GAP).toPx()
-                for (week in 0 until CALENDAR_WEEKS) {
-                    for (weekday in 0 until 7) {
-                        val day = firstMonday.plusDays(week * 7L + weekday)
-                        if (day > today) continue
-                        val minutes = (calendar[day] ?: 0L) / 60
-                        val color = when {
-                            minutes < 1 -> empty
-                            minutes < 15 -> fill.copy(alpha = 0.35f)
-                            minutes < 30 -> fill.copy(alpha = 0.55f)
-                            minutes < 60 -> fill.copy(alpha = 0.75f)
-                            else -> fill
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val weeks = CalendarWindow.weeks(maxWidth.value, MIN_CELL.value, GAP.value, CALENDAR_WEEKS)
+                val offset = newerBy.coerceIn(0, CALENDAR_WEEKS - weeks)
+                val lastMonday = thisMonday.minusWeeks(offset.toLong())
+                val shownFirst = lastMonday.minusWeeks(weeks - 1L)
+                val cellDp = (maxWidth - GAP * (weeks - 1)) / weeks
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { newerBy = (offset + weeks).coerceAtMost(CALENDAR_WEEKS - weeks) }, enabled = offset < CALENDAR_WEEKS - weeks) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.progress_calendar_older))
                         }
-                        drawRoundRect(
-                            color = color,
-                            topLeft = Offset(week * step, weekday * step),
-                            size = Size(cell, cell),
-                            cornerRadius = CornerRadius(2.dp.toPx()),
+                        Text(
+                            stringResource(
+                                R.string.progress_calendar_range,
+                                shownFirst.format(monthFormat),
+                                minOf(lastMonday.plusDays(6), today).format(monthFormat),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.weight(1f),
                         )
+                        IconButton(onClick = { newerBy = (offset - weeks).coerceAtLeast(0) }, enabled = offset > 0) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.progress_calendar_newer))
+                        }
+                    }
+                    Canvas(modifier = Modifier.fillMaxWidth().height((cellDp + GAP) * 7 - GAP)) {
+                        val cell = cellDp.toPx()
+                        val step = (cellDp + GAP).toPx()
+                        for (week in 0 until weeks) {
+                            for (weekday in 0 until 7) {
+                                val day = shownFirst.plusDays(week * 7L + weekday)
+                                if (day > today) continue
+                                val minutes = (calendar[day] ?: 0L) / 60
+                                val color = when {
+                                    minutes < 1 -> empty
+                                    minutes < 15 -> fill.copy(alpha = 0.35f)
+                                    minutes < 30 -> fill.copy(alpha = 0.55f)
+                                    minutes < 60 -> fill.copy(alpha = 0.75f)
+                                    else -> fill
+                                }
+                                drawRoundRect(
+                                    color = color,
+                                    topLeft = Offset(week * step, weekday * step),
+                                    size = Size(cell, cell),
+                                    cornerRadius = CornerRadius(2.dp.toPx()),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -498,10 +539,17 @@ private fun ReadingCalendar(calendar: Map<LocalDate, Long>, today: LocalDate) {
     }
 }
 
+/** How much of the calendar fits a width. */
+internal object CalendarWindow {
+    /** Weeks (columns) of at least [minCell] plus [gap] that fit [width]; at least 4, at most [max]. All in dp. */
+    fun weeks(width: Float, minCell: Float, gap: Float, max: Int): Int =
+        ((width + gap) / (minCell + gap)).toInt().coerceIn(4, max)
+}
+
 private const val RECENT_DAYS = 6L
 private const val GLOW_PERIOD_MS = 1_600
 private const val CALENDAR_WEEKS = 53
-private val CELL = 12.dp
+private val MIN_CELL = 12.dp
 private val GAP = 3.dp
 
 private val MIN_TILE_WIDTH = 72.dp
