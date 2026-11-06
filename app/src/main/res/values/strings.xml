@@ -976,7 +976,7 @@
     <string name="stats_faster">▲ %1$d%% vs. %2$s</string>
     <string name="stats_slower">▼ %1$d%% vs. %2$s</string>
     <string name="stats_same_speed">Same as %1$s</string>
-    <string name="stats_vs_last_week">the last 7 days</string>
+    <string name="stats_vs_last_week">the 7 days before today</string>
     <string name="stats_vs_week_before">the 7 days before</string>
     <string name="stats_vs_start">your first 2 weeks</string>
     <string name="stats_books_today">Books today</string>
