@@ -264,11 +264,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             tracker.setForeground(false)
         }
     }
+    // Listen or Read sentence was tapped in the open panel: the volume buttons change the volume
+    // until the panel closes (they would close the panel otherwise).
+    var panelSpeaking by remember { mutableStateOf(false) }
     // With "Count time while a lookup is open" off, the timer pauses while the panel is open
     // (its touches are native: the book sees no activity).
     val countDuringLookup by container.readingTimeSettings.countDuringLookup.collectAsStateWithLifecycle()
     LaunchedEffect(countDuringLookup) { tracker.setCountLookupTime(countDuringLookup) }
     LaunchedEffect(panel != null) {
+        panelSpeaking = false
         tracker.setLookupOpen(panel != null)
         // The panel's word audio never talks over the reader's voice: it ends before that goes on.
         if (panel == null) container.wordAudio.stop()
@@ -546,7 +550,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     readAloud.pageReloaded()
                     audiobook.controller.pageReloaded()
                 },
-                volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown),
+                volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown, panelSpeaking),
                 hideSelectionToolbar = appSettings.selectionLookup,
                 panelOpen = panel != null,
                 modifier = Modifier
@@ -702,12 +706,18 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onSetIgnored = viewModel::setIgnored,
                     onSetFurigana = viewModel::setFurigana,
                     onEditLookup = { openInDictionary(context, it) },
-                    onListen = viewModel::listen,
+                    onListen = { group ->
+                        panelSpeaking = true
+                        viewModel.listen(group)
+                    },
                     onLookupWord = viewModel::lookupWord,
                     onShowKanji = viewModel::showKanji,
                     onBack = { viewModel.back() },
                     previousSentence = if (showPreviousSentence) state.tap.previousSentence else "",
-                    onReadSentence = viewModel::readSentence,
+                    onReadSentence = {
+                        panelSpeaking = true
+                        viewModel.readSentence()
+                    },
                     onDontCount = if (countedTap == state.tap) viewModel::dontCount else null,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },

@@ -20,4 +20,10 @@ class VolumeKeysTest {
         assertFalse(VolumeKeys.turnPages(setting = false, listening = false))
         assertFalse(VolumeKeys.turnPages(setting = false, listening = true))
     }
+
+    @Test
+    fun theyChangeTheVolumeAfterListenInThePanelUntilItCloses() {
+        assertFalse(VolumeKeys.turnPages(setting = true, listening = false, panelSpeaking = true))
+        assertTrue(VolumeKeys.turnPages(setting = true, listening = false, panelSpeaking = false))
+    }
 }
