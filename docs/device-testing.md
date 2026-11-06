@@ -169,7 +169,7 @@ aloud, on a page with furigana.
 - Page end: the book turns itself (a sentence crossing the break turns when the rest is off the page);
   paged/continuous, both directions. Close and reopen: on the page reached.
 - Pause/play resumes at the sentence start; next/previous move a sentence, also paused. Speed
-  0.75/1/1.25/1.5, kept per book. Fits at 360 dp and the largest font; TalkBack reads each button.
+  0.5/0.75/1/1.25/1.5, kept per book. Fits at 360 dp and the largest font; TalkBack reads each button.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
 - Call, other player, Home pauses it; the screen stays on only while reading.
@@ -190,7 +190,7 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Subtitles not in the book change nothing (mark stays); under half found -> the bar says so.
 - Same bar order, volume buttons and swipe-away/Follow as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
-  0.75/1/1.25/1.5, kept.
+  0.5/0.75/1/1.25/1.5, kept.
 - Pause, close the app: audio paused, screen no longer kept on, Play continues. Call/other player
   pauses; a word tap pauses while the panel is open.
 - Read aloud and the audiobook stop each other.

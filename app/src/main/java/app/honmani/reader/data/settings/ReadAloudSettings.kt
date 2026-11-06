@@ -26,7 +26,7 @@ class ReadAloudSettings(private val preferences: SharedPreferences) {
 
     companion object {
         const val KEY_RATE = "read_aloud_rate"
-        val RATES = listOf(0.75f, 1f, 1.25f, 1.5f)
+        val RATES = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f)
 
         /** The speed after [current] in [RATES], back to the first after the last. */
         fun nextRate(current: Float): Float = RATES[(RATES.indexOf(current) + 1) % RATES.size]
