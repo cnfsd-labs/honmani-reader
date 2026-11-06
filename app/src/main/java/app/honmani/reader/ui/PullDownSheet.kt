@@ -26,6 +26,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Velocity
@@ -73,7 +76,24 @@ fun PullDownSheet(
         sheetState = sheetState,
         sheetGesturesEnabled = false,
         properties = properties,
-        dragHandle = dragHandle,
+        dragHandle = dragHandle?.let { handle ->
+            {
+                // The handle is outside the scrolling content: dragging it pulls the sheet too.
+                Box(
+                    modifier = Modifier.draggable(
+                        orientation = Orientation.Vertical,
+                        state = rememberDraggableState { pull = (pull + it).coerceAtLeast(0f) },
+                        onDragStopped = { velocity ->
+                            if (pull > closeDistance || velocity > closeDistance * 10) {
+                                launchClose(scope, sheetState, onDismiss)
+                            } else {
+                                animate(pull, 0f) { value, _ -> pull = value }
+                            }
+                        },
+                    ),
+                ) { handle() }
+            }
+        },
     ) {
         Box(modifier = Modifier.heightIn(max = maxHeight).nestedScroll(pullDown)) { content() }
     }
