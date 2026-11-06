@@ -817,13 +817,14 @@ private fun LibraryToolbar(
                         StatusFilters(uiState, onFilter)
                     }
                 }
-                // 48 dp touch targets already keep 8 dp between the 40 dp buttons.
-                Row {
+                // As tall as the status filters (48 dp), which is also the touch target.
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (uiState.folders.isNotEmpty() && !uiState.showHidden) {
                         // Tinted while a folder is chosen, open row or not.
                         val active = uiState.folderId != null
                         FilledTonalIconButton(
                             onClick = onToggleFolders,
+                            modifier = Modifier.size(48.dp),
                             colors = if (active) {
                                 IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
@@ -837,10 +838,10 @@ private fun LibraryToolbar(
                         }
                     }
                     SortButton(uiState.sort, uiState.skill, onSort)
-                    FilledTonalIconButton(onClick = onStartSearch) {
+                    FilledTonalIconButton(onClick = onStartSearch, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Filled.Search, contentDescription = stringResource(R.string.action_search))
                     }
-                    FilledTonalIconButton(onClick = onAdd) {
+                    FilledTonalIconButton(onClick = onAdd, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.action_add_book))
                     }
                 }
@@ -854,7 +855,7 @@ private fun LibraryToolbar(
 private fun SortButton(sort: LibrarySort, skill: Int?, onSort: (LibrarySort) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        FilledTonalIconButton(onClick = { open = true }) {
+        FilledTonalIconButton(onClick = { open = true }, modifier = Modifier.size(48.dp)) {
             Icon(painter = painterResource(R.drawable.ic_sort), contentDescription = stringResource(R.string.action_sort))
         }
         DropdownMenu(
