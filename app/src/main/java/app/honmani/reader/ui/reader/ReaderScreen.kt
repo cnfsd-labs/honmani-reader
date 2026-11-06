@@ -612,7 +612,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
                 )
             }
-            // Over the bar, not in it: the book keeps its size when the button comes and goes.
+            // Over the bar, not in it: the book keeps its size when the button comes and goes. Above
+            // ttu's 32 px footer (page counter) too, which sits just over the bar.
             val following = readAloudBarShown && readAloudState.detached || audiobookBarShown && audiobookState.detached
             if (following) {
                 FollowButton(
@@ -622,7 +623,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     },
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 12.dp, bottom = readAloudBarHeight + 8.dp),
+                        .padding(end = 12.dp, bottom = readAloudBarHeight + FOOTER_HEIGHT + 8.dp),
                 )
             }
             val state = panel
@@ -1182,6 +1183,9 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 /** The room an immersive book keeps clear: the display cutout and the keyboard, never the bars. */
 private val bookInsets: WindowInsets
     @Composable get() = WindowInsets.displayCutout.union(WindowInsets.ime)
+
+/** Height of ttu's page footer, in dp (CSS px), above the read-aloud bar. */
+private val FOOTER_HEIGHT = 32.dp
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"
