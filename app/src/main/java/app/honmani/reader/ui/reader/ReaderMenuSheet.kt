@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -177,6 +178,7 @@ data class MenuPlace(val characters: Long, val total: Int)
 
 /** A slider over the whole book with its label; letting go jumps there. */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
     val total = place?.total ?: 0
     var fraction by remember(place) { mutableFloatStateOf(place?.let { BookPlace.fraction(it.characters, it.total) } ?: 0f) }
@@ -198,6 +200,8 @@ private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
             onValueChange = { fraction = it },
             onValueChangeFinished = { onJump(BookPlace.charactersAt(fraction, total)) },
             enabled = place != null && total > 0,
+            // No dot at the end of the track.
+            track = { state -> SliderDefaults.Track(sliderState = state, enabled = place != null && total > 0, drawStopIndicator = null) },
             modifier = Modifier.semantics { contentDescription = label },
         )
     }

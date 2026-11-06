@@ -20,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +64,7 @@ import app.honmani.reader.data.stats.GoalProgress
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.stats.WeekSpeed
+import app.honmani.reader.ui.ProgressBar
 import java.text.NumberFormat
 import android.text.format.DateFormat
 import java.time.format.DateTimeFormatter
@@ -280,7 +280,7 @@ private fun GoalCard(goal: GoalProgress) {
                 },
                 style = MaterialTheme.typography.titleLarge,
             )
-            LinearProgressIndicator(progress = { goal.fraction }, modifier = Modifier.fillMaxWidth())
+            ProgressBar(progress = { goal.fraction }, modifier = Modifier.fillMaxWidth())
             if (goal.streak > 0) {
                 Text(
                     pluralStringResource(R.plurals.stats_goal_streak, goal.streak, goal.streak),
