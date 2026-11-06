@@ -2,9 +2,11 @@ package app.honmani.reader.ui.words
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -99,68 +101,76 @@ fun ReviewPage(
     // Under another chip the counts would be wrong: the button reads plain "Start".
     val startDescription =
         if (state.mode == ReviewPageMode.Due) stringResource(R.string.review_start_description, due, newShown) else null
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    ) {
-        when (state.mode) {
-            ReviewPageMode.Due -> {
-                Text(due.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
-                Text(pluralStringResource(R.plurals.review_page_due, due), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    pluralStringResource(R.plurals.review_card_new, newShown, newShown),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            ReviewPageMode.Nothing -> Message(R.string.review_page_nothing_title, R.string.review_page_nothing_body)
-            ReviewPageMode.Ahead -> Message(R.string.review_page_ahead_title, R.string.review_page_ahead_body)
-            ReviewPageMode.NoStarred -> Message(R.string.review_page_no_starred_title, R.string.review_page_no_starred_body)
-        }
-        Button(
-            onClick = onStart,
-            enabled = state.canStart,
+    // Counts on top (small), what is due in the middle, and what the thumb needs (the scope
+    // chips and a big Start) at the bottom; the page scrolls when the screen is too short.
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier
-                .heightIn(min = 48.dp)
-                .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
-        ) { Text(stringResource(R.string.review_start)) }
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            @Composable
-            fun chip(scope: ReviewScope, label: String, onClick: () -> Unit = { choice.onChange(scope) }) {
-                val selected = choice.scope == scope
-                FilterChip(
-                    selected = selected,
-                    onClick = onClick,
-                    label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp)) },
-                    // A tick as well as the tint: a selected chip stands out in every theme.
-                    leadingIcon = if (selected) {
-                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else {
-                        null
-                    },
-                )
+            if (summary != null && summary.any) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    ReviewTiles(summary, compact = true)
+                }
             }
-            chip(ReviewScope.Due, stringResource(R.string.review_chip_due))
-            chip(ReviewScope.DueOnly, stringResource(R.string.review_chip_due_only))
-            chip(ReviewScope.ThisBook, stringResource(R.string.review_chip_this_book))
-            val book = choice.scope as? ReviewScope.Book
-            chip(book ?: ReviewScope.Book(-1, ""), book?.title ?: stringResource(R.string.review_chip_a_book)) { pickBook = true }
-            chip(ReviewScope.Starred, stringResource(R.string.review_chip_starred))
-            chip(ReviewScope.AllLearning, stringResource(R.string.review_chip_all_learning))
-        }
-        if (summary != null && summary.any) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                ReviewTiles(summary)
+            Spacer(Modifier.weight(1f))
+            when (state.mode) {
+                ReviewPageMode.Due -> {
+                    Text(due.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+                    Text(pluralStringResource(R.plurals.review_page_due, due), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        pluralStringResource(R.plurals.review_card_new, newShown, newShown),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ReviewPageMode.Nothing -> Message(R.string.review_page_nothing_title, R.string.review_page_nothing_body)
+                ReviewPageMode.Ahead -> Message(R.string.review_page_ahead_title, R.string.review_page_ahead_body)
+                ReviewPageMode.NoStarred -> Message(R.string.review_page_no_starred_title, R.string.review_page_no_starred_body)
             }
+            Spacer(Modifier.weight(1f))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                @Composable
+                fun chip(scope: ReviewScope, label: String, onClick: () -> Unit = { choice.onChange(scope) }) {
+                    val selected = choice.scope == scope
+                    FilterChip(
+                        selected = selected,
+                        onClick = onClick,
+                        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp)) },
+                        // A tick as well as the tint: a selected chip stands out in every theme.
+                        leadingIcon = if (selected) {
+                            { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        } else {
+                            null
+                        },
+                    )
+                }
+                chip(ReviewScope.Due, stringResource(R.string.review_chip_due))
+                chip(ReviewScope.DueOnly, stringResource(R.string.review_chip_due_only))
+                chip(ReviewScope.ThisBook, stringResource(R.string.review_chip_this_book))
+                val book = choice.scope as? ReviewScope.Book
+                chip(book ?: ReviewScope.Book(-1, ""), book?.title ?: stringResource(R.string.review_chip_a_book)) { pickBook = true }
+                chip(ReviewScope.Starred, stringResource(R.string.review_chip_starred))
+                chip(ReviewScope.AllLearning, stringResource(R.string.review_chip_all_learning))
+            }
+            Button(
+                onClick = onStart,
+                enabled = state.canStart,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 64.dp)
+                    .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
+            ) { Text(stringResource(R.string.review_start), style = MaterialTheme.typography.titleLarge) }
+            TextButton(onClick = { settings = true }) { Text(stringResource(R.string.review_page_settings)) }
         }
-        TextButton(onClick = { settings = true }) { Text(stringResource(R.string.review_page_settings)) }
     }
     if (settings) {
         PullDownSheet(onDismiss = { settings = false }) {

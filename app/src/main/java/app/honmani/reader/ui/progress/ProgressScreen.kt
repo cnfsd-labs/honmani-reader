@@ -257,22 +257,24 @@ private fun LevelCard(state: ProgressUiState) {
 
 /** Reviews today, the time they took, retention over the last 30 days and the words in review. */
 @Composable
-internal fun ReviewTiles(reviews: ReviewSummary) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+internal fun ReviewTiles(reviews: ReviewSummary, compact: Boolean = false) {
+    Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
         StatTile(
             label = stringResource(R.string.progress_reviews_today),
             value = number(reviews.today.toLong()),
             detail = pluralStringResource(R.plurals.progress_reviews_new, reviews.newToday, reviews.newToday),
+            compact = compact,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         StatTile(
             label = stringResource(R.string.progress_reviews_time),
             value = duration(reviews.todayMillis / 1000),
             detail = stringResource(R.string.progress_reviews_time_note),
+            compact = compact,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
         StatTile(
             label = stringResource(R.string.progress_retention),
             value = reviews.retention?.let { stringResource(R.string.progress_retention_value, Math.round(it * 100).toInt()) } ?: "–",
@@ -281,11 +283,13 @@ internal fun ReviewTiles(reviews: ReviewSummary) {
             } else {
                 stringResource(R.string.progress_retention_none)
             },
+            compact = compact,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         StatTile(
             label = stringResource(R.string.progress_words_in_review),
             value = number(reviews.inReview.toLong()),
+            compact = compact,
             modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
