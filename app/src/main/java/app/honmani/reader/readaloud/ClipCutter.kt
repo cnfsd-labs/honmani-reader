@@ -34,7 +34,11 @@ fun interface ClipCutter {
  * The range is widened by [PAD_MS] on each side, because subtitles cut tightly.
  */
 class MediaClipCutter(private val context: Context) : ClipCutter {
+    /** Audio files whose format can't be cut (until the app restarts): not opened again for every card. */
+    private val unsupported = java.util.Collections.synchronizedSet(HashSet<String>())
+
     override fun cut(audio: String, range: ClipRange, target: File): File? {
+        if (audio in unsupported) return null
         val extractor = MediaExtractor()
         var part: File? = null
         try {
@@ -46,7 +50,11 @@ class MediaClipCutter(private val context: Context) : ClipCutter {
             val extension = when (format.getString(MediaFormat.KEY_MIME)) {
                 MediaFormat.MIMETYPE_AUDIO_MPEG -> "mp3"
                 MediaFormat.MIMETYPE_AUDIO_AAC -> "m4a"
-                else -> return null
+                else -> {
+                    unsupported += audio
+                    logWarning("Honmani.audio", "The audiobook's format can't be cut into clips: " + format.getString(MediaFormat.KEY_MIME))
+                    return null
+                }
             }
             val result = File(target.parentFile, target.name + "." + extension)
             part = File(target.parentFile, target.name + ".part")
