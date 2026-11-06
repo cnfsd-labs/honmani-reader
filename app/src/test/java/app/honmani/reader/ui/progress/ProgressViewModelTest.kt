@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,6 +49,7 @@ class ProgressViewModelTest {
     private fun viewModel(
         books: List<BookEntity> = emptyList(),
         recorded: List<FinishedBookEntity> = emptyList(),
+        goalMinutes: Int? = null,
     ) = ProgressViewModel(
         days = days,
         books = flowOf(books),
@@ -55,6 +57,7 @@ class ProgressViewModelTest {
         wordsLearned = flowOf(0),
         ankiCards = flowOf(0),
         store = store,
+        goalMinutes = flowOf(goalMinutes),
         today = { today },
         zone = { ZoneId.of("Asia/Tokyo") },
     )
@@ -87,5 +90,18 @@ class ProgressViewModelTest {
         assertEquals(listOf("characters_100000"), viewModel.pending.value.map { it.id })
         viewModel.shown(viewModel.pending.value)
         assertEquals(emptyList<String>(), viewModel.pending.value.map { it.id })
+    }
+
+    @Test
+    fun theGoalCardHasAStateOnlyWhileTheGoalIsOn() = runTest {
+        days.value += ReadingDayEntity(1, today.toString(), 600, 9_000)
+        val off = viewModel()
+        val on = viewModel(goalMinutes = 20)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { off.uiState.collect {} }
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { on.uiState.collect {} }
+
+        assertNull(off.uiState.value?.goal)
+        assertEquals(600L, on.uiState.value?.goal?.secondsToday)
+        assertEquals(20, on.uiState.value?.goal?.goalMinutes)
     }
 }

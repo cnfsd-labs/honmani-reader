@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -60,11 +62,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.stats.DayTotal
-import app.honmani.reader.data.stats.GoalProgress
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.stats.WeekSpeed
-import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.InfoButton
+import app.honmani.reader.ui.InfoDialog
+
 import java.text.NumberFormat
 import android.text.format.DateFormat
 import java.time.format.DateTimeFormatter
@@ -119,6 +122,10 @@ fun StatisticsContent(
             }
         }
     }
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    if (explaining) {
+        InfoDialog(stringResource(R.string.stats_title), stringResource(R.string.stats_how), onDismiss = { explaining = false })
+    }
     if (refoldDialog) {
         RefoldDialog(viewModel, onDismiss = { refoldDialog = false })
     }
@@ -140,8 +147,7 @@ fun StatisticsContent(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            current.goal?.let { GoalCard(it) }
-            Headline(summary)
+            Headline(summary, onInfo = { explaining = true })
             Tiles(current)
             when (summary.period) {
                 StatsPeriod.TODAY -> BooksToday(summary.books, current.titles)
@@ -166,17 +172,7 @@ fun StatisticsContent(
                     )
                 }
             }
-            Text(
-                text = stringResource(R.string.stats_how),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = { exportCsv.launch(csvFileName) }) {
-                Text(stringResource(R.string.csv_stats_export))
-            }
-            TextButton(onClick = { refoldDialog = true }) {
-                Text(stringResource(R.string.refold_export))
-            }
+            ExportSection(onCsv = { exportCsv.launch(csvFileName) }, onRefold = { refoldDialog = true })
         }
     }
 }
@@ -257,58 +253,60 @@ private fun periodName(period: StatsPeriod) = stringResource(
     },
 )
 
-/** Today's reading against the daily goal, with the days in a row that reached it. */
+/** The period's reading time, large (the info icon explains how time and characters are counted), with the characters read. */
 @Composable
-private fun GoalCard(goal: GoalProgress) {
+private fun Headline(summary: PeriodSummary, onInfo: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(start = 20.dp, top = 8.dp, end = 4.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                stringResource(R.string.stats_goal_title),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                if (goal.met) {
-                    stringResource(R.string.stats_goal_met)
-                } else {
-                    stringResource(R.string.stats_goal_progress, (goal.secondsToday / 60).toInt(), goal.goalMinutes)
-                },
-                style = MaterialTheme.typography.titleLarge,
-            )
-            ProgressBar(progress = { goal.fraction }, modifier = Modifier.fillMaxWidth())
-            if (goal.streak > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    pluralStringResource(R.plurals.stats_goal_streak, goal.streak, goal.streak),
-                    style = MaterialTheme.typography.bodyMedium,
+                    periodName(summary.period),
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
                 )
+                InfoButton(onClick = onInfo)
             }
+            Text(duration(summary.seconds), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+            Text(characters(summary.characters), style = MaterialTheme.typography.titleMedium)
         }
     }
 }
 
-/** The period's reading time, large, with the characters read. */
+/** "Export": two equal cards, reading per day as a CSV file and the Refold export. */
 @Composable
-private fun Headline(summary: PeriodSummary) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+private fun ExportSection(onCsv: () -> Unit, onRefold: () -> Unit) {
+    Text(
+        stringResource(R.string.stats_export),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+        ExportCard(R.drawable.ic_table, stringResource(R.string.csv_stats_export_card), onCsv, Modifier.weight(1f).fillMaxHeight())
+        ExportCard(R.drawable.ic_refold, stringResource(R.string.refold_export_card), onRefold, Modifier.weight(1f).fillMaxHeight())
+    }
+}
+
+@Composable
+private fun ExportCard(icon: Int, title: String, onClick: () -> Unit, modifier: Modifier) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
-                periodName(summary.period),
-                style = MaterialTheme.typography.labelLarge,
+                stringResource(R.string.stats_export_csv_note),
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(duration(summary.seconds), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
-            Text(characters(summary.characters), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

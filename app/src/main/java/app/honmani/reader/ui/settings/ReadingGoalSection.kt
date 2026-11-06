@@ -37,15 +37,13 @@ import app.honmani.reader.R
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.stats.ReadingGoal
 
-/** Settings → Reading: the daily reading goal, off until switched on; its progress shows in the statistics. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Settings → Reading: the daily reading goal, off until switched on; its progress shows in Progress. */
 @Composable
 fun ReadingGoalSection() {
     val context = LocalContext.current
     val settings = remember { (context.applicationContext as HonmaniApplication).container.readingGoalSettings }
     val enabled by settings.enabled.collectAsStateWithLifecycle()
     val minutes by settings.minutes.collectAsStateWithLifecycle()
-    var askingMinutes by rememberSaveable { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(stringResource(R.string.settings_daily_goal)) },
         supportingContent = { Text(stringResource(R.string.settings_daily_goal_details)) },
@@ -53,29 +51,40 @@ fun ReadingGoalSection() {
         modifier = Modifier.toggleable(enabled, role = Role.Switch, onValueChange = settings::setEnabled),
     )
     if (enabled) {
-        // A value typed under "Other" or restored from a backup is shown as one more chip.
-        val choices = (ReadingGoal.PRESETS + minutes).distinct().sorted()
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                for (choice in choices) {
-                    FilterChip(
-                        selected = choice == minutes,
-                        onClick = { settings.setMinutes(choice) },
-                        label = { Text(stringResource(R.string.settings_daily_goal_minutes, choice)) },
-                    )
-                }
-                FilterChip(
-                    selected = false,
-                    onClick = { askingMinutes = true },
-                    label = { Text(stringResource(R.string.settings_daily_goal_other)) },
-                )
-            }
+            GoalMinutesChips(selected = minutes, onChosen = settings::setMinutes)
         }
+    }
+}
+
+/**
+ * The goal choices as chips (10, 20, 30, 45, 60 and Other, which asks for a number), shared by Settings and
+ * the Progress goal card. [selected] marks the current goal, if any.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun GoalMinutesChips(selected: Int?, onChosen: (Int) -> Unit, modifier: Modifier = Modifier) {
+    var askingMinutes by rememberSaveable { mutableStateOf(false) }
+    // A value typed under "Other" or restored from a backup is shown as one more chip.
+    val choices = (ReadingGoal.PRESETS + listOfNotNull(selected)).distinct().sorted()
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier) {
+        for (choice in choices) {
+            FilterChip(
+                selected = choice == selected,
+                onClick = { onChosen(choice) },
+                label = { Text(stringResource(R.string.settings_daily_goal_minutes, choice)) },
+            )
+        }
+        FilterChip(
+            selected = false,
+            onClick = { askingMinutes = true },
+            label = { Text(stringResource(R.string.settings_daily_goal_other)) },
+        )
     }
     if (askingMinutes) {
         GoalMinutesDialog(
             onChosen = {
-                settings.setMinutes(it)
+                onChosen(it)
                 askingMinutes = false
             },
             onDismiss = { askingMinutes = false },

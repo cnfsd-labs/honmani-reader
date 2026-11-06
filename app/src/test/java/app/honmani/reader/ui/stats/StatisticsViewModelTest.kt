@@ -23,7 +23,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -53,7 +52,6 @@ class StatisticsViewModelTest {
         books: List<BookEntity> = emptyList(),
         recorded: List<FinishedBookEntity> = emptyList(),
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
-        goalMinutes: Int? = null,
         writeRefoldFile: suspend (String, String) -> String = { name, _ -> name },
         markRefoldExported: suspend (List<RefoldExport.Mark>) -> Unit = {},
     ) = StatisticsViewModel(
@@ -64,7 +62,6 @@ class StatisticsViewModelTest {
         lookups = { from -> lookupTimes.map { times -> times.count { from == null || it >= from } } },
         bookLookups = { flowOf(0) },
         words = flowOf(WordCounts()),
-        goalMinutes = flowOf(goalMinutes),
         today = { today },
         zone = { zone },
         now = { clock },
@@ -98,19 +95,6 @@ class StatisticsViewModelTest {
         assertEquals(4, finished(StatsPeriod.ALL))
         assertEquals(2, finished(StatsPeriod.WEEK))
         assertEquals(0, finished(StatsPeriod.TODAY))
-    }
-
-    @Test
-    fun theGoalShowsOnlyWhileItIsOn() = runTest {
-        val rows = listOf(ReadingDayEntity(1, today.toString(), seconds = 600))
-        val off = viewModel(rows)
-        val on = viewModel(rows, goalMinutes = 20)
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { off.uiState.collect {} }
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { on.uiState.collect {} }
-
-        assertNull(off.uiState.filterNotNull().first().goal)
-        assertEquals(600L, on.uiState.filterNotNull().first().goal?.secondsToday)
-        assertEquals(20, on.uiState.filterNotNull().first().goal?.goalMinutes)
     }
 
     @Test

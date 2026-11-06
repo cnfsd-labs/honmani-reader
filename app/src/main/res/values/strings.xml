@@ -61,6 +61,17 @@
         <item quantity="one">%1$d day in a row</item>
         <item quantity="other">%1$d days in a row</item>
     </plurals>
+    <string name="progress_goal_set">Set a daily goal</string>
+    <string name="progress_goal_off">Turn the goal off</string>
+    <plurals name="progress_goal_best">
+        <item quantity="one">best: %1$d day</item>
+        <item quantity="other">best: %1$d days</item>
+    </plurals>
+    <string name="info_description">More information</string>
+    <string name="stats_export">Export</string>
+    <string name="csv_stats_export_card">Reading per day</string>
+    <string name="refold_export_card">Refold</string>
+    <string name="stats_export_csv_note">CSV file</string>
     <string name="settings_word_frequency">Show frequency in Words</string>
     <string name="settings_word_frequency_details">Shows how common each saved word is (#727), from your frequency dictionary; nothing shows without one</string>
     <string name="settings_examples">Example sentences</string>
@@ -441,7 +452,6 @@
         <item quantity="other">%d words saved to a CSV file.</item>
     </plurals>
     <string name="csv_stats_exported">Reading statistics saved to a CSV file.</string>
-    <string name="csv_stats_export">Export reading per day (CSV)</string>
     <string name="refold_export">Export for Refold (CSV)</string>
     <string name="refold_share">Export for Refold</string>
     <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese. In the Refold app, import it under Import/Export. Each export holds only reading that was not exported before, today\'s so far included; Refold adds the rows up. The file is not sent anywhere by Honmani; you choose where it goes.</string>

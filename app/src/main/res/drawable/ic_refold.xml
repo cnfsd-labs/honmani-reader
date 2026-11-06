@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Own neutral monogram (a circle with the letter R) for the Refold export; not Refold's logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,12m-9.25,0a9.25,9.25 0 1,0 18.5,0a9.25,9.25 0 1,0 -18.5,0"
+        android:strokeWidth="1.5"
+        android:strokeColor="#FF000000" />
+    <path
+        android:pathData="M9.5,17V7h3a2.5,2.5 0 0 1 0,5h-3M12.5,12L15,17"
+        android:strokeWidth="1.8"
+        android:strokeColor="#FF000000"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

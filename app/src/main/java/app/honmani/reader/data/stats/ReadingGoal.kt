@@ -12,6 +12,8 @@ data class GoalProgress(
      * the streak stays until the day is over.
      */
     val streak: Int,
+    /** The longest run of days in a row that reached the goal, at least [streak]. */
+    val bestStreak: Int = streak,
 ) {
     val goalSeconds: Long get() = goalMinutes * 60L
 
@@ -40,6 +42,15 @@ object ReadingGoal {
             streak++
             day = day.minusDays(1)
         }
-        return GoalProgress(minutes, secondsByDay[today] ?: 0L, streak)
+        // The longest run over all recorded days, counted by walking the days that reached the goal.
+        var best = 0
+        var run = 0
+        var previous: LocalDate? = null
+        for (reached in secondsByDay.filterValues { it >= goalSeconds }.keys.sorted()) {
+            run = if (previous != null && previous.plusDays(1) == reached) run + 1 else 1
+            best = maxOf(best, run)
+            previous = reached
+        }
+        return GoalProgress(minutes, secondsByDay[today] ?: 0L, streak, bestStreak = maxOf(best, streak))
     }
 }

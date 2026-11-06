@@ -3,14 +3,12 @@ package app.honmani.reader.ui.progress
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
@@ -20,6 +18,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -27,12 +28,12 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.stats.Skill
 import app.honmani.reader.data.stats.SkillEstimate
 import app.honmani.reader.data.stats.SkillPoint
+import app.honmani.reader.ui.InfoButton
+import app.honmani.reader.ui.InfoDialog
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.difficultyBand
 import app.honmani.reader.ui.stats.duration
@@ -40,85 +41,73 @@ import app.honmani.reader.ui.stats.number
 
 /** The reader's skill on the books' difficulty scale, its course over the last weeks, and books that fit it. */
 @Composable
-internal fun SkillContent(
-    modifier: Modifier = Modifier,
-    onOpenBook: (Long) -> Unit = {},
-    viewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val current = state ?: return
-    Column(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        SkillCard(current.skill)
-        if (current.skill.trend.any { it.skill != null }) SkillTrend(current.skill.trend)
-        if (current.fitting.isNotEmpty()) FittingBooks(current.fitting, onOpenBook)
-        Text(
-            text = stringResource(R.string.skill_how),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+internal fun SkillSection(state: ProgressUiState, onOpenBook: (Long) -> Unit) {
+    SkillCard(state.skill)
+    if (state.skill.trend.any { it.skill != null }) SkillTrend(state.skill.trend)
+    if (state.fitting.isNotEmpty()) FittingBooks(state.fitting, onOpenBook)
 }
 
 @Composable
 private fun SkillCard(skill: SkillEstimate) {
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    if (explaining) {
+        InfoDialog(stringResource(R.string.progress_skill), stringResource(R.string.skill_how), onDismiss = { explaining = false })
+    }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-        ) {
-            val value = skill.current
-            if (value != null) {
-                Text(
-                    stringResource(R.string.skill_value, value),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(difficultyBand(value), style = MaterialTheme.typography.titleMedium)
-                val vocabulary = skill.vocabulary
-                if (vocabulary != null && skill.fluency != null) {
+        Box {
+            InfoButton(onClick = { explaining = true }, modifier = Modifier.align(Alignment.TopEnd))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+            ) {
+                val value = skill.current
+                if (value != null) {
                     Text(
-                        stringResource(R.string.skill_parts, vocabulary.score, number(vocabulary.estimate.words.toLong()), skill.fluency),
-                        style = MaterialTheme.typography.bodyLarge,
+                        stringResource(R.string.skill_value, value),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
-                } else if (skill.gradedCharacters < Skill.VOCABULARY_MIN_CHARACTERS) {
+                    Text(difficultyBand(value), style = MaterialTheme.typography.titleMedium)
+                    val vocabulary = skill.vocabulary
+                    if (vocabulary != null && skill.fluency != null) {
+                        Text(
+                            stringResource(R.string.skill_parts, vocabulary.score, number(vocabulary.estimate.words.toLong()), skill.fluency),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    } else if (skill.gradedCharacters < Skill.VOCABULARY_MIN_CHARACTERS) {
+                        Text(
+                            stringResource(
+                                R.string.skill_vocabulary_waiting,
+                                number(Skill.VOCABULARY_MIN_CHARACTERS),
+                                number(skill.gradedCharacters),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.skill_based_on, duration(skill.gradedSeconds)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(stringResource(R.string.progress_skill), style = MaterialTheme.typography.titleMedium)
                     Text(
                         stringResource(
-                            R.string.skill_vocabulary_waiting,
-                            number(Skill.VOCABULARY_MIN_CHARACTERS),
-                            number(skill.gradedCharacters),
+                            R.string.skill_measuring,
+                            skill.gradedSeconds / 60,
+                            Skill.MIN_SECONDS / 60,
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    ProgressBar(
+                        progress = { (skill.gradedSeconds.toFloat() / Skill.MIN_SECONDS).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
-                Text(
-                    stringResource(R.string.skill_based_on, duration(skill.gradedSeconds)),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                Text(stringResource(R.string.progress_skill), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(
-                        R.string.skill_measuring,
-                        skill.gradedSeconds / 60,
-                        Skill.MIN_SECONDS / 60,
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ProgressBar(
-                    progress = { (skill.gradedSeconds.toFloat() / Skill.MIN_SECONDS).coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
         }
     }

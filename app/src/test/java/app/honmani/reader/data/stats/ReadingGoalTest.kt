@@ -66,4 +66,21 @@ class ReadingGoalTest {
 
         assertEquals(1, ReadingGoal.progress(rows, today, 20).streak)
     }
+
+    @Test
+    fun theBestStreakIsTheLongestRunEvenWhenItEndedEarlier() {
+        // Four days in a row long ago, then a gap, then two days up to today.
+        val rows = listOf(read(0, 20), read(1, 25), read(5, 20), read(6, 30), read(7, 21), read(8, 40))
+
+        val progress = ReadingGoal.progress(rows, today, 20)
+
+        assertEquals(2, progress.streak)
+        assertEquals(4, progress.bestStreak)
+    }
+
+    @Test
+    fun theBestStreakIsAtLeastTheCurrentOneAndZeroWithoutAnyGoalDay() {
+        assertEquals(3, ReadingGoal.progress(listOf(read(1, 20), read(2, 20), read(3, 20)), today, 20).bestStreak)
+        assertEquals(0, ReadingGoal.progress(listOf(read(0, 5), read(1, 19)), today, 20).bestStreak)
+    }
 }

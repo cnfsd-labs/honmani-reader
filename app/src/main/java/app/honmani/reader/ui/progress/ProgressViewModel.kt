@@ -12,11 +12,13 @@ import app.honmani.reader.data.review.ReviewSummary
 import app.honmani.reader.data.stats.DayTotal
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.FinishedBooks
+import app.honmani.reader.data.stats.GoalProgress
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.Progression
 import app.honmani.reader.data.stats.ProgressionData
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.stats.ReadingGoal
 import app.honmani.reader.data.stats.ReadingLevel
 import app.honmani.reader.data.stats.ReadingStats
 import app.honmani.reader.data.stats.perBookAndDay
@@ -55,6 +57,8 @@ data class ProgressUiState(
     val calendar: Map<LocalDate, Long> = emptyMap(),
     val today: LocalDate = DayClock().today(),
     val reviews: ReviewSummary = ReviewSummary(),
+    /** Today against the daily reading goal; null while the goal is off. */
+    val goal: GoalProgress? = null,
 )
 
 private data class Library(
@@ -62,6 +66,7 @@ private data class Library(
     val grades: Map<String, StoredDifficulty>,
     val skill: SkillEstimate,
     val reviews: ReviewSummary,
+    val goalMinutes: Int?,
     val recorded: List<FinishedBookEntity>,
 )
 
@@ -82,13 +87,17 @@ class ProgressViewModel(
     /** The skill; by default from speed alone (no words read). */
     private val skill: Flow<SkillEstimate> = SkillTracker(days, books, grades, flowOf(WordKnowledge.EMPTY), today = today).estimate,
     private val reviews: Flow<ReviewSummary> = flowOf(ReviewSummary()),
+    /** The daily reading goal in minutes; null while it is off. */
+    private val goalMinutes: Flow<Int?> = flowOf(null),
     /** Finished books removed from the library; they still count as finished. */
     private val recordedFinished: Flow<List<FinishedBookEntity>> = flowOf(emptyList()),
 ) : ViewModel() {
-    private val library = combine(books, grades, skill, reviews, recordedFinished, ::Library)
+    private val library = combine(books, grades, skill, combine(reviews, goalMinutes, ::Pair), recordedFinished) { books, grades, skill, (reviews, goal), recorded ->
+        Library(books, grades, skill, reviews, goal, recorded)
+    }
 
     val uiState: StateFlow<ProgressUiState?> =
-        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews, recorded), learned, anki, seen ->
+        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews, goalMinutes, recorded), learned, anki, seen ->
             val today = today()
             val dayClock = DayClock(zone, startHour)
             val data = ProgressionData(
@@ -114,6 +123,7 @@ class ProgressViewModel(
                 anyReading = week.anyReading,
                 skill = skill,
                 reviews = reviews,
+                goal = goalMinutes?.let { ReadingGoal.progress(rows, today, it) },
                 calendar = rows.groupBy { LocalDate.parse(it.day) }.mapValues { (_, list) -> list.sumOf { it.seconds } },
                 today = today,
                 fitting = skill.current?.let { current ->
@@ -152,6 +162,7 @@ class ProgressViewModel(
                     skill = container.skillTracker.estimate,
                     startHour = { container.daySettings.startHour.value },
                     reviews = container.reviewRepository.observeSummary(),
+                    goalMinutes = container.readingGoalSettings.goalMinutes,
                 )
             }
         }

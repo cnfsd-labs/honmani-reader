@@ -44,6 +44,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,6 +75,8 @@ import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneKind
 import app.honmani.reader.data.stats.Progression
 import app.honmani.reader.data.stats.ReadingLevel
+import app.honmani.reader.ui.InfoButton
+import app.honmani.reader.ui.InfoDialog
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.stats.StatTile
 import app.honmani.reader.ui.stats.StatisticsContent
@@ -84,19 +89,19 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
 
-/** Sections of the Progress tab. Skill (book difficulty against the reader) will join Overview. */
+/** Sections of the Progress tab. */
 private enum class ProgressSection(val label: Int) {
     OVERVIEW(R.string.progress_overview),
-    SKILL(R.string.progress_skill),
+    MILESTONES(R.string.progress_milestones),
     STATISTICS(R.string.stats_title),
 }
 
-/** The Progress tab: level and milestones, skill, and the reading statistics; swipe between them. */
+/** The Progress tab: level, goal and skill; the milestones; and the reading statistics. Swipe between them. */
 @Composable
 fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = {}) {
     val pager = rememberPagerState { ProgressSection.entries.size }
     val scope = rememberCoroutineScope()
-    // Back from Skill or Statistics goes to the overview first, then on to the Library.
+    // Back from Milestones or Statistics goes to the overview first, then on to the Library.
     BackHandler(enabled = pager.currentPage != 0) { scope.launch { pager.animateScrollToPage(0) } }
     Scaffold(
         // No title: the bottom bar names the tab.
@@ -125,18 +130,19 @@ fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = 
                 .fillMaxSize(),
         ) { page ->
             when (ProgressSection.entries[page]) {
-                ProgressSection.OVERVIEW -> ProgressContent()
-                ProgressSection.SKILL -> SkillContent(onOpenBook = onOpenBook)
+                ProgressSection.OVERVIEW -> ProgressContent(onOpenBook = onOpenBook)
+                ProgressSection.MILESTONES -> MilestonesContent()
                 ProgressSection.STATISTICS -> StatisticsContent()
             }
         }
     }
 }
 
-/** The reading level, the next milestones and all milestones. */
+/** The reading level, the daily goal, the skill and the reviews. */
 @Composable
 private fun ProgressContent(
     modifier: Modifier = Modifier,
+    onOpenBook: (Long) -> Unit = {},
     viewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -156,15 +162,30 @@ private fun ProgressContent(
             )
         }
         LevelCard(current)
+        GoalCard(current.goal)
+        SkillSection(current, onOpenBook)
         if (current.reviews.any) ReviewTiles(current.reviews)
+    }
+}
+
+/** The next milestones, the reading calendar and all milestones. */
+@Composable
+private fun MilestonesContent(
+    modifier: Modifier = Modifier,
+    viewModel: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val current = state ?: return
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
         if (current.next.isNotEmpty()) NextMilestones(current.next)
         ReadingCalendar(current.calendar, current.today)
         AllMilestones(current.milestones, recentSince = current.today.minusDays(RECENT_DAYS))
-        Text(
-            text = stringResource(R.string.progress_how),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -313,12 +334,20 @@ private fun NextMilestones(next: List<Milestone>) {
 @Composable
 private fun AllMilestones(milestones: List<Milestone>, recentSince: LocalDate) {
     val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT) }
+    var explaining by rememberSaveable { mutableStateOf(false) }
+    if (explaining) {
+        InfoDialog(stringResource(R.string.progress_milestones), stringResource(R.string.progress_how), onDismiss = { explaining = false })
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            stringResource(R.string.progress_milestones),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.progress_milestones),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            InfoButton(onClick = { explaining = true })
+        }
         BoxWithConstraints {
             // As many tiles in a row as fit a goal and a short date, also with large text.
             val minTile = MIN_TILE_WIDTH * LocalDensity.current.fontScale.coerceAtLeast(1f)

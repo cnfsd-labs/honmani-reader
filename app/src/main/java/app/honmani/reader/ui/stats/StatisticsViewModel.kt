@@ -15,8 +15,6 @@ import app.honmani.reader.data.stats.FinishedBook
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.FinishedBooks
 import app.honmani.reader.data.stats.ReadingDayEntity
-import app.honmani.reader.data.stats.GoalProgress
-import app.honmani.reader.data.stats.ReadingGoal
 import app.honmani.reader.data.stats.ReadingStats
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
@@ -63,8 +61,6 @@ data class StatisticsUiState(
     val words: WordCounts = WordCounts(),
     /** Titles of the books in [PeriodSummary.books], by book id. */
     val titles: Map<Long, String> = emptyMap(),
-    /** Today against the daily reading goal; null while the goal is off. */
-    val goal: GoalProgress? = null,
 )
 
 /** One book's statistics, for its sheet in the library. */
@@ -104,8 +100,6 @@ class StatisticsViewModel(
     private val unknownWords: (contentHash: String) -> Flow<UnknownWords?> = { flowOf(null) },
     /** "Prepare a book": adds words of a book to review with its sentences; how many are in review. */
     private val prepareBook: suspend (contentHash: String, keys: List<String>) -> Int = { _, _ -> 0 },
-    /** The daily reading goal in minutes; null while it is off. */
-    private val goalMinutes: Flow<Int?> = flowOf(null),
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     /** The hour a day starts at ([DayClock]); 0 is midnight. */
     private val startHour: () -> Int = { 0 },
@@ -172,7 +166,7 @@ class StatisticsViewModel(
         combine(books, recordedFinished) { books, recorded -> books to FinishedBooks.merge(books, recorded) }
 
     val uiState: StateFlow<StatisticsUiState?> =
-        combine(days, libraryBooks, periodLookups, words, goalMinutes) { days, (books, finished), (period, today, lookups), words, goalMinutes ->
+        combine(days, libraryBooks, periodLookups, words) { days, (books, finished), (period, today, lookups), words ->
             val from = firstDay(period, today)
             fun inPeriod(millis: Long) = from == null || !dayClock.date(millis).isBefore(from)
             StatisticsUiState(
@@ -184,7 +178,6 @@ class StatisticsViewModel(
                 lookups = lookups,
                 words = words,
                 titles = books.associate { it.id to it.title },
-                goal = goalMinutes?.let { ReadingGoal.progress(days, today, it) },
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
@@ -314,7 +307,6 @@ class StatisticsViewModel(
                     coverage = container::bookCoverage,
                     unknownWords = container::unknownWords,
                     prepareBook = { hash, keys -> container.bookDao.findByHash(hash)?.let { container.prepareBook(it, keys) } ?: 0 },
-                    goalMinutes = container.readingGoalSettings.goalMinutes,
                     startHour = { container.daySettings.startHour.value },
                     writeDocument = { uri, text -> writeTextDocument(application, uri, text) },
                     lastRefoldExport = { container.refoldExportSettings.lastExport },
