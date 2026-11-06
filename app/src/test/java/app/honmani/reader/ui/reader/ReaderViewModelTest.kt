@@ -572,5 +572,23 @@ class ReaderViewModelTest {
         assertEquals(LookupOrigin.SEARCH, word.origin)
         assertEquals(setOf(WordRepository.key("食べる", "食べる")), (search.panel.value as LookupPanelState.Results).saved)
     }
-}
 
+    @Test
+    fun aLongPressRecordsNothing_untilTheReaderSavesTheWord() {
+        viewModel.onTap(tap("猫").copy(bySelection = true))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+        val panel = viewModel.panel.value as LookupPanelState.Results
+        assertEquals("猫", panel.groups.single().expression)
+        assertTrue(recorded.isEmpty())
+        assertEquals(null, viewModel.countedTap.value)
+
+        // A star saves the word, as for any match but the best one of a tap.
+        viewModel.setStarred(panel.groups.single(), true)
+        assertEquals(listOf("猫"), recorded.map { it.expression })
+
+        // A plain tap on another word records as before.
+        viewModel.onTap(tap("犬"))
+        pending.getValue("犬").complete(LookupResult(listOf(entry("犬", "犬"))))
+        assertEquals(listOf("猫", "犬"), recorded.map { it.expression })
+    }
+}

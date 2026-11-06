@@ -147,6 +147,12 @@ class ReaderViewModel(
 ) : ViewModel() {
     private val recordsTaps = origin == LookupOrigin.READER
 
+    /**
+     * Whether opening the panel for [tap] records a lookup: a tap in a book does, a long press
+     * (selecting text) does not; the panel's explicit actions (star, Anki, ...) still save the word.
+     */
+    private fun recordsOnOpen(tap: TapLookup) = recordsTaps && !tap.bySelection
+
     // The open library book, still being looked up right after ttu opens it.
     private var book: Deferred<ReadingBook?>? = null
 
@@ -294,7 +300,7 @@ class ReaderViewModel(
                         show(LookupPanelState.NothingFound(tap))
                         return@launch
                     }
-                    if (recordsTaps) record(tap, groups.first(), taps = true)
+                    if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
                     LookupPanelState.Results(
                         tap = tap,
                         groups = groups,
@@ -353,7 +359,7 @@ class ReaderViewModel(
                 return@launch
             }
             val groups = withContext(compute) { LookupGroups.from(found) }
-            if (recordsTaps) record(tap, groups.first(), taps = true)
+            if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
