@@ -17,6 +17,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -32,7 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -255,7 +255,10 @@ internal fun FolderPickerDialog(
                 for (folder in folders) {
                     FolderChoice(folder.name, chosen == folder.id) { onPick(folder.id) }
                 }
-                TextButton(onClick = onNew) { Text(stringResource(R.string.book_folder_new)) }
+                TextButton(onClick = onNew) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text(stringResource(R.string.book_folder_new), modifier = Modifier.padding(start = 8.dp))
+                }
             }
         },
         confirmButton = {},
@@ -273,7 +276,10 @@ private fun FolderChoice(label: String, selected: Boolean, onClick: () -> Unit) 
             .heightIn(min = 48.dp)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
     ) {
-        RadioButton(selected = selected, onClick = null)
+        // A check at the chosen one, room for it at the others.
+        Box(modifier = Modifier.size(24.dp)) {
+            if (selected) Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        }
         Text(text = label, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 8.dp))
     }
 }

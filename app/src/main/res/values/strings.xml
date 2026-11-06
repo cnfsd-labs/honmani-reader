@@ -238,10 +238,10 @@
     <string name="folder_error_duplicate">A folder with this name already exists.</string>
     <string name="folder_delete_title">Delete “%1$s”?</string>
     <string name="folder_delete_message">The books stay in your library; they go back to no folder.</string>
-    <string name="book_folder_row">Folder: %1$s</string>
-    <string name="book_folder_none">None</string>
+    <string name="book_folder_add">Add to folder</string>
+    <string name="book_folder_none">No folder</string>
     <string name="book_folder_title">Folder</string>
-    <string name="book_folder_new">New folder…</string>
+    <string name="book_folder_new">New folder</string>
     <string name="library_hidden_shelf">Hidden · %1$d</string>
     <string name="action_close_hidden">Back to the library</string>
     <plurals name="library_hidden_books">
@@ -1015,7 +1015,13 @@
     <string name="book_time_whole">About %1$s to read</string>
     <string name="book_time_left">About %1$s left</string>
     <string name="book_coverage_all">You know all its words, or are learning them.</string>
-    <string name="unknown_words_button">Words to learn before reading</string>
+    <string name="book_known_words">Known words %1$d%%</string>
+    <plurals name="book_new_words">
+        <item quantity="one">%1$s new word</item>
+        <item quantity="other">%1$s new words</item>
+    </plurals>
+    <string name="book_new_words_unknown">New words</string>
+    <string name="book_new_words_choose">Choose what to learn first</string>
     <string name="prepare_top">Top %1$d</string>
     <plurals name="prepare_button">
         <item quantity="one">Learn %1$d word</item>
@@ -1027,17 +1033,14 @@
     </plurals>
     <string name="unknown_words_title">Words you don\'t know yet</string>
     <plurals name="unknown_words_all">
-        <item quantity="one">The one word of this book that is new to you. Tap it to look it up.</item>
-        <item quantity="other">All %1$s words of this book that are new to you, the most used first. Tap one to look it up.</item>
+        <item quantity="one">The one word of this book that is new to you. Tap it to select it.</item>
+        <item quantity="other">All %1$s words of this book that are new to you, the most used first. Tap a word to select it.</item>
     </plurals>
-    <string name="unknown_words_capped">The %1$s most used of the %2$s words of this book that are new to you. Tap one to look it up.</string>
+    <string name="unknown_words_capped">The %1$s most used of the %2$s words of this book that are new to you. Tap a word to select it.</string>
+    <string name="unknown_words_look_up">Look up %1$s</string>
     <plurals name="unknown_words_uses">
         <item quantity="one">%1$s time</item>
         <item quantity="other">%1$s times</item>
-    </plurals>
-    <plurals name="book_coverage">
-        <item quantity="one">You know %1$d%% of its words; one is new to you.</item>
-        <item quantity="other">You know %1$d%% of its words; %2$s are new to you.</item>
     </plurals>
     <string name="book_fit_easy">Easy read</string>
     <string name="book_fit_fits">Fits you</string>

@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.R
 import app.honmani.reader.data.words.UnknownWords
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.ui.stats.StatisticsViewModel
 import app.honmani.reader.ui.stats.number
 import app.honmani.reader.ui.words.openInDictionary
@@ -47,7 +51,8 @@ private const val PREPARE_TOP = 20
 
 /**
  * The words of a book the reader does not know yet, the most used first (at most
- * [UnknownWords.LIMIT]), to look over before reading it. A tap opens the word in the dictionary.
+ * [UnknownWords.LIMIT]), to choose from before reading it. A tap on a word ticks it, the
+ * magnifier beside it takes a look in the dictionary without making it a word being learned.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,7 +63,7 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
     // Words ticked to learn before reading ("Prepare"), most used first like the list.
     val chosen = remember(contentHash) { mutableStateListOf<String>() }
     var preparing by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    PullDownSheet(onDismiss = onDismiss) {
         Column(modifier = Modifier.navigationBarsPadding()) {
             Text(
                 text = stringResource(R.string.unknown_words_title),
@@ -79,29 +84,68 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                     modifier = Modifier.padding(32.dp),
                 )
                 else -> {
-                    Text(
-                        text = if (found.total > found.words.size) {
-                            stringResource(R.string.unknown_words_capped, number(found.words.size.toLong()), number(found.total.toLong()))
-                        } else {
-                            pluralStringResource(R.plurals.unknown_words_all, found.total, number(found.total.toLong()))
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 8.dp),
-                    )
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
+                            .padding(start = 24.dp, end = 16.dp),
                     ) {
+                        Text(
+                            text = if (found.total > found.words.size) {
+                                stringResource(R.string.unknown_words_capped, number(found.words.size.toLong()), number(found.total.toLong()))
+                            } else {
+                                pluralStringResource(R.plurals.unknown_words_all, found.total, number(found.total.toLong()))
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 4.dp),
+                        )
+                        if (chosen.isNotEmpty()) {
+                            TextButton(onClick = { chosen.clear() }) { Text(stringResource(R.string.action_clear)) }
+                        }
                         TextButton(onClick = {
                             chosen.clear()
                             chosen.addAll(found.words.take(PREPARE_TOP).map { it.key })
                         }) { Text(stringResource(R.string.prepare_top, PREPARE_TOP)) }
+                    }
+                    LazyColumn(modifier = Modifier.weight(1f, fill = false), overscrollEffect = null) {
+                        itemsIndexed(found.words, key = { _, word -> word.key }) { _, word ->
+                            val selected = word.key in chosen
+                            ListItem(
+                                headlineContent = { Text(word.key) },
+                                leadingContent = { Checkbox(checked = selected, onCheckedChange = null) },
+                                trailingContent = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = pluralStringResource(R.plurals.unknown_words_uses, word.uses, number(word.uses.toLong())),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        IconButton(onClick = { openInDictionary(context, word.key, preview = true) }) {
+                                            Icon(
+                                                Icons.Filled.Search,
+                                                contentDescription = stringResource(R.string.unknown_words_look_up, word.key),
+                                            )
+                                        }
+                                    }
+                                },
+                                colors = ListItemDefaults.colors(
+                                    containerColor = if (selected) {
+                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = SELECTED_ALPHA)
+                                    } else {
+                                        Color.Transparent
+                                    },
+                                ),
+                                modifier = Modifier.clickable { if (selected) chosen -= word.key else chosen += word.key },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                    if (chosen.isNotEmpty()) {
                         Button(
-                            enabled = chosen.isNotEmpty() && !preparing,
+                            enabled = !preparing,
                             onClick = {
                                 preparing = true
                                 val order = found.words.map { it.key }.filter { it in chosen }
@@ -115,33 +159,15 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                                     ).show()
                                 }
                             },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 12.dp),
                         ) { Text(pluralStringResource(R.plurals.prepare_button, chosen.size, chosen.size)) }
-                    }
-                    LazyColumn {
-                        itemsIndexed(found.words, key = { _, word -> word.key }) { _, word ->
-                            ListItem(
-                                headlineContent = { Text(word.key) },
-                                leadingContent = {
-                                    Checkbox(
-                                        checked = word.key in chosen,
-                                        onCheckedChange = { if (it) chosen += word.key else chosen -= word.key },
-                                    )
-                                },
-                                trailingContent = {
-                                    Text(
-                                        text = pluralStringResource(R.plurals.unknown_words_uses, word.uses, number(word.uses.toLong())),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                modifier = Modifier.clickable { openInDictionary(context, word.key) },
-                            )
-                            HorizontalDivider()
-                        }
                     }
                 }
             }
         }
     }
 }
+
+private const val SELECTED_ALPHA = 0.5f

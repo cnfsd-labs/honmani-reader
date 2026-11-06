@@ -69,7 +69,9 @@ import app.honmani.reader.ui.reader.TapLookup
 fun LookupScreen(
     initialText: String,
     onDone: () -> Unit,
-    viewModel: ReaderViewModel = viewModel(factory = ReaderViewModel.Factory),
+    /** A peek at a word: the lookup is not recorded, as in a dictionary search. */
+    preview: Boolean = false,
+    viewModel: ReaderViewModel = viewModel(factory = if (preview) ReaderViewModel.SearchFactory else ReaderViewModel.Factory),
 ) {
     val context = LocalContext.current
     val panel by viewModel.panel.collectAsStateWithLifecycle()

@@ -18,7 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -39,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.library.PRONUNCIATION_READING_MAX
 import app.honmani.reader.data.library.PRONUNCIATION_TEXT_MAX
 import app.honmani.reader.data.library.PronunciationEntity
@@ -68,10 +68,10 @@ fun PronunciationsSheet(
     val undo = stringResource(R.string.action_undo)
     // The pair being edited; ("" to "") is a new one.
     var editing by remember { mutableStateOf<Pair<String, String>?>(null) }
-    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+    PullDownSheet(onDismiss = onDismiss, properties = menuReturnSheetProperties(onBack)) {
         MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
-            LazyColumn(modifier = Modifier.padding(bottom = 48.dp)) {
+            LazyColumn(modifier = Modifier.padding(bottom = 48.dp), overscrollEffect = null) {
                 item {
                     ListItem(
                         headlineContent = { Text(stringResource(R.string.pronunciation_title), style = MaterialTheme.typography.titleMedium) },

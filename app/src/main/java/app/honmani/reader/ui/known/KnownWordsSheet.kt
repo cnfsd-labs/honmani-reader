@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -47,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.words.KnownBatchEntity
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
@@ -233,8 +233,8 @@ fun KnownWordsSheet(onDismiss: () -> Unit) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(flow::file) }
     val batches by container.knownWords.batches.batches.collectAsState(initial = emptyList())
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+    PullDownSheet(onDismiss = onDismiss) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState(), overscrollEffect = null).padding(bottom = 24.dp)) {
             Text(
                 text = stringResource(R.string.known_title),
                 style = MaterialTheme.typography.titleLarge,

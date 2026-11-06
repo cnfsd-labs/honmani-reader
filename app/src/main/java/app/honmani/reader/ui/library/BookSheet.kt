@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -23,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -79,6 +82,7 @@ import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.data.difficulty.BookDifficulty
 import app.honmani.reader.data.difficulty.GradingState
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.ui.difficultyBand
 import app.honmani.reader.ui.progress.ProgressViewModel
 import app.honmani.reader.ui.stats.BookStatistics
@@ -120,55 +124,9 @@ fun BookSheet(
     var showUnknown by rememberSaveable(book.id) { mutableStateOf(false) }
     var pickingFolder by rememberSaveable(book.id) { mutableStateOf(false) }
     var namingFolder by rememberSaveable(book.id) { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    // The sheet adds the navigation bar's height under its content: leave room for both bars, or a long
-    // sheet (a large font, a long folder name) grows past the screen and its last button hides behind them.
-    val screenHeight = with(density) { LocalWindowInfo.current.containerSize.height.toDp() }
-    val bars = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() +
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val maxHeight = minOf(screenHeight * MAX_HEIGHT_FRACTION, screenHeight - bars)
-    val closeDistance = with(density) { CLOSE_DISTANCE.toPx() }
-    // How far the sheet is pulled down, following the finger.
-    var pull by remember { mutableFloatStateOf(0f) }
-    val pullDown = remember(sheetState) {
-        object : NestedScrollConnection {
-            // Pushing back up takes the pull back before the content scrolls.
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y >= 0f || pull <= 0f) return Offset.Zero
-                val used = available.y.coerceAtLeast(-pull)
-                pull += used
-                return Offset(0f, used)
-            }
-
-            // What the content can't scroll down any further pulls the sheet.
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (available.y <= 0f || source != NestedScrollSource.UserInput) return Offset.Zero
-                pull += available.y
-                return Offset(0f, available.y)
-            }
-
-            override suspend fun onPreFling(available: Velocity): Velocity {
-                if (pull <= 0f) return Velocity.Zero
-                if (pull > closeDistance || available.y > closeDistance * 10) {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                } else {
-                    animate(pull, 0f) { value, _ -> pull = value }
-                }
-                return available
-            }
-        }
-    }
-    // The sheet itself ignores drags: on a OnePlus 7 Pro its drag and the content's scroll moved
-    // it up and down, past the top of the screen, whenever the content was scrolled to its end.
-    // A pull down with the content at its top moves it instead (pullDown), and closes it when far
-    // or fast enough; so do a tap beside it and back. Below the status bar, without overscroll.
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        modifier = Modifier.graphicsLayer { translationY = pull },
-        sheetState = sheetState,
-        sheetGesturesEnabled = false,
+    // Pulling the sheet down and its scroll without a bounce: see PullDownSheet.
+    PullDownSheet(
+        onDismiss = onDismiss,
         // The handle is drawn inside the header, so the cover's colour reaches the sheet's top.
         dragHandle = null,
     ) {
@@ -176,8 +134,6 @@ fun BookSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = maxHeight)
-                    .nestedScroll(pullDown)
                     .verticalScroll(rememberScrollState(), overscrollEffect = null)
                     .padding(bottom = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -203,17 +159,23 @@ fun BookSheet(
                         modifier = Modifier.padding(start = 8.dp),
                     )
                 }
-                stats?.let { DifficultyCard(it, book, skill) }
                 // Before the reader's vocabulary is estimated, a graded book's list assumes a beginner's (to prepare it).
                 val coverage = stats?.coverage
                 val hasNewWords = if (coverage != null) coverage.newWords > 0 else (stats?.difficulty?.score ?: 0) > 0
-                if (hasNewWords && book.contentHash.isNotEmpty()) {
-                    TextButton(onClick = { showUnknown = true }, modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Text(stringResource(R.string.unknown_words_button))
-                    }
+                stats?.let {
+                    DifficultyCard(
+                        stats = it,
+                        book = book,
+                        skill = skill,
+                        onLearn = if (hasNewWords && book.contentHash.isNotEmpty()) ({ showUnknown = true }) else null,
+                    )
                 }
                 stats?.let { Statistics(it) }
-                FolderRow(folders.firstOrNull { it.id == book.folderId }?.name, onClick = { pickingFolder = true })
+                FolderAndCopy(
+                    folder = folders.firstOrNull { it.id == book.folderId }?.name,
+                    onFolder = { pickingFolder = true },
+                    onSaveCopy = onSaveCopy,
+                )
                 Actions(
                     book = book,
                     onMarkFinished = onMarkFinished,
@@ -221,10 +183,6 @@ fun BookSheet(
                     onSetHidden = onSetHidden,
                     onRemove = onRemove,
                 )
-                TextButton(onClick = onSaveCopy, modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Icon(painterResource(R.drawable.ic_download), contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text(stringResource(R.string.action_save_copy), modifier = Modifier.padding(start = 8.dp))
-                }
             }
         }
     }
@@ -255,11 +213,6 @@ fun BookSheet(
     // After the book's sheet, so it opens above it.
     if (showUnknown) UnknownWordsSheet(book.contentHash, viewModel, onDismiss = { showUnknown = false })
 }
-
-private const val MAX_HEIGHT_FRACTION = 0.92f
-
-/** How far a pull down closes the sheet (or a fling at ten times that per second). */
-private val CLOSE_DISTANCE = 56.dp
 
 /** Reading time left (or for the whole book) at the reader's recent speed, as text; null without one. */
 @Composable
@@ -393,7 +346,7 @@ private fun StatusPill(book: LibraryBook) {
  * JLPT level that is, and how much of its words the reader knows. A tap shows the measures behind the score. Without a grade: that it is being worked out, or what is missing.
  */
 @Composable
-private fun DifficultyCard(stats: BookStatistics, book: LibraryBook, skill: Int?) {
+private fun DifficultyCard(stats: BookStatistics, book: LibraryBook, skill: Int?, onLearn: (() -> Unit)?) {
     val difficulty = stats.difficulty
     if (difficulty == null) {
         val hint = when (stats.grading) {
@@ -441,17 +394,16 @@ private fun DifficultyCard(stats: BookStatistics, book: LibraryBook, skill: Int?
             )
             ProgressBar(progress = { difficulty.score / 100f }, modifier = Modifier.fillMaxWidth())
             stats.coverage?.let { coverage ->
+                // Rounded down: 99.6% isn't all of them.
+                val percent = (coverage.known * 100).toInt()
                 Text(
-                    text = if (coverage.newWords == 0) {
-                        stringResource(R.string.book_coverage_all)
-                    } else {
-                        // Rounded down: 99.6% isn't all of them.
-                        val percent = (coverage.known * 100).toInt()
-                        pluralStringResource(R.plurals.book_coverage, coverage.newWords, percent, number(coverage.newWords.toLong()))
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.book_known_words, percent),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                ProgressBar(progress = { coverage.known.toFloat() }, modifier = Modifier.fillMaxWidth())
             }
+            onLearn?.let { NewWordsRow(stats.coverage?.newWords, it) }
             if (expanded) {
                 Text(
                     text = stringResource(
@@ -597,24 +549,59 @@ private fun Fact(label: String, value: String, modifier: Modifier = Modifier, de
     }
 }
 
-/** "Folder: name" (or None), opening the picker. */
+/** What to learn first: the count of the book's new words, opening the list to choose from. */
 @Composable
-private fun FolderRow(folder: String?, onClick: () -> Unit) {
+private fun NewWordsRow(count: Int?, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (count != null) {
+                        pluralStringResource(R.plurals.book_new_words, count, number(count.toLong()))
+                    } else {
+                        stringResource(R.string.book_new_words_unknown)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(stringResource(R.string.book_new_words_choose), style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
+    }
+}
+
+/** Two equal pills: the book's folder (opening the picker) and "Save a copy". Long names are cut. */
+@Composable
+private fun FolderAndCopy(folder: String?, onFolder: () -> Unit, onSaveCopy: () -> Unit) {
     Row(
-        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = 24.dp),
     ) {
-        Icon(painterResource(R.drawable.ic_folder), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        PillButton(R.drawable.ic_folder, folder ?: stringResource(R.string.book_folder_add), onFolder, Modifier.weight(1f))
+        PillButton(R.drawable.ic_download, stringResource(R.string.action_save_copy), onSaveCopy, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun PillButton(icon: Int, label: String, onClick: () -> Unit, modifier: Modifier) {
+    FilledTonalButton(onClick = onClick, modifier = modifier, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
         Text(
-            text = stringResource(R.string.book_folder_row, folder ?: stringResource(R.string.book_folder_none)),
-            style = MaterialTheme.typography.bodyLarge,
-            maxLines = 2,
+            text = label,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 12.dp),
+            modifier = Modifier.padding(start = 8.dp).weight(1f, fill = false),
         )
     }
 }

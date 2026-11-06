@@ -2,6 +2,8 @@ package app.honmani.reader.ui.lookup
 
 import android.content.Intent
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -17,6 +19,15 @@ class LookupActivityTest {
         assertEquals(LookupActivity.MAX_TEXT, LookupActivity.textOf(shared).length)
 
         assertEquals("", LookupActivity.textOf(Intent(Intent.ACTION_MAIN)))
+    }
+
+    @Test
+    fun aPreviewIsOnlyAskedForByTheExtra() {
+        val peek = Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, "猫").putExtra(LookupActivity.EXTRA_PREVIEW, true)
+        assertTrue(LookupActivity.isPreview(peek))
+        // Text selected in another app, or shared, is a lookup like reading.
+        assertFalse(LookupActivity.isPreview(Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_TEXT, "猫")))
+        assertFalse(LookupActivity.isPreview(null))
     }
 
     @Test

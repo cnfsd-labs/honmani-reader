@@ -18,7 +18,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -39,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
 import app.honmani.reader.data.library.BookmarkEntity
 import kotlinx.coroutines.launch
@@ -64,7 +64,7 @@ fun BookmarksSheet(
     var renaming by remember { mutableStateOf<BookmarkEntity?>(null) }
     val deleted = stringResource(R.string.bookmark_deleted)
     val undo = stringResource(R.string.action_undo)
-    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+    PullDownSheet(onDismiss = onDismiss, properties = menuReturnSheetProperties(onBack)) {
         MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
             if (bookmarks.isEmpty()) {
@@ -75,7 +75,7 @@ fun BookmarksSheet(
                     modifier = Modifier.padding(16.dp),
                 )
             } else {
-                LazyColumn(modifier = Modifier.padding(bottom = 48.dp)) {
+                LazyColumn(modifier = Modifier.padding(bottom = 48.dp), overscrollEffect = null) {
                     items(bookmarks, key = { it.id }) { bookmark ->
                         ListItem(
                             headlineContent = { Text(bookmark.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },

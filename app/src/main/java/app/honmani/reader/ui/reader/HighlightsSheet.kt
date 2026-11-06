@@ -17,7 +17,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -33,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.library.HighlightEntity
 import kotlinx.coroutines.launch
 
@@ -55,7 +55,7 @@ fun HighlightsSheet(
     val scope = rememberCoroutineScope()
     val removed = stringResource(R.string.highlight_removed)
     val undo = stringResource(R.string.action_undo)
-    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+    PullDownSheet(onDismiss = onDismiss, properties = menuReturnSheetProperties(onBack)) {
         MenuReturnBack(onBack)
         Box(modifier = Modifier.navigationBarsPadding()) {
             if (highlights.isEmpty()) {
@@ -66,7 +66,7 @@ fun HighlightsSheet(
                     modifier = Modifier.padding(16.dp),
                 )
             } else {
-                LazyColumn(modifier = Modifier.padding(bottom = 48.dp)) {
+                LazyColumn(modifier = Modifier.padding(bottom = 48.dp), overscrollEffect = null) {
                     items(highlights, key = { it.id }) { highlight ->
                         ListItem(
                             leadingContent = {

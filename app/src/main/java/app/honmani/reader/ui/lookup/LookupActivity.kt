@@ -37,7 +37,7 @@ class LookupActivity : ComponentActivity() {
             val customHue by appearance.customHue.collectAsStateWithLifecycle()
             HonmaniTheme(accent = accent, customHue = customHue) {
                 CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
-                    LookupScreen(initialText = text, onDone = ::finish)
+                    LookupScreen(initialText = text, onDone = ::finish, preview = isPreview(intent))
                 }
             }
         }
@@ -59,6 +59,15 @@ class LookupActivity : ComponentActivity() {
     }
 
     companion object {
+        /**
+         * Set (true) when the lookup is a peek at a word from a list, not reading: it records
+         * nothing, so the word does not become one the reader is learning. Anki and the star in
+         * the panel still act, and save the word, when pressed.
+         */
+        const val EXTRA_PREVIEW = "app.honmani.reader.PREVIEW"
+
+        fun isPreview(intent: Intent?): Boolean = intent?.getBooleanExtra(EXTRA_PREVIEW, false) == true
+
         /** The text to look up: selected in another app, shared, or none (type a word). */
         fun textOf(intent: Intent?): String {
             val text = when (intent?.action) {

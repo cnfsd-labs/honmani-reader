@@ -14,7 +14,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import app.honmani.reader.ui.reader.MenuReturnBack
 import app.honmani.reader.ui.reader.menuReturnSheetProperties
 import androidx.compose.material3.Text
@@ -28,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.words.SessionWords
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.ui.lookup.LookupActivity
@@ -40,7 +40,7 @@ import app.honmani.reader.ui.lookup.LookupActivity
 @Composable
 fun SessionSheet(session: SessionWords, onDismiss: () -> Unit, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
-    ModalBottomSheet(onDismissRequest = onDismiss, properties = menuReturnSheetProperties(onBack)) {
+    PullDownSheet(onDismiss = onDismiss, properties = menuReturnSheetProperties(onBack)) {
         MenuReturnBack(onBack)
         Column(modifier = Modifier.navigationBarsPadding()) {
             Text(
@@ -71,7 +71,7 @@ fun SessionSheet(session: SessionWords, onDismiss: () -> Unit, onBack: (() -> Un
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 8.dp),
                 )
-                LazyColumn {
+                LazyColumn(overscrollEffect = null) {
                     items(session.words, key = { it.id }) { word ->
                         SessionRow(word, onClick = { openInDictionary(context, word.expression) })
                         HorizontalDivider()
@@ -101,11 +101,13 @@ private fun SessionRow(word: WordEntity, onClick: () -> Unit) {
     )
 }
 
-internal fun openInDictionary(context: Context, text: String) {
+/** Looks [text] up on its own; with [preview] it is only a peek and leaves no trace in Words. */
+internal fun openInDictionary(context: Context, text: String, preview: Boolean = false) {
     context.startActivity(
         Intent(context, LookupActivity::class.java)
             .setAction(Intent.ACTION_SEND)
             .setType("text/plain")
-            .putExtra(Intent.EXTRA_TEXT, text),
+            .putExtra(Intent.EXTRA_TEXT, text)
+            .putExtra(LookupActivity.EXTRA_PREVIEW, preview),
     )
 }

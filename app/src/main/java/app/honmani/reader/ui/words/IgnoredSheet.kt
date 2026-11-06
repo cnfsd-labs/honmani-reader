@@ -10,7 +10,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,13 +20,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.words.WordEntity
 
 /** The ignored words ([WordEntity.ignored]), each with "Stop ignoring", which brings it back as it was. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IgnoredSheet(words: List<WordEntity>, onUnignore: (id: Long) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    PullDownSheet(onDismiss = onDismiss) {
         Column(modifier = Modifier.navigationBarsPadding()) {
             Text(
                 text = stringResource(R.string.ignored_words_title),
@@ -48,7 +48,7 @@ fun IgnoredSheet(words: List<WordEntity>, onUnignore: (id: Long) -> Unit, onDism
                     modifier = Modifier.padding(32.dp),
                 )
             } else {
-                LazyColumn {
+                LazyColumn(overscrollEffect = null) {
                     items(words, key = { it.id }) { word ->
                         val title = if (word.reading.isNotEmpty() && word.reading != word.expression) {
                             "${word.expression}  ${word.reading}"
