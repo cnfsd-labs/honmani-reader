@@ -507,9 +507,9 @@
     <string name="custom_source_sentence_audio">Sentence audio</string>
     <string name="custom_source_pitch">Pitch accent</string>
     <string name="custom_source_frequency">Frequency</string>
-    <string name="anki_custom_not_chosen">No note type of your own is chosen. Pick one in Settings, Anki, Card type, My own.</string>
-    <string name="anki_custom_missing">The note type \"%1$s\" is not in AnkiDroid any more. Pick it again in Settings, Anki, Card type, My own.</string>
-    <string name="anki_custom_no_word">No field of \"%1$s\" is set to take the word. Check it in Settings, Anki, Card type, My own.</string>
+    <string name="anki_custom_not_chosen">No note type of your own is chosen. Pick one in Settings, Flashcards, Anki, Card type, My own.</string>
+    <string name="anki_custom_missing">The note type \"%1$s\" is not in AnkiDroid any more. Pick it again in Settings, Flashcards, Anki, Card type, My own.</string>
+    <string name="anki_custom_no_word">No field of \"%1$s\" is set to take the word. Check it in Settings, Flashcards, Anki, Card type, My own.</string>
     <string name="sentence_ends">Sentence ends</string>
     <string name="sentence_ends_details">The characters that end a sentence on new cards, in sentence highlights and in the sentence tint. A line break always does.</string>
     <string name="sentence_ends_save">Save</string>
@@ -1239,7 +1239,7 @@
     <string name="backup_restore">Restore…</string>
     <string name="backup_working">One moment…</string>
     <string name="backup_saved_title">Backup saved</string>
-    <string name="backup_saved">Keep the file somewhere safe, away from this phone (your computer or cloud storage, say). To restore it, open Settings → Back up and restore → Restore.</string>
+    <string name="backup_saved">Keep the file somewhere safe, away from this phone (your computer or cloud storage, say). To restore it, open Settings → Backup → Restore.</string>
     <string name="backup_restored_title">Backup restored</string>
     <string name="backup_restored">Your settings, statistics, milestones, saved words and review cards are back.</string>
     <plurals name="backup_restored_books">

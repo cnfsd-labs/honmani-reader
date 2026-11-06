@@ -117,8 +117,8 @@ public: never copy those notes, personal details or discussions into it.
   reserves some font families (`reservedFontNames`) without their files: downloaded fonts use their own
   family ("Honmani Klee One"), or books wait for ttu's 30 s font timeout.
 - A long press can't grow into a passage via native selection: the page clears it after 250 ms and the
-  WebView sends `touchcancel` once it selects. Honmani uses its own long press (mark while held, lookup
-  on release); highlights take their extent from the lookup panel. Test selection features with more
+  WebView sends `touchcancel` once it selects. Honmani uses its own long press (mark while held, a drag
+  extends it, lookup on release); highlights take their extent from the lookup panel. Test selection features with more
   than one character.
 - A continuation resumed from callbacks on other threads must resume at most once (`AtomicBoolean`).
   Catch exceptions from other apps' content providers.

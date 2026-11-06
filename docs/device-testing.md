@@ -8,9 +8,9 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   (release code; use for checks and timing) and `app-debug.apk` (WebView inspectable from
   `chrome://inspect`). Each run signs with a new key: uninstall the old build first (clears dictionaries).
 - Timing: `adb logcat -s Honmani.lookup` prints each lookup's duration.
-- **Reader looks wrong** (blank page): open the book, wait 5 s, back to the library, Settings -> **Share
+- **Reader looks wrong** (blank page): open the book, wait 5 s, back to the library, Settings -> Help and about -> **Share
   diagnostics**, send to cnfsd.labs@gmail.com or an issue. Nothing is sent automatically.
-- Test files: `docs/samples/tebukuro.epub` (also on first start; Settings -> Sample books has eight
+- Test files: `docs/samples/tebukuro.epub` (also on first start; Settings -> Reading -> Sample books has eight
   more; no text = app bug), any DRM-free Japanese EPUB, an Aozora `.txt` (unzip the ルビあり zip).
 
 ## Release pass (fresh install of the release build, ~10 min)
@@ -23,6 +23,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   with the panel open a volume press only closes it.
 - Long press a word (own long press, no native selection): word marked while held, panel opens on
   release, no blue handles or Copy toolbar, panel has "Copy word" / "Copy sentence"; moving first cancels.
+  Dragging after the mark extends it either way, across ruby and columns (page stays still); the panel's
+  bubble shows the whole selection with Copy, no arrows. A quick flick still turns the page.
 - AnkiDroid card; Words -> export -> "Anki package", import in desktop Anki (audio in the chosen deck).
 - Force-stop, reopen -> books, dictionaries, position kept.
 
@@ -98,16 +100,16 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 
 - Words -> Learning "Check against Anki": forgets the "in Anki" mark of cards deleted in AnkiDroid, marks
   words whose card exists; only the chosen "Card type" note type and saved words. "Choose a deck"
-  (also Settings -> Anki): saved words found in a deck's word field become learned, every word on its
+  (also Settings -> Flashcards -> Anki): saved words found in a deck's word field become learned, every word on its
   notes Known (also never looked up); confirm shows both numbers. Sentence decks match almost nothing.
-- Settings -> Anki -> Card type "Honmani" (default) or "Sentence": adding a word creates "Honmani
+- Settings -> Flashcards -> Anki -> Card type "Honmani" (default) or "Sentence": adding a word creates "Honmani
   Sentence": front = source sentence without mark on the word, back = word, reading, meanings (no
   sentence: the word). "Check against Anki" uses it; export "Anki package" follows; the text file is
   always Honmani type. "My own": mapping fills the user's note type; no field added, template untouched.
 - Both Honmani types end in `FuriganaPlain` (`飛[と]び 散[ち]る`, for `{{furigana:FuriganaPlain}}`), shown
   by no template. The first card to an older type adds it without asking (once per run; if refused, the
   card goes in without). Changing a note type moves `scm`: next AnkiWeb sync is one-way, sync all devices
-  first. Importing an `.apkg` over an older type makes "Honmani Sentence+". Settings -> Anki -> Sentence
+  first. Importing an `.apkg` over an older type makes "Honmani Sentence+". Settings -> Flashcards -> Anki -> Sentence
   ends: end characters for new cards, sentence highlights and tint; old cards unchanged.
 
 ## Dictionary search and radicals
@@ -133,7 +135,7 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - "Reviews per day" (50/100 default/200/No limit): 120 due, 100 chosen -> Words and badge say 100,
   session asks 100, most overdue first, 20 carry over; after 30 answers 70 left (new words use "New
   words a day"); an Again returns today. 200/No limit shows 120. Book due tint follows the same cards.
-- Settings -> Reading -> "Day starts at" (Midnight, 1-6 am): with 4 am, 02:00 reading/reviews count for
+- Settings -> Goal and time -> "Day starts at" (Midnight, 1-6 am): with 4 am, 02:00 reading/reviews count for
   the day before (statistics, goal, streak, new words a day, reviews today, due); applies from the
   change.
 - Stability >= 365 days retires a card (never due; badge/tint ignore it); a lookup after it is overdue
@@ -230,20 +232,20 @@ paged/continuous; with/without furigana:
 
 Setup: KOReader on an e-reader (or Calibre-Web Automated with its "CWA Progress Sync" plugin; in Honmani
 its plain address and Calibre-Web login suffice), same sync server, same EPUB on both. Settings ->
-Reading progress sync, sign in, read a few pages, back to the library.
+Books and sync -> Reading progress sync, sign in, read a few pages, back to the library.
 - KOReader offers Honmani's position (top of the shown page). Read on there, open in Honmani ->
   "Continued at ...% from ..." at KOReader's page. Aozora-converted books match only with the same EPUB.
 - Offline: read in Honmani, back to the library, reconnect (or restart on home Wi-Fi) -> without
   reopening the book KOReader offers the last page. Conflict: read on offline in Honmani, open in
   KOReader at its older place and close, reconnect, open in Honmani -> "Where to continue?"; "Stay at
   ..." keeps Honmani's page (KOReader offers it next), "Go to ..." jumps back.
-- Status: Settings shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
+- Status: Settings -> Books and sync shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
   attempt failed ...: server unreachable" (or wrong login, HTTP status); that book's reader menu starts
   with "Progress sync failed: ..."; other books no hint. Server back -> next sync clears both.
 
 ## Back up and restore
 
-- Settings -> Back up and restore -> Back up..., save. Uninstall, reinstall, get a dictionary, Restore...
+- Settings -> Backup -> Back up..., save. Uninstall, reinstall, get a dictionary, Restore...
   -> accent colour, reader settings, Words (progress), Progress (level, streak, calendar, milestones,
   skill), Statistics return. Re-add a book: old progress, old page, its statistics. Same file twice
   changes nothing. Review cards keep due dates (answer after the backup, restore -> backup's date);
@@ -253,7 +255,7 @@ Reading progress sync, sign in, read a few pages, back to the library.
 - Without a file: Honmani's own backup (rewritten on going to the background, at most every 6 h) rides
   Android's Google backup or phone transfer. New phone's first start: "Restore from your previous
   phone?" (with date); Restore = from file; settings already restored by Android.
-- Sync folder (Settings -> Back up and restore): pick a folder, press Home: `honmani-sync-<id>.zip` is
+- Sync folder (Settings -> Backup): pick a folder, press Home: `honmani-sync-<id>.zip` is
   there (no `.part` file); its JSON has `syncFormat`, `deviceId`, no `settings`/`catalogs`. Remove the
   folder in the file app: "Folder unavailable: choose it again". Default off. Two phones, one folder
   (copying the `honmani-sync-*.zip` by hand is enough; a folder app is not needed): a word, a word

@@ -46,7 +46,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   by the book you are reading, a daily review limit (50, 100, 200 or none), words due today tinted in the
   book, cards known for a year retired, and a book's words learned before you read it (book sheet)
 - Reading statistics (time, characters, speed), a reading level and milestones, a day that can start
-  later than midnight (Settings, Day starts at); reading time per day and book can be exported as a CSV
+  later than midnight (Settings, Goal and time); reading time per day and book can be exported as a CSV
   for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download
@@ -114,7 +114,7 @@ complete bundled reader, and no Play-restricted permissions.
   books, which are named by content hash (review cards, logs and read days ride on their word, matched
   by spelling and reading); a restore merges and keeps what books not in the library had until the same
   file is added again.
-- **Sync folder (writing only so far).** Settings -> Sync folder: this phone's own
+- **Sync folder (writing only so far).** Settings -> Backup -> Sync folder: this phone's own
   `honmani-sync-<id>.zip` (backup format plus edit times and deletion markers, no settings or
   passwords) in a folder you pick, written when the app goes to the background (`SyncFolder`).
 
@@ -124,11 +124,11 @@ Honmani is free software under the [GNU General Public License v3.0](LICENSE) or
 later version. It comes with no warranty.
 
 It includes [ッツ Ebook Reader](https://github.com/ttu-ttu/ebook-reader) (BSD 3-Clause) and the
-libraries listed in the app under Settings → About Honmani. Dictionaries and fonts are downloaded from
+libraries listed in the app under Settings → Help and about → About Honmani. Dictionaries and fonts are downloaded from
 their publishers and keep their own licences. The radical search ships EDRDG's RADKFILE, KRADFILE and
 KANJIDIC2 data (© Electronic Dictionary Research and Development Group,
 [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html)), converted by
-`scripts/radicals/build_radicals.py`. The optional example sentences (Settings → Example sentences,
+`scripts/radicals/build_radicals.py`. The optional example sentences (Settings → Reading → Example sentences,
 off until switched on) are from [Tatoeba](https://tatoeba.org) (Japanese sentences with English
 translations, [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/)), packed by
 `scripts/examples/build_examples.py` and downloaded from this repository's GitHub releases only when

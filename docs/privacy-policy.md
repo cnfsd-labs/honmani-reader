@@ -20,7 +20,7 @@ deck) and a copy Honmani keeps of its own backup file (see below: your saved wor
 sentences, your flashcard reviews, reading progress, statistics and the titles of your books). On a new phone Honmani
 offers to restore it. Books, dictionaries, passwords and keys are never part of it.
 
-Settings → Back up and restore writes your settings, reading progress, statistics, saved words
+Settings → Backup writes your settings, reading progress, statistics, saved words
 and flashcard reviews to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
 Honmani sends it nowhere itself. The file holds no passwords or keys; it does hold your saved
 words with their sentences and the titles of your books, so keep it where only you can read it.
@@ -47,7 +47,7 @@ Honmani only connects to the internet for these things, and only to these places
   network; on a hotspot with a login page (as in cafés and hotels) it sends none. A device
   that asks on purpose still gets it, so use `https://` or a VPN away from home. The same
   applies to reading progress sync.
-- **Reading progress sync, only if you sign in** (Settings → Reading progress sync) to a
+- **Reading progress sync, only if you sign in** (Settings → Books and sync) to a
   KOReader sync server of your choice: for EPUB books, Honmani sends that server an identifier
   computed from the book file (not its title or text), your reading position and percentage,
   the name of your phone model and a random id Honmani made for this phone (so the server can
@@ -66,7 +66,7 @@ Honmani only connects to the internet for these things, and only to these places
 
 The book reader itself never loads anything from the internet.
 
-Settings → Network activity lists the latest requests Honmani made (when, what for, the server's
+Settings → Help and about → Network activity lists the latest requests Honmani made (when, what for, the server's
 name and how it went). The list is kept in memory on your phone only: it holds no addresses,
 logins or keys, is not sent anywhere unless you share the diagnostics yourself, and is gone when
 the app stops.
