@@ -232,7 +232,6 @@ class Backup(
 
     /** Merges [backup] into what this phone has; ttu's reader settings are the caller's. */
     suspend fun restore(backup: BackupFile): RestoreSummary {
-        val waitingBefore = restored.waiting().associateBy { it.key }
         val newWaiting = ArrayList<WaitingBook>()
         val positions = ArrayList<BookEntity>()
         val savedAt = HashMap<Long, Long>()
@@ -242,6 +241,9 @@ class Backup(
         var wordsAdded = 0
         var catalogsAdded = 0
         database.withTransaction {
+            // Read inside the transaction, like SyncMerge.mergeBooks: a sync merge (also a transaction)
+            // can't add waiting books in between and give two books the same negative id.
+            val waitingBefore = restored.waiting().associateBy { it.key }
             val library = dao.books().associateBy { it.contentHash }
             var nextId = minOf(-1L, (waitingBefore.values.minOfOrNull { it.id } ?: 0L) - 1)
             val ids = HashMap<String, Long>()
