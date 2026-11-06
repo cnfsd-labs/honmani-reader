@@ -255,6 +255,25 @@ class KnownWordsTest {
     }
 
     @Test
+    fun theQuizAsksOnlyTheBestRankedReadingOfAWrittenForm() = runTest {
+        install(
+            "JMdict",
+            listOf("女性", "じょせい", "", 10, "woman"),
+            listOf("女性", "にょしょう", "", 10, "lady"),
+            listOf("猫", "ねこ", "", 10, "cat"),
+        )
+        // じょせい ranks above the first asked rank; にょしょう fills the ranks the draws land on.
+        val ranks = (1..5).map { Triple("女性", "じょせい", it) } +
+            (30..100).map { Triple("猫", "ねこ", it) } +
+            (101..700).map { Triple("女性", "にょしょう", it) }
+        jiten(*ranks.toTypedArray())
+
+        val setup = known.prepareQuiz(kotlin.random.Random(1))!!
+
+        assertEquals(listOf("猫"), setup.questions.map { it.word.expression })
+    }
+
+    @Test
     fun quizNeedsAFrequencyDictionaryWithEnoughWords() = runTest {
         jmdict()
         assertNull(known.prepareQuiz())

@@ -101,8 +101,13 @@ class KnownWords(
         val ranked = topWords(id, PlacementQuiz.MAX_WORDS).take(PlacementQuiz.MAX_WORDS)
         if (ranked.size < MIN_QUIZ_WORDS) return null
         val seen = HashSet<String>()
+        // Each reading of a written form is a ranked row of its own; only the best-ranked reading is
+        // asked (女性 as じょせい, not にょしょう). The ranks stay those of the list, which planQuiz cuts.
+        val firstReading = HashMap<String, String?>()
+        for (row in ranked) if (row.written !in firstReading) firstReading[row.written] = row.reading
         val questions = PlacementQuiz.sampleRanks(ranked.size, random).mapNotNull { rank ->
             val row = ranked[rank - 1]
+            if (firstReading[row.written] != row.reading) return@mapNotNull null
             val word = resolver.resolve(listOf(WantedWord(row.written, row.reading)), deinflect = false).words.firstOrNull()
             if (word != null && seen.add(word.expression)) QuizQuestion(rank, word, usuallyKana = row.usuallyKana) else null
         }
