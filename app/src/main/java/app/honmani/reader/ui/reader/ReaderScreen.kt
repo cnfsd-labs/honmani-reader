@@ -561,6 +561,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     // a moment: its size doesn't follow them, so they never reflow the page.
                     .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
+            // Back ends read aloud first (composed after the WebView, so it comes before its back);
+            // the lookup panel's own handler is composed later still and closes the panel before this.
+            BackHandler(enabled = readAloudBarShown) { readAloud.close() }
             if (readAloudBarShown) {
                 val problem = readAloudState.problem
                 val ended = readAloudState.phase == ReadAloudPhase.ENDED
