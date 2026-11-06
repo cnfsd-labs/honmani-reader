@@ -320,6 +320,16 @@ test('the reader\'s invisible buttons have names for screen readers', async ({ p
   expect(unnamed).toBe(0);
 });
 
+test('the top bar\'s menu icon on a phone has a name for screen readers', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 736 });
+  await setUp(page, { viewMode: 'paginated' });
+  await importAndOpen(page);
+  // The tap-to-show strip along the top opens the bar.
+  await page.mouse.click(180, 10);
+
+  await expect(page.getByRole('button', { name: 'More: jump, settings' })).toHaveCount(1);
+});
+
 test('Aozora Bunko text files (Shift_JIS, with markup) import as clean text', async ({ page }) => {
   await setUp(page);
   await importAndOpen(
