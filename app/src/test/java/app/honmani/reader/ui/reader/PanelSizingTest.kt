@@ -15,6 +15,16 @@ class PanelSizingTest {
     }
 
     @Test
+    fun expandedLeavesRoomForTheBubble() {
+        val tall = PanelSizing.heights(available = 2000f, minCollapsed = 500f, roomAbove = 100f)
+        assertEquals(1760f, tall.expanded, 0.01f)
+        val short = PanelSizing.heights(available = 800f, minCollapsed = 500f, roomAbove = 150f)
+        assertEquals(650f, short.expanded, 0.01f)
+        val tiny = PanelSizing.heights(available = 300f, minCollapsed = 500f, roomAbove = 150f)
+        assertEquals(tiny.collapsed, tiny.expanded, 0.01f)
+    }
+
+    @Test
     fun shortAreaGetsTheMinimumButNotMoreThanSixtyPercent() {
         val landscape = PanelSizing.heights(available = 800f, minCollapsed = 500f)
         assertEquals(480f, landscape.collapsed, 0.01f)

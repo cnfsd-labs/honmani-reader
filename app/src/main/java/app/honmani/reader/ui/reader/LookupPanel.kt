@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -48,12 +47,9 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.CircularProgressIndicator
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -90,6 +86,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -105,6 +102,7 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -145,6 +143,8 @@ fun LookupPanel(
     onOpenDictionaries: () -> Unit,
     modifier: Modifier = Modifier,
     onAddToAnki: (LookupGroup) -> Unit = {},
+    /** Whether words offer Add to Anki (see [app.honmani.reader.anki.AnkiSettings.isEnabled]). */
+    showAnki: Boolean = true,
     /** The star of a word: star it (true) or remove the star. Words reached from a reference have no star. */
     onSetStarred: (LookupGroup, Boolean) -> Unit = { _, _ -> },
     /** "Correct furigana" in a word's overflow menu: save the corrected furigana (blank removes it); null shows no such entry. */
@@ -189,6 +189,7 @@ fun LookupPanel(
     val heights = PanelSizing.heights(
         available = with(density) { availableHeight.toPx() },
         minCollapsed = with(density) { MIN_COLLAPSED.toPx() },
+        roomAbove = with(density) { (BUBBLE_HEIGHT + BUBBLE_GAP).toPx() },
     )
     val maxExtra = rememberUpdatedState(heights.extra)
     // A new tap opens collapsed; navigation inside the panel keeps the tap and so the state.
@@ -284,15 +285,26 @@ fun LookupPanel(
         }
     }
 
-    // The match arrows float over the results, for a first lookup that has results to match.
-    val matchState = state as? LookupPanelState.Results
-    val pillShown = matchState != null && matchState.previous == null && (matchState.canShorten || matchState.canLengthen)
-    val sideRail = availableHeight < SIDE_RAIL_BELOW
-    Surface(
+    val copy = rememberCopy()
+    // Outside the sheet, so its rounded clip can't cut the bubble; the empty space beside it takes no touches.
+    Column(
         modifier = modifier
             .fillMaxWidth()
+            .offset { IntOffset(0, offset.roundToInt()) },
+    ) {
+    selectionBubble(state)?.let { bubble ->
+        SelectionBubbleRow(
+            bubble = bubble,
+            onShorter = onShorterMatch,
+            onLonger = onLongerMatch,
+            onCopy = { copy(bubble.text) },
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = BUBBLE_GAP),
+        )
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
             .height(with(density) { (heights.collapsed + extra).toDp() })
-            .offset { IntOffset(0, offset.roundToInt()) }
             .onSizeChanged { height[0] = it.height.toFloat() },
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         tonalElevation = 3.dp,
@@ -300,100 +312,64 @@ fun LookupPanel(
     ) {
         Box(modifier = Modifier.navigationBarsPadding()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Column(
+                // One thin row: the handle in the middle, back on the left, menu and close on the right.
+                // All of it drags the panel; the tapped sentence is not repeated (it is on screen in the book).
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(HEADER_HEIGHT)
                         .draggable(
                             state = rememberDraggableState { dragBy(it) },
                             orientation = Orientation.Vertical,
                             onDragStopped = { velocity -> settle(velocity) },
                         ),
                 ) {
-                val expanded = extra > maxExtra.value / 2f
-                val handleLabel = stringResource(if (expanded) R.string.lookup_panel_collapse else R.string.lookup_panel_expand)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(HANDLE_AREA)
-                        .clickable(onClickLabel = handleLabel, role = Role.Button) {
-                            scope.launch {
-                                animate(extra, if (expanded) 0f else maxExtra.value) { value, _ -> extra = value }
-                            }
-                        }
-                        .semantics { contentDescription = handleLabel },
-                    contentAlignment = Alignment.Center,
-                ) {
+                    val expanded = extra > maxExtra.value / 2f
+                    val handleLabel = stringResource(if (expanded) R.string.lookup_panel_collapse else R.string.lookup_panel_expand)
                     Box(
                         modifier = Modifier
+                            .matchParentSize()
+                            .clickable(onClickLabel = handleLabel, role = Role.Button) {
+                                scope.launch {
+                                    animate(extra, if (expanded) 0f else maxExtra.value) { value, _ -> extra = value }
+                                }
+                            }
+                            .semantics { contentDescription = handleLabel },
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
                             .size(width = 32.dp, height = 4.dp)
                             .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), CircleShape),
                     )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 20.dp, end = 4.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
                     val canGoBack = when (state) {
                         is LookupPanelState.Results -> state.previous != null
                         is LookupPanelState.Kanji -> state.previous != null
                         else -> false
                     }
-                    // The tapped sentence is not repeated here: it is on screen in the book (only the
-                    // sentence before it, if the reader asked, see [previousSentence]). Back sits
-                    // beside close, where the thumb already is.
-                    if (state is LookupPanelState.Results && state.previous == null) {
-                        Text(
-                            text = state.tap.text.take(state.highlight.length),
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                    if (onDontCount != null && state is LookupPanelState.Results && state.previous == null) {
-                        // An icon, not a text button: at the largest font a label left the matched word
-                        // only three characters.
-                        IconButton(onClick = onDontCount, modifier = Modifier.size(HEADER_BUTTON)) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_undo),
-                                contentDescription = stringResource(R.string.lookup_dont_count_description),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    if (state.tap.sentence.isNotBlank()) {
-                        IconButton(onClick = onReadSentence, modifier = Modifier.size(HEADER_BUTTON)) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_listen),
-                                contentDescription = stringResource(R.string.lookup_read_sentence),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
                     if (canGoBack) {
-                        IconButton(onClick = onBack, modifier = Modifier.size(HEADER_BUTTON)) {
+                        IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.lookup_back),
                             )
                         }
                     }
-                    IconButton(onClick = onClose, modifier = Modifier.size(HEADER_BUTTON)) {
-                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
+                    Row(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
+                        PanelMenu(
+                            onReadSentence = onReadSentence.takeIf { state.tap.sentence.isNotBlank() },
+                            onDontCount = onDontCount.takeIf { state is LookupPanelState.Results && state.previous == null },
+                            onCopyWord = copyableWord(state)?.let { word -> { copy(word) } },
+                            onCopySentence = if (state.tap.sentence.isNotBlank()) {
+                                { copy(state.tap.sentence) }
+                            } else {
+                                null
+                            },
+                        )
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.lookup_close))
+                        }
                     }
-                }
-                }
-                // The selection is gone after a long press: its text can be copied here, found or not.
-                val results = state as? LookupPanelState.Results
-                if (state.tap.bySelection && results?.previous == null) {
-                    CopyActions(
-                        word = results?.let { state.tap.text.take(it.highlight.length) } ?: state.tap.text,
-                        sentence = state.tap.sentence,
-                    )
                 }
                 if (highlight != null && (state as? LookupPanelState.Results)?.previous == null) HighlightBar(highlight)
                 if (previousSentence.isNotBlank() && state is LookupPanelState.Results && state.previous == null) {
@@ -421,20 +397,19 @@ fun LookupPanel(
                                 }
                             }
                             .nestedScroll(listConnection),
-                        // Room under the last lines for the match arrows (see [MatchPill]), when they are there.
-                        // In a short (landscape) area the pill gets a rail on the right instead, so it never covers a word's buttons.
-                        contentPadding = PaddingValues(
-                            start = 20.dp,
-                            end = if (pillShown && sideRail) PILL_RAIL else 20.dp,
-                            bottom = if (pillShown && !sideRail) PILL_CLEARANCE else 16.dp,
-                        ),
+                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         itemsIndexed(
                             items = state.groups,
                             key = { i, group -> "$i:${group.expression}:${group.reading}" },
                         ) { i, group ->
-                            if (i > 0) HorizontalDivider(modifier = Modifier.padding(bottom = 12.dp))
+                            if (i > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(bottom = 12.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                )
+                            }
                             // The best match opens with its first meanings; the others are folded
                             // to a line each until tapped.
                             val detail = details[i] ?: if (i == 0) Detail.BRIEF else Detail.FOLDED
@@ -445,6 +420,7 @@ fun LookupPanel(
                                 inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
                                 adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
                                 onAddToAnki = { onAddToAnki(group) },
+                                showAnki = showAnki,
                                 starred = WordRepository.key(group.expression, group.reading) in state.starred,
                                 onSetStarred = if (state.previous == null) {
                                     { onSetStarred(group, it) }
@@ -488,13 +464,11 @@ fun LookupPanel(
                             stringResource(R.string.lookup_nothing_found, nothingFoundText(state.tap.text)),
                             bottomPadding = 0.dp,
                         )
-                        // After a long press the copy buttons are already above.
-                        CopyActions(
-                            word = nothingFoundText(state.tap.text),
-                            sentence = state.tap.sentence,
-                            showCopy = !state.tap.bySelection,
-                            onEdit = onEditLookup?.let { edit -> { edit(state.tap.text) } },
-                        )
+                        if (onEditLookup != null) {
+                            TextButton(onClick = { onEditLookup(state.tap.text) }, modifier = Modifier.padding(start = 8.dp)) {
+                                Text(stringResource(R.string.lookup_edit))
+                            }
+                        }
                     }
                     is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
                         Message(stringResource(R.string.lookup_no_dictionaries))
@@ -504,17 +478,8 @@ fun LookupPanel(
                     }
                 }
             }
-            // Over the results, at the bottom right where the thumb is: the match arrows (see [MatchPill]).
-            if (matchState != null && pillShown) {
-                MatchPill(
-                    canShorten = matchState.canShorten,
-                    canLengthen = matchState.canLengthen,
-                    onShorter = onShorterMatch,
-                    onLonger = onLongerMatch,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 12.dp),
-                )
-            }
         }
+    }
     }
 }
 
@@ -626,20 +591,13 @@ private fun HighlightBar(controls: HighlightControls) {
     }
 }
 
-/** Copy buttons for a long-press lookup, which has no Android selection toolbar. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Copies a text to the clipboard, with a toast where Android doesn't confirm it itself. */
 @Composable
-private fun CopyActions(
-    word: String,
-    sentence: String,
-    showCopy: Boolean = true,
-    /** Opens the search screen with the text; the button is left out when null. */
-    onEdit: (() -> Unit)? = null,
-) {
+private fun rememberCopy(): (String) -> Unit {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    fun copy(text: String) {
+    return { text ->
         scope.launch {
             clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(null, text)))
             // Android 13 and later confirm a copy themselves.
@@ -648,30 +606,18 @@ private fun CopyActions(
             }
         }
     }
-    FlowRow(modifier = Modifier.padding(start = 12.dp, end = 12.dp)) {
-        if (showCopy) {
-            TextButton(onClick = { copy(word) }) { Text(stringResource(R.string.lookup_copy_word)) }
-            if (sentence.isNotBlank()) {
-                TextButton(onClick = { copy(sentence) }) { Text(stringResource(R.string.lookup_copy_sentence)) }
-            }
-        }
-        if (onEdit != null) {
-            TextButton(onClick = onEdit) { Text(stringResource(R.string.lookup_edit)) }
-        }
-    }
 }
 
 /**
- * The buttons that make the matched text of a tap one character shorter or longer: a small pill
- * floating at the panel's bottom right, in reach of the thumb, over the scrolling results. A
- * button that can't do anything is left out (its place stays, so the other doesn't move).
+ * The tinted pill above the panel, see [SelectionBubble]: unlike a result's headword on purpose. An
+ * arrow that can't do anything is dimmed, so the bubble keeps its shape while the match changes.
  */
 @Composable
-private fun MatchPill(
-    canShorten: Boolean,
-    canLengthen: Boolean,
+private fun SelectionBubbleRow(
+    bubble: SelectionBubble,
     onShorter: () -> Unit,
     onLonger: () -> Unit,
+    onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -679,46 +625,103 @@ private fun MatchPill(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp,
+        shadowElevation = 3.dp,
     ) {
-        Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (canShorten) {
-                IconButton(onClick = onShorter, modifier = Modifier.size(HEADER_BUTTON)) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = stringResource(R.string.lookup_match_shorter),
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(HEADER_BUTTON))
+        Row(
+            modifier = Modifier.height(BUBBLE_HEIGHT).padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (bubble.hasArrows) {
+                BubbleButton(
+                    label = stringResource(R.string.lookup_match_shorter),
+                    enabled = bubble.canShorten,
+                    onClick = onShorter,
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null) }
             }
-            if (canLengthen) {
-                IconButton(onClick = onLonger, modifier = Modifier.size(HEADER_BUTTON)) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = stringResource(R.string.lookup_match_longer),
-                    )
+            Text(
+                text = bubble.text,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .widthIn(min = 32.dp)
+                    .padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
+            )
+            if (bubble.hasArrows) {
+                BubbleButton(
+                    label = stringResource(R.string.lookup_match_longer),
+                    enabled = bubble.canLengthen,
+                    onClick = onLonger,
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
+            }
+            if (bubble.canCopy) {
+                BubbleButton(label = stringResource(R.string.lookup_copy_word), onClick = onCopy) {
+                    Icon(painterResource(R.drawable.ic_copy), contentDescription = null, modifier = Modifier.size(18.dp))
                 }
-            } else {
-                Spacer(modifier = Modifier.size(HEADER_BUTTON))
             }
         }
     }
 }
 
-/** The header's buttons: the usual 48 dp touch size, for the thumb at the bottom of a tall phone. */
-private val HEADER_BUTTON = 48.dp
-private val HANDLE_AREA = 24.dp
+/** A button of the bubble: as wide as any touch target, as tall as the bubble. */
+@Composable
+private fun BubbleButton(label: String, onClick: () -> Unit, enabled: Boolean = true, icon: @Composable () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(width = 48.dp, height = BUBBLE_HEIGHT)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
+            .semantics { contentDescription = label }
+            .alpha(if (enabled) 1f else 0.3f),
+    ) {
+        icon()
+    }
+}
 
-/** Bottom padding of the results while the match pill floats over them: the pill (56 dp) and its margin (12 dp), plus some air. */
-private val PILL_CLEARANCE = 80.dp
+/** The panel's overflow menu; a null action leaves its entry out, and without any there is no menu. */
+@Composable
+private fun PanelMenu(
+    onReadSentence: (() -> Unit)?,
+    onDontCount: (() -> Unit)?,
+    onCopyWord: (() -> Unit)?,
+    onCopySentence: (() -> Unit)?,
+) {
+    val entries = listOfNotNull(
+        onReadSentence?.let { R.string.lookup_read_sentence to it },
+        onDontCount?.let { R.string.lookup_dont_count to it },
+        onCopyWord?.let { R.string.lookup_copy_word to it },
+        onCopySentence?.let { R.string.lookup_copy_sentence to it },
+    )
+    if (entries.isEmpty()) return
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.action_more_options),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for ((label, action) in entries) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    onClick = {
+                        open = false
+                        action()
+                    },
+                )
+            }
+        }
+    }
+}
 
-/** Below this reader height (landscape) the pill sits in a rail of its own on the right, not over the results. */
-private val SIDE_RAIL_BELOW = 480.dp
-
-/** The rail's width: the pill (104 dp), its margin (12 dp) and some air. */
-private val PILL_RAIL = 132.dp
+/** The header row: the height of its buttons, for the thumb at the bottom of a tall phone. */
+private val HEADER_HEIGHT = 48.dp
+private val BUBBLE_HEIGHT = 40.dp
+private val BUBBLE_GAP = 6.dp
 
 /** In a short (landscape) area the collapsed panel is at least this tall, up to 60% of the area. */
 private val MIN_COLLAPSED = 220.dp
@@ -765,6 +768,7 @@ private fun LookupGroupItem(
     starred: Boolean,
     onSetStarred: ((Boolean) -> Unit)?,
     onLookupWord: (String) -> Unit,
+    showAnki: Boolean = true,
     ignored: Boolean = false,
     onSetIgnored: ((Boolean) -> Unit)? = null,
     onListen: () -> Unit = {},
@@ -778,85 +782,90 @@ private fun LookupGroupItem(
     onCorrectFurigana: (() -> Unit)? = null,
 ) {
     val folded = detail == Detail.FOLDED
+    val expandLabel = stringResource(R.string.lookup_expand)
     Column(
-        modifier = if (folded) Modifier.clickable { onDetail(Detail.BRIEF) } else Modifier,
+        modifier = if (folded) Modifier.clickable(onClickLabel = expandLabel) { onDetail(Detail.BRIEF) } else Modifier,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Row(
-            // Tapping the word of an open result folds it again.
-            modifier = if (folded) Modifier else Modifier.clickable { onDetail(Detail.FOLDED) },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(modifier = Modifier.weight(1f)) {
-                // Kanji open their entry once the result is open (a folded one opens first).
-                HeadwordWithPitch(group, furigana, if (folded) emptySet() else kanji.keys, onShowKanji)
-            }
-            group.frequencies.firstOrNull()?.let { FrequencyBadge(it) }
-            IconButton(onClick = onListen) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_listen),
-                    contentDescription = stringResource(R.string.action_listen),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(onClick = onAddToAnki, enabled = !adding) {
-                if (adding) {
-                    // Making the card (with audio) takes a few seconds.
-                    val addingText = stringResource(R.string.anki_adding)
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp).semantics { contentDescription = addingText },
-                        strokeWidth = 2.dp,
-                    )
-                } else {
+        if (folded) {
+            // A line to scan: the word only. Its pitch, frequency and buttons come when it is opened.
+            HeadwordWithPitch(group, furigana, starred = starred, plain = true)
+        } else {
+            Row(
+                // Tapping the word of an open result folds it again.
+                modifier = Modifier.clickable { onDetail(Detail.FOLDED) },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    HeadwordWithPitch(group, furigana, kanji.keys, onShowKanji, starred = starred)
+                    group.frequencies.firstOrNull()?.let { FrequencyBadge(it, quiet = true) }
+                }
+                IconButton(onClick = onListen) {
                     Icon(
-                        painter = painterResource(if (inAnki) R.drawable.ic_in_anki else R.drawable.ic_add_card),
-                        contentDescription = stringResource(
-                            if (inAnki) R.string.word_in_anki else R.string.action_add_to_anki,
-                        ),
-                        tint = if (inAnki) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        painter = painterResource(R.drawable.ic_listen),
+                        contentDescription = stringResource(R.string.action_listen),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            }
-            if (onSetStarred != null) {
-                IconToggleButton(checked = starred, onCheckedChange = onSetStarred) {
-                    Icon(
-                        imageVector = if (starred) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = stringResource(
-                            if (starred) R.string.action_unstar_word else R.string.action_star_word,
-                        ),
-                        tint = if (starred) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (onSetIgnored != null || onCorrectFurigana != null) {
-                // Unobtrusive: names, wrong splits and wrong furigana only, in an overflow menu.
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menu = true }) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.action_more_options),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        if (onCorrectFurigana != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.furigana_correct)) },
-                                onClick = {
-                                    menu = false
-                                    onCorrectFurigana()
-                                },
+                if (showAnki) {
+                    IconButton(onClick = onAddToAnki, enabled = !adding) {
+                        if (adding) {
+                            // Making the card (with audio) takes a few seconds.
+                            val addingText = stringResource(R.string.anki_adding)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp).semantics { contentDescription = addingText },
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(
+                                painter = painterResource(if (inAnki) R.drawable.ic_in_anki else R.drawable.ic_add_card),
+                                contentDescription = stringResource(
+                                    if (inAnki) R.string.word_in_anki else R.string.action_add_to_anki,
+                                ),
+                                tint = if (inAnki) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (onSetIgnored != null) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(if (ignored) R.string.action_unignore_word else R.string.action_ignore_word)) },
-                                onClick = {
-                                    menu = false
-                                    onSetIgnored(!ignored)
-                                },
+                    }
+                }
+                if (onSetStarred != null || onSetIgnored != null || onCorrectFurigana != null) {
+                    // Used now and then, so out of the way: the star shows beside the word once set.
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }) {
+                            Icon(
+                                Icons.Filled.MoreVert,
+                                contentDescription = stringResource(R.string.action_more_options),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            if (onSetStarred != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (starred) R.string.action_unstar_word else R.string.action_star_word)) },
+                                    onClick = {
+                                        menu = false
+                                        onSetStarred(!starred)
+                                    },
+                                )
+                            }
+                            if (onCorrectFurigana != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.furigana_correct)) },
+                                    onClick = {
+                                        menu = false
+                                        onCorrectFurigana()
+                                    },
+                                )
+                            }
+                            if (onSetIgnored != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(if (ignored) R.string.action_unignore_word else R.string.action_ignore_word)) },
+                                    onClick = {
+                                        menu = false
+                                        onSetIgnored(!ignored)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -981,6 +990,9 @@ private fun HeadwordWithPitch(
     furigana: String,
     tappableKanji: Set<String> = emptySet(),
     onKanji: (String) -> Unit = {},
+    starred: Boolean = false,
+    /** Only the word (and its star): a folded result. */
+    plain: Boolean = false,
 ) {
     val reading = group.reading.ifEmpty { group.expression }
     val patterns = remember(reading, group.pitches) {
@@ -995,6 +1007,15 @@ private fun HeadwordWithPitch(
             Furigana.shown(group.expression, group.reading, furigana)
         }
         Headword(segments, tappableKanji, onKanji)
+        if (starred) {
+            Icon(
+                Icons.Filled.Star,
+                contentDescription = stringResource(R.string.word_starred),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 6.dp).size(16.dp),
+            )
+        }
+        if (plain) return@FlowRow
         patterns.forEach { PitchReading(it, Modifier.padding(bottom = 4.dp)) }
         // Readings merged into this entry (same meanings), after the main one.
         if (group.otherReadings.isNotEmpty()) {
@@ -1151,30 +1172,22 @@ private fun FoldedMeaning(group: LookupGroup) {
     val meaning = group.sections.firstNotNullOfOrNull { section ->
         section.senses.firstOrNull()?.glosses?.joinToString("; ")
     }.orEmpty()
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = meaning,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            Icons.Filled.KeyboardArrowDown,
-            contentDescription = stringResource(R.string.lookup_expand),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
+    Text(
+        text = meaning,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /**
  * How common the word is ("#727"), from the first frequency dictionary. Tapping it explains
- * the number.
+ * the number. [quiet] is plain small text, for under a headword with buttons beside it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun FrequencyBadge(frequency: Frequency) {
+internal fun FrequencyBadge(frequency: Frequency, quiet: Boolean = false) {
     val tooltip = rememberTooltipState(isPersistent = true)
     val scope = rememberCoroutineScope()
     TooltipBox(
@@ -1192,17 +1205,28 @@ internal fun FrequencyBadge(frequency: Frequency) {
         },
         state = tooltip,
     ) {
-        Surface(
-            onClick = { scope.launch { tooltip.show() } },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-        ) {
+        if (quiet) {
             Text(
                 text = frequency.badge,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clickable(role = Role.Button) { scope.launch { tooltip.show() } }
+                    .padding(end = 8.dp, top = 2.dp, bottom = 2.dp),
             )
+        } else {
+            Surface(
+                onClick = { scope.launch { tooltip.show() } },
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Text(
+                    text = frequency.badge,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
         }
     }
 }

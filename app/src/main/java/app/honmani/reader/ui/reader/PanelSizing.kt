@@ -13,11 +13,12 @@ internal object PanelSizing {
 
     /**
      * Collapsed is [COLLAPSED_FRACTION] of [available], but in a short (landscape) area at least
-     * [minCollapsed], never more than 60% of it; expanded is [EXPANDED_FRACTION].
+     * [minCollapsed], never more than 60% of it; expanded is [EXPANDED_FRACTION], leaving at least
+     * [roomAbove] free for what floats above the panel (see [SelectionBubble]).
      */
-    fun heights(available: Float, minCollapsed: Float): PanelHeights {
+    fun heights(available: Float, minCollapsed: Float, roomAbove: Float = 0f): PanelHeights {
         val collapsed = maxOf(available * COLLAPSED_FRACTION, minOf(available * 0.6f, minCollapsed))
-        return PanelHeights(collapsed, maxOf(collapsed, available * EXPANDED_FRACTION))
+        return PanelHeights(collapsed, maxOf(collapsed, minOf(available * EXPANDED_FRACTION, available - roomAbove)))
     }
 
     /**
