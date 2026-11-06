@@ -171,7 +171,7 @@
     <string name="action_done">Done</string>
     <string name="action_close">Close</string>
     <string name="add_book_folder">A folder on this phone</string>
-    <string name="add_book_folder_details">Adds every EPUB and text file in it and its subfolders</string>
+    <string name="add_book_folder_details">Adds every EPUB and text file in it and its subfolders, once</string>
     <string name="library_export">Export library</string>
     <string name="library_export_details">Saves a copy of every book in a folder you choose</string>
     <string name="library_folder_searching">Looking for books…</string>

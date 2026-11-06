@@ -969,7 +969,7 @@ private fun floatingChipColors() = FilterChipDefaults.filterChipColors(
 
 /**
  * One tap back into the book read last, while it is being read: a bubble at the right, under
- * the thumb, as wide as its title needs up to a limit.
+ * the thumb, as wide as its title needs, up to the screen's width (480 dp at most).
  */
 @Composable
 private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () -> Unit) {
@@ -982,7 +982,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
         horizontalArrangement = Arrangement.End,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 64.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp),
     ) {
         Surface(
             onClick = onOpen,
@@ -991,7 +991,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
             shape = CircleShape,
             shadowElevation = 4.dp,
             modifier = Modifier
-                .widthIn(max = 320.dp)
+                .widthIn(max = 480.dp)
                 .onSizeChanged { width = it.width }
                 .offset { IntOffset(offset.roundToInt(), 0) }
                 .graphicsLayer { alpha = 1f - (offset / (width.coerceAtLeast(1) * 1.2f)).coerceIn(0f, 1f) }

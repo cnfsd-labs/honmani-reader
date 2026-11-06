@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -40,7 +41,7 @@ fun AddBookSheet(
         val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         Column(modifier = Modifier.navigationBarsPadding().padding(bottom = 8.dp)) {
             ListItem(
-                leadingContent = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                leadingContent = { Icon(painterResource(R.drawable.ic_book_file), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.add_book_files)) },
                 supportingContent = { Text(stringResource(R.string.add_book_files_details)) },
                 colors = colors,
@@ -77,8 +78,9 @@ fun AddBookSheet(
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onAddCatalog),
             )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             ListItem(
-                leadingContent = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
+                leadingContent = { Icon(painterResource(R.drawable.ic_export), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.library_export)) },
                 supportingContent = { Text(stringResource(R.string.library_export_details)) },
                 colors = colors,
