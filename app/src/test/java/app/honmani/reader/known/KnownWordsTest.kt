@@ -6,6 +6,7 @@ import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.dictionary.DictionaryImporter
 import app.honmani.reader.data.dictionary.index
 import app.honmani.reader.data.dictionary.writeZip
+import app.honmani.reader.data.difficulty.LexiconLoader
 import app.honmani.reader.data.difficulty.LexiconSources
 import app.honmani.reader.data.words.KnownBatchRepository
 import app.honmani.reader.data.words.KnownCandidate
@@ -49,7 +50,7 @@ class KnownWordsTest {
                     ?.frequency?.let { it.id to it.title }
             },
             topWords = { dictionary, maxRank ->
-                database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { it.expression to it.reading }
+                database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { RankedWord(it.expression, it.reading, LexiconLoader.isKanaRank(it.display)) }
             },
         )
     }
@@ -80,9 +81,11 @@ class KnownWordsTest {
         listOf("犬", "いぬ", "", 10, "dog"),
     )
 
-    private suspend fun jiten(vararg ranks: Triple<String, String, Int>) {
+    /** A rank of [word]; [kana] marks it as the rank of the word written in kana, as Jiten does ("45" plus the mark). */
+    private suspend fun jiten(vararg ranks: Triple<String, String, Int>, kana: Set<Int> = emptySet()) {
         val rows = ranks.joinToString(",", "[", "]") { (word, reading, rank) ->
-            """["$word","freq",{"reading":"$reading","frequency":{"value":$rank,"displayValue":"$rank"}}]"""
+            val shown = if (rank in kana) "$rank\u32D5" else "$rank"
+            """["$word","freq",{"reading":"$reading","frequency":{"value":$rank,"displayValue":"$shown"}}]"""
         }
         val files = mapOf("index.json" to index("Jiten", extra = ",\"frequencyMode\":\"rank-based\""), "term_meta_bank_1.json" to rows)
         DictionaryImporter(database).import(writeZip(temp.root, files, "jiten.zip"))
@@ -188,6 +191,67 @@ class KnownWordsTest {
         assertEquals(4, change.created)
         assertEquals(KnownSource.QUIZ, database.knownBatchDao().batch(id!!)!!.source)
         assertEquals(4, known.batches.undo(id).removed)
+    }
+
+    private suspend fun kanaWords() {
+        install(
+            "JMdict",
+            listOf("此処", "ここ", "", 10, "here"),
+            listOf("是", "これ", "", 10, "this"),
+            listOf("猫", "ねこ", "", 10, "cat"),
+        )
+        // The kana rows of a Jiten list come with the kanji rows; the kana rank is marked.
+        jiten(Triple("ここ", "ここ", 1), Triple("此処", "ここ", 1), Triple("これ", "これ", 2), Triple("是", "これ", 2), Triple("猫", "ねこ", 3), kana = setOf(1, 2))
+    }
+
+    private suspend fun knownKeys(result: TopNResult) =
+        (result as TopNResult.Ready).plan.resolved.words.map { it.expression }
+
+    @Test
+    fun aWordRankedInKanaIsAskedInKana_andKnowingItMarksTheKanaSpellingToo() = runTest {
+        kanaWords()
+        val cat = QuizQuestion(3, KnownCandidate("猫", "ねこ", "cat"))
+        val here = QuizQuestion(1, KnownCandidate("此処", "ここ", "here"), usuallyKana = true)
+
+        assertEquals("猫", cat.shown)
+        assertEquals("ここ", here.shown)
+        assertEquals(listOf("猫"), cat.marked.map { it.expression })
+        assertEquals(listOf("此処" to "ここ", "ここ" to "ここ"), here.marked.map { it.expression to it.reading })
+        assertEquals("here", here.marked.last().gloss)
+
+        val (id, _) = known.confirm((known.planQuiz(1, listOf(here to true)) as TopNResult.Ready).plan)
+
+        // A book that writes ここ is matched by the word ここ, one that writes 此処 by the other.
+        assertEquals(WordStatus.LEARNED, statusOf("ここ"))
+        assertEquals(WordStatus.LEARNED, statusOf("此処"))
+        assertEquals(2, known.batches.undo(id!!).removed)
+    }
+
+    @Test
+    fun dontKnowDropsBothSpellings_andTheTopWordsGetTheKanaSpellingToo() = runTest {
+        kanaWords()
+        val here = QuizQuestion(1, KnownCandidate("此処", "ここ", "here"), usuallyKana = true)
+
+        val all = knownKeys(known.planQuiz(5, emptyList()))
+        val without = knownKeys(known.planQuiz(5, listOf(here to false)))
+        val top = knownKeys(known.planTopN(5))
+
+        assertEquals(listOf("此処", "ここ", "是", "これ", "猫"), all)
+        assertEquals(listOf("是", "これ", "猫"), without)
+        assertEquals(all, top)
+    }
+
+    @Test
+    fun theQuizAsksTheRanksMarkedKanaInKana() = runTest {
+        install("JMdict", listOf("此処", "ここ", "", 10, "here"))
+        val ranks = (1..700).map { Triple("此処", "ここ", it) }
+        jiten(*ranks.toTypedArray(), kana = ranks.map { it.third }.toSet())
+
+        val setup = known.prepareQuiz(kotlin.random.Random(1))!!
+
+        assertEquals(1, setup.questions.size)
+        assertEquals("ここ", setup.questions.single().shown)
+        assertEquals(listOf("此処", "ここ"), setup.questions.single().marked.map { it.expression })
     }
 
     @Test

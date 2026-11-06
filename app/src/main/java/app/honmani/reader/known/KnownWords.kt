@@ -4,6 +4,7 @@ import app.honmani.reader.data.words.KnownBatchRepository
 import app.honmani.reader.data.words.KnownCandidate
 import app.honmani.reader.data.words.KnownChange
 import app.honmani.reader.data.words.KnownSource
+import app.honmani.reader.lookup.JapaneseText
 import kotlin.random.Random
 
 /**
@@ -26,8 +27,36 @@ sealed interface TopNResult {
     data class Ready(val plan: KnownPlan, val dictionary: String) : TopNResult
 }
 
-/** One question of the quick quiz: the word at [rank] of the frequency dictionary (1 = most common). */
-class QuizQuestion(val rank: Int, val word: KnownCandidate)
+/**
+ * A row of the frequency dictionary: the word as written and its reading, and whether this rank is the
+ * word's in kana ([usuallyKana], Jiten's mark: ここ, これ, この, for 此処, 是, 此の).
+ */
+data class RankedWord(val written: String, val reading: String?, val usuallyKana: Boolean = false) {
+    /** The word's kana spelling, if this rank is the one in kana. */
+    fun kanaSpelling(): String? =
+        if (usuallyKana) (reading?.takeIf { it.isNotEmpty() } ?: written).takeIf(::isKanaOnly) else null
+}
+
+private fun isKanaOnly(text: String) = text.isNotEmpty() && text.all { JapaneseText.isKana(it) }
+
+/**
+ * One question of the quick quiz: the word at [rank] of the frequency dictionary (1 = most common).
+ * A word [usuallyKana] is asked in kana (ここ, not 此処), as books write it.
+ */
+class QuizQuestion(val rank: Int, val word: KnownCandidate, val usuallyKana: Boolean = false) {
+    /** The kana spelling, when it is the one asked; null for other words. */
+    private val kana: String? = word.reading.takeIf { usuallyKana && it != word.expression && isKanaOnly(it) }
+
+    /** What the question shows. */
+    val shown: String get() = kana ?: word.expression
+
+    /**
+     * What a "know" answer marks: the dictionary word, and its kana spelling as a word of its own,
+     * because a book that writes ここ is matched by that spelling and not by 此処 ([KnownWordsTest]).
+     */
+    val marked: List<KnownCandidate> =
+        listOfNotNull(word, kana?.let { KnownCandidate(it, it, word.gloss) })
+}
 
 /** The questions of one quiz, and how many ranked words the slider can reach ([size]). */
 class QuizSetup(val dictionary: String, val size: Int, val questions: List<QuizQuestion>)
@@ -41,8 +70,8 @@ class KnownWords(
     val batches: KnownBatchRepository,
     /** The frequency dictionary ranks come from, with its title; null if none is installed. */
     private val frequencyDictionary: suspend () -> Pair<Long, String>?,
-    /** (written form, reading) of the words ranked [maxRank] or better in a frequency dictionary, most common first. */
-    private val topWords: suspend (dictionary: Long, maxRank: Int) -> List<Pair<String, String?>>,
+    /** The words ranked [maxRank] or better in a frequency dictionary, most common first. */
+    private val topWords: suspend (dictionary: Long, maxRank: Int) -> List<RankedWord>,
 ) {
     suspend fun planWordList(name: String, list: ParsedWordList, onProgress: (Int) -> Unit = {}): KnownPlan =
         plan(KnownSource.WORD_LIST, name, list.entries.map { WantedWord(it.word, it.reading) }, deinflect = true, skipped = list.skippedLines, onProgress)
@@ -57,8 +86,9 @@ class KnownWords(
      */
     suspend fun planTopN(n: Int, onProgress: (Int) -> Unit = {}): TopNResult {
         val (id, title) = frequencyDictionary() ?: return TopNResult.NoFrequencyDictionary
-        val wanted = topWords(id, n).map { (written, reading) -> WantedWord(written, reading) }
-        return TopNResult.Ready(plan(KnownSource.TOP_N, n.toString(), wanted, deinflect = false, skipped = 0, onProgress), title)
+        val ranked = topWords(id, n)
+        val resolved = withKanaSpellings(resolver.resolve(ranked.map { WantedWord(it.written, it.reading) }, deinflect = false, onProgress), ranked)
+        return TopNResult.Ready(KnownPlan(KnownSource.TOP_N, n.toString(), resolved, batches.preview(resolved.words)), title)
     }
 
     /**
@@ -72,9 +102,9 @@ class KnownWords(
         if (ranked.size < MIN_QUIZ_WORDS) return null
         val seen = HashSet<String>()
         val questions = PlacementQuiz.sampleRanks(ranked.size, random).mapNotNull { rank ->
-            val (written, reading) = ranked[rank - 1]
-            val word = resolver.resolve(listOf(WantedWord(written, reading)), deinflect = false).words.firstOrNull()
-            if (word != null && seen.add(word.expression)) QuizQuestion(rank, word) else null
+            val row = ranked[rank - 1]
+            val word = resolver.resolve(listOf(WantedWord(row.written, row.reading)), deinflect = false).words.firstOrNull()
+            if (word != null && seen.add(word.expression)) QuizQuestion(rank, word, usuallyKana = row.usuallyKana) else null
         }
         return QuizSetup(title, ranked.size, questions)
     }
@@ -85,15 +115,31 @@ class KnownWords(
      */
     suspend fun planQuiz(n: Int, answers: List<Pair<QuizQuestion, Boolean>>, onProgress: (Int) -> Unit = {}): TopNResult {
         val (id, title) = frequencyDictionary() ?: return TopNResult.NoFrequencyDictionary
-        val wanted = topWords(id, PlacementQuiz.MAX_WORDS).take(PlacementQuiz.MAX_WORDS).take(n)
-            .map { (written, reading) -> WantedWord(written, reading) }
-        val resolved = resolver.resolve(wanted, deinflect = false, onProgress)
-        val unknown = answers.filterNot { it.second }.mapTo(HashSet()) { it.first.word.expression }
+        val ranked = topWords(id, PlacementQuiz.MAX_WORDS).take(PlacementQuiz.MAX_WORDS).take(n)
+        val resolved = withKanaSpellings(resolver.resolve(ranked.map { WantedWord(it.written, it.reading) }, deinflect = false, onProgress), ranked)
+        val unknown = answers.filterNot { it.second }.flatMapTo(HashSet()) { (question, _) -> question.marked.map { it.expression } }
         val words = LinkedHashMap<String, KnownCandidate>()
         for (word in resolved.words) if (word.expression !in unknown) words.putIfAbsent("${word.expression}\u0000${word.reading}", word)
-        for ((question, known) in answers) if (known) words.putIfAbsent("${question.word.expression}\u0000${question.word.reading}", question.word)
+        for ((question, known) in answers) if (known) for (word in question.marked) words.putIfAbsent("${word.expression}\u0000${word.reading}", word)
         val kept = ResolvedWords(words.values.toList(), resolved.unmatched, resolved.names)
         return TopNResult.Ready(KnownPlan(KnownSource.QUIZ, n.toString(), kept, batches.preview(kept.words)), title)
+    }
+
+    /**
+     * Words the frequency dictionary ranks in kana (ここ for 此処) also as that spelling: the books
+     * that write ここ are matched by it, a known 此処 does not cover them.
+     */
+    private fun withKanaSpellings(resolved: ResolvedWords, ranked: List<RankedWord>): ResolvedWords {
+        val kana = ranked.mapNotNullTo(HashSet()) { it.kanaSpelling() }
+        if (kana.isEmpty()) return resolved
+        val words = LinkedHashMap<String, KnownCandidate>()
+        for (word in resolved.words) {
+            words.putIfAbsent("${word.expression}\u0000${word.reading}", word)
+            if (word.reading in kana && word.reading != word.expression) {
+                words.putIfAbsent("${word.reading}\u0000${word.reading}", KnownCandidate(word.reading, word.reading, word.gloss))
+            }
+        }
+        return ResolvedWords(words.values.toList(), resolved.unmatched, resolved.names)
     }
 
     /** Saves the plan as one batch; returns its id (null if nothing changed) and what changed. */

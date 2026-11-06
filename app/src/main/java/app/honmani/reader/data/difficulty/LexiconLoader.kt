@@ -72,6 +72,9 @@ class LexiconLoader(private val dao: DifficultyDao) {
         /** Jiten's mark for a rank of the word written in kana ("615㋕"). */
         private const val KANA_MARK = '\u32D5'
 
+        /** Whether Jiten marks the rank as the word's in kana. */
+        fun isKanaRank(display: String?): Boolean = display?.trimEnd()?.endsWith(KANA_MARK) == true
+
         /**
          * A rank counts for the written form, and for the reading the word is written in kana.
          * A rank Jiten marks as the word's in kana counts for the reading only: 或る's "615㋕" is
@@ -82,7 +85,7 @@ class LexiconLoader(private val dao: DifficultyDao) {
         fun addRank(builder: Lexicon.Builder, row: LexiconFrequency) {
             val rank = row.rank.toInt()
             val reading = row.reading?.takeIf { it.isNotEmpty() }
-            if (row.display?.trimEnd()?.endsWith(KANA_MARK) == true) {
+            if (isKanaRank(row.display)) {
                 builder.add(reading ?: row.expression, 0, rank)
                 return
             }

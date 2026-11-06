@@ -343,7 +343,8 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
         }
         is KnownWordsFlow.Step.Quiz -> {
             val questions = step.setup.questions
-            val word = questions[step.answers.size].word
+            val question = questions[step.answers.size]
+            val word = question.word
             AlertDialog(
                 onDismissRequest = flow::cancel,
                 title = { Text(stringResource(R.string.known_quiz_title, step.answers.size + 1, questions.size)) },
@@ -353,8 +354,8 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(word.expression, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
-                        if (word.reading != word.expression) Text(word.reading, style = MaterialTheme.typography.titleMedium)
+                        Text(question.shown, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
+                        if (word.reading != question.shown) Text(word.reading, style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = flow::undoAnswer, enabled = step.answers.isNotEmpty()) {
                             Text(stringResource(R.string.known_quiz_back))
                         }

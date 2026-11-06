@@ -110,6 +110,7 @@ import app.honmani.reader.data.words.KnownBatchRepository
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.known.KnownWordResolver
 import app.honmani.reader.known.KnownWords
+import app.honmani.reader.known.RankedWord
 import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.DictionaryLookup
@@ -338,7 +339,7 @@ class AppContainer(context: Context) {
             batches = KnownBatchRepository(database),
             frequencyDictionary = { lexiconSources()?.frequency?.let { it.id to it.title } },
             topWords = { dictionary, maxRank ->
-                database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { it.expression to it.reading }
+                database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { RankedWord(it.expression, it.reading, LexiconLoader.isKanaRank(it.display)) }
             },
         )
     }
