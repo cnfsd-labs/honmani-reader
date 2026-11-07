@@ -71,7 +71,7 @@ public: never copy those notes, personal details or discussions into it.
 - **Credentials and servers:** OPDS 1.x only, own parser and `HttpURLConnection` client. Passwords are
   AES-GCM with a Keystore key (not androidx security-crypto). A login goes only to the server's own
   origin; redirects are followed by hand. Plain http and user CAs are allowed for home servers, with a
-  warning; over http a login goes only after the server's 401, per server and Android network, never
+  warning; over http a login goes only after the server's 401 (the progress sync client also accepts Komga's 403), per server and Android network, never
   on a captive-portal hotspot (`data/net/`).
 - **Progress sync:** KOReader's protocol, EPUB only, document id = KOReader's partial MD5, exact
   positions (`EpubPositions` follows ttu's character counting). Calibre-Web Automated wants its web
