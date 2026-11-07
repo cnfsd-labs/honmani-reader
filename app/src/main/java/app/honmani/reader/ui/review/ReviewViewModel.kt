@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -81,6 +82,8 @@ object NoReviewAudio : ReviewAudio {
     override suspend fun sentence(text: String, bookId: Long?, bookTitle: String?): VoiceProblem? = null
 
     override fun stop(reason: String) = Unit
+
+    override fun stopOwn(reason: String) = Unit
 }
 
 /** One review session: the queue from [ReviewSession], the card on screen, and what a tap does. */
@@ -114,6 +117,14 @@ class ReviewViewModel(
     // The session isn't thread safe: one action at a time.
     private val lock = Mutex()
     private var session: ReviewSession? = null
+
+    init {
+        // The buttons follow the settings at once, so coming back from Settings agrees with the auto-play gate.
+        viewModelScope.launch {
+            combine(settings.showSentence, settings.speakers) { sentence, speakers -> sentence to speakers }
+                .collect { (sentence, speakers) -> _state.update { it.copy(showSentence = sentence, speakers = speakers) } }
+        }
+    }
 
     private fun initialState() =
         ReviewUiState(showSentence = settings.showSentence.value, speakers = settings.speakers.value)
@@ -181,8 +192,26 @@ class ReviewViewModel(
     }
 
     private fun playing(play: suspend () -> VoiceProblem?) {
-        audioJob?.cancel()
+        beginSound()
         audioJob = viewModelScope.launch { play()?.let { _voiceProblems.send(it) } }
+    }
+
+    // Whether review has started a sound since it last stopped one. The player is shared with the lookup panel, so
+    // review stops it only for a sound of its own, never one the panel started.
+    private var reviewSound = false
+
+    /** A new review sound replaces the one review made before, even while that is still being recorded. */
+    private fun beginSound() {
+        stopOwnAudio("replaced")
+        reviewSound = true
+    }
+
+    /** Ends review's own sound, if any; the panel's sound is left alone. */
+    private fun stopOwnAudio(reason: String) {
+        audioJob?.cancel()
+        audioJob = null
+        if (reviewSound) audio.stopOwn(reason)
+        reviewSound = false
     }
 
     private enum class AutoTrigger { SHOW, REVEAL }
@@ -208,9 +237,9 @@ class ReviewViewModel(
         }
         val sentence = card.sentence?.takeIf { state.showSentence }
         val text = card.shownReading.ifBlank { card.expression }
-        val sayWord = settings.autoPlayContent.value == ReviewAutoPlayContent.WORD
-        if (!sayWord && sentence == null) return
-        audioJob?.cancel()
+        // A card with no sentence on show still has its word to say.
+        val sayWord = settings.autoPlayContent.value == ReviewAutoPlayContent.WORD || sentence == null
+        beginSound()
         // A failed auto-play only goes to the log; the reader didn't ask for it.
         audioJob = viewModelScope.launch {
             val problem = if (sayWord) audio.word(text, phoneOnly = true) else audio.sentence(sentence!!.text, sentence.bookId, sentence.bookTitle)
@@ -218,10 +247,11 @@ class ReviewViewModel(
         }
     }
 
-    /** Stops the sound and any recording on its way: the app went to the background, the screen closed, the card changed. */
+    /** Stops every sound and any recording on its way: the app went to the background or the screen closed. */
     fun stopAudio(reason: String) {
         audioJob?.cancel()
         audioJob = null
+        reviewSound = false
         audio.stop(reason)
     }
 
@@ -247,7 +277,7 @@ class ReviewViewModel(
         // An edit keeps the card (and its sound); an answer or an undo shows another front.
         // The same card again after an edit or a restart of the screen is not a new showing.
         val sameCard = active.current?.word?.id == shownWordId && (keepRevealed || restart)
-        if (!keepRevealed && !sameCard) stopAudio("card")
+        if (!keepRevealed && !sameCard) stopOwnAudio("card")
         val item = active.current
         val card = item?.let {
             val lookups = words.latestLookups(it.word.id)

@@ -1,6 +1,9 @@
 package app.honmani.reader.ui.review
 
 import androidx.activity.compose.BackHandler
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.AnimatedVisibility
@@ -180,15 +183,17 @@ fun ReviewScreen(
         viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
     // Sound ends with the screen: leaving the app or the review, never over the next thing.
+    // A rotation recreates the activity but not the screen's state: the sound plays on.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
+        val activity = context.findActivity()
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) viewModel.stopAudio("background")
+            if (event == Lifecycle.Event.ON_STOP && activity?.isChangingConfigurations != true) viewModel.stopAudio("background")
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            viewModel.stopAudio("closed")
+            if (activity?.isChangingConfigurations != true) viewModel.stopAudio("closed")
         }
     }
     LaunchedEffect(panelModel) {
@@ -836,3 +841,9 @@ private val BURST_AREA = 200.dp
 private val BUTTON_HEIGHT = 56.dp
 private const val SWIPE_FRACTION = 0.3f
 private const val SCRIM_ALPHA = 0.32f
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}

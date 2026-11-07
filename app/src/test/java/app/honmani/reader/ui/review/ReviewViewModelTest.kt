@@ -45,6 +45,7 @@ class ReviewViewModelTest {
     private class FakeAudio : ReviewAudio {
         val played = java.util.concurrent.CopyOnWriteArrayList<String>()
         val stops = mutableListOf<String>()
+        val ownStops = mutableListOf<String>()
         val phoneOnly = java.util.concurrent.CopyOnWriteArrayList<Boolean>()
         var gate: CompletableDeferred<Unit>? = null
         var problem: VoiceProblem? = null
@@ -64,6 +65,11 @@ class ReviewViewModelTest {
 
         override fun stop(reason: String) {
             stops += reason
+        }
+
+        override fun stopOwn(reason: String) {
+            stops += reason
+            ownStops += reason
         }
     }
 
@@ -351,14 +357,76 @@ class ReviewViewModelTest {
     }
 
     @Test
-    fun aSentenceAutoPlayIsQuietWhenTheFrontShowsTheWordAlone() {
+    fun aSentenceAutoPlayFallsBackToTheWordWhenTheFrontShowsNoSentence() {
         autoPlay(ReviewAutoPlay.ON_REVEAL, ReviewAutoPlayContent.SENTENCE)
         settings.setShowSentence(false)
         val model = started()
 
         model.reveal()
 
-        assertEquals(emptyList<String>(), playedAfterAWhile())
+        assertEquals(listOf("word:ねこ"), played(1))
+    }
+
+    @Test
+    fun aNewCardStopsOnlyASoundReviewStarted() {
+        val model = started()
+
+        nextCard(model)
+        assertEquals(emptyList<String>(), audio.stops)
+
+        model.speakWord()
+        nextCard(model)
+        assertEquals(listOf("card"), audio.ownStops.takeLast(1))
+        assertEquals(emptyList<String>(), audio.stops.filter { it != "card" && it != "replaced" })
+    }
+
+    @Test
+    fun gradingTwiceStopsTheSoundOnlyOnce() {
+        val model = started()
+        model.speakWord()
+        val first = model.state.value.card!!.wordId
+
+        model.gotIt()
+        waitFor(model) { it.card?.wordId != first }
+        val after = audio.stops.size
+        model.undo()
+        waitFor(model) { it.card?.wordId == first }
+
+        assertEquals(after, audio.stops.size)
+    }
+
+    @Test
+    fun aWordPressStopsTheSentenceStillPlaying() {
+        val model = started()
+        model.speakSentence()
+        audio.gate = CompletableDeferred()
+
+        model.speakWord()
+
+        assertEquals(listOf("replaced"), audio.ownStops)
+        audio.gate!!.complete(Unit)
+    }
+
+    @Test
+    fun leavingStopsEverySound_evenOneReviewDidNotStart() {
+        val model = started()
+
+        model.stopAudio("background")
+
+        assertEquals(listOf("background"), audio.stops)
+        assertEquals(emptyList<String>(), audio.ownStops)
+    }
+
+    @Test
+    fun theButtonsFollowTheSettingsLive() {
+        val model = started()
+        assertTrue(model.state.value.speakers)
+
+        settings.setSpeakers(false)
+        settings.setShowSentence(false)
+
+        assertEquals(false, model.state.value.speakers)
+        assertEquals(false, model.state.value.showSentence)
     }
 
     @Test

@@ -44,6 +44,11 @@ class WordAudio(
     /** A recording is playing right now (UI sounds keep quiet meanwhile). */
     val playing: Boolean get() = player != null
 
+    /** How many sounds have started; whoever started one can tell whether another has replaced it since. */
+    @Volatile
+    var plays = 0
+        private set
+
     /**
      * Plays [text]; returns why it couldn't, or null once it plays. [phoneOnly] says it with the phone's own
      * voice whatever voice the user chose (what plays by itself never costs money or leaves the phone).
@@ -114,6 +119,7 @@ class WordAudio(
 
     private fun start(file: File, kind: String, source: String, rate: Double, owned: Boolean): VoiceProblem? {
         stop()
+        plays++
         Log.d(LOG_TAG, "play $kind source=$source rate=$rate")
         focus.request()
         return try {

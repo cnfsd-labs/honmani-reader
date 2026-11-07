@@ -16,6 +16,9 @@ interface ReviewAudio {
 
     /** Stops what plays; [reason] is for the log. Call it on the main thread. */
     fun stop(reason: String)
+
+    /** Stops the sound only if this player started it and nothing replaced it since (the lookup panel shares the player). */
+    fun stopOwn(reason: String)
 }
 
 /** [ReviewAudio] through the app's one [WordAudio] player. */
@@ -41,13 +44,25 @@ class WordAudioReview(
         audio.playSentence(text)
     }
 
+    /** [WordAudio.plays] after the last sound this started; another player start makes it stale. */
+    private var lastPlay = -1
+
     override fun stop(reason: String) {
         Log.d(TAG, "stopped reason=$reason")
         audio.stop()
     }
 
+    override fun stopOwn(reason: String) {
+        if (audio.playing && audio.plays == lastPlay) {
+            Log.d(TAG, "stopped own reason=$reason")
+            audio.stop()
+        }
+    }
+
     private suspend fun guarded(kind: String, play: suspend () -> VoiceProblem?): VoiceProblem? = try {
-        play().also { if (it != null) Log.w(TAG, "play $kind failed: $it") }
+        play().also {
+            if (it != null) Log.w(TAG, "play $kind failed: $it") else lastPlay = audio.plays
+        }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
