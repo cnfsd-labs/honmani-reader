@@ -64,6 +64,31 @@ class GoogleCloudVoiceTest {
     }
 
     @Test
+    fun aReplyLargerThanAnyAudioIsAFailure_andNothingIsWritten() = runBlocking {
+        body = """{"audioContent":"${"A".repeat(GoogleCloudVoice.MAX_RESPONSE_BYTES)}"}"""
+        val out = File(folder.root, "big.mp3")
+        try {
+            GoogleCloudVoice("key", "ja-JP-Neural2-B", baseUrl).speak("ねこ", out)
+            fail("Expected a VoiceException")
+        } catch (e: VoiceException) {
+            assertEquals(VoiceProblem.FAILED, e.problem)
+        }
+        assertFalse(out.exists())
+    }
+
+    @Test
+    fun anErrorBodyLargerThanTheLimitIsAFailure() = runBlocking {
+        status = "400 Bad Request"
+        body = "x".repeat(GoogleCloudVoice.MAX_ERROR_BYTES + 1)
+        try {
+            GoogleCloudVoice("key", "ja-JP-Neural2-B", baseUrl).speak("ねこ", File(folder.root, "e.mp3"))
+            fail("Expected a VoiceException")
+        } catch (e: VoiceException) {
+            assertEquals(VoiceProblem.FAILED, e.problem)
+        }
+    }
+
+    @Test
     fun aSlowerRateIsSentAsSpeakingRate() = runBlocking {
         body = """{"audioContent":"${Base64.getEncoder().encodeToString(byteArrayOf(1))}"}"""
 

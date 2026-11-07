@@ -204,6 +204,20 @@ class WaniKaniClientTest {
     }
 
     @Test
+    fun aReplyLargerThanAnyPageIsAFailure() {
+        handler = { _, out -> out.respond("200 OK", "x".repeat(WaniKaniClient.MAX_PAGE_BYTES + 1)) }
+
+        assertEquals(WaniKaniProblem.FAILED, problemOf { client.knownItems(token, false) })
+    }
+
+    @Test
+    fun anErrorBodyLargerThanTheLimitIsAFailure_notABadToken() {
+        handler = { _, out -> out.respond("401 Unauthorized", "x".repeat(WaniKaniClient.MAX_ERROR_BYTES + 1)) }
+
+        assertEquals(WaniKaniProblem.FAILED, problemOf { client.knownItems(token, false) })
+    }
+
+    @Test
     fun aReplyThatIsNotJsonIsAFailure() {
         handler = { _, out -> out.respond("200 OK", "<html>") }
 

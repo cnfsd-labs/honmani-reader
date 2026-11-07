@@ -197,6 +197,7 @@ class DictionariesViewModelTest {
             dictionary("JMdict [2026-10-01]").copy(
                 isUpdatable = true,
                 indexUrl = "https://example.org/JMdict.json",
+                downloadUrl = "https://example.org/JMdict-old.zip",
             ),
         )
         assertEquals(UpdateCheck.NOT_CHECKED, state().updateCheck)

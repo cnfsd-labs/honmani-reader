@@ -1,6 +1,8 @@
 package app.honmani.reader.known
 
+import app.honmani.reader.data.TooLargeException
 import app.honmani.reader.data.net.originOf
+import app.honmani.reader.data.readBytesAtMost
 import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.IOException
@@ -139,13 +141,17 @@ class WaniKaniClient(
                 val status = connection.responseCode
                 NetworkLog.shared.answered(NetworkPurpose.WANIKANI, url, status, connection.contentLengthLong)
                 val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-                val body = stream?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
+                val limit = if (status in 200..299) MAX_PAGE_BYTES else MAX_ERROR_BYTES
+                val body = stream?.use { it.readBytesAtMost(limit).toString(Charsets.UTF_8) }.orEmpty()
                 return Response(
                     status,
                     body,
                     connection.getHeaderField("RateLimit-Remaining")?.trim()?.toIntOrNull(),
                     connection.getHeaderField("RateLimit-Reset")?.trim()?.toLongOrNull(),
                 )
+            } catch (e: TooLargeException) {
+                // Not WaniKani's answer: nothing to wait for or retry.
+                throw WaniKaniException(WaniKaniProblem.FAILED, e)
             } catch (e: IOException) {
                 NetworkLog.shared.failed(NetworkPurpose.WANIKANI, url, e)
                 throw WaniKaniException(WaniKaniProblem.OFFLINE, e)
@@ -175,6 +181,10 @@ class WaniKaniClient(
         private const val MAX_RETRIES = 3
         private const val MAX_WAIT_MS = 60_000L
         private const val TIMEOUT_MS = 20_000
+
+        /** A page of 500 items is a few hundred KB; more than this is not WaniKani's answer. */
+        internal const val MAX_PAGE_BYTES = 8 * 1024 * 1024
+        internal const val MAX_ERROR_BYTES = 64 * 1024
         private val TOKEN = Regex("[A-Za-z0-9-]{8,64}")
 
         internal fun parseAssignments(page: JsonObject): List<Assignment> = try {

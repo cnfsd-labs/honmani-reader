@@ -1,5 +1,7 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.data.TooLargeException
+import app.honmani.reader.data.readBytesAtMost
 import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.File
@@ -122,13 +124,15 @@ class GoogleCloudVoice(
                     val status = connection.responseCode
                     NetworkLog.shared.answered(NetworkPurpose.GOOGLE_VOICE, url, status, connection.contentLengthLong)
                     if (status !in 200..299) {
-                        val error = connection.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
+                        val error = connection.errorStream?.use { it.readBytesAtMost(MAX_ERROR_BYTES).toString(Charsets.UTF_8) }.orEmpty()
                         throw VoiceException(problemFor(status, error))
                     }
-                    val text = connection.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
+                    val text = connection.inputStream.use { it.readBytesAtMost(MAX_RESPONSE_BYTES).toString(Charsets.UTF_8) }
                     Json.parseToJsonElement(text).jsonObject
                 } catch (e: VoiceException) {
                     throw e
+                } catch (e: TooLargeException) {
+                    throw VoiceException(VoiceProblem.FAILED, e)
                 } catch (e: IOException) {
                     NetworkLog.shared.failed(NetworkPurpose.GOOGLE_VOICE, url, e)
                     throw VoiceException(VoiceProblem.NETWORK, e)
@@ -154,6 +158,10 @@ class GoogleCloudVoice(
         const val PREFERRED_VOICE = "ja-JP-Chirp3-HD-Aoede"
         private val MODELS = listOf("Chirp3-HD", "Chirp-HD", "Neural2", "Wavenet", "Standard")
         private const val TIMEOUT_MS = 20_000
+
+        /** The audio of one word or sentence, base64 in JSON, is a few MB at most. */
+        internal const val MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+        internal const val MAX_ERROR_BYTES = 64 * 1024
     }
 }
 
