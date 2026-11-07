@@ -82,7 +82,7 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   deck -> preview (matched, new, already known, not found) before "Mark as known". "Earlier steps" Undo
   removes what the step added, moves back what it moved, keeps words changed since. Top 1000 -> Known
   filter and book "% known" rise; Undo -> fall.
-- **Quick quiz** (~45 words; I know it / I don't, Undo last) -> "You seem to know about N words" +
+- **Quick quiz** (~45 content words, no particles or pronouns; I know it / I don't, Undo last) -> "You seem to know about N words" +
   slider; Continue -> preview, nothing marked before "Mark as known". "Don't know" never marked, "know"
   always. Know up to a point: estimate near it; batch "Quick quiz: about N words", Undo removes it.
 - **Mark words**: "Learning" (default): look up, turn a page -> word and forms (食べた, 食べない) tinted;
@@ -127,8 +127,11 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 
 ## Review
 
-- Look up words in a book; next day the Review tab (first in Words) shows "Review · n" and an icon badge.
-  Page: small stats on top, chips and a large Start low down. Front = sentence with
+- Look up words in a book; next day the Review tab (first in Words; Words always opens on it) shows
+  "Review · n" and an icon badge. Page: small stats on top, chips and a large Start low down. With no
+  words yet: "No words yet", no Start button or chips; a Stats button opens Progress. Answers and the end
+  of a session give a soft haptic (system touch feedback) and, with Settings -> Appearance -> Sounds on, a sound. The end
+  screen shows the result and animates in. Front = sentence with
   the word marked; tap = answer; Forgot / Got it (or swipe); Undo; Back mid-session keeps answers.
 - ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field per
   kanji part, kana only, Reset; also in the panel ⋮; changes only Honmani's built furigana, never the
@@ -189,6 +192,9 @@ aloud, on a page with furigana.
 
 Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent recording (media volume
 0). Reader menu -> Audiobook: pick audio, then subtitles.
+
+- Back while the bar is shown ends the audiobook (the book stays open); a second Back leaves the book.
+  Same for read aloud.
 
 - Bar, "Matching the subtitles to the book..." briefly, audio plays, the heard subtitle is marked; pages
   turn at page end (both directions, paged/continuous) and count as reading: with progress sync the
@@ -296,7 +302,15 @@ adb shell bmgr enable false
 
 ## Tabs, Progress, Appearance
 
-- Tapping the open tab: Words and Progress go to their next page and wrap; Settings returns to its list.
+- Tapping the open tab: Words and Progress go to their next page and wrap (Words restarts at Review);
+  Settings returns to its list. Tabs fade into each other.
+- Progress: the level has a title (New Reader, Page Turner, ...) next to its number; the streak shows
+  only when a daily goal is set and counts goal days ("goal streak"). A milestone or level-up shows a
+  banner at the top of the Library once (swipe it away; not again on the next start; nothing on the first
+  run after install). Words in Learning show one progress bar, also on collapsed rows.
+- Settings -> Appearance -> Sounds: off by default; on plays short tones for review answers, session end
+  and milestones, never while read aloud, an audiobook or other media plays. With
+  E-ink mode, or animations turned off in Android, no animation runs (the screens still change).
 - Progress -> Milestones: the calendar fits the width, arrows step through older weeks, a swipe on it
   turns the page. Level and milestones each have their own info text.
 - Settings -> Appearance -> random accent: Every launch changes on a cold start only, Every day with the

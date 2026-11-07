@@ -48,6 +48,10 @@ public: never copy those notes, personal details or discussions into it.
   2.4.21, KSP 2.3 (move together), compileSdk 37, targetSdk 36 (raise deliberately).
 - **Reader settings:** ttu's localStorage is the only store (Honmani's own as `honmani*` keys); theme
   follows the system until the reader picks one (`honmaniAutoTheme`).
+- **Motion and sounds.** Animations use the springs in `ui/theme/Motion.kt` and run only when
+  `LocalMotionEnabled` (not E-ink, Android animator scale above 0): new animations must check it.
+  Interface sounds are self-made sine tones (`scripts/sounds`, listed in `AboutScreen`), played by
+  `UiSounds`, never while read aloud or audio plays; the Appearance "Sounds" switch (off by default) gates them; haptics follow the system setting.
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
   contradicts ranks below those it agrees with; own deinflection (`lookup/Deinflector`); glossaries
   stored deflated (`GlossaryPacker`).
