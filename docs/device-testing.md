@@ -74,6 +74,11 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   Ignored: no tint, out of Learning/Learned/All, card out of the queue, not in book-sheet N%/M/"Words to
   learn". Words ⋮ -> "Ignored words"; "Stop ignoring" restores state. Lookup works; backup keeps it.
 
+- **Show pitch accent** (Settings -> Reading, on by default; needs a pitch dictionary, e.g. Kanjium):
+  off -> no pitch line over the reading in the reader's panel, Words, Review and search panels; the headword,
+  other readings and everything else unchanged; dictionaries still listed. Kill and reopen: stays off.
+  Anki card of a word with pitch still has the Pitch field. Backup + restore keeps the switch.
+
 ## Word marks and known words
 
 - **"Tell Honmani what you already know"** (Words ⋮, Settings, or the Learning card while under 50

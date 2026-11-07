@@ -94,6 +94,8 @@
     <string name="lookup_examples">Examples (%1$d)</string>
     <string name="lookup_examples_expanded">Expanded</string>
     <string name="lookup_examples_collapsed">Collapsed</string>
+    <string name="settings_show_pitch">Show pitch accent</string>
+    <string name="settings_show_pitch_details">Draws the pitch accent over the reading in the lookup panel. Your pitch dictionaries stay installed, and Anki cards still get the pitch.</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
     <string name="settings_animations">Animations</string>
     <string name="settings_animations_details">Screens fade, panels slide and cards move; off keeps the interface still (the reader page never animates)</string>

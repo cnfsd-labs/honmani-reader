@@ -118,6 +118,19 @@ class AppearanceSettingsTest {
     }
 
     @Test
+    fun pitchAccentIsShownUntilSwitchedOff_andReloadReadsARestoredValue() {
+        val settings = AppearanceSettings(preferences(), device())
+        assertEquals(true, settings.showPitch.value)
+
+        settings.setShowPitch(false)
+
+        assertEquals(false, AppearanceSettings(preferences(), device()).showPitch.value)
+        preferences().edit().putBoolean(AppearanceSettings.KEY_SHOW_PITCH, true).apply()
+        settings.reload()
+        assertEquals(true, settings.showPitch.value)
+    }
+
+    @Test
     fun animationsAreOnByDefault_andSwitchOffIsRemembered() {
         assertEquals(true, AppearanceSettings(preferences(), device()).animations.value)
 

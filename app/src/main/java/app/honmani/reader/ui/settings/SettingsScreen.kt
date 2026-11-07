@@ -340,6 +340,7 @@ private fun SettingsContent(
                             ),
                         )
                     }
+                    item { LookupPitchSection() }
                     item { examples() }
                     item {
                         ListItem(

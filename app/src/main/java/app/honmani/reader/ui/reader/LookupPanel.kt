@@ -79,7 +79,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.honmani.reader.HonmaniApplication
+import app.honmani.reader.data.settings.AppearanceSettings
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -191,6 +197,8 @@ fun LookupPanel(
     var extra by remember { mutableFloatStateOf(0f) }
     val height = remember { floatArrayOf(0f) }
     val density = LocalDensity.current
+    val appearance = rememberAppearanceSettings()
+    val showPitch by (appearance?.showPitch ?: DEFAULT_SHOW_PITCH).collectAsStateWithLifecycle()
     val closeDistance = with(density) { CLOSE_DISTANCE.toPx() }
     val closeVelocity = with(density) { CLOSE_VELOCITY.toPx() }
     val heights = PanelSizing.heights(
@@ -407,96 +415,98 @@ fun LookupPanel(
                             .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
                     )
                 }
-                when (state) {
-                    is LookupPanelState.Results -> LazyColumn(
-                        state = listState,
-                        // Fills the panel below the header; a short list leaves empty space.
-                        modifier = Modifier
-                            .weight(1f)
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                                    swipe.startedAtTop = !listState.canScrollBackward
+                CompositionLocalProvider(LocalShowPitch provides showPitch) {
+                    when (state) {
+                        is LookupPanelState.Results -> LazyColumn(
+                            state = listState,
+                            // Fills the panel below the header; a short list leaves empty space.
+                            modifier = Modifier
+                                .weight(1f)
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                        swipe.startedAtTop = !listState.canScrollBackward
+                                    }
                                 }
-                            }
-                            .nestedScroll(listConnection),
-                        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        itemsIndexed(
-                            items = state.groups,
-                            key = { i, group -> "$i:${group.expression}:${group.reading}" },
-                        ) { i, group ->
-                            if (i > 0) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(bottom = 12.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                .nestedScroll(listConnection),
+                            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            itemsIndexed(
+                                items = state.groups,
+                                key = { i, group -> "$i:${group.expression}:${group.reading}" },
+                            ) { i, group ->
+                                if (i > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(bottom = 12.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    )
+                                }
+                                // The best match opens with its first meanings; the others are folded
+                                // to a line each until tapped.
+                                val detail = details[i] ?: if (i == 0) Detail.BRIEF else Detail.FOLDED
+                                LookupGroupItem(
+                                    group = group,
+                                    detail = detail,
+                                    onDetail = { details[i] = it },
+                                    inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
+                                    adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
+                                    onAddToAnki = { onAddToAnki(group) },
+                                    showAnki = showAnki,
+                                    starred = WordRepository.key(group.expression, group.reading) in state.starred,
+                                    onSetStarred = if (state.previous == null) {
+                                        { onSetStarred(group, it) }
+                                    } else {
+                                        null
+                                    },
+                                    ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
+                                    onSetIgnored = if (state.previous == null) {
+                                        { onSetIgnored(group, it) }
+                                    } else {
+                                        null
+                                    },
+                                    onListen = { onListen(group) },
+                                    onLookupWord = onLookupWord,
+                                    onLearn = if (onLearn != null && state.previous == null) {
+                                        { onLearn(group) }
+                                    } else {
+                                        null
+                                    },
+                                    saved = WordRepository.key(group.expression, group.reading) in state.saved,
+                                    kanji = state.kanji,
+                                    onShowKanji = onShowKanji,
+                                    furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
+                                    onCorrectFurigana = if (onSetFurigana != null && state.previous == null && FuriganaOverride.canCorrect(group.expression)) {
+                                        { correcting = group }
+                                    } else {
+                                        null
+                                    },
                                 )
                             }
-                            // The best match opens with its first meanings; the others are folded
-                            // to a line each until tapped.
-                            val detail = details[i] ?: if (i == 0) Detail.BRIEF else Detail.FOLDED
-                            LookupGroupItem(
-                                group = group,
-                                detail = detail,
-                                onDetail = { details[i] = it },
-                                inAnki = WordRepository.key(group.expression, group.reading) in state.inAnki,
-                                adding = WordRepository.key(group.expression, group.reading) in state.addingToAnki,
-                                onAddToAnki = { onAddToAnki(group) },
-                                showAnki = showAnki,
-                                starred = WordRepository.key(group.expression, group.reading) in state.starred,
-                                onSetStarred = if (state.previous == null) {
-                                    { onSetStarred(group, it) }
-                                } else {
-                                    null
-                                },
-                                ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
-                                onSetIgnored = if (state.previous == null) {
-                                    { onSetIgnored(group, it) }
-                                } else {
-                                    null
-                                },
-                                onListen = { onListen(group) },
-                                onLookupWord = onLookupWord,
-                                onLearn = if (onLearn != null && state.previous == null) {
-                                    { onLearn(group) }
-                                } else {
-                                    null
-                                },
-                                saved = WordRepository.key(group.expression, group.reading) in state.saved,
-                                kanji = state.kanji,
-                                onShowKanji = onShowKanji,
-                                furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
-                                onCorrectFurigana = if (onSetFurigana != null && state.previous == null && FuriganaOverride.canCorrect(group.expression)) {
-                                    { correcting = group }
-                                } else {
-                                    null
-                                },
-                            )
                         }
-                    }
-                    is LookupPanelState.Kanji -> KanjiCard(
-                        kanji = state.kanji,
-                        modifier = Modifier
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
-                    )
-                    is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
-                        Message(
-                            stringResource(R.string.lookup_nothing_found, nothingFoundText(state.tap.text)),
-                            bottomPadding = 0.dp,
+                        is LookupPanelState.Kanji -> KanjiCard(
+                            kanji = state.kanji,
+                            modifier = Modifier
+                                .weight(1f)
+                                .verticalScroll(rememberScrollState())
+                                .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
                         )
-                        if (onEditLookup != null) {
-                            TextButton(onClick = { onEditLookup(state.tap.text) }, modifier = Modifier.padding(start = 8.dp)) {
-                                Text(stringResource(R.string.lookup_edit))
+                        is LookupPanelState.NothingFound -> Column(modifier = Modifier.weight(1f)) {
+                            Message(
+                                stringResource(R.string.lookup_nothing_found, nothingFoundText(state.tap.text)),
+                                bottomPadding = 0.dp,
+                            )
+                            if (onEditLookup != null) {
+                                TextButton(onClick = { onEditLookup(state.tap.text) }, modifier = Modifier.padding(start = 8.dp)) {
+                                    Text(stringResource(R.string.lookup_edit))
+                                }
                             }
                         }
-                    }
-                    is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
-                        Message(stringResource(R.string.lookup_no_dictionaries))
-                        TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
-                            Text(stringResource(R.string.lookup_open_dictionaries))
+                        is LookupPanelState.NoDictionaries -> Column(modifier = Modifier.weight(1f).padding(bottom = 8.dp)) {
+                            Message(stringResource(R.string.lookup_no_dictionaries))
+                            TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
+                                Text(stringResource(R.string.lookup_open_dictionaries))
+                            }
                         }
                     }
                 }
@@ -504,6 +514,18 @@ fun LookupPanel(
         }
     }
     }
+}
+
+/** Whether words draw their pitch accent (Settings → Reading); results in a panel read it here. */
+private val LocalShowPitch = compositionLocalOf { true }
+
+private val DEFAULT_SHOW_PITCH = MutableStateFlow(true)
+
+/** The app's appearance settings, or null where there is no app (a preview). */
+@Composable
+private fun rememberAppearanceSettings(): AppearanceSettings? {
+    val context = LocalContext.current
+    return remember(context) { (context.applicationContext as? HonmaniApplication)?.container?.appearanceSettings }
 }
 
 private const val MAX_SHOWN_TEXT = 8
@@ -1046,7 +1068,7 @@ private fun HeadwordWithPitch(
             )
         }
         if (plain) return@FlowRow
-        patterns.forEach { PitchReading(it, Modifier.padding(bottom = 4.dp)) }
+        if (LocalShowPitch.current) patterns.forEach { PitchReading(it, Modifier.padding(bottom = 4.dp)) }
         // Readings merged into this entry (same meanings), after the main one.
         if (group.otherReadings.isNotEmpty()) {
             Text(

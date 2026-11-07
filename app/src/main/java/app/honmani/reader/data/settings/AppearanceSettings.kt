@@ -139,6 +139,14 @@ class AppearanceSettings(
      */
     val showExamples: StateFlow<Boolean> = _showExamples.asStateFlow()
 
+    private val _showPitch = MutableStateFlow(preferences.getBoolean(KEY_SHOW_PITCH, true))
+
+    /**
+     * Whether the lookup panel draws the pitch accent over the reading (on by default). Only the
+     * display: the pitch dictionaries stay installed and Anki cards still carry the pitch.
+     */
+    val showPitch: StateFlow<Boolean> = _showPitch.asStateFlow()
+
     /** The reader chose [accent] by hand: the random accent turns off. */
     fun setAccent(accent: Accent) {
         _accent.value = accent
@@ -232,8 +240,14 @@ class AppearanceSettings(
         preferences.edit().putBoolean(KEY_SHOW_EXAMPLES, show).apply()
     }
 
+    fun setShowPitch(show: Boolean) {
+        _showPitch.value = show
+        preferences.edit().putBoolean(KEY_SHOW_PITCH, show).apply()
+    }
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
+        _showPitch.value = preferences.getBoolean(KEY_SHOW_PITCH, true)
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
         _randomAccent.value = AccentRandom.fromName(preferences.getString(KEY_ACCENT_RANDOM, null))
         _customHue.value = preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE)
@@ -256,6 +270,7 @@ class AppearanceSettings(
         const val KEY_SHOW_PREVIOUS_SENTENCE = "show_previous_sentence"
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
         const val KEY_SHOW_EXAMPLES = "show_examples"
+        const val KEY_SHOW_PITCH = "show_pitch_accent"
         const val KEY_SOUNDS = "ui_sounds"
         const val KEY_ANIMATIONS = "ui_animations"
         const val KEY_EINK = "eink_mirror"
