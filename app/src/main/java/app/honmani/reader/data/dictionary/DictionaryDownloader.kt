@@ -18,6 +18,7 @@ class DownloadException(message: String, cause: Throwable? = null) : IOException
 class DictionaryDownloader(
     private val connectTimeoutMs: Int = 15_000,
     private val readTimeoutMs: Int = 30_000,
+    private val maxDownloadBytes: Long = MAX_DOWNLOAD_BYTES,
 ) {
     /**
      * Downloads [url] into [destination], reporting bytes received and the total (-1 if the
@@ -31,6 +32,7 @@ class DictionaryDownloader(
         val connection = connect(url)
         try {
             val total = connection.contentLengthLong
+            if (total > maxDownloadBytes) throw tooLarge()
             var done = 0L
             var reported = -1L
             try {
@@ -41,8 +43,9 @@ class DictionaryDownloader(
                             ensureActive()
                             val read = input.read(buffer)
                             if (read < 0) break
-                            output.write(buffer, 0, read)
                             done += read
+                            if (done > maxDownloadBytes) throw tooLarge()
+                            output.write(buffer, 0, read)
                             // Report about every 1% (or every MB when the size is unknown).
                             val step = if (total > 0) total / 100 else 1L shl 20
                             if (done - reported >= step) {
@@ -124,9 +127,17 @@ class DictionaryDownloader(
         return connection
     }
 
-    private companion object {
-        const val MAX_TEXT_BYTES = 256 * 1024
-        const val BUFFER_SIZE = 64 * 1024
-        const val USER_AGENT = "Honmani (Android; dictionary download)"
+    private fun tooLarge() = DownloadException(
+        "The file is larger than ${(maxDownloadBytes + MB - 1) / MB} MB, which is more than Honmani will download.",
+    )
+
+    companion object {
+        /** The biggest dictionary is some 100 MB; a font or the example sentences are smaller. */
+        const val MAX_DOWNLOAD_BYTES = 500L * 1024 * 1024
+
+        private const val MB = 1024L * 1024
+        private const val MAX_TEXT_BYTES = 256 * 1024
+        private const val BUFFER_SIZE = 64 * 1024
+        private const val USER_AGENT = "Honmani (Android; dictionary download)"
     }
 }

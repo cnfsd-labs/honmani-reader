@@ -42,6 +42,11 @@ class DictionaryDownloaderTest {
                     out.head("200 OK", "Content-Length: ${payload.size * 2}")
                     out.write(payload)
                 }
+                // Does not say how long it is, and just goes on until the connection closes.
+                "/unknown-length.zip" -> {
+                    out.head("200 OK")
+                    out.write(payload)
+                }
                 "/index.json" -> {
                     val body = """{"revision":"2026.10.17"}""".toByteArray()
                     out.head("200 OK", "Content-Length: ${body.size}", "Content-Type: application/json")
@@ -111,15 +116,44 @@ class DictionaryDownloaderTest {
     }
 
     @Test
+    fun aFileAnnouncedAsTooLargeIsRefusedBeforeItIsRead() = runTest {
+        val destination = File(temp.root, "big.zip")
+
+        assertDownloadFails("$base/assets/dict-2026.zip", "The file is larger than", maxBytes = payload.size - 1L)
+        assertTrue(!destination.exists() || destination.length() == 0L)
+    }
+
+    @Test
+    fun aFileOfUnknownLengthIsStoppedAtTheLimit() = runTest {
+        val destination = File(temp.root, "out.zip")
+
+        assertDownloadFails("$base/unknown-length.zip", "The file is larger than", maxBytes = 100_000)
+        assertTrue(destination.length() <= 100_000)
+    }
+
+    @Test
+    fun aFileWithinTheLimitIsDownloaded() = runTest {
+        val destination = File(temp.root, "ok.zip")
+
+        DictionaryDownloader(maxDownloadBytes = payload.size.toLong()).download("$base/assets/dict-2026.zip", destination)
+
+        assertArrayEquals(payload, destination.readBytes())
+    }
+
+    @Test
     fun unreachableHostsAreReported() = runTest {
         // Port 1: nothing listens there, and no test server can take it (below 1024). A port
         // just freed by stopping the server was taken by another test's server once.
         assertDownloadFails("http://127.0.0.1:1/missing.zip", "Could not connect")
     }
 
-    private suspend fun assertDownloadFails(url: String, messageStart: String) {
+    private suspend fun assertDownloadFails(
+        url: String,
+        messageStart: String,
+        maxBytes: Long = DictionaryDownloader.MAX_DOWNLOAD_BYTES,
+    ) {
         try {
-            DictionaryDownloader(connectTimeoutMs = 2_000, readTimeoutMs = 2_000)
+            DictionaryDownloader(connectTimeoutMs = 2_000, readTimeoutMs = 2_000, maxDownloadBytes = maxBytes)
                 .download(url, File(temp.root, "out.zip"))
             fail("expected DownloadException")
         } catch (e: DownloadException) {

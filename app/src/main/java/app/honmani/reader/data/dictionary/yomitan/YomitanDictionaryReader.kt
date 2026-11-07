@@ -134,7 +134,7 @@ class YomitanDictionaryReader private constructor(
         action: suspend (List<YomitanTermMeta>) -> Unit,
     ) {
         val entry = entry(bank) ?: throw InvalidDictionaryException("$bank is missing")
-        val counting = CountingInputStream(zip.getInputStream(entry))
+        val counting = CountingInputStream(limited(entry))
         counting.buffered().use { stream ->
             val elements = decoding(bank) {
                 json.decodeToSequence<JsonElement>(stream, DecodeSequenceMode.ARRAY_WRAPPED).iterator()
@@ -174,7 +174,7 @@ class YomitanDictionaryReader private constructor(
         action: suspend (List<YomitanTerm>) -> Unit,
     ) {
         val entry = entry(bank) ?: throw InvalidDictionaryException("$bank is missing")
-        val counting = CountingInputStream(zip.getInputStream(entry))
+        val counting = CountingInputStream(limited(entry))
         counting.buffered().use { stream ->
             val elements = decoding(bank) {
                 json.decodeToSequence<JsonElement>(stream, DecodeSequenceMode.ARRAY_WRAPPED).iterator()
@@ -208,7 +208,7 @@ class YomitanDictionaryReader private constructor(
         action: suspend (List<YomitanKanji>) -> Unit,
     ) {
         val entry = entry(bank) ?: throw InvalidDictionaryException("$bank is missing")
-        val counting = CountingInputStream(zip.getInputStream(entry))
+        val counting = CountingInputStream(limited(entry))
         counting.buffered().use { stream ->
             val elements = decoding(bank) {
                 json.decodeToSequence<JsonElement>(stream, DecodeSequenceMode.ARRAY_WRAPPED).iterator()
@@ -245,10 +245,14 @@ class YomitanDictionaryReader private constructor(
 
     private fun entry(name: String): ZipEntry? = zip.getEntry(root + name)
 
+    /** The entry's content, which may not inflate to more than the size the archive declares. */
+    private fun limited(entry: ZipEntry): InputStream =
+        LimitedInputStream(zip.getInputStream(entry), entry.name, entry.size.takeIf { it >= 0 } ?: MAX_UNPACKED_BYTES)
+
     private fun readJson(name: String): JsonElement {
         val entry = entry(name) ?: throw InvalidDictionaryException("$name is missing")
         val text = try {
-            zip.getInputStream(entry).use { it.readBytesAtMost(MAX_JSON_BYTES) }.toString(Charsets.UTF_8)
+            limited(entry).use { it.readBytesAtMost(MAX_JSON_BYTES) }.toString(Charsets.UTF_8)
         } catch (e: TooLargeException) {
             throw InvalidDictionaryException("$name is too large", e)
         }
@@ -371,7 +375,11 @@ class YomitanDictionaryReader private constructor(
         private val json = Json
 
         /** Opens [file]. Throws [InvalidDictionaryException] if it is not a usable dictionary. */
-        fun open(file: File): YomitanDictionaryReader {
+        fun open(
+            file: File,
+            maxEntries: Int = MAX_ENTRIES,
+            maxUnpackedBytes: Long = MAX_UNPACKED_BYTES,
+        ): YomitanDictionaryReader {
             val zip = try {
                 ZipFile(file)
             } catch (e: ZipException) {
@@ -380,6 +388,7 @@ class YomitanDictionaryReader private constructor(
                 throw InvalidDictionaryException("The file could not be read", e)
             }
             try {
+                checkSize(zip, maxEntries, maxUnpackedBytes)
                 return YomitanDictionaryReader(zip, findRoot(zip))
             } catch (e: Throwable) {
                 zip.close()
@@ -427,6 +436,27 @@ class YomitanDictionaryReader private constructor(
         /** Runs [block], reporting malformed JSON in [name] as an invalid dictionary. */
         /** index.json and tag banks are small; a zip entry can claim to inflate to gigabytes. */
         private const val MAX_JSON_BYTES = 32 * 1024 * 1024
+
+        /** A zip bomb has very many entries or inflates to far more than any dictionary. */
+        private fun checkSize(zip: ZipFile, maxEntries: Int, maxUnpackedBytes: Long) {
+            var entries = 0
+            var unpacked = 0L
+            for (entry in zip.entries()) {
+                if (++entries > maxEntries) {
+                    throw InvalidDictionaryException("The file contains too many files to be a dictionary")
+                }
+                unpacked += maxOf(entry.size, 0)
+                if (unpacked > maxUnpackedBytes) {
+                    throw InvalidDictionaryException("The file is too large when unpacked to be a dictionary")
+                }
+            }
+        }
+
+        /** Most files in a zip of a real dictionary: banks of 10,000 rows, and some media. */
+        private const val MAX_ENTRIES = 100_000
+
+        /** The largest unpacked size accepted in total (the biggest dictionaries are some 1 GB). */
+        private const val MAX_UNPACKED_BYTES = 4L * 1024 * 1024 * 1024
 
         private inline fun <T> decoding(name: String, block: () -> T): T = try {
             block()
@@ -480,4 +510,27 @@ internal class CountingInputStream(input: InputStream) : FilterInputStream(input
         super.read(b, off, len).also { if (it > 0) count += it }
 
     override fun skip(n: Long): Long = super.skip(n).also { count += it }
+}
+
+/** Stops reading a zip entry that inflates to more than the [limit] bytes it declared. */
+internal class LimitedInputStream(input: InputStream, private val name: String, private val limit: Long) :
+    FilterInputStream(input) {
+    private var count = 0L
+
+    override fun read(): Int {
+        val b = super.read()
+        if (b >= 0) add(1)
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = super.read(b, off, len)
+        if (n > 0) add(n.toLong())
+        return n
+    }
+
+    private fun add(n: Long) {
+        count += n
+        if (count > limit) throw InvalidDictionaryException("$name is larger than the archive says")
+    }
 }

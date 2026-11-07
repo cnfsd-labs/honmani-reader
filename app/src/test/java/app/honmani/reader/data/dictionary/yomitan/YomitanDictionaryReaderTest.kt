@@ -48,6 +48,35 @@ class YomitanDictionaryReaderTest {
     }
 
     @Test
+    fun anArchiveWithTooManyFilesIsRefused() {
+        val files = sampleDictionary() + (1..20).associate { "media/$it.txt" to "x" }
+        val zip = writeZip(temp.root, files)
+
+        val e = assertThrows(InvalidDictionaryException::class.java) { YomitanDictionaryReader.open(zip, maxEntries = 10) }
+        assertEquals("The file contains too many files to be a dictionary", e.message)
+        YomitanDictionaryReader.open(zip, maxEntries = 1_000).close()
+    }
+
+    @Test
+    fun anArchiveThatUnpacksToTooMuchIsRefused() {
+        val zip = writeZip(temp.root, sampleDictionary() + ("media/big.bin" to "x".repeat(50_000)))
+
+        val e = assertThrows(InvalidDictionaryException::class.java) {
+            YomitanDictionaryReader.open(zip, maxUnpackedBytes = 10_000)
+        }
+        assertEquals("The file is too large when unpacked to be a dictionary", e.message)
+    }
+
+    @Test
+    fun anEntryThatInflatesBeyondItsDeclaredSizeIsStopped() {
+        val stream = LimitedInputStream(ByteArray(100).inputStream(), "term_bank_1.json", 60)
+
+        val e = assertThrows(InvalidDictionaryException::class.java) { stream.readBytes() }
+        assertEquals("term_bank_1.json is larger than the archive says", e.message)
+        assertEquals(60, LimitedInputStream(ByteArray(60).inputStream(), "x", 60).readBytes().size)
+    }
+
+    @Test
     fun legacyVersionKeyIsAcceptedAsFormat() {
         val files = mapOf("index.json" to """{"title":"Old","revision":"1","version":3}""")
         open(files).use { assertEquals(3, it.index.format) }
