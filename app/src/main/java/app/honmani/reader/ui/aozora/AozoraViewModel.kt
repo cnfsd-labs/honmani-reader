@@ -79,7 +79,6 @@ class AozoraViewModel(
 
     private var index: AozoraIndex? = null
     private var searchJob: Job? = null
-    private var loadJob: Job? = null
     private var downloadJob: Job? = null
 
     init {
@@ -92,9 +91,9 @@ class AozoraViewModel(
 
     /** Downloads the list (the user chose to), or checks that the kept one is current. */
     fun load() {
-        if (loadJob?.isActive == true) return
+        if (state.value.loading) return
         state.update { it.copy(loading = true, error = null) }
-        loadJob = viewModelScope.launch {
+        viewModelScope.launch {
             try {
                 show(repository.refresh())
                 state.update { it.copy(loading = false) }
@@ -148,7 +147,7 @@ class AozoraViewModel(
     /** Downloads the selected work; it arrives in [downloaded]. */
     fun add() {
         val work = state.value.selected ?: return
-        if (downloadJob?.isActive == true) return
+        if (state.value.download is AozoraDownload.Running) return
         state.update { it.copy(download = AozoraDownload.Running(null)) }
         downloadJob = viewModelScope.launch {
             try {

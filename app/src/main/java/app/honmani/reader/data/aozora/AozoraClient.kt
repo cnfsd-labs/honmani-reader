@@ -115,8 +115,8 @@ class AozoraClient(
 
     /** The address of a work's text file: `<card>/<file>` is at `<books>/<card>/files/<file>`. */
     fun bookUrl(file: String): String {
-        val card = file.substringBefore('/')
-        val name = file.substringAfter('/')
+        val card = file.substringBefore('/', "")
+        val name = file.substringAfter('/', "")
         if (card.isEmpty() || name.isEmpty() || name.contains('/') || file.contains("..")) {
             throw AozoraException(AozoraException.Reason.BAD_DATA, "Not a book file: $file")
         }
