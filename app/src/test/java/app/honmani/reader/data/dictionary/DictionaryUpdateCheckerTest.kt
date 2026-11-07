@@ -50,12 +50,12 @@ class DictionaryUpdateCheckerTest {
     fun aNewRevisionIsOffered_withTheDownloadUrlOfTheNewIndex() = runTest {
         val id = install("Jitendex.org [2026-10-03]", "2026.10.03.0", "https://jitendex.org/static/yomitan.json")
         remote["https://jitendex.org/static/yomitan.json"] =
-            """{"title":"Jitendex.org [2026-10-17]","revision":"2026.10.17.0","downloadUrl":"https://example.org/jitendex.zip"}"""
+            """{"title":"Jitendex.org [2026-10-17]","revision":"2026.10.17.0","downloadUrl":"https://jitendex.org/jitendex-new.zip"}"""
 
         val updates = checker.check()
 
         assertEquals(
-            listOf(DictionaryUpdate(id, "Jitendex.org [2026-10-03]", "2026.10.17.0", "https://example.org/jitendex.zip")),
+            listOf(DictionaryUpdate(id, "Jitendex.org [2026-10-03]", "2026.10.17.0", "https://jitendex.org/jitendex-new.zip")),
             updates,
         )
     }
@@ -92,15 +92,37 @@ class DictionaryUpdateCheckerTest {
 
     @Test
     fun anUpdateWithoutAnHttpsDownloadIsNotOffered() {
-        val installed = DictionaryEntity(id = 1, title = "A", revision = "1", formatVersion = 3, importedAt = 0)
+        val installed = DictionaryEntity(
+            id = 1, title = "A", revision = "1", formatVersion = 3, importedAt = 0, downloadUrl = "https://a/old.zip",
+        )
 
-        assertNull(DictionaryUpdateChecker.updateFor(installed, """{"revision":"2"}"""))
-        assertNull(DictionaryUpdateChecker.updateFor(installed, """{"revision":"2","downloadUrl":"http://a/a.zip"}"""))
+        val withoutStored = installed.copy(downloadUrl = null)
+        assertNull(DictionaryUpdateChecker.updateFor(withoutStored, """{"revision":"2"}"""))
+        assertNull(DictionaryUpdateChecker.updateFor(withoutStored, """{"revision":"2","downloadUrl":"https://a/a.zip"}"""))
         assertEquals(
             "https://a/old.zip",
-            DictionaryUpdateChecker.updateFor(installed.copy(downloadUrl = "https://a/old.zip"), """{"revision":"2"}""")
-                ?.downloadUrl,
+            DictionaryUpdateChecker.updateFor(installed, """{"revision":"2","downloadUrl":"http://a/a.zip"}""")?.downloadUrl,
         )
+        assertEquals("https://a/old.zip", DictionaryUpdateChecker.updateFor(installed, """{"revision":"2"}""")?.downloadUrl)
+    }
+
+    @Test
+    fun aNewDownloadUrlOnAnotherHostIsIgnored() {
+        val installed = DictionaryEntity(
+            id = 1, title = "A", revision = "1", formatVersion = 3, importedAt = 0,
+            downloadUrl = "https://github.com/a/releases/latest/download/a.zip",
+        )
+
+        fun offered(url: String) =
+            DictionaryUpdateChecker.updateFor(installed, """{"revision":"2","downloadUrl":"$url"}""")?.downloadUrl
+
+        assertEquals("https://GitHub.com/a/b.zip", offered("https://GitHub.com/a/b.zip"))
+        assertEquals("https://github.com/b/new.zip", offered("https://github.com/b/new.zip"))
+        // Another host, a look-alike host, or credentials in front of the real one: the stored address stays.
+        assertEquals(installed.downloadUrl, offered("https://evil.example/a.zip"))
+        assertEquals(installed.downloadUrl, offered("https://github.com.evil.example/a.zip"))
+        assertEquals(installed.downloadUrl, offered("https://github.com@evil.example/a.zip"))
+        assertEquals(installed.downloadUrl, offered("https://objects.githubusercontent.com/a.zip"))
     }
 
     @Test
@@ -144,6 +166,7 @@ class DictionaryUpdateCheckerTest {
                 importedAt = importedAt,
                 isUpdatable = true,
                 indexUrl = indexUrl,
+                downloadUrl = indexUrl.substringBeforeLast('/') + "/old.zip",
             ),
         )
 }

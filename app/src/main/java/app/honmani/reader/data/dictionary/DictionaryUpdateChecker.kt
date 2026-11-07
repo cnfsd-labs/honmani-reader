@@ -1,5 +1,7 @@
 package app.honmani.reader.data.dictionary
 
+import java.net.URI
+import java.net.URISyntaxException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +30,7 @@ data class DictionaryUpdate(
  * does: dictionaries that declare `isUpdatable` name an `indexUrl` whose `index.json` carries
  * the latest revision and its `downloadUrl` (Jitendex, JMdict, KANJIDIC and Jiten do). Only the
  * two URLs from the dictionary itself are requested, over HTTPS, with nothing about the reader.
+ * A new `downloadUrl` counts only on the host of the one stored with the dictionary.
  *
  * Updates are offered, not installed: Jitendex is a 40 MB download and a minute of import.
  * JMdict and KANJIDIC are rebuilt almost daily, so the automatic check leaves out dictionaries
@@ -102,10 +105,25 @@ class DictionaryUpdateChecker(
             fun string(key: String) = (json[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
             val revision = string("revision")?.takeIf { it.isNotBlank() } ?: return null
             if (revision == installed.revision) return null
-            val downloadUrl = (string("downloadUrl") ?: installed.downloadUrl)?.takeIf(::isHttps) ?: return null
+            // The download address may change, but only within the host the dictionary was
+            // installed from: a hijacked or hostile index.json must not send the app elsewhere.
+            val stored = installed.downloadUrl?.takeIf(::isHttps)
+            val offered = string("downloadUrl")?.takeIf { isHttps(it) && stored != null && sameHost(it, stored) }
+            val downloadUrl = offered ?: stored ?: return null
             return DictionaryUpdate(installed.id, installed.title, revision, downloadUrl)
         }
 
         private fun isHttps(url: String) = url.startsWith("https://")
+
+        private fun sameHost(a: String, b: String): Boolean {
+            val hostA = hostOf(a) ?: return false
+            return hostA.equals(hostOf(b), ignoreCase = true)
+        }
+
+        private fun hostOf(url: String): String? = try {
+            URI(url).host
+        } catch (_: URISyntaxException) {
+            null
+        }
     }
 }
