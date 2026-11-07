@@ -13,6 +13,17 @@ import java.util.zip.ZipFile
 /** Text with the characters that have furigana (ruby) over them. */
 class RubyText(val text: String, val ruby: BitSet = BitSet())
 
+/**
+ * A piece of a document's text for speech: [text] as the page shows it (a gaiji picture is
+ * [GAIJI_CHAR]); for the base of a ruby, [reading] is what its `rt` says.
+ */
+class SpeechPiece(val text: String, val reading: String? = null) {
+    companion object {
+        /** Stands for a gaiji picture, which ttu counts as one character. */
+        const val GAIJI_CHAR = '\uFFFC'
+    }
+}
+
 /** Where each of ttu's sections (`ttu-<idref>`) begins in the book, and the characters in all of it. */
 class SectionStarts(val starts: Map<String, Int>, val total: Int)
 
@@ -191,6 +202,71 @@ class EpubPositions private constructor(
                     }
                     visit(body, inRuby = false)
                     RubyText(text.toString(), ruby)
+                }
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+
+        /**
+         * The text of each spine document as [SpeechPiece]s, counted the way [countedText] counts
+         * (gaiji pictures as one character; a `rp` inside a ruby is left out), with a line break
+         * after each block as [texts] has it. Null if it is not a readable EPUB.
+         */
+        fun speechPieces(file: File): List<List<SpeechPiece>>? = try {
+            ZipFile(file).use { zip ->
+                val spine = spineOf(zip)
+                if (spine.isEmpty()) return null
+                spine.mapNotNull { name ->
+                    val body = zip.text(name)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
+                    val pieces = ArrayList<SpeechPiece>()
+                    fun isGaiji(node: XNode) = node.name == "img" && node.attributes["class"]?.contains("gaiji") == true
+
+                    /** The text under [node] as the page shows it, without readings. */
+                    fun collect(node: XNode, sink: StringBuilder) {
+                        for (child in node.children) {
+                            when {
+                                child.isText -> sink.append(child.text)
+                                skipped(child) || child.name == "rp" -> {}
+                                isGaiji(child) -> sink.append(SpeechPiece.GAIJI_CHAR)
+                                else -> collect(child, sink)
+                            }
+                        }
+                    }
+
+                    fun ruby(node: XNode) {
+                        val base = StringBuilder()
+                        for (child in node.children) {
+                            if (child.name == "rt") {
+                                val reading = StringBuilder().also { collect(child, it) }
+                                if (base.isNotEmpty()) pieces += SpeechPiece(base.toString(), reading.toString())
+                                base.clear()
+                            } else if (child.isText) {
+                                base.append(child.text)
+                            } else if (!skipped(child) && child.name != "rp") {
+                                if (isGaiji(child)) base.append(SpeechPiece.GAIJI_CHAR) else collect(child, base)
+                            }
+                        }
+                        if (base.isNotEmpty()) pieces += SpeechPiece(base.toString())
+                    }
+
+                    fun visit(node: XNode) {
+                        for (child in node.children) {
+                            when {
+                                child.isText -> pieces += SpeechPiece(child.text!!)
+                                skipped(child) -> {}
+                                isGaiji(child) -> pieces += SpeechPiece(SpeechPiece.GAIJI_CHAR.toString())
+                                else -> {
+                                    if (child.name == "ruby") ruby(child) else visit(child)
+                                    if (child.name in BLOCKS) pieces += SpeechPiece("\n")
+                                }
+                            }
+                        }
+                    }
+                    visit(body)
+                    pieces
                 }
             }
         } catch (_: IOException) {
