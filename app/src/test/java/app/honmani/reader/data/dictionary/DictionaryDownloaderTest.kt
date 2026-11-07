@@ -33,6 +33,10 @@ class DictionaryDownloaderTest {
                 // Like a GitHub "latest release" link: a redirect to the actual file.
                 "/releases/latest/download/dict.zip" ->
                     out.head("302 Found", "Location: $base/assets/dict-2026.zip", "Content-Length: 0")
+                // Redirects to a different host name for the same local server.
+                "/elsewhere.zip" ->
+                    out.head("302 Found", "Location: http://localhost:${server.port}/assets/dict-2026.zip", "Content-Length: 0")
+                "/loop.zip" -> out.head("302 Found", "Location: $base/loop.zip", "Content-Length: 0")
                 "/assets/dict-2026.zip" -> {
                     out.head("200 OK", "Content-Length: ${payload.size}")
                     out.write(payload)
@@ -67,7 +71,7 @@ class DictionaryDownloaderTest {
     fun theRequestIsNoted_withItsHostOnly() = runTest {
         NetworkLog.shared.clear()
 
-        DictionaryDownloader().fetchText("$base/index.json?token=secret")
+        DictionaryDownloader(allowHttp = true).fetchText("$base/index.json?token=secret")
 
         val entry = NetworkLog.shared.entries().single()
         assertEquals(NetworkPurpose.DICTIONARY, entry.purpose)
@@ -81,7 +85,7 @@ class DictionaryDownloaderTest {
         val destination = File(temp.root, "dict.zip")
         val progress = mutableListOf<Pair<Long, Long>>()
 
-        DictionaryDownloader().download("$base/releases/latest/download/dict.zip", destination) { done, total ->
+        DictionaryDownloader(allowHttp = true).download("$base/releases/latest/download/dict.zip", destination) { done, total ->
             progress += done to total
         }
 
@@ -94,7 +98,7 @@ class DictionaryDownloaderTest {
 
     @Test
     fun fetchesSmallTexts_andRefusesLargeOnes() = runTest {
-        val downloader = DictionaryDownloader()
+        val downloader = DictionaryDownloader(allowHttp = true)
 
         assertEquals("""{"revision":"2026.10.17"}""", downloader.fetchText("$base/index.json"))
         try {
@@ -135,9 +139,48 @@ class DictionaryDownloaderTest {
     fun aFileWithinTheLimitIsDownloaded() = runTest {
         val destination = File(temp.root, "ok.zip")
 
-        DictionaryDownloader(maxDownloadBytes = payload.size.toLong()).download("$base/assets/dict-2026.zip", destination)
+        DictionaryDownloader(allowHttp = true, maxDownloadBytes = payload.size.toLong()).download("$base/assets/dict-2026.zip", destination)
 
         assertArrayEquals(payload, destination.readBytes())
+    }
+
+    @Test
+    fun aRedirectToAnotherHostIsRefused_unlessItsOnTheList() = runTest {
+        assertDownloadFails("$base/elsewhere.zip", "The server sent the download to another site (localhost)")
+
+        val destination = File(temp.root, "listed.zip")
+        DictionaryDownloader(allowHttp = true, redirectHosts = setOf("localhost"))
+            .download("$base/elsewhere.zip", destination)
+        assertArrayEquals(payload, destination.readBytes())
+    }
+
+    @Test
+    fun redirectsThatNeverEndAreStopped() = runTest {
+        assertDownloadFails("$base/loop.zip", "The server redirected too many times")
+    }
+
+    @Test
+    fun plainHttpIsRefusedUnlessAllowed() = runTest {
+        try {
+            DictionaryDownloader().download("$base/assets/dict-2026.zip", File(temp.root, "x.zip"))
+            fail("expected DownloadException")
+        } catch (e: DownloadException) {
+            assertTrue(e.message, e.message!!.startsWith("Only secure (https) addresses"))
+        }
+    }
+
+    @Test
+    fun theBuiltInSourcesRedirectHostsAreListed() {
+        val hosts = DictionaryDownloader.REDIRECT_HOSTS
+        // GitHub release assets, Hugging Face's CDN.
+        assertTrue(DictionaryDownloader.isListed("release-assets.githubusercontent.com", hosts))
+        assertTrue(DictionaryDownloader.isListed("objects.githubusercontent.com", hosts))
+        assertTrue(DictionaryDownloader.isListed("us.aws.cdn.hf.co", hosts))
+        assertTrue(DictionaryDownloader.isListed("huggingface.co", hosts))
+        // Look-alikes.
+        assertTrue(!DictionaryDownloader.isListed("evilgithub.com", hosts))
+        assertTrue(!DictionaryDownloader.isListed("github.com.evil.example", hosts))
+        assertTrue(!DictionaryDownloader.isListed("hf.co.example", hosts))
     }
 
     @Test
@@ -151,9 +194,16 @@ class DictionaryDownloaderTest {
         url: String,
         messageStart: String,
         maxBytes: Long = DictionaryDownloader.MAX_DOWNLOAD_BYTES,
+        redirectHosts: Set<String> = emptySet(),
     ) {
         try {
-            DictionaryDownloader(connectTimeoutMs = 2_000, readTimeoutMs = 2_000, maxDownloadBytes = maxBytes)
+            DictionaryDownloader(
+                connectTimeoutMs = 2_000,
+                readTimeoutMs = 2_000,
+                maxDownloadBytes = maxBytes,
+                allowHttp = true,
+                redirectHosts = redirectHosts,
+            )
                 .download(url, File(temp.root, "out.zip"))
             fail("expected DownloadException")
         } catch (e: DownloadException) {
