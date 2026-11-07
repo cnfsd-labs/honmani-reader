@@ -22,7 +22,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Audiobook (reader menu, EPUB): pair a book with an audio file and a subtitle file (SRT or WebVTT);
   subtitles are matched to the book's text, the sentence being heard is marked and the pages turn by
   themselves. Previous/next move one subtitle, speed 0.5 to 1.5, the place is remembered per book.
-  Subtitles not in the book are skipped; if fewer than half are found, the bar asks whether the files fit
+  Subtitles not in the book are skipped; if fewer than half are found, the bar asks whether the files fit.
+  Or make one with your own Google Cloud voice (costs money, shown before you start, with a spending cap).
 - Named bookmarks (reader menu): as many places per book as you like, jump from a list, rename or delete
   (Undo); a slider over the book shows the place as % and characters and jumps on release. After a jump,
   "Back to where you were" returns. Bookmarks are in the backup

@@ -21,6 +21,8 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.anki.VoiceProblem
+import app.honmani.reader.ui.anki.label
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.Flow
@@ -89,11 +91,25 @@ class AudiobookMakerWorker(
                 postResult(title, applicationContext.getString(R.string.audiobook_ready), bookHash)
                 Result.success()
             }
-            is MakerResult.CapReached -> stopped(files, MakerOutcome(MakerOutcome.Kind.CAP, result.message), title)
-            is MakerResult.Stopped -> stopped(files, MakerOutcome(MakerOutcome.Kind.STOPPED, result.message), title)
-            is MakerResult.Paused -> paused(files, result.message)
+            is MakerResult.CapReached -> stopped(
+                files,
+                MakerOutcome(MakerOutcome.Kind.CAP, applicationContext.getString(R.string.audiobook_cap_reached, usd(result.spentUsd), usd(result.capUsd))),
+                title,
+            )
+            is MakerResult.Stopped -> stopped(files, MakerOutcome(MakerOutcome.Kind.STOPPED, stoppedText(result.problem)), title)
+            is MakerResult.Paused -> paused(files, pausedText(result.problem))
         }
     }
+
+    /** The reader's words for a stop (the maker's own English stays in the log). */
+    private fun stoppedText(problem: VoiceProblem?): String = applicationContext.getString(
+        R.string.audiobook_stopped_for,
+        applicationContext.getString(problem?.label() ?: R.string.audiobook_problem_other),
+    )
+
+    private fun pausedText(problem: VoiceProblem): String = applicationContext.getString(
+        if (problem == VoiceProblem.NETWORK) R.string.audiobook_paused_network else R.string.audiobook_paused_busy,
+    )
 
     private fun paused(files: GeneratedFiles, message: String): Result {
         files.writeOutcome(MakerOutcome(MakerOutcome.Kind.PAUSED, message))

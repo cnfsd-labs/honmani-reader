@@ -236,6 +236,28 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Remove: pairing, subtitle copy, position gone. Delete the audio file, play -> "audio is gone", "Change
   files". Unplayable audio, empty subtitles, non-EPUB -> readable message, no crash.
 
+## Audiobook made with a Google voice
+
+Needs your own Google Cloud API key (Settings -> Anki -> Card audio) with billing on; a short test book
+(about 2,000 characters, roughly $0.06 with a Chirp 3 voice) keeps the cost small. Silent: media volume 0.
+
+- Reader menu -> Audiobook: the button "Make one with a Google voice (costs money)". A TXT book: disabled,
+  "EPUB only". No key: tapping it explains where to enter one and nothing else happens.
+- The sheet: counting, then the voices with a price each; characters, length, size, estimated USD; the bold
+  "This costs money" line, free-tier note, "Your book's text is sent to Google"; cap (estimate + 10%),
+  "Also on mobile data" off. A cap under the estimate or a voice without a price (type one) keeps Start off.
+  A wrong key shows Google's reason and nothing is billed.
+- Start (asks for notifications on Android 13+): notification "Making audiobook" with Cancel and n / N
+  sentences; leave the reader, lock the phone: it goes on (logcat tag Honmani.audiobookmaker).
+- Menu -> Audiobook while it runs: n / N, $ so far; Cancel keeps the audio, Continue goes on; Delete partial
+  audio asks "Making it again costs money".
+- A small cap stops it ("Spending cap reached"); "Raise cap and continue" goes on from the same sentence.
+  Airplane mode: it waits and resumes. Wi-Fi off with mobile data off: it waits for Wi-Fi.
+- Finished: Play follows the audio with the marks like a paired recording; seek/next sentence land within
+  ~50 ms. "Delete audio (N MB)" asks, then the pairing and `files/audiobook/generated/<hash>/` are gone
+  (run-as ls). Removing the book from the library deletes them too.
+- The folder is not in a backup (`bmgr`, docs above) and the Network activity screen lists "Google audiobook voice".
+
 ## Bookmarks and the reading slider
 
 Reader menu top: slider with live label ("42% · 10,350 / 24,847"), Add bookmark, Bookmarks. Paged and

@@ -906,6 +906,9 @@ class LibraryViewModel(
                     forgetDerivedData = { hash ->
                         container.difficultyStore.forget(hash)
                         container.audiobookStore.forget(hash)
+                        // A generated audiobook: stop the job, then delete generated/<hash>/ (and its pairing).
+                        container.audiobookScheduler.cancel(hash)
+                        container.audiobookMaker.delete(hash)
                         container.restoredBooks.forgetPosition(hash)
                     },
                     syncPosition = { book, ttuId, ask ->
