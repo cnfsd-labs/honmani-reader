@@ -147,6 +147,11 @@ class AppearanceSettings(
      */
     val showPitch: StateFlow<Boolean> = _showPitch.asStateFlow()
 
+    private val _lookupTextPercent = MutableStateFlow(readLookupTextPercent())
+
+    /** The size of the lookup panel's text in percent of the usual ([LOOKUP_TEXT_MIN]..[LOOKUP_TEXT_MAX]); 100 by default. */
+    val lookupTextPercent: StateFlow<Int> = _lookupTextPercent.asStateFlow()
+
     /** The reader chose [accent] by hand: the random accent turns off. */
     fun setAccent(accent: Accent) {
         _accent.value = accent
@@ -245,8 +250,23 @@ class AppearanceSettings(
         preferences.edit().putBoolean(KEY_SHOW_PITCH, show).apply()
     }
 
+    /** Stores the lookup text size, snapped to a step of [LOOKUP_TEXT_STEP] within the range. */
+    fun setLookupTextPercent(percent: Int) {
+        val snapped = snapLookupTextPercent(percent)
+        _lookupTextPercent.value = snapped
+        preferences.edit().putInt(KEY_LOOKUP_TEXT_PERCENT, snapped).apply()
+    }
+
+    private fun readLookupTextPercent(): Int =
+        if (preferences.contains(KEY_LOOKUP_TEXT_PERCENT)) {
+            snapLookupTextPercent(preferences.getInt(KEY_LOOKUP_TEXT_PERCENT, LOOKUP_TEXT_DEFAULT))
+        } else {
+            LOOKUP_TEXT_DEFAULT
+        }
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
+        _lookupTextPercent.value = readLookupTextPercent()
         _showPitch.value = preferences.getBoolean(KEY_SHOW_PITCH, true)
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
         _randomAccent.value = AccentRandom.fromName(preferences.getString(KEY_ACCENT_RANDOM, null))
@@ -271,11 +291,23 @@ class AppearanceSettings(
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
         const val KEY_SHOW_EXAMPLES = "show_examples"
         const val KEY_SHOW_PITCH = "show_pitch_accent"
+        const val KEY_LOOKUP_TEXT_PERCENT = "lookup_text_percent"
         const val KEY_SOUNDS = "ui_sounds"
         const val KEY_ANIMATIONS = "ui_animations"
         const val KEY_EINK = "eink_mirror"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"
+
+        const val LOOKUP_TEXT_MIN = 85
+        const val LOOKUP_TEXT_MAX = 150
+        const val LOOKUP_TEXT_STEP = 5
+        const val LOOKUP_TEXT_DEFAULT = 100
+
+        /** [percent] limited to the range and rounded to the nearest step. */
+        fun snapLookupTextPercent(percent: Int): Int {
+            val clamped = percent.coerceIn(LOOKUP_TEXT_MIN, LOOKUP_TEXT_MAX)
+            return ((clamped + LOOKUP_TEXT_STEP / 2) / LOOKUP_TEXT_STEP * LOOKUP_TEXT_STEP).coerceIn(LOOKUP_TEXT_MIN, LOOKUP_TEXT_MAX)
+        }
 
         /** A sky blue that none of the presets has (#51C5EC). */
         const val DEFAULT_CUSTOM_HUE = 195f

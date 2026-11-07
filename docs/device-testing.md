@@ -78,6 +78,10 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   off -> no pitch line over the reading in the reader's panel, Words, Review and search panels; the headword,
   other readings and everything else unchanged; dictionaries still listed. Kill and reopen: stays off.
   Anki card of a word with pitch still has the Pitch field. Backup + restore keeps the switch.
+- **Lookup text size** (Settings -> Reading, slider 85-150 %, 100 % default): headword, reading, glossary,
+  tags and kanji card follow it; header, handle and highlight bar stay. At 150 % with a long word and
+  furigana, and with the system's largest font: nothing cut, the panel keeps its height and scrolls, buttons
+  reachable. 85 % readable. Kill and reopen / backup + restore: keeps the value. Also in Words, Review, Search.
 
 ## Word marks and known words
 

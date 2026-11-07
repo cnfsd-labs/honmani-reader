@@ -340,6 +340,7 @@ private fun SettingsContent(
                             ),
                         )
                     }
+                    item { LookupTextSizeSection() }
                     item { LookupPitchSection() }
                     item { examples() }
                     item {

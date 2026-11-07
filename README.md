@@ -31,7 +31,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   stay when it is off)
 - Readings, definitions, word frequency, pitch accent and kanji details for every tap; tap a Japanese
   word inside a definition or example sentence to look it up in turn (Back steps out, nothing counted);
-  Settings → Reading can hide the pitch accent (dictionaries stay installed)
+  Settings → Reading can hide the pitch accent (dictionaries stay installed) and resize the panel's text
 - Marks in the book on words you are learning or have not met yet, and a list of the words a book holds
   that you don't know; "Ignore word" sets aside names and wrongly split words (no mark, no card, not
   counted), with a list in Words to undo it

@@ -131,6 +131,29 @@ class AppearanceSettingsTest {
     }
 
     @Test
+    fun theLookupTextIsTheUsualSizeByDefault_andAChoiceIsRemembered() {
+        val settings = AppearanceSettings(preferences(), device())
+        assertEquals(100, settings.lookupTextPercent.value)
+
+        settings.setLookupTextPercent(130)
+
+        assertEquals(130, AppearanceSettings(preferences(), device()).lookupTextPercent.value)
+        preferences().edit().putInt(AppearanceSettings.KEY_LOOKUP_TEXT_PERCENT, 90).apply()
+        settings.reload()
+        assertEquals(90, settings.lookupTextPercent.value)
+    }
+
+    @Test
+    fun theLookupTextSizeSnapsToStepsWithinTheRange_andABadStoredValueIsFixed() {
+        assertEquals(85, AppearanceSettings.snapLookupTextPercent(10))
+        assertEquals(150, AppearanceSettings.snapLookupTextPercent(400))
+        assertEquals(105, AppearanceSettings.snapLookupTextPercent(104))
+        assertEquals(100, AppearanceSettings.snapLookupTextPercent(102))
+        preferences().edit().putInt(AppearanceSettings.KEY_LOOKUP_TEXT_PERCENT, 999).apply()
+        assertEquals(150, AppearanceSettings(preferences(), device()).lookupTextPercent.value)
+    }
+
+    @Test
     fun animationsAreOnByDefault_andSwitchOffIsRemembered() {
         assertEquals(true, AppearanceSettings(preferences(), device()).animations.value)
 

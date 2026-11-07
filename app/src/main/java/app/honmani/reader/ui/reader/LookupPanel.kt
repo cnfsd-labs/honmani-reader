@@ -106,6 +106,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.sp
@@ -199,6 +200,7 @@ fun LookupPanel(
     val density = LocalDensity.current
     val appearance = rememberAppearanceSettings()
     val showPitch by (appearance?.showPitch ?: DEFAULT_SHOW_PITCH).collectAsStateWithLifecycle()
+    val textPercent by (appearance?.lookupTextPercent ?: DEFAULT_TEXT_PERCENT).collectAsStateWithLifecycle()
     val closeDistance = with(density) { CLOSE_DISTANCE.toPx() }
     val closeVelocity = with(density) { CLOSE_VELOCITY.toPx() }
     val heights = PanelSizing.heights(
@@ -415,7 +417,10 @@ fun LookupPanel(
                             .padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
                     )
                 }
-                CompositionLocalProvider(LocalShowPitch provides showPitch) {
+                // Only the results scale, not the header, the bubble or the highlight bar (their height is fixed):
+                // the font scale is multiplied, so dp sizes and the panel's height stay.
+                val scaled = Density(density.density, density.fontScale * textPercent / 100f)
+                CompositionLocalProvider(LocalShowPitch provides showPitch, LocalDensity provides scaled) {
                     when (state) {
                         is LookupPanelState.Results -> LazyColumn(
                             state = listState,
@@ -520,6 +525,8 @@ fun LookupPanel(
 private val LocalShowPitch = compositionLocalOf { true }
 
 private val DEFAULT_SHOW_PITCH = MutableStateFlow(true)
+
+private val DEFAULT_TEXT_PERCENT = MutableStateFlow(AppearanceSettings.LOOKUP_TEXT_DEFAULT)
 
 /** The app's appearance settings, or null where there is no app (a preview). */
 @Composable
