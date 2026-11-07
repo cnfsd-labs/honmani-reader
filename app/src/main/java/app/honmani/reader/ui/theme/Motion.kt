@@ -26,14 +26,18 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * Whether the interface may animate. Off in E-ink mode (the screen smears) and when the phone's
+ * Whether the interface may animate. Off by the Appearance switch, in E-ink mode (the screen smears) and when the phone's
  * animations are off (Accessibility, "Remove animations"). Every animation of the interface goes
  * through this, directly or through the helpers below; the reader page itself never animates.
  */
 val LocalMotionEnabled = staticCompositionLocalOf { true }
 
-/** Animations are on unless E-ink mode is on or the system's animator duration scale is 0. */
-fun motionEnabled(eInk: Boolean, animatorScale: Float): Boolean = !eInk && animatorScale > 0f
+/**
+ * Animations are on unless the Appearance switch is off, E-ink mode is on or the system's animator
+ * duration scale is 0.
+ */
+fun motionEnabled(eInk: Boolean, animatorScale: Float, setting: Boolean = true): Boolean =
+    setting && !eInk && animatorScale > 0f
 
 /** The system's animator duration scale, read again when the user changes it. */
 @Composable

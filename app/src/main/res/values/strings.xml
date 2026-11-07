@@ -95,8 +95,10 @@
     <string name="lookup_examples_expanded">Expanded</string>
     <string name="lookup_examples_collapsed">Collapsed</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
+    <string name="settings_animations">Animations</string>
+    <string name="settings_animations_details">Screens fade, panels slide and cards move; off keeps the interface still (the reader page never animates)</string>
     <string name="settings_sounds">Sounds</string>
-    <string name="settings_sounds_details">Short, soft sounds for answers in a review and for milestones; never while something is read aloud</string>
+    <string name="settings_sounds_details">Short, soft sounds for answers in a review and for milestones, at the media volume; never while something is read aloud</string>
     <string name="settings_cover_difficulty">Difficulty on covers</string>
     <string name="settings_cover_difficulty_details">Each book\'s difficulty (1–100) in a corner of its cover</string>
     <string name="settings_reader">Reader settings</string>

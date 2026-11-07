@@ -358,6 +358,7 @@ private fun SettingsContent(
                     }
                     item { RandomAccentSection() }
                     item { SoundsSection() }
+                    item { AnimationsSection() }
                     item {
                         ListItem(
                             headlineContent = { Text(stringResource(R.string.settings_cover_difficulty)) },

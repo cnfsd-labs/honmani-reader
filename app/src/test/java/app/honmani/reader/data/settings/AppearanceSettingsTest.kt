@@ -118,6 +118,15 @@ class AppearanceSettingsTest {
     }
 
     @Test
+    fun animationsAreOnByDefault_andSwitchOffIsRemembered() {
+        assertEquals(true, AppearanceSettings(preferences(), device()).animations.value)
+
+        AppearanceSettings(preferences(), device()).setAnimations(false)
+
+        assertEquals(false, AppearanceSettings(preferences(), device()).animations.value)
+    }
+
+    @Test
     fun soundsAreOffByDefault_andSwitchOnIsRemembered() {
         assertEquals(false, AppearanceSettings(preferences(), device()).sounds.value)
 

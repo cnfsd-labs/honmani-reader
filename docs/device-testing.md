@@ -130,7 +130,7 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Look up words in a book; next day the Review tab (first in Words; Words always opens on it) shows
   "Review · n" and an icon badge. Page: small stats on top, chips and a large Start low down. With no
   words yet: "No words yet", no Start button or chips; a Stats button opens Progress. Answers and the end
-  of a session give a soft haptic (system touch feedback) and, with Settings -> Appearance -> Sounds on, a sound. The end
+  of a session give a soft haptic (system touch feedback) and, with Settings -> Appearance -> Sounds on, a sound (media volume; ringer silent or vibrate does not mute it). The end
   screen shows the result and animates in. Front = sentence with
   the word marked; tap = answer; Forgot / Got it (or swipe); Undo; Back mid-session keeps answers.
 - ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field per
@@ -309,8 +309,11 @@ adb shell bmgr enable false
   banner at the top of the Library once (swipe it away; not again on the next start; nothing on the first
   run after install). Words in Learning show one progress bar, also on collapsed rows.
 - Settings -> Appearance -> Sounds: off by default; on plays short tones for review answers, session end
-  and milestones, never while read aloud, an audiobook or other media plays. With
-  E-ink mode, or animations turned off in Android, no animation runs (the screens still change).
+  and milestones, never while read aloud, an audiobook or other media plays. Animations
+  (next line) is on by default; off, or with E-ink mode, or animations turned off in Android, nothing
+  animates (the screens still change).
+- Settings -> Appearance -> Animations: off stops tab fades, panel slides, card moves and progress bars
+  growing; on brings them back at once.
 - Progress -> Milestones: the calendar fits the width, arrows step through older weeks, a swipe on it
   turns the page. Level and milestones each have their own info text.
 - Settings -> Appearance -> random accent: Every launch changes on a cold start only, Every day with the

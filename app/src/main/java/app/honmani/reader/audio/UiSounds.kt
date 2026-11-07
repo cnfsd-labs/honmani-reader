@@ -25,7 +25,7 @@ object UiSoundRule {
 }
 
 /**
- * Plays [UiSound]s with a [SoundPool] as sonification: no audio focus is taken, so nothing else is
+ * Plays [UiSound]s with a [SoundPool] as short effects: no audio focus is taken, so nothing else is
  * ducked or paused. The clips load when the switch is first on and are released when it goes off.
  */
 class UiSounds(
@@ -54,7 +54,7 @@ class UiSounds(
             return
         }
         val allowed = UiSoundRule.maySound(on, readerSpeaking, wordAudio.playing, audio.isMusicActive)
-        Log.d(TAG, "${sound.name.lowercase()} ${if (allowed) "play" else "skipped (speech or media active)"}")
+        Log.d(TAG, "${sound.name.lowercase()} ${if (allowed) "play" else "skipped (speech or media active)"}, media volume ${audio.getStreamVolume(AudioManager.STREAM_MUSIC)}")
         if (!allowed) return
         val active = pool ?: create()
         val id = ids[sound] ?: return
@@ -66,7 +66,9 @@ class UiSounds(
             .setMaxStreams(2)
             .setAudioAttributes(
                 AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    // Media, not sonification: that stream is muted by the ringer's silent and vibrate
+                    // modes (most phones sit there), so the sounds were never heard. Media volume rules.
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build(),
             )

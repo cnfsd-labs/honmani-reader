@@ -178,6 +178,16 @@ class AppearanceSettings(
     /** Whether short interface sounds play (reviews, milestones); off until switched on. */
     val sounds: StateFlow<Boolean> = _sounds.asStateFlow()
 
+    private val _animations = MutableStateFlow(preferences.getBoolean(KEY_ANIMATIONS, true))
+
+    /** Whether the interface animates (on by default); E-ink mode and the phone's own setting still turn it off. */
+    val animations: StateFlow<Boolean> = _animations.asStateFlow()
+
+    fun setAnimations(on: Boolean) {
+        _animations.value = on
+        preferences.edit().putBoolean(KEY_ANIMATIONS, on).apply()
+    }
+
     private val _eInk = MutableStateFlow(devicePreferences.getBoolean(KEY_EINK, false))
 
     /**
@@ -233,6 +243,7 @@ class AppearanceSettings(
         _showWordFrequency.value = preferences.getBoolean(KEY_SHOW_WORD_FREQUENCY, true)
         _showExamples.value = preferences.getBoolean(KEY_SHOW_EXAMPLES, false)
         _sounds.value = preferences.getBoolean(KEY_SOUNDS, false)
+        _animations.value = preferences.getBoolean(KEY_ANIMATIONS, true)
     }
 
     companion object {
@@ -246,6 +257,7 @@ class AppearanceSettings(
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
         const val KEY_SHOW_EXAMPLES = "show_examples"
         const val KEY_SOUNDS = "ui_sounds"
+        const val KEY_ANIMATIONS = "ui_animations"
         const val KEY_EINK = "eink_mirror"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"

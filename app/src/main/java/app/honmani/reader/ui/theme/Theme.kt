@@ -23,6 +23,7 @@ fun HonmaniTheme(
     customHue: Float = 0f,
     darkTheme: Boolean = isSystemInDarkTheme(),
     eInk: Boolean = false,
+    animations: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val color = if (accent == Accent.CUSTOM) customAccentColor(customHue) else accent.color
@@ -34,7 +35,7 @@ fun HonmaniTheme(
         }
         else -> accentColorScheme(Color(Accent.DEFAULT.color!!), darkTheme)
     }
-    val animationsOn = motionEnabled(eInk, rememberAnimatorScale())
+    val animationsOn = motionEnabled(eInk, rememberAnimatorScale(), animations)
     CompositionLocalProvider(LocalMotionEnabled provides animationsOn) {
         MaterialTheme(colorScheme = colorScheme, content = content)
     }

@@ -22,4 +22,9 @@ class MotionTest {
         assertFalse(motionEnabled(eInk = false, animatorScale = 0f))
         assertFalse(motionEnabled(eInk = true, animatorScale = 0f))
     }
+
+    @Test
+    fun theSwitchTurnsAnimationsOffEvenWhenTheSystemAllowsThem() {
+        assertFalse(motionEnabled(eInk = false, animatorScale = 1f, setting = false))
+    }
 }
