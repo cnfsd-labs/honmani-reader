@@ -133,6 +133,8 @@
     <string name="about_fonts_details">%1$s · SIL Open Font License 1.1</string>
     <string name="about_sounds">Interface sounds</string>
     <string name="about_sounds_details">Made for Honmani from plain sine tones (scripts/sounds in the source code) · GPL-3.0-or-later like the app</string>
+    <string name="about_aozora">Free books catalogue (optional)</string>
+    <string name="about_aozora_details">Aozora Bunko (aozora.gr.jp): works are public domain; the work list is CC BY 4.0</string>
     <string name="about_sample_book">Sample books</string>
     <string name="about_sample_book_details">Texts from Aozora Bunko (aozora.gr.jp), typed and proofread by its volunteers, who are named at the end of each book · public domain (Niimi Nankichi, Miyazawa Kenji, Akutagawa Ryūnosuke, Natsume Sōseki) · covers made for Honmani in Shippori Mincho (SIL Open Font License)</string>
     <string name="settings_sample_books">Sample books</string>

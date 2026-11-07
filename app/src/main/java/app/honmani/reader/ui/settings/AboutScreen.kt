@@ -146,6 +146,11 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
                 )
             }
             item {
+                Entry(R.string.about_aozora, stringResource(R.string.about_aozora_details)) {
+                    openUrl(context, AOZORA_LICENCE_URL)
+                }
+            }
+            item {
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.about_sample_book)) },
                     supportingContent = { Text(stringResource(R.string.about_sample_book_details)) },
@@ -219,4 +224,5 @@ private fun openUrl(context: Context, url: String) {
 const val SOURCE_URL = "https://github.com/cnfsd-labs/honmani-reader"
 
 private const val TATOEBA_LICENCE_URL = "https://creativecommons.org/licenses/by/2.0/fr/"
+private const val AOZORA_LICENCE_URL = "https://creativecommons.org/licenses/by/4.0/"
 private const val EDRDG_LICENCE_URL = "https://www.edrdg.org/edrdg/licence.html"

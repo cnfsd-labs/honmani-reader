@@ -38,6 +38,13 @@ Honmani only connects to the internet for these things, and only to these places
 - **Example sentences**, only if you switch them on in Settings: one file (about 4 MB) from
   GitHub (github.com), over https, with the same request details as above. The sentences are
   looked up on your phone; nothing about the words you look up is sent.
+- **Free books (Aozora Bunko), only if you open "Free books" and tap "Load the list"**: Honmani
+  asks cnfsd-labs.github.io (GitHub Pages) for the list of public-domain works (about 2.5 MB,
+  less compressed), and, when you tap "Add to library" on a book, downloads that book's text
+  from www.aozora.gr.jp. Both over https. Nothing is sent but the request itself (the address
+  asked for and the app's name; no account, no identifier, nothing about your reading or
+  searches: the search runs on your phone). Neither host is contacted before you tap, and
+  the list is kept on your phone until you refresh it. Their own privacy policies apply.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
   to the addresses you enter. If you give a user name and password, the password is stored
   encrypted on your phone and sent only to that server.

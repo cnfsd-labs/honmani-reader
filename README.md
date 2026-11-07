@@ -6,7 +6,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 
 - Dictionaries with one tap on the first start (English or Japanese definitions), or any
   Yomitan dictionary
-- EPUB and text files (Aozora Bunko too); text shared from another app or pasted from the clipboard
+- EPUB and text files (Aozora Bunko too); an optional free-books catalogue of about 17,000
+  public-domain Aozora works to search and add (contacts its servers only after one tap); text shared from another app or pasted from the clipboard
   becomes a book; vertical or horizontal text, furigana, reader fonts; pages
   turn with a tap, a swipe or the volume buttons. Optional: immersive mode (hides the status and
   navigation bars), e-ink mode (black on white, no animations, grey marks), your own CSS for the book

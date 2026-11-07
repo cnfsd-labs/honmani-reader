@@ -342,6 +342,27 @@ adb shell bmgr enable false
   "There is no text to add". A very long text (over 5 MB): "too long" message, no book added.
 - Aozora-style text with ruby (`漢字《かんじ》`) pasted: becomes an EPUB with furigana like a file.
 
+## Free books (Aozora Bunko)
+
+- Airplane mode, Library -> + -> **Free books (Aozora Bunko)** (or "Browse free books" in an empty
+  library): the intro names cnfsd-labs.github.io and www.aozora.gr.jp. Nothing is listed under Settings ->
+  Network activity before you tap **Load the list**. Tap it: a readable "could not be loaded, check your
+  internet connection" message, no crash, the button still there.
+- Internet back, Load the list: about 17,000 works ("17,xxx works · list of <date>"), Network activity lists
+  one request to cnfsd-labs.github.io. Close the screen and open it again offline: the list is still there.
+- Search 吾輩: 吾輩は猫である. Search 夏目 (author) and なつめ / ナツメ (readings, hiragana or katakana alike):
+  Natsume's works. Two words (夏目 こころ) both must match. A search with no hit: "No work matches".
+- The old-spelling switch: with it off, a work in 旧仮名 (e.g. こゝろ) is missing and works marked 旧仮名
+  never show; switch on: they appear with a 旧仮名 label.
+- Tap a work -> details (author, 旧仮名/旧字 notes, date) -> **Add to library**: progress shows, the
+  book appears in the library and opens with furigana over the kanji (not 《》 marks) and the work's title.
+  Network activity shows www.aozora.gr.jp.
+- Add the same work twice: the second time the usual "already in your library" notice, no duplicate.
+- **Refresh list**: second request (a short "not modified" answer if nothing changed), the list stays.
+- Add a large work (e.g. a long novel) and cancel while it downloads (or close the details): the
+  download stops, no book appears, adding it again afterwards works. In airplane mode **Add to library**
+  shows a readable error and can be retried.
+
 ## Tabs, Progress, Appearance
 
 - Tapping the open tab: Words and Progress go to their next page and wrap (Words restarts at Review);
