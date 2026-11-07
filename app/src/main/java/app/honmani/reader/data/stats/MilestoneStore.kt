@@ -20,6 +20,19 @@ class MilestoneStore(private val preferences: SharedPreferences) {
     )
     val seen: StateFlow<Map<String, LocalDate>> = _seen.asStateFlow()
 
+    private val _celebratedLevel = MutableStateFlow(
+        preferences.getInt(KEY_LEVEL, 0).takeIf { it > 0 },
+    )
+
+    /** The last reading level announced (or taken as known); null before the first run. */
+    val celebratedLevel: StateFlow<Int?> = _celebratedLevel.asStateFlow()
+
+    fun setCelebratedLevel(level: Int) {
+        if (_celebratedLevel.value == level) return
+        _celebratedLevel.value = level
+        preferences.edit().putInt(KEY_LEVEL, level).apply()
+    }
+
     private val _pending = MutableStateFlow(preferences.getStringSet(KEY_PENDING, null).orEmpty().toSet())
 
     /** Reached since the library last showed them. */
@@ -62,6 +75,7 @@ class MilestoneStore(private val preferences: SharedPreferences) {
     private companion object {
         const val KEY_SEEN = "milestones_seen"
         const val KEY_PENDING = "milestones_pending"
+        const val KEY_LEVEL = "level_celebrated"
         const val SEPARATOR = '@'
     }
 }

@@ -81,10 +81,8 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -155,6 +153,8 @@ import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import app.honmani.reader.data.stats.LevelTitles
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.FilledTonalButton
@@ -251,16 +251,35 @@ fun LibraryScreen(
     val haptics = LocalHapticFeedback.current
     val appContext = LocalContext.current.applicationContext
     val uiSounds = remember { (appContext as HonmaniApplication).container.uiSounds }
-    LaunchedEffect(milestoneText) {
-        if (milestoneText != null) {
+    // A level reached since the last one announced: after the milestones, so one banner at a time.
+    val levelMoment by progress.levelMoment.collectAsStateWithLifecycle()
+    val levelText = levelMoment?.takeIf { browsing == null && milestoneText == null }?.let {
+        if (it.newTitle) {
+            stringResource(R.string.level_reached_title, it.level, stringResource(LevelTitles.titleFor(it.level)))
+        } else {
+            stringResource(R.string.level_reached, it.level)
+        }
+    }
+    // The banner shown now (null: none) and what became of it: a tap opens Progress, a swipe or the
+    // timeout only hides it. Either way it counts as seen, but leaving the library first keeps it for next time.
+    var banner by remember { mutableStateOf<String?>(null) }
+    var bannerOpened by remember { mutableStateOf<Boolean?>(null) }
+    val bannerText = milestoneText ?: levelText
+    LaunchedEffect(bannerText) {
+        if (bannerText == null) {
+            banner = null
+        } else {
             Log.d("Honmani.haptic", "milestone")
             haptics.performHapticFeedback(HapticFeedbackType.Confirm)
             uiSounds.play(UiSound.MILESTONE)
-            val showing = milestones
-            val result = snackbarHostState.showSnackbar(milestoneText, actionLabel = viewProgress, duration = SnackbarDuration.Long)
-            // Only once seen: leaving the library first keeps them for next time.
-            progress.shown(showing)
-            if (result == SnackbarResult.ActionPerformed) onShowProgress()
+            val showingMilestones = milestones
+            val showingLevel = levelMoment
+            bannerOpened = null
+            banner = bannerText
+            val opened = withTimeoutOrNull(BANNER_MS) { snapshotFlow { bannerOpened }.first { it != null } }
+            banner = null
+            if (milestoneText != null) progress.shown(showingMilestones) else showingLevel?.let { progress.levelCelebrated(it.level) }
+            if (opened == true) onShowProgress()
         }
     }
 
@@ -283,6 +302,7 @@ fun LibraryScreen(
         val container = (LocalContext.current.applicationContext as HonmaniApplication).container
         val grades by container.difficultyStore.grades.collectAsStateWithLifecycle()
         val showDifficulty by container.appearanceSettings.showDifficulty.collectAsStateWithLifecycle()
+        Box {
         LibraryContent(
             difficulty = { book ->
                 if (showDifficulty) grades[book.contentHash]?.difficulty?.score?.takeIf { it > 0 } else null
@@ -313,6 +333,14 @@ fun LibraryScreen(
             bottomBar = bottomBar,
             modifier = modifier,
         )
+        MomentBanner(
+            text = banner,
+            actionLabel = viewProgress,
+            onOpen = { bannerOpened = true },
+            onDismiss = { if (bannerOpened == null) bannerOpened = false },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
+        }
     }
 
     if (choosingSource) {
@@ -1105,6 +1133,9 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
 }
 
 private const val DISMISS_FRACTION = 0.4f
+
+/** How long a milestone or level banner stays. */
+private const val BANNER_MS = 5_000L
 
 /** Pixels per second; a quick flick to the right dismisses from any distance. */
 private const val FLING_VELOCITY = 1_500f

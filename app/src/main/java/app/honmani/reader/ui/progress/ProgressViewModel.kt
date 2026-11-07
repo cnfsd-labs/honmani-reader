@@ -13,6 +13,8 @@ import app.honmani.reader.data.stats.DayTotal
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.FinishedBooks
 import app.honmani.reader.data.stats.GoalProgress
+import app.honmani.reader.data.stats.LevelMoment
+import app.honmani.reader.data.stats.LevelMoments
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.Progression
@@ -131,7 +133,11 @@ class ProgressViewModel(
                 }.orEmpty(),
             )
         }
-            .onEach { state -> store.record(state.milestones.filter { it.reached }.map { it.id }, today()) }
+            .onEach { state ->
+                store.record(state.milestones.filter { it.reached }.map { it.id }, today())
+                // The first run (or a fresh restore) takes the level as known, silently.
+                LevelMoments.decide(store.celebratedLevel.value, state.level.level).remember?.let(store::setCelebratedLevel)
+            }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** Milestones reached since the library last showed them, in [Progression.TIERS] order. */
@@ -141,6 +147,14 @@ class ProgressViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun shown(milestones: List<Milestone>) = store.shown(milestones.map { it.id })
+
+    /** A level reached since the last one announced, for the library's banner. */
+    val levelMoment: StateFlow<LevelMoment?> =
+        combine(uiState, store.celebratedLevel) { state, celebrated ->
+            state?.let { LevelMoments.decide(celebrated, it.level.level).announce }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun levelCelebrated(level: Int) = store.setCelebratedLevel(level)
 
     companion object {
         val Factory = viewModelFactory {
