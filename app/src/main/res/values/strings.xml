@@ -302,7 +302,6 @@
     <string name="words_empty_known">Words you have read 9 times without looking them up appear here, and words you mark as learned (✓).</string>
     <string name="words_read_no_entry">Your dictionaries have no entry for this word.</string>
     <string name="word_progress">%1$d%%</string>
-    <string name="word_memory">Memory %1$d%%</string>
     <plurals name="word_read_times">
         <item quantity="one">read %1$d time</item>
         <item quantity="other">read %1$d times</item>

@@ -803,46 +803,20 @@ private fun ReadWordRow(expression: String, reads: Int, details: ReadWordDetails
     }
 }
 
-/** Progress towards known: a short bar and the percentage. */
+/** Progress towards known ([WordProgress.shown]): a short bar and the percentage. */
 @Composable
-private fun StepsBar(steps: Int) {
+private fun WordProgressBar(progress: Float) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.padding(top = 6.dp),
     ) {
         ProgressBar(
-            progress = { steps.toFloat() / WordProgress.KNOWN },
+            progress = { progress },
             modifier = Modifier.width(96.dp),
         )
         Text(
-            text = stringResource(R.string.word_progress, WordProgress.percent(steps)),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-}
-
-/**
- * Memory of a word in review: a ring, so it never reads as the steps bar of words not in
- * review, filling up to known by memory.
- */
-@Composable
-private fun MemoryRing(memory: Float) {
-    val percent = (memory * 100).toInt()
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(top = 6.dp),
-    ) {
-        CircularProgressIndicator(
-            progress = { memory },
-            modifier = Modifier.size(18.dp),
-            strokeWidth = 3.dp,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant,
-        )
-        Text(
-            text = stringResource(R.string.word_memory, percent),
+            text = stringResource(R.string.word_progress, WordProgress.shownPercent(progress)),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -1015,7 +989,7 @@ private fun WordRow(
     lookups: List<WordLookupEntity>,
     /** Progress towards known, shown in the learning list. */
     steps: Int?,
-    /** Memory towards known (0 to 1) of a word in review, shown instead of [steps]. */
+    /** Memory towards known (0 to 1) of a word in review; it fills what [steps] left open. */
     memory: Float? = null,
     /** How common the word is, if the setting is on and a frequency dictionary knows it. */
     frequency: Frequency? = null,
@@ -1087,6 +1061,7 @@ private fun WordRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        if (steps != null || memory != null) WordProgressBar(WordProgress.shown(steps ?: 0, memory))
         if (expanded) {
             if (word.note.isNotEmpty()) {
                 Text(
@@ -1133,7 +1108,6 @@ private fun WordRow(
                     maxLines = Int.MAX_VALUE,
                 )
             }
-            if (memory != null) MemoryRing(memory) else steps?.let { StepsBar(it) }
             Text(
                 text = details(word, now),
                 style = MaterialTheme.typography.labelSmall,

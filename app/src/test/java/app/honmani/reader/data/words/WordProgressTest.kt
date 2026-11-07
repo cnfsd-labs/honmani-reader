@@ -5,6 +5,22 @@ import org.junit.Test
 
 class WordProgressTest {
     @Test
+    fun enteringReviewKeepsWhatReadingEarned() {
+        val beforeReview = WordProgress.shown(steps = 7, memory = null)
+        assertEquals(78, WordProgress.shownPercent(beforeReview))
+        // Memory starts low; the shown progress must not fall from 78% to 10%.
+        assertEquals(80, WordProgress.shownPercent(WordProgress.shown(steps = 7, memory = 0.1f)))
+        assertEquals(10, WordProgress.shownPercent(WordProgress.shown(steps = 0, memory = 0.1f)))
+    }
+
+    @Test
+    fun fullOnlyWhenKnownByReadingOrMemory() {
+        assertEquals(100, WordProgress.shownPercent(WordProgress.shown(steps = WordProgress.KNOWN, memory = null)))
+        assertEquals(100, WordProgress.shownPercent(WordProgress.shown(steps = 3, memory = 1f)))
+        assertEquals(99, WordProgress.shownPercent(WordProgress.shown(steps = 8, memory = 0.99f)))
+    }
+
+    @Test
     fun nineReadsWithoutALookupMakeAWordKnown() {
         assertEquals(4, WordProgress.steps(4))
         assertEquals(WordProgress.KNOWN, WordProgress.steps(30))

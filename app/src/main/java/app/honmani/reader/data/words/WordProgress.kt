@@ -24,6 +24,20 @@ object WordProgress {
 
     fun percent(steps: Int): Int = (steps * 100.0 / KNOWN).roundToInt()
 
+    /**
+     * The one progress a Learning word shows, 0 to 1. Reading's [steps] count first and a word in
+     * review fills the rest by its [memory] (0 to 1): entering review loses nothing, forgetting never
+     * goes below what reading earned, and it is full exactly when the word is known by either.
+     */
+    fun shown(steps: Int, memory: Float?): Float {
+        val read = steps.coerceIn(0, KNOWN).toFloat() / KNOWN
+        return read + (1f - read) * (memory ?: 0f).coerceIn(0f, 1f)
+    }
+
+    /** [progress] as a percentage; 100 only when it really is full. */
+    fun shownPercent(progress: Float): Int =
+        if (progress >= 1f) 100 else (progress * 100).roundToInt().coerceAtMost(99)
+
     /** Words never looked up: known once read [KNOWN] times. */
     fun steps(reads: Int): Int = reads.coerceIn(0, KNOWN)
 

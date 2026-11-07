@@ -69,7 +69,7 @@ data class WordsUiState(
     val knownByReading: List<Pair<String, Int>> = emptyList(),
     /** Progress of saved words in steps of `WordProgress.KNOWN`, by id. */
     val steps: Map<Long, Int> = emptyMap(),
-    /** Memory of the words in review, 0 to 1 (1: known by memory), by id; shown instead of [steps]. */
+    /** Memory of the words in review, 0 to 1 (1: known by memory), by id; together with [steps] in `WordProgress.shown`. */
     val memory: Map<Long, Float> = emptyMap(),
     val knownCount: Int = 0,
     /** Words in the learning list without an Anki card, for "Add all to Anki" (grammar words it left out not counted). */
