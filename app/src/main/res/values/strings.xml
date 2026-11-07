@@ -95,7 +95,7 @@
     <string name="lookup_examples_expanded">Expanded</string>
     <string name="lookup_examples_collapsed">Collapsed</string>
     <string name="settings_lookup_text_size">Lookup text size: %1$d%%</string>
-    <string name="settings_lookup_text_size_details">Scales the text in the lookup panel; 100%% is the usual size</string>
+    <string name="settings_lookup_text_size_details">Scales the text in the lookup panel; 100% is the usual size</string>
     <string name="settings_show_pitch">Show pitch accent</string>
     <string name="settings_show_pitch_details">Draws the pitch accent over the reading in the lookup panel. Your pitch dictionaries stay installed, and Anki cards still get the pitch.</string>
     <string name="settings_previous_sentence_details">Shows the sentence before the tapped one, dimmed, in the lookup panel</string>
@@ -1307,7 +1307,7 @@
     <string name="sync_off">Off. Continue books where you left off in KOReader (on an e-reader, say) or on another phone.</string>
     <string name="sync_signed_in">%1$s on %2$s</string>
     <string name="sync_signed_in_details">Signed in as %1$s on %2$s. Your reading position in EPUBs is saved there and taken from there when you open a book. Books match when every device has the same file.</string>
-    <string name="sync_message">Uses a KOReader sync server: KOReader\'s own (sync.koreader.rocks), your own, or Calibre-Web Automated (its address and your Calibre-Web account). Sign in with the account you use in KOReader (made there or on your server).</string>
+    <string name="sync_message">Uses a KOReader sync server: KOReader\'s own (sync.koreader.rocks), your own, Calibre-Web Automated (its address and your Calibre-Web account), or Komga (its address, an API key as the user name, any password). Sign in with the account you use in KOReader (made there or on your server).</string>
     <string name="sync_server">Server</string>
     <string name="sync_server_hint">https://sync.koreader.rocks</string>
     <string name="sync_username">User name</string>
