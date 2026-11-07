@@ -773,6 +773,15 @@
     <string name="delete_dictionary_title">Delete “%1$s”?</string>
     <string name="delete_dictionary_message">Its entries are removed from lookups. You can import it again later.</string>
 
+    <string name="notification_channel_audiobook">Making audiobooks</string>
+    <string name="audiobook_notification_title">Audiobook</string>
+    <string name="audiobook_making">Making audiobook: %1$s</string>
+    <string name="audiobook_preparing">Preparing…</string>
+    <string name="audiobook_progress">%1$d / %2$d sentences, %3$s so far</string>
+    <string name="audiobook_ready">The audiobook is ready.</string>
+    <string name="audiobook_no_key">There is no Google API key. Add one in Settings, then continue.</string>
+    <string name="audiobook_open_honmani">Paused. Open Honmani to continue.</string>
+
     <string name="notification_channel_imports">Dictionary imports</string>
     <string name="import_preparing">Preparing dictionary import…</string>
     <string name="import_queued">Waiting to import a dictionary…</string>

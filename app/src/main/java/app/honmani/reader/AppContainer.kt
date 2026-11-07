@@ -98,6 +98,11 @@ import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
 import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
+import app.honmani.reader.readaloud.generate.AudiobookEnvironment
+import app.honmani.reader.readaloud.generate.AudiobookMaker
+import app.honmani.reader.readaloud.generate.AudiobookScheduler
+import app.honmani.reader.readaloud.generate.GoogleSentenceVoice
+import app.honmani.reader.readaloud.generate.WorkManagerAudiobookScheduler
 import app.honmani.reader.readaloud.ClipBook
 import app.honmani.reader.readaloud.MediaClipCutter
 import app.honmani.reader.readaloud.SentenceClips
@@ -487,6 +492,20 @@ class AppContainer(context: Context) {
     /** Each book's audiobook pairing and the subtitle matching, on this phone only (reader menu → Audiobook). */
     val audiobookStore: AudiobookStore by lazy { AudiobookStore(devicePreferences, File(appContext.filesDir, "audiobook")) }
     val audiobookLoader: AudiobookLoader by lazy { AudiobookLoader(audiobookStore) }
+
+    /** Makes generated audiobooks (Google voice, one request per sentence) into `files/audiobook/generated`. */
+    val audiobookMaker: AudiobookMaker by lazy { AudiobookMaker(File(appContext.filesDir, "audiobook/generated"), audiobookStore) }
+
+    /** What the audiobook worker needs; the worker is created by WorkManager, so it asks for this. */
+    val audiobookEnvironment: AudiobookEnvironment by lazy {
+        AudiobookEnvironment(
+            maker = audiobookMaker,
+            voice = { name -> ankiSettings.googleKey()?.let { GoogleSentenceVoice(it, name) } },
+            title = { hash -> bookDao.findByHash(hash)?.title },
+        )
+    }
+
+    val audiobookScheduler: AudiobookScheduler by lazy { WorkManagerAudiobookScheduler(appContext, audiobookMaker) }
 
     /** Sentence audio cut from a book's paired audiobook, for Anki cards (null: the voice speaks). */
     val sentenceClips: SentenceClips by lazy {

@@ -85,7 +85,8 @@ data class JournalEntry(val index: Int, val bytes: Long, val frames: Long, val c
  * The files of one generated audiobook in [directory]: `plan.json`, `audio.mp3.part` and
  * `journal.tsv` while it is made (the journal has a line per sentence, flushed after its audio,
  * so a stop at any moment leaves a clean prefix), `billing.tsv` (a line for every request sent,
- * written before it goes out), and `audio.mp3` when it is done.
+ * written before it goes out), `outcome.txt` (why the last run stopped, if it needs the reader), and
+ * `audio.mp3` when it is done.
  */
 class GeneratedFiles(val directory: File) {
     val plan = File(directory, "plan.json")
@@ -93,6 +94,7 @@ class GeneratedFiles(val directory: File) {
     val audio = File(directory, "audio.mp3")
     val journal = File(directory, "journal.tsv")
     val billing = File(directory, "billing.tsv")
+    val outcome = File(directory, "outcome.txt")
 
     fun readPlan(): FrozenPlan? = plan.takeIf { it.isFile }?.let { FrozenPlan.parse(it.readText()) }
 
@@ -101,6 +103,18 @@ class GeneratedFiles(val directory: File) {
         val temporary = File(directory, "plan.json.tmp")
         temporary.writeText(value.toJson())
         Files.move(temporary.toPath(), plan.toPath(), StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    /** Why the last run did not finish, kept for the dialog; null if there is nothing to tell. */
+    fun readOutcome(): MakerOutcome? = outcome.takeIf { it.isFile }?.let { MakerOutcome.parse(it.readText()) }
+
+    fun writeOutcome(value: MakerOutcome) {
+        directory.mkdirs()
+        outcome.writeText(value.toText())
+    }
+
+    fun clearOutcome() {
+        outcome.delete()
     }
 
     /** The micro-dollars billed so far: the sum of the lines of `billing.tsv` (a half-written last line counts as nothing). */
