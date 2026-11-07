@@ -43,8 +43,7 @@ import kotlinx.coroutines.flow.stateIn
 /** Everything the progress screen shows. */
 data class ProgressUiState(
     val level: ReadingLevel,
-    /** Days in a row with reading, and days read in the last 7. */
-    val streak: Int,
+    /** Days read in the last 7. */
     val daysThisWeek: Int,
     /** Every milestone, in [Progression.TIERS] order. */
     val milestones: List<Milestone>,
@@ -116,7 +115,6 @@ class ProgressViewModel(
             val unfinished = scores.filter { (book, _) -> book.finishedAt == null && book.progress < 1f && !book.hidden }
             ProgressUiState(
                 level = Progression.level(rows.sumOf { it.characters }),
-                streak = week.streak,
                 daysThisWeek = week.daysRead,
                 milestones = milestones,
                 next = Progression.next(milestones),

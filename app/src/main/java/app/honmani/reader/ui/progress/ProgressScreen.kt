@@ -77,6 +77,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewSummary
+import app.honmani.reader.data.stats.LevelTitles
 import app.honmani.reader.data.stats.Milestone
 import app.honmani.reader.data.stats.MilestoneKind
 import app.honmani.reader.data.stats.Progression
@@ -201,15 +202,21 @@ private fun MilestonesContent(
     }
 }
 
-/** "Level 14" beside a ring that fills towards the next level, with the streak below. */
+/** "Level 14" and its title beside a ring that fills towards the next level, with the reading days of the week below. */
 @Composable
 private fun LevelCard(state: ProgressUiState) {
     val level = state.level
     var explaining by rememberSaveable { mutableStateOf(false) }
     if (explaining) {
+        val nextStart = LevelTitles.nextStart(level.level)
+        val how = stringResource(R.string.progress_level_how)
         InfoDialog(
             stringResource(R.string.progress_level_title),
-            stringResource(R.string.progress_level_how),
+            if (nextStart == null) {
+                how
+            } else {
+                how + " " + stringResource(R.string.progress_level_next_title, stringResource(LevelTitles.titleFor(nextStart)), nextStart)
+            },
             onDismiss = { explaining = false },
         )
     }
@@ -228,6 +235,11 @@ private fun LevelCard(state: ProgressUiState) {
                         style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                    Text(
+                        stringResource(LevelTitles.titleFor(level.level)),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(characters(level.characters), style = MaterialTheme.typography.titleMedium)
                     Text(
                         stringResource(R.string.progress_to_next, number(level.nextLevelAt - level.characters), level.level + 1),
@@ -237,20 +249,11 @@ private fun LevelCard(state: ProgressUiState) {
                 }
                 InfoButton(onClick = { explaining = true })
             }
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    stringResource(
-                        R.string.progress_streak,
-                        pluralStringResource(R.plurals.stats_days, state.streak, state.streak),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    stringResource(R.string.progress_this_week, state.daysThisWeek),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                stringResource(R.string.progress_this_week, state.daysThisWeek),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
