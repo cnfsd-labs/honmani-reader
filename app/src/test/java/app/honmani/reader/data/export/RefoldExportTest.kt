@@ -89,6 +89,49 @@ class RefoldExportTest {
         assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 170)), second.marks)
     }
 
+    private fun listenDay(book: Long, day: String, seconds: Long, listen: Long, exported: Long = 0, exportedListen: Long = 0) =
+        ReadingDayEntity(book, day, seconds, 100, listenSeconds = listen, refoldSeconds = exported, refoldListenSeconds = exportedListen)
+
+    @Test
+    fun timeWithAudioIsAnExtraRowOfActivity10101_andTheReadingRowHoldsTheRest() {
+        val titles = mapOf(1L to "A")
+        // 600 s on screen, 200 of them with audio.
+        val first = RefoldExport.build(listOf(listenDay(1, "2026-11-02", 600, 200)), titles)
+        assertEquals(header + "20101,ja,2026-11-02,400000,,A,\r\n" + "10101,ja,2026-11-02,200000,,A,\r\n", first.csv)
+        assertEquals(2, first.rows)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 400, listenSeconds = 200)), first.marks)
+        // Nothing new after marking.
+        assertEquals(0, RefoldExport.build(listOf(listenDay(1, "2026-11-02", 600, 200, exported = 400, exportedListen = 200)), titles).rows)
+        // 100 s more with audio: only a 10101 row, and the reading row stays out.
+        val second = RefoldExport.build(listOf(listenDay(1, "2026-11-02", 700, 300, exported = 400, exportedListen = 200)), titles)
+        assertEquals(header + "10101,ja,2026-11-02,100000,,A,\r\n", second.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 400, listenSeconds = 300)), second.marks)
+    }
+
+    @Test
+    fun aDayExportedBeforeListeningWasTrackedDoublesNothing() {
+        // Exported whole as 20101 (600 s); later 100 s of audio were added: 100 s go out as 10101, the
+        // reading-only seconds (700 - 100 = 600) were all sent already.
+        val result = RefoldExport.build(listOf(listenDay(1, "2026-11-02", 700, 100, exported = 600)), mapOf(1L to "A"))
+        assertEquals(header + "10101,ja,2026-11-02,100000,,A,\r\n", result.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 600, listenSeconds = 100)), result.marks)
+    }
+
+    @Test
+    fun againSendsBothPartsInFull() {
+        val days = listOf(listenDay(1, "2026-11-02", 600, 200, exported = 400, exportedListen = 200))
+        val result = RefoldExport.build(days, mapOf(1L to "A"), again = true)
+        assertEquals(header + "20101,ja,2026-11-02,400000,,A,\r\n" + "10101,ja,2026-11-02,200000,,A,\r\n", result.csv)
+        assertEquals(listOf(RefoldExport.Mark(1, "2026-11-02", 400, listenSeconds = 200)), result.marks)
+    }
+
+    @Test
+    fun aDayWithOnlyAudioHasNoReadingRow() {
+        val result = RefoldExport.build(listOf(listenDay(1, "2026-11-02", 300, 300)), mapOf(1L to "A"))
+        assertEquals(header + "10101,ja,2026-11-02,300000,,A,\r\n", result.csv)
+        assertEquals(1, result.rows)
+    }
+
     @Test
     fun nothingNewGivesNoRows() {
         val result = RefoldExport.build(

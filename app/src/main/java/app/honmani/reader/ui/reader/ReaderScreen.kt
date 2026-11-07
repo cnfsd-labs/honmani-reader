@@ -251,6 +251,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The window flag, not View.keepScreenOn: that one is only passed on at the next frame, which
     // a stopped or still screen never draws.
     val keepScreenOn = readAloudState.running || audiobookState.running
+    // Time with sound playing (the voice speaking or the recording running) is also counted as listening;
+    // a pause, the end, a problem or leaving the book (both close) all clear it.
+    val audioPlaying = readAloudState.phase == ReadAloudPhase.SPEAKING || audiobookState.phase == AudiobookPhase.PLAYING
+    DisposableEffect(audioPlaying) {
+        tracker.setAudioPlaying(audioPlaying)
+        onDispose { tracker.setAudioPlaying(false) }
+    }
     // Interface sounds keep quiet over speech.
     DisposableEffect(keepScreenOn) {
         container.uiSounds.readerSpeaking = keepScreenOn
@@ -267,6 +274,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             if (event == Lifecycle.Event.ON_STOP) {
                 readAloud.appStopped()
                 audiobook.controller.appStopped()
+                tracker.setAudioPlaying(false)
                 // The state collection is stopped too, so the flag is cleared here, not by the effect.
                 context.findActivity()?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }

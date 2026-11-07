@@ -528,7 +528,7 @@
     <string name="csv_stats_exported">Reading statistics saved to a CSV file.</string>
     <string name="refold_export">Export for Refold (CSV)</string>
     <string name="refold_share">Export for Refold</string>
-    <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese. In the Refold app, import it under Import/Export. Each export holds only reading that was not exported before, today\'s so far included; Refold adds the rows up. The file is not sent anywhere by Honmani; you choose where it goes.</string>
+    <string name="refold_detail">One row per day and book with the time you read, as Interactive Reading in Japanese (time with an audiobook or Read aloud playing as Interactive Reading w/ Audio). In the Refold app, import it under Import/Export. Each export holds only reading that was not exported before, today\'s so far included; Refold adds the rows up. The file is not sent anywhere by Honmani; you choose where it goes.</string>
     <string name="refold_again_warning">\"Export everything again\" sends all your reading, also what Refold already has, and Refold adds it to that. Use it only for a new Refold account.</string>
     <string name="refold_never">Nothing exported yet.</string>
     <string name="refold_last">Last export: %1$s.</string>
@@ -1200,6 +1200,7 @@
     <string name="stats_today">Today</string>
     <string name="stats_week">Last 7 days</string>
     <string name="stats_total">All time</string>
+    <string name="stats_with_audio">%1$s of it with audio</string>
     <string name="stats_streak">Streak</string>
     <plurals name="stats_days">
         <item quantity="one">%1$d day</item>
@@ -1231,7 +1232,7 @@
     <string name="stats_speed_value">%1$s characters/hour</string>
     <string name="stats_books_finished">Books finished</string>
     <string name="stats_lookups">Lookups</string>
-    <string name="stats_how">Time counts while a book is on screen; after 5 minutes without a page turn or tap it stops. Characters count for pages on screen for at least 5 seconds; pages flicked past and jumps through the table of contents don\'t.</string>
+    <string name="stats_how">Time counts while a book is on screen; after 5 minutes without a page turn or tap it stops. Time with an audiobook or Read aloud playing is also counted as time with audio. Characters count for pages on screen for at least 5 seconds; pages flicked past and jumps through the table of contents don\'t.</string>
     <string name="stats_no_time">0 min</string>
     <string name="stats_under_a_minute">under a minute</string>
     <string name="stats_minutes">%1$d min</string>

@@ -82,6 +82,9 @@ object Skill {
                 if (daysAgo < 0) return@mapNotNull null
                 gradedSeconds += row.seconds
                 gradedCharacters += row.characters
+                // Narration sets the pace of a day mostly read with audio: no measure of reading speed
+                // (the time and characters still count everywhere else).
+                if (row.listenSeconds * 2 > row.seconds) return@mapNotNull null
                 Triple(row.bookId to (daysAgo / 7).toInt(), score, row)
             }
             .groupBy({ it.first }, { it.second to it.third })

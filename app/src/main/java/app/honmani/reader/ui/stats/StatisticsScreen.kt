@@ -274,6 +274,13 @@ private fun Headline(summary: PeriodSummary, onInfo: () -> Unit) {
             }
             Text(duration(summary.seconds), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
             Text(characters(summary.characters), style = MaterialTheme.typography.titleMedium)
+            if (summary.listenSeconds > 0) {
+                Text(
+                    stringResource(R.string.stats_with_audio, duration(summary.listenSeconds)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

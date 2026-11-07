@@ -111,9 +111,9 @@ class BackupTest {
             return book.copy(id = database.bookDao().insert(book))
         }
 
-        suspend fun read(bookId: Long, day: String, seconds: Long, characters: Long) {
+        suspend fun read(bookId: Long, day: String, seconds: Long, characters: Long, listenSeconds: Long = 0) {
             database.readingDao().insertIfMissing(ReadingDayEntity(bookId, day))
-            database.readingDao().add(bookId, day, seconds, characters)
+            database.readingDao().add(bookId, day, seconds, characters, listenSeconds)
         }
 
         suspend fun days() = database.backupDao().readingDays()
@@ -170,9 +170,9 @@ class BackupTest {
     /** A phone with a book read on two days, a removed book's reading, words, settings and more. */
     private suspend fun oldPhone(): Phone = Phone("old").apply {
         val book = addBook("hash-a", characters = 5_000, progress = 0.25f, lastOpenedAt = LAST_OPENED)
-        read(book.id, "2026-10-20", seconds = 600, characters = 3_000)
+        read(book.id, "2026-10-20", seconds = 600, characters = 3_000, listenSeconds = 250)
         read(book.id, "2026-10-21", seconds = 400, characters = 2_000)
-        database.readingDao().markRefoldExported(book.id, "2026-10-20", 200)
+        database.readingDao().markRefoldExported(book.id, "2026-10-20", 200, listenSeconds = 100)
         // A book removed from the library: its reading still counts.
         read(99, "2026-10-19", seconds = 300, characters = 1_000)
         words.record(lookup("猫", book.id))
@@ -224,6 +224,9 @@ class BackupTest {
         assertEquals(1_300L, new.days().sumOf { it.seconds })
         // What the Refold export already handed out is not handed out again.
         assertEquals(200L, new.days().sumOf { it.refoldSeconds })
+        assertEquals(100L, new.days().sumOf { it.refoldListenSeconds })
+        // Time with audio is restored too.
+        assertEquals(250L, new.days().sumOf { it.listenSeconds })
         assertTrue(new.days().all { it.bookId < 0 })
         assertEquals("TEAL", new.settings.getString("accent", null))
         assertEquals(false, new.settings.getBoolean("show_difficulty", true))

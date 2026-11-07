@@ -19,8 +19,18 @@ data class ReadingDayEntity(
     val day: String,
     val seconds: Long = 0,
     val characters: Long = 0,
-    /** Seconds of this day and book the Refold export has already handed out ([RefoldExport]). */
+    /**
+     * Seconds of [seconds] with audio playing (an audiobook or Read aloud): a subset of the total, never
+     * counted twice ([ReadingTracker]).
+     */
+    @ColumnInfo(name = "listen_seconds", defaultValue = "0") val listenSeconds: Long = 0,
+    /**
+     * Seconds of this day and book the Refold export has already handed out as reading without audio
+     * ([RefoldExport]). Before listening was tracked it was the whole day's seconds.
+     */
     @ColumnInfo(name = "refold_seconds", defaultValue = "0") val refoldSeconds: Long = 0,
+    /** How much of [listenSeconds] the Refold export has handed out (as reading with audio). */
+    @ColumnInfo(name = "refold_listen_seconds", defaultValue = "0") val refoldListenSeconds: Long = 0,
     /**
      * Which phone read: `''` is this one; the sync file of another phone carries its installation id.
      * One row per book, day and phone, so two phones' minutes add up instead of one replacing the
@@ -46,7 +56,9 @@ fun List<ReadingDayEntity>.perBookAndDay(): List<ReadingDayEntity> {
             sum.copy(
                 seconds = sum.seconds + row.seconds,
                 characters = sum.characters + row.characters,
+                listenSeconds = sum.listenSeconds + row.listenSeconds,
                 refoldSeconds = sum.refoldSeconds + row.refoldSeconds,
+                refoldListenSeconds = sum.refoldListenSeconds + row.refoldListenSeconds,
             )
         }
     }

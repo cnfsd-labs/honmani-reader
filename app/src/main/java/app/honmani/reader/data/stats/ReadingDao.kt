@@ -15,22 +15,27 @@ interface ReadingDao {
     suspend fun insertIfMissing(day: ReadingDayEntity)
 
     @Query(
-        "UPDATE reading_day SET seconds = seconds + :seconds, characters = characters + :characters " +
+        "UPDATE reading_day SET seconds = seconds + :seconds, characters = characters + :characters, " +
+            "listen_seconds = listen_seconds + :listenSeconds " +
             "WHERE book_id = :bookId AND day = :day AND device_id = ''",
     )
-    suspend fun add(bookId: Long, day: String, seconds: Long, characters: Long)
+    suspend fun add(bookId: Long, day: String, seconds: Long, characters: Long, listenSeconds: Long = 0)
 
-    /** Remembers that [seconds] of a book, day and phone went into a Refold export; never lowers the mark. */
+    /**
+     * Remembers that [seconds] (reading without audio) and [listenSeconds] (with audio) of a book, day and
+     * phone went into a Refold export; never lowers a mark.
+     */
     @Query(
-        "UPDATE reading_day SET refold_seconds = MAX(refold_seconds, :seconds) " +
+        "UPDATE reading_day SET refold_seconds = MAX(refold_seconds, :seconds), " +
+            "refold_listen_seconds = MAX(refold_listen_seconds, :listenSeconds) " +
             "WHERE book_id = :bookId AND day = :day AND device_id = :deviceId",
     )
-    suspend fun markRefoldExported(bookId: Long, day: String, seconds: Long, deviceId: String = "")
+    suspend fun markRefoldExported(bookId: Long, day: String, seconds: Long, listenSeconds: Long = 0, deviceId: String = "")
 
     /** Marks everything a Refold file held, together or not at all. */
     @Transaction
     suspend fun markRefoldExported(marks: List<RefoldExport.Mark>) {
-        for (mark in marks) markRefoldExported(mark.bookId, mark.day, mark.seconds, mark.deviceId)
+        for (mark in marks) markRefoldExported(mark.bookId, mark.day, mark.seconds, mark.listenSeconds, mark.deviceId)
     }
 
     /** Forgets all reading of a book (removed from the library with its statistics). */

@@ -256,7 +256,9 @@ class SyncMerge(
                 deviceId = device,
                 seconds = maxOf(before?.seconds ?: 0, day.seconds),
                 characters = maxOf(before?.characters ?: 0, day.characters),
+                listenSeconds = maxOf(before?.listenSeconds ?: 0, day.listenSeconds),
                 refoldSeconds = maxOf(before?.refoldSeconds ?: 0, day.refoldSeconds),
+                refoldListenSeconds = maxOf(before?.refoldListenSeconds ?: 0, day.refoldListenSeconds),
             )
             if (after != before) changed += after
         }

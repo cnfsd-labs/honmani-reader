@@ -432,11 +432,11 @@ class AppContainer(context: Context) {
     /** Counts reading time and characters; fed by the reader screen and ttu's position reports. */
     val readingTracker: ReadingTracker by lazy {
         val store = object : ReadingStore {
-            override suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long) {
+            override suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long, listenSeconds: Long) {
                 val book = bookDao.findByTtuId(ttuId) ?: return
                 database.withTransaction {
                     readingDao.insertIfMissing(ReadingDayEntity(book.id, day))
-                    readingDao.add(book.id, day, seconds, characters)
+                    readingDao.add(book.id, day, seconds, characters, listenSeconds)
                 }
             }
 

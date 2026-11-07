@@ -24,6 +24,21 @@ class ReadingStatsTest {
     )
 
     @Test
+    fun timeWithAudioIsAPartOfTheTime_addedUpOverPhonesAndDays() {
+        val listening = listOf(
+            row(1, 0, 20).copy(listenSeconds = 600),
+            row(1, 0, 10).copy(deviceId = "other", listenSeconds = 300),
+            row(1, 3, 30).copy(listenSeconds = 1_800),
+        )
+
+        val summary = ReadingStats.period(listening, today, StatsPeriod.ALL)
+        assertEquals(60 * 60L, summary.seconds)
+        assertEquals(2_700L, summary.listenSeconds)
+        assertEquals(900L, ReadingStats.period(listening, today, StatsPeriod.TODAY).listenSeconds)
+        assertEquals(0L, ReadingStats.period(rows, today, StatsPeriod.ALL).listenSeconds)
+    }
+
+    @Test
     fun today() {
         val summary = ReadingStats.period(rows, today, StatsPeriod.TODAY)
 

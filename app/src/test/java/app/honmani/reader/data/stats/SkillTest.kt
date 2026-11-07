@@ -27,6 +27,28 @@ class SkillTest {
     }
 
     @Test
+    fun daysMostlyReadWithAudioAreLeftOutOfTheSpeed_butStillCountAsReading() {
+        val rows = listOf(
+            // Level 50 for half an hour, silent.
+            day(1, 1, 1_800, 4_000),
+            // An hour at double speed, but half of it or more with audio: paced by the narration.
+            day(2, 1, 3_600, 16_000).copy(listenSeconds = 1_900),
+            // Less than half with audio: counts.
+            day(3, 2, 3_600, 16_000).copy(listenSeconds = 1_800),
+        )
+
+        val estimate = Skill.estimate(rows, grades::get, today)
+
+        // Book 1 this week: only the silent day (level 50); book 2 at level 70 for an hour.
+        assertEquals(63, estimate.current)
+        assertEquals(9_000, estimate.gradedSeconds)
+        assertEquals(36_000, estimate.gradedCharacters)
+        // Counted as silent, the fast day would pull book 1's week up to level 57 and the mean to 62.
+        val silent = Skill.estimate(rows.map { it.copy(listenSeconds = 0) }, grades::get, today)
+        assertEquals(62, silent.current)
+    }
+
+    @Test
     fun recentWeeksCountMore_andTheTrendShowsEachWeek() {
         val estimate = Skill.estimate(
             listOf(

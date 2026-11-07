@@ -150,7 +150,7 @@ class Backup(
         fun keyOf(id: Long): String = keys.getOrPut(id) {
             "book:${installationId()}:$id".also { books += BackupBook(it) }
         }
-        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.refoldSeconds, if (sync != null && it.deviceId.isEmpty()) sync.deviceId else it.deviceId) }
+        val readingDays = tables.days.map { BackupReadingDay(keyOf(it.bookId), it.day, it.seconds, it.characters, it.listenSeconds, it.refoldSeconds, it.refoldListenSeconds, if (sync != null && it.deviceId.isEmpty()) sync.deviceId else it.deviceId) }
         val lookupEvents = tables.events.map { BackupLookupEvent(it.lookedUpAt, it.bookId?.let(::keyOf)) }
         val progress = wordProgress.load()
         val lookups = tables.lookups.groupBy { it.wordId }
@@ -293,7 +293,9 @@ class Backup(
                     deviceId = day.device,
                     seconds = maxOf(before?.seconds ?: 0, day.seconds),
                     characters = maxOf(before?.characters ?: 0, day.characters),
+                    listenSeconds = maxOf(before?.listenSeconds ?: 0, day.listenSeconds),
                     refoldSeconds = maxOf(before?.refoldSeconds ?: 0, day.refoldSeconds),
+                    refoldListenSeconds = maxOf(before?.refoldListenSeconds ?: 0, day.refoldListenSeconds),
                 )
                 after.takeIf { it != before }
             }

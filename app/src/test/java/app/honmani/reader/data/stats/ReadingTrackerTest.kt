@@ -13,11 +13,13 @@ class ReadingTrackerTest {
     private class FakeStore : ReadingStore {
         val seconds = HashMap<Pair<Long, String>, Long>()
         val characters = HashMap<Pair<Long, String>, Long>()
+        val listen = HashMap<Pair<Long, String>, Long>()
         val positions = HashMap<Long, Long>()
         val read = ArrayList<Pair<Float, Float>>()
 
-        override suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long) {
+        override suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long, listenSeconds: Long) {
             val key = ttuId to day
+            this.listen[key] = (this.listen[key] ?: 0) + listenSeconds
             this.seconds[key] = (this.seconds[key] ?: 0) + seconds
             this.characters[key] = (this.characters[key] ?: 0) + characters
         }
@@ -63,6 +65,63 @@ class ReadingTrackerTest {
         advanceUntilIdle()
 
         assertEquals(4 * 60L, store.seconds[7L to DAY])
+    }
+
+    @Test
+    fun timeWithAudioPlayingIsAlsoCountedAsListening_andNeverAddsToTheTotal() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        minutes(1) // silent
+        tracker.setAudioPlaying(true)
+        minutes(2)
+        tracker.onActivity()
+        minutes(1)
+        tracker.setAudioPlaying(false) // paused
+        minutes(1)
+        tracker.setBook(null)
+        advanceUntilIdle()
+
+        assertEquals(5 * 60L, store.seconds[7L to DAY])
+        assertEquals(3 * 60L, store.listen[7L to DAY])
+    }
+
+    @Test
+    fun audioPlayingWhileTheAppIsInTheBackgroundIsNotCounted() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        tracker.setAudioPlaying(true)
+        minutes(1)
+        tracker.setForeground(false)
+        minutes(10)
+        tracker.setForeground(true)
+        minutes(1)
+        tracker.setBook(null)
+        advanceUntilIdle()
+
+        assertEquals(2 * 60L, store.seconds[7L to DAY])
+        assertEquals(2 * 60L, store.listen[7L to DAY])
+    }
+
+    @Test
+    fun theListeningPartOfPartlyWrittenTimeNeverExceedsTheTime() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        now += 1_100
+        tracker.setAudioPlaying(true) // 1.1 s silent
+        now += 1_000
+        tracker.setAudioPlaying(false) // 1 s with audio
+        now += 1_000
+        tracker.setBook(null) // flush: 3.1 s counted, 1.0 s with audio
+        advanceUntilIdle()
+
+        assertEquals(3L, store.seconds[7L to DAY])
+        assertEquals(1L, store.listen[7L to DAY])
     }
 
     @Test

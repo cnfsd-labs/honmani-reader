@@ -182,7 +182,9 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Largest font: chips wrap uncut, buttons and menu usable.
 - Progress: reviews today, review time, retention, words in review. Statistics -> "Export for Refold
   (CSV)": only reading not exported before (today's included; Refold adds rows up, so a second same-day
-  export has only new minutes); "Export everything again" only for a new account.
+  export has only new minutes); "Export everything again" only for a new account. Reading with an audiobook
+  or Read aloud playing goes out as a second row per day and book, "Interactive Reading w/ Audio" (10101);
+  Statistics shows the total "of it with audio" under the time.
 
 ## Search in the book
 

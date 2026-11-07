@@ -52,8 +52,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   book, cards known for a year retired, speaker buttons for the word and the sentence (optionally played by
   themselves, with the phone's voice), and a book's words learned before you read it (book sheet)
 - Reading statistics (time, characters, speed), a reading level with titles, milestones (a banner celebrates them) and optional soft sounds, a day that can start
-  later than midnight (Settings, Goal and time); reading time per day and book can be exported as a CSV
-  for the Refold app (Progress, Statistics)
+  later than midnight (Settings, Goal and time); reading time per day and book (time with an audiobook or Read aloud playing is counted
+  separately) can be exported as a CSV for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download. A folder on the phone: add
   it once, or watch it (Settings, Books and sync) and its new books join when the library opens

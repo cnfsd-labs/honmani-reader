@@ -160,8 +160,12 @@ data class BackupReadingDay(
     val day: String,
     val seconds: Long,
     val characters: Long,
-    /** Seconds already handed out by the Refold export. */
+    /** Seconds with audio playing (part of [seconds]). */
+    val listenSeconds: Long = 0,
+    /** Seconds already handed out by the Refold export as reading without audio. */
     val refoldSeconds: Long = 0,
+    /** Seconds with audio already handed out by the Refold export. */
+    val refoldListenSeconds: Long = 0,
     /** The phone that read (a sync file's installation id); empty = the phone that wrote the file. */
     val device: String = "",
 )

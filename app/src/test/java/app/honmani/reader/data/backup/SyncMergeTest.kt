@@ -97,10 +97,12 @@ class SyncMergeTest {
 
         suspend fun findWord(expression: String = "猫") = db.wordDao().find(expression, "ねこ")
 
-        suspend fun read(bookId: Long, seconds: Long) {
+        suspend fun read(bookId: Long, seconds: Long, listenSeconds: Long = 0) {
             db.readingDao().insertIfMissing(ReadingDayEntity(bookId, day))
-            db.readingDao().add(bookId, day, seconds, seconds * 10)
+            db.readingDao().add(bookId, day, seconds, seconds * 10, listenSeconds)
         }
+
+        suspend fun secondsListened() = db.backupDao().readingDays().sumOf { it.listenSeconds }
 
         suspend fun secondsRead() = db.backupDao().readingDays().sumOf { it.seconds }
 
@@ -407,6 +409,18 @@ class SyncMergeTest {
     }
 
     // Reading
+
+    @Test
+    fun listeningTimeTravelsWithTheReadingRows() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        a.read(a.addBook(), 20 * 60, listenSeconds = 5 * 60)
+        b.read(b.addBook(), 15 * 60, listenSeconds = 15 * 60)
+
+        settle(a, b)
+        assertEquals(20L * 60, a.secondsListened())
+        assertEquals(20L * 60, b.secondsListened())
+    }
 
     @Test
     fun twoPhonesReadingAddUpAndStayAddedUp() = runBlocking<Unit> {

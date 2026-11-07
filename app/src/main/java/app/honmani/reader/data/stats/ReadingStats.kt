@@ -3,7 +3,7 @@ package app.honmani.reader.data.stats
 import java.time.LocalDate
 
 /** Reading on one day (or, in [PeriodSummary.chart] for all time, one week), all books together. */
-data class DayTotal(val day: LocalDate, val seconds: Long, val characters: Long)
+data class DayTotal(val day: LocalDate, val seconds: Long, val characters: Long, val listenSeconds: Long = 0)
 
 /** The time span the statistics screen shows. */
 enum class StatsPeriod { TODAY, WEEK, ALL }
@@ -16,6 +16,8 @@ data class PeriodSummary(
     val period: StatsPeriod,
     val seconds: Long,
     val characters: Long,
+    /** The part of [seconds] with audio playing (an audiobook or Read aloud). */
+    val listenSeconds: Long = 0,
     /** Days with reading in the period. */
     val daysRead: Int,
     /** Days in a row with reading, up to today (or yesterday, if today has none yet). */
@@ -62,7 +64,7 @@ object ReadingStats {
 
     fun period(rows: List<ReadingDayEntity>, today: LocalDate, period: StatsPeriod): PeriodSummary {
         val byDay = rows.perBookAndDay().groupBy { LocalDate.parse(it.day) }.mapValues { (day, list) ->
-            DayTotal(day, list.sumOf { it.seconds }, list.sumOf { it.characters })
+            DayTotal(day, list.sumOf { it.seconds }, list.sumOf { it.characters }, list.sumOf { it.listenSeconds })
         }
         fun total(day: LocalDate) = byDay[day] ?: DayTotal(day, 0, 0)
 
@@ -89,6 +91,7 @@ object ReadingStats {
             period = period,
             seconds = inPeriod.sumOf { it.seconds },
             characters = inPeriod.sumOf { it.characters },
+            listenSeconds = inPeriod.sumOf { it.listenSeconds },
             daysRead = inPeriod.count(::isReadingDay),
             streak = streak(byDay, today),
             charactersPerHour = speedNow,

@@ -11,8 +11,11 @@ import kotlinx.coroutines.sync.withLock
 
 /** Where [ReadingTracker] keeps what it counted, by ttu's book id. */
 interface ReadingStore {
-    /** Adds reading to the book's row for [day] (`yyyy-MM-dd`); unknown books are ignored. */
-    suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long)
+    /**
+     * Adds reading to the book's row for [day] (`yyyy-MM-dd`); unknown books are ignored. [listenSeconds]
+     * are the part of [seconds] with audio playing.
+     */
+    suspend fun add(ttuId: Long, day: String, seconds: Long, characters: Long, listenSeconds: Long = 0)
 
     /** Characters read up to the book's reading position when last seen; null if never seen. */
     suspend fun position(ttuId: Long): Long?
@@ -30,6 +33,9 @@ interface ReadingStore {
  * app is in front (and, if the user chose so, no lookup panel is open). A stretch without any
  * activity in the book (touch, page turn, lookup: see `reading-activity.js`) counts for at most [IDLE_MS], so a phone left on the
  * table doesn't keep counting.
+ *
+ * **Listening**: the part of that time with audio playing (an audiobook or Read aloud, see
+ * [setAudioPlaying]) is counted again on the side, as a subset of the time, never added to it.
  *
  * **Characters** come from ttu's bookmark, which holds the characters read up to the reading
  * position and is saved on every page turn (`reading-activity.js` reports each one). Turning
@@ -64,6 +70,7 @@ class ReadingTracker(
     private var foreground = false
     private var lookupOpen = false
     private var countLookupTime = true
+    private var audioPlaying = false
 
     /** Start of the time not counted yet, while active. */
     private var mark: Long? = null
@@ -79,6 +86,9 @@ class ReadingTracker(
 
     /** Milliseconds counted but not written yet, by book and day. */
     private val pending = HashMap<Pair<Long, String>, Long>()
+
+    /** The part of [pending] with audio playing (never more than it). */
+    private val pendingListen = HashMap<Pair<Long, String>, Long>()
 
     /** ttu opened book [ttuId] (null: none is open). */
     fun setBook(ttuId: Long?) = change { book = ttuId }
@@ -97,6 +107,12 @@ class ReadingTracker(
      * when the panel opens and carries on when it closes.
      */
     fun setCountLookupTime(value: Boolean) = change { countLookupTime = value }
+
+    /**
+     * Whether audio plays (an audiobook, or Read aloud speaking). Time counted meanwhile is also
+     * listening time. Must go false when it stops, pauses or the book is left.
+     */
+    fun setAudioPlaying(value: Boolean) = change { audioPlaying = value }
 
     /** The reader touched or scrolled the book. */
     fun onActivity() {
@@ -185,16 +201,23 @@ class ReadingTracker(
         val due = synchronized(lock) {
             // Whole seconds are written; the rest of a second waits for the next flush.
             val seconds = pending.mapValues { (_, millis) -> millis / 1_000 }.filterValues { it > 0 }
+            val due = HashMap<Pair<Long, String>, Pair<Long, Long>>()
             for ((key, whole) in seconds) {
                 val rest = pending.getValue(key) - whole * 1_000
                 if (rest > 0) pending[key] = rest else pending.remove(key)
+                val listenMillis = pendingListen[key] ?: 0L
+                val listenWhole = minOf(listenMillis / 1_000, whole)
+                // The part with audio never outgrows the time it is part of.
+                val listenRest = minOf(listenMillis - listenWhole * 1_000, rest)
+                if (listenRest > 0) pendingListen[key] = listenRest else pendingListen.remove(key)
+                due[key] = whole to listenWhole
             }
-            seconds
+            due
         }
         if (due.isEmpty()) return
         scope.launch {
             writes.withLock {
-                for ((key, seconds) in due) safely { store.add(key.first, key.second, seconds, 0) }
+                for ((key, counted) in due) safely { store.add(key.first, key.second, counted.first, 0, counted.second) }
             }
         }
     }
@@ -243,6 +266,7 @@ class ReadingTracker(
         if (millis <= 0) return
         val key = book to day
         pending[key] = (pending[key] ?: 0L) + millis
+        if (audioPlaying) pendingListen[key] = (pendingListen[key] ?: 0L) + millis
         // Kept in milliseconds: the characters' allowance floors only the total.
         sinceReport[book] = sinceReport[book].orEmpty().let { it + (day to (it[day] ?: 0L) + millis) }
     }

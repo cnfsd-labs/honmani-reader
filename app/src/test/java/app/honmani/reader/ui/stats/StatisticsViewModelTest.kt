@@ -124,6 +124,27 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun timeWithAudioIsShownPerPeriod() = runTest {
+        val viewModel = viewModel(
+            days = listOf(
+                ReadingDayEntity(1, today.toString(), seconds = 600, listenSeconds = 200),
+                ReadingDayEntity(1, today.minusDays(2).toString(), seconds = 900, listenSeconds = 900),
+                ReadingDayEntity(2, today.minusDays(30).toString(), seconds = 300),
+            ),
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+
+        suspend fun listened(period: StatsPeriod): Long {
+            viewModel.setPeriod(period)
+            return viewModel.uiState.filterNotNull().first { it.summary.period == period }.summary.listenSeconds
+        }
+
+        assertEquals(200L, listened(StatsPeriod.TODAY))
+        assertEquals(1_100L, listened(StatsPeriod.WEEK))
+        assertEquals(1_100L, listened(StatsPeriod.ALL))
+    }
+
+    @Test
     fun todayMovesOnAtMidnightForReadingAndLookupsAlike() = runTest {
         lookupTimes.value = listOf(millis(today, 21))
         val viewModel = viewModel()
@@ -187,6 +208,26 @@ class StatisticsViewModelTest {
         assertEquals(StatisticsViewModel.RefoldEvent.Ready("honmani-refold-$today.csv", "honmani-refold-$today.csv"), event)
         assertEquals(true, written.single().contains(",$today,360000,"))
         assertEquals(listOf(RefoldExport.Mark(1, today.toString(), 600)), marked)
+    }
+
+    @Test
+    fun aRefoldExportWithListeningMarksBothParts() = runTest {
+        val marked = mutableListOf<RefoldExport.Mark>()
+        val written = mutableListOf<String>()
+        val model = viewModel(
+            days = listOf(ReadingDayEntity(1, today.toString(), seconds = 600, listenSeconds = 200, refoldSeconds = 240)),
+            writeRefoldFile = { name, text -> written += text; name },
+            markRefoldExported = { marked += it },
+        )
+        assertEquals(2, model.refoldInfo().newRows)
+
+        model.exportRefold(again = false)
+        model.refold.first()
+
+        // 400 s without audio, 240 of them sent before: 160 s as 20101; all 200 s of audio as 10101.
+        assertEquals(true, written.single().contains("20101,ja,$today,160000,"))
+        assertEquals(true, written.single().contains("10101,ja,$today,200000,"))
+        assertEquals(listOf(RefoldExport.Mark(1, today.toString(), 400, listenSeconds = 200)), marked)
     }
 
     @Test

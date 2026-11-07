@@ -52,6 +52,21 @@ class ReadingDaoTest {
     }
 
     @Test
+    fun listeningAddsUpAsAPartOfTheTime_andBothRefoldMarksNeverLower() = runTest {
+        dao.insertIfMissing(ReadingDayEntity(1, "2026-10-17"))
+        dao.add(1, "2026-10-17", 60, 0, listenSeconds = 20)
+        dao.add(1, "2026-10-17", 30, 0, listenSeconds = 30)
+        dao.markRefoldExported(listOf(RefoldExport.Mark(1, "2026-10-17", 40, listenSeconds = 50)))
+        dao.markRefoldExported(listOf(RefoldExport.Mark(1, "2026-10-17", 10, listenSeconds = 10)))
+
+        val row = dao.observeBook(1).first().single()
+        assertEquals(90L, row.seconds)
+        assertEquals(50L, row.listenSeconds)
+        assertEquals(40L, row.refoldSeconds)
+        assertEquals(50L, row.refoldListenSeconds)
+    }
+
+    @Test
     fun theRefoldMarkIsSetPerDayAndBookAndNeverLowered() = runTest {
         add(1, "2026-10-17", 60, 0)
         add(1, "2026-10-18", 30, 0)
