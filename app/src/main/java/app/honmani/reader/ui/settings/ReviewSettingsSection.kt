@@ -1,18 +1,21 @@
 package app.honmani.reader.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,6 +33,7 @@ fun ReviewSettingsSection() {
     val newPerDay by settings.newPerDay.collectAsStateWithLifecycle()
     val reviewsPerDay by settings.reviewsPerDay.collectAsStateWithLifecycle()
     val showSentence by settings.showSentence.collectAsStateWithLifecycle()
+    val speakers by settings.speakers.collectAsStateWithLifecycle()
     val knownAfter by settings.knownAfterDays.collectAsStateWithLifecycle()
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_new_per_day)) },
@@ -77,6 +81,12 @@ fun ReviewSettingsSection() {
             label = { Text(stringResource(R.string.review_settings_front_word)) },
         )
     }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.review_settings_speakers)) },
+        supportingContent = { Text(stringResource(R.string.review_settings_speakers_details)) },
+        trailingContent = { Switch(checked = speakers, onCheckedChange = null) },
+        modifier = Modifier.toggleable(speakers, role = Role.Switch, onValueChange = settings::setSpeakers),
+    )
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_known_after)) },
         supportingContent = { Text(stringResource(R.string.review_settings_known_after_details)) },

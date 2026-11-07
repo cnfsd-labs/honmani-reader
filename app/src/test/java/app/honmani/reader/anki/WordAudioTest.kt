@@ -18,13 +18,30 @@ class WordAudioTest {
 
     private class CountingVoice(private val problem: VoiceProblem? = null) : CardVoice {
         val spoken = mutableListOf<String>()
+        val rates = mutableListOf<Double>()
         override val extension = "wav"
 
         override suspend fun speak(text: String, out: File, rate: Double) {
             problem?.let { throw VoiceException(it) }
             spoken += text
+            rates += rate
             out.writeBytes(byteArrayOf(1, 2, 3))
             ShadowMediaPlayer.addMediaInfo(DataSource.toDataSource(out.path.removeSuffix(".part")), ShadowMediaPlayer.MediaInfo(500, 0))
+        }
+    }
+
+    private class CountingFocus : PlaybackFocus {
+        var requests = 0
+        var held = false
+
+        override fun request(): Boolean {
+            requests++
+            held = true
+            return true
+        }
+
+        override fun release() {
+            held = false
         }
     }
 
@@ -52,10 +69,78 @@ class WordAudioTest {
         assertEquals(null, audio.playSentence("名前はまだ無い。"))
 
         assertEquals(emptyList<String>(), card.spoken)
-        // Not remembered: the same sentence is made again, and one file is left.
-        assertEquals(listOf("吾輩は猫である。", "吾輩は猫である。", "名前はまだ無い。"), phone.spoken)
+        // The same sentence twice is a replay of the kept recording; a new one replaces it, and one file is left.
+        assertEquals(listOf("吾輩は猫である。", "名前はまだ無い。"), phone.spoken)
         assertEquals(listOf("sentence.wav"), dir.listFiles()!!.map { it.name })
         audio.stop()
+    }
+
+    @Test
+    fun aSentenceIsReadAtTheSentenceSpeed_aWordAtNormalSpeed_andAnotherSpeedMakesANewRecording() = runBlocking {
+        val voice = CountingVoice()
+        var rate = 0.85
+        val audio = WordAudio(voice = { voice }, dir = dir, main = Dispatchers.Unconfined, sentenceRate = { rate })
+
+        audio.play("たべる")
+        audio.playSentence("吾輩は猫である。")
+        audio.playSentence("吾輩は猫である。")
+        rate = 0.7
+        audio.playSentence("吾輩は猫である。")
+
+        assertEquals(listOf(1.0, 0.85, 0.7), voice.rates)
+        audio.stop()
+    }
+
+    @Test
+    fun aWordAtAnotherSpeedIsAnotherRecording_andNormalSpeedKeepsItsName() {
+        val voice = CountingVoice()
+        assertNotEquals(WordAudio.name(voice, "たべる", 1.0), WordAudio.name(voice, "たべる", 0.7))
+        assertEquals(WordAudio.name(voice, "たべる"), WordAudio.name(voice, "たべる", 1.0))
+    }
+
+    @Test
+    fun otherAudioIsAskedToDuckWhileASoundPlaysAndGetsFocusBackWhenItIsStopped() = runBlocking {
+        val focus = CountingFocus()
+        val audio = WordAudio(voice = { CountingVoice() }, dir = dir, main = Dispatchers.Unconfined, focus = focus)
+
+        assertEquals(null, audio.play("たべる"))
+        assertEquals(true, focus.held)
+        // A second sound replaces the first: still one focus held.
+        assertEquals(null, audio.playSentence("吾輩は猫である。"))
+        assertEquals(true, focus.held)
+        audio.stop()
+
+        assertEquals(false, focus.held)
+        assertEquals(true, focus.requests >= 2)
+    }
+
+    @Test
+    fun focusIsGivenBackWhenASoundCantPlay() = runBlocking {
+        val focus = CountingFocus()
+        val audio = WordAudio(voice = { CountingVoice() }, dir = dir, main = Dispatchers.Unconfined, focus = focus)
+        val broken = File(dir, "missing.mp3")
+
+        assertEquals(VoiceProblem.FAILED, audio.playFile(broken))
+
+        assertEquals(false, focus.held)
+    }
+
+    @Test
+    fun aFileFromElsewhereIsPlayedAndNeverDeleted() = runBlocking {
+        val clip = File(dir, "clip.mp3").also {
+            it.writeBytes(byteArrayOf(1, 2, 3))
+            ShadowMediaPlayer.addMediaInfo(DataSource.toDataSource(it.path), ShadowMediaPlayer.MediaInfo(500, 0))
+        }
+        val focus = CountingFocus()
+        val audio = WordAudio(voice = { CountingVoice() }, dir = dir, main = Dispatchers.Unconfined, focus = focus)
+
+        assertEquals(null, audio.playFile(clip))
+        assertEquals(true, audio.playing)
+        audio.stop()
+
+        assertEquals(true, clip.exists())
+        assertEquals(false, audio.playing)
+        assertEquals(false, focus.held)
     }
 
     @Test

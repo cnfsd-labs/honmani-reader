@@ -901,6 +901,8 @@
     <string name="review_card_front">Card %1$s. Tap to show the answer.</string>
     <string name="review_card_back">Card %1$s, reading %2$s, meaning %3$s.</string>
     <string name="review_card_back_note">Card %1$s, reading %2$s, meaning %3$s, note %4$s.</string>
+    <string name="review_speak_word">Say the word</string>
+    <string name="review_speak_sentence">Read the sentence</string>
     <string name="review_swipe_hint">Swipe left: forgot. Swipe right: got it.</string>
     <string name="review_new_label">New</string>
     <string name="review_no_meaning">No meaning saved. Look it up or edit the meaning.</string>
@@ -941,6 +943,8 @@
     <string name="review_settings_front">Front of a card</string>
     <string name="review_settings_front_sentence">Sentence with the word marked</string>
     <string name="review_settings_front_word">The word alone</string>
+    <string name="review_settings_speakers">Speakers on cards</string>
+    <string name="review_settings_speakers_details">Buttons on a card that say the word and read the sentence aloud. A sentence from a book with a paired audiobook is played from the audiobook.</string>
     <string name="review_settings_known_after">Known after</string>
     <string name="review_settings_known_after_details">A word moves to Known once you can wait this long between reviews.</string>
     <string name="review_settings_days">%1$d days</string>

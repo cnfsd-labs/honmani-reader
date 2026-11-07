@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -92,6 +94,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -106,6 +109,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
@@ -117,6 +123,7 @@ import app.honmani.reader.lookup.FuriganaOverride
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.FuriganaDialog
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
@@ -169,6 +176,21 @@ fun ReviewScreen(
             )
         }
     }
+    LaunchedEffect(viewModel) {
+        viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
+    }
+    // Sound ends with the screen: leaving the app or the review, never over the next thing.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) viewModel.stopAudio("background")
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.stopAudio("closed")
+        }
+    }
     LaunchedEffect(panelModel) {
         panelModel.ankiResults.collect { (expression, result) -> showAnkiResult(context, expression, result) }
     }
@@ -207,6 +229,14 @@ fun ReviewScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
+                        val card = state.card
+                        if (state.speakers && card != null) {
+                            Speakers(
+                                withSentence = state.showSentence && card.sentence != null,
+                                onWord = viewModel::speakWord,
+                                onSentence = viewModel::speakSentence,
+                            )
+                        }
                         AnswerButtons(
                             revealed = state.revealed,
                             onReveal = viewModel::reveal,
@@ -637,6 +667,29 @@ private fun marked(sentence: ReviewSentence): AnnotatedString {
         append(sentence.text.substring(0, sentence.start))
         withStyle(highlight) { append(sentence.text.substring(sentence.start, sentence.end)) }
         append(sentence.text.substring(sentence.end))
+    }
+}
+
+/** The word's and the sentence's speaker buttons, above the answer buttons on the front and the back. */
+@Composable
+private fun Speakers(withSentence: Boolean, onWord: () -> Unit, onSentence: () -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
+    ) {
+        SpeakerButton(R.string.review_speak_word, onWord, Modifier.weight(1f, fill = false))
+        if (withSentence) SpeakerButton(R.string.review_speak_sentence, onSentence, Modifier.weight(1f, fill = false))
+    }
+}
+
+@Composable
+private fun SpeakerButton(@androidx.annotation.StringRes label: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(onClick = onClick, modifier = modifier) {
+        Icon(painterResource(R.drawable.ic_listen), contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(label), maxLines = 1)
     }
 }
 

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.review.Grade
 import app.honmani.reader.data.review.ReviewFilter
 import app.honmani.reader.data.review.ReviewRepository
@@ -19,6 +20,7 @@ import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.FuriganaOverride
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +60,8 @@ data class ReviewUiState(
     val remembered: Int = 0,
     /** Settings: the front shows the sentence (when the word has one) rather than the word alone. */
     val showSentence: Boolean = true,
+    /** Settings: the card shows the speaker buttons. */
+    val speakers: Boolean = true,
 )
 
 /** An answer the screen should let the reader feel (and, if switched on, hear); [finished] when it was the session's last card. */
@@ -65,6 +69,15 @@ data class ReviewCue(val gotIt: Boolean, val finished: Boolean)
 
 /** A line for the snackbar; [undoable] adds the Undo button. */
 class ReviewNotice(@StringRes val message: Int, val word: String, val undoable: Boolean = true)
+
+/** No sound (the default where there is no player). */
+object NoReviewAudio : ReviewAudio {
+    override suspend fun word(text: String): VoiceProblem? = null
+
+    override suspend fun sentence(text: String, bookId: Long?, bookTitle: String?): VoiceProblem? = null
+
+    override fun stop(reason: String) = Unit
+}
 
 /** One review session: the queue from [ReviewSession], the card on screen, and what a tap does. */
 class ReviewViewModel(
@@ -75,12 +88,19 @@ class ReviewViewModel(
     private val filter: suspend () -> ReviewFilter? = { null },
     /** False for the Reviews only chip: the session holds due cards and no new ones. */
     private val withNew: () -> Boolean = { true },
+    /** What the speaker buttons play. */
+    private val audio: ReviewAudio = NoReviewAudio,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(ReviewUiState(showSentence = settings.showSentence.value))
+    private val _state = MutableStateFlow(initialState())
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
 
     private val _notices = Channel<ReviewNotice>(Channel.BUFFERED)
     val notices: Flow<ReviewNotice> = _notices.receiveAsFlow()
+
+    private val _voiceProblems = Channel<VoiceProblem>(Channel.BUFFERED)
+
+    /** Why a speaker button press made no sound (the screen says it). */
+    val voiceProblems: Flow<VoiceProblem> = _voiceProblems.receiveAsFlow()
 
     private val _cues = Channel<ReviewCue>(Channel.BUFFERED)
     val cues: Flow<ReviewCue> = _cues.receiveAsFlow()
@@ -89,11 +109,14 @@ class ReviewViewModel(
     private val lock = Mutex()
     private var session: ReviewSession? = null
 
+    private fun initialState() =
+        ReviewUiState(showSentence = settings.showSentence.value, speakers = settings.speakers.value)
+
     /** Builds a fresh queue; the screen calls it each time it opens. */
     fun start() {
         viewModelScope.launch {
             lock.withLock {
-                _state.value = ReviewUiState(showSentence = settings.showSentence.value)
+                _state.value = initialState()
                 val next = ReviewSession(
                     reviews, words, settings.newPerDay.value, settings.knownAfterDays.value, settings.reviewsPerDay.value,
                 )
@@ -130,6 +153,37 @@ class ReviewViewModel(
 
     fun undo() = act { it.undo() }
 
+    // One job at a time: a recording that is still being made never plays over the next card.
+    private var audioJob: Job? = null
+
+    /** The word's speaker button: says the reading as corrected by the reader's furigana. */
+    fun speakWord() {
+        val card = _state.value.card ?: return
+        val text = card.shownReading.ifBlank { card.expression }
+        playing { audio.word(text) }
+    }
+
+    /** The sentence's speaker button (only shown when the card shows a sentence). */
+    fun speakSentence() {
+        val state = _state.value
+        val sentence = state.card?.sentence?.takeIf { state.showSentence } ?: return
+        playing { audio.sentence(sentence.text, sentence.bookId, sentence.bookTitle) }
+    }
+
+    private fun playing(play: suspend () -> VoiceProblem?) {
+        audioJob?.cancel()
+        audioJob = viewModelScope.launch { play()?.let { _voiceProblems.send(it) } }
+    }
+
+    /** Stops the sound and any recording on its way: the app went to the background, the screen closed, the card changed. */
+    fun stopAudio(reason: String) {
+        audioJob?.cancel()
+        audioJob = null
+        audio.stop(reason)
+    }
+
+    override fun onCleared() = stopAudio("cleared")
+
     /** The book of the current card's sentence, if it has one. */
     val currentBookId: Long? get() = _state.value.card?.sentence?.bookId
 
@@ -147,6 +201,8 @@ class ReviewViewModel(
     }
 
     private suspend fun publish(active: ReviewSession, keepRevealed: Boolean = false) {
+        // An edit keeps the card (and its sound); an answer or an undo shows another front.
+        if (!keepRevealed) stopAudio("card")
         val item = active.current
         val card = item?.let {
             val lookups = words.latestLookups(it.word.id)
@@ -185,6 +241,7 @@ class ReviewViewModel(
                     container.reviewSettings,
                     filter = { container.reviewFilter(container.reviewScope.value) },
                     withNew = { container.reviewScope.value != ReviewScope.DueOnly },
+                    audio = WordAudioReview(container.wordAudio) { id, title, text -> container.sentenceClips.clip(id, title, text) },
                 )
             }
         }

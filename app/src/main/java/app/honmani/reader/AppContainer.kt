@@ -1,6 +1,7 @@
 package app.honmani.reader
 
 import android.content.Context
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
@@ -10,6 +11,7 @@ import androidx.room.withTransaction
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiExporter
 import app.honmani.reader.anki.AnkiSettings
+import app.honmani.reader.anki.DuckingFocus
 import app.honmani.reader.anki.AnkiSync
 import app.honmani.reader.anki.PhoneVoice
 import app.honmani.reader.anki.WordAudio
@@ -350,6 +352,8 @@ class AppContainer(context: Context) {
             voice = { ankiSettings.voice { phoneVoice } ?: phoneVoice },
             dir = File(appContext.cacheDir, "listen"),
             sentenceVoice = { phoneVoice },
+            sentenceRate = { ankiSettings.sentenceSpeed.value.rate },
+            focus = DuckingFocus(appContext.getSystemService(AudioManager::class.java)),
         )
     }
 

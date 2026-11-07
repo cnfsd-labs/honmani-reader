@@ -22,6 +22,11 @@ class ReviewSettings(private val preferences: SharedPreferences) {
     /** The front shows the saved sentence with the word marked; off: the word alone. */
     val showSentence: StateFlow<Boolean> = _showSentence.asStateFlow()
 
+    private val _speakers = MutableStateFlow(preferences.getBoolean(KEY_SPEAKERS, true))
+
+    /** The card shows speaker buttons for the word and the sentence. */
+    val speakers: StateFlow<Boolean> = _speakers.asStateFlow()
+
     private val _knownAfterDays = MutableStateFlow(storedKnownAfter())
 
     /** Memory stability in days from which a word counts as known: one of [KNOWN_AFTER_CHOICES]. */
@@ -42,6 +47,11 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         preferences.edit().putBoolean(KEY_SENTENCE, value).apply()
     }
 
+    fun setSpeakers(value: Boolean) {
+        _speakers.value = value
+        preferences.edit().putBoolean(KEY_SPEAKERS, value).apply()
+    }
+
     fun setKnownAfterDays(value: Int) {
         _knownAfterDays.value = if (value in KNOWN_AFTER_CHOICES) value else ReviewRules.DEFAULT_KNOWN_AFTER_DAYS
         preferences.edit().putInt(KEY_KNOWN_AFTER, _knownAfterDays.value).apply()
@@ -52,6 +62,7 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         _newPerDay.value = storedNewPerDay()
         _reviewsPerDay.value = storedReviewsPerDay()
         _showSentence.value = preferences.getBoolean(KEY_SENTENCE, true)
+        _speakers.value = preferences.getBoolean(KEY_SPEAKERS, true)
         _knownAfterDays.value = storedKnownAfter()
     }
 
@@ -66,6 +77,7 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         const val KEY_NEW_PER_DAY = "review_new_per_day"
         const val KEY_REVIEWS_PER_DAY = "review_reviews_per_day"
         const val KEY_SENTENCE = "review_show_sentence"
+        const val KEY_SPEAKERS = "review_speakers"
         const val KEY_KNOWN_AFTER = "review_known_after_days"
         const val DEFAULT_NEW_PER_DAY = 10
         const val MAX_NEW_PER_DAY = 200

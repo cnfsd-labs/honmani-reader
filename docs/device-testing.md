@@ -138,6 +138,12 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   book), Add/Edit note (max 500 chars; back of the card; empty removes; survives re-lookup, remove and
   take back, restore; Words shows it), Look up, Open in book (at the sentence; Back -> Words), Not a
   word, Remove.
+- Speakers (Settings -> Flashcards -> "Speakers on cards", on by default): a "Say the word" button (the
+  corrected furigana's reading) and, if the card shows a sentence, "Read the sentence" (a clip of the paired
+  audiobook if found, else the phone voice at the Anki sentence speed) sit above the answer buttons, front and
+  back. Other audio ducks meanwhile and comes back after. Home, Back or a new card stops the sound; a press
+  without a voice shows a message. Logs: `adb logcat -s ReviewAudio` (`play word|sentence source=... rate=...`,
+  `focus ...`, `stopped reason=...`).
 - "Reviews only": due cards, no new ones. Chips other than these two (This book, A book..., Starred, All
   learning) review early, ignore the limit.
 - "Reviews per day" (50/100 default/200/No limit): 120 due, 100 chosen -> Words and badge say 100,
