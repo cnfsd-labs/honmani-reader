@@ -277,6 +277,10 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
   reopening the book KOReader offers the last page. Conflict: read on offline in Honmani, open in
   KOReader at its older place and close, reconnect, open in Honmani -> "Where to continue?"; "Stay at
   ..." keeps Honmani's page (KOReader offers it next), "Go to ..." jumps back.
+- Komga (tried against Komga 1.30 on localhost with curl and `KoSyncClient`, not on the phone): user needs the
+  KOREADER_SYNC role and the library "KOReader hash"; sign in with its address, an API key as user name and any
+  password. Komga keeps the chapter only: KOReader/Honmani open at the chapter start from the other device
+  (Honmani then uses the percentage). Kavita (read from its source, untested): the API key is part of the address, `<address>/api/koreader/<API key>`, with any user name and password.
 - Status: Settings -> Books and sync shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
   attempt failed ...: server unreachable" (or wrong login, HTTP status); that book's reader menu starts
   with "Progress sync failed: ..."; other books no hint. Server back -> next sync clears both.

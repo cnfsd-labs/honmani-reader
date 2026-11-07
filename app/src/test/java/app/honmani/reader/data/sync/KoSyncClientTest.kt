@@ -72,6 +72,26 @@ class KoSyncClientTest {
     }
 
     @Test
+    fun signsInToKomga_withItsApiKeyFromItsPlainAddress() = runTest {
+        val komga = FakeKoSyncServer(user = "api-key", password = "dummy", komga = true)
+        try {
+            // Komga's web interface answers 200 at the plain address, and 403 without the login.
+            val signedIn = client.signIn(komga.url, "api-key", "dummy")
+            assertEquals(komga.url + "/koreader", signedIn.server)
+            assertNull(signedIn.password)
+            // Over http the login follows the server's refusal, as with a 401.
+            client.update(signedIn, "abc", "/body/DocFragment[2]/body/p/text().3", 0.5, "Honmani (Test)", "DEV1")
+            assertEquals("/body/DocFragment[2]/body/p/text().3", client.progress(signedIn, "abc")!!.progress)
+            assertEquals("api-key", komga.requests.last().headers["x-auth-user"])
+
+            assertFails(KoSyncException.Reason.UNAUTHORIZED) { client.signIn(komga.url, "wrong-key", "dummy") }
+            assertFails(KoSyncException.Reason.UNAUTHORIZED) { client.signIn(komga.url + "/koreader", "wrong-key", "dummy") }
+        } finally {
+            komga.stop()
+        }
+    }
+
+    @Test
     fun overHttpTheLoginWaitsForTheServerToAsk() = runTest {
         client.authorize(account)
         client.progress(account, "abc")

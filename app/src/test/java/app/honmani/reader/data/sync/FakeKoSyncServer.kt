@@ -13,11 +13,14 @@ import kotlinx.serialization.json.put
 /**
  * A KOReader sync server (koreader-sync-server's API) on localhost, for tests. [cwa] makes it
  * answer like Calibre-Web Automated: under `/kosync`, with the password as HTTP Basic only.
+ * [komga] makes it answer like Komga: under `/koreader`, the login is the API key in `x-auth-user`
+ * alone, a missing or wrong one is a 403, and every other address is the web interface (a page).
  */
 internal class FakeKoSyncServer(
     private val user: String = "reader",
     private val password: String = "secret",
     private val cwa: Boolean = false,
+    private val komga: Boolean = false,
 ) {
     private val key = KoSyncAccount.userKey(password)
     val users = ConcurrentHashMap(mapOf(user to key))
@@ -42,10 +45,16 @@ internal class FakeKoSyncServer(
         http = HeaderServer { fullPath, out ->
             val request = http.requests.last()
             if (delayMs > 0) Thread.sleep(delayMs)
-            val path = if (cwa) fullPath.removePrefix("/kosync") else fullPath
+            val path = when {
+                cwa -> fullPath.removePrefix("/kosync")
+                komga -> fullPath.removePrefix("/koreader")
+                else -> fullPath
+            }
             val basic = "Basic " + Base64.getEncoder().encodeToString("$user:$password".toByteArray())
             val authorized = if (cwa) {
                 request.headers["authorization"] == basic
+            } else if (komga) {
+                request.headers["x-auth-user"] == user
             } else {
                 request.headers["x-auth-user"]?.let { users[it] }?.let { it == request.headers["x-auth-key"] } == true
             }
@@ -53,6 +62,8 @@ internal class FakeKoSyncServer(
                 down -> out.respond("503 Service Unavailable", "")
                 cwa && !fullPath.startsWith("/kosync/") -> out.respond("308 Permanent Redirect", "")
                 request.headers["accept"] != "application/vnd.koreader.v1+json" -> out.respond("412 Precondition Failed", "{}")
+                komga && !fullPath.startsWith("/koreader/") -> out.respond("200 OK", "<!doctype html><html></html>")
+                !authorized && komga -> out.respond("403 Forbidden", "")
                 !authorized -> out.respond("401 Unauthorized", """{"code":2001,"message":"Unauthorized"}""")
                 path == "/users/auth" -> out.respond("200 OK", """{"authorized":"OK"}""")
                 request.method == "PUT" && path == "/syncs/progress" -> {

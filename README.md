@@ -56,8 +56,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download. A folder on the phone: add
   it once, or watch it (Settings, Books and sync) and its new books join when the library opens
 - Accent colours, or a random one every day or every launch (Settings, Appearance)
-- Reading progress sync with KOReader (e-readers, Calibre-Web Automated), to the character, with the
-  last sync and error shown in Settings
+- Reading progress sync with KOReader (e-readers, Calibre-Web Automated, Komga), to the character
+  (Komga keeps the chapter), with the last sync and error shown in Settings
 - Back up settings, progress, statistics, saved words and flashcard reviews to one file, for a new
   phone; Android's own backup takes them along too, and a new install offers to restore them
 - No account, no ads, no tracking ([privacy policy](docs/privacy-policy.md))

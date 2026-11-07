@@ -20,7 +20,7 @@ import kotlinx.serialization.json.put
 
 /**
  * A KOReader progress sync account: the server (KOReader's own sync server, a self-hosted
- * koreader-sync-server, or Calibre-Web Automated's `/kosync`) and the login. [userKey] is the
+ * koreader-sync-server, Calibre-Web Automated's `/kosync`, or Komga's `/koreader`) and the login. [userKey] is the
  * MD5 of the password, which is what KOReader sends and stores instead of the password.
  * [password] is kept only for servers that check the password itself with HTTP Basic
  * (Calibre-Web Automated, whose accounts are its web accounts).
@@ -91,12 +91,17 @@ class KoSyncClient(
      *   Calibre-Web Automated asks for. The password itself only goes to an address ending in
      *   `/kosync` (CWA's), never to KOReader's servers when the key was merely wrong.
      * - An address without a sync server is tried again with `/kosync` (Calibre-Web Automated's
-     *   own address, as its KOReader page shows it).
+     *   own address, as its KOReader page shows it) and `/koreader` (Komga's, where the login is
+     *   its API key and the password is ignored).
      */
     suspend fun signIn(server: String, username: String, password: String): KoSyncAccount {
         val keyed = KoSyncAccount(server.trim(), username.trim(), KoSyncAccount.userKey(password))
         val base = keyed.server.trimEnd('/')
-        val addresses = if (base.endsWith(CWA_PATH)) listOf(keyed.server) else listOf(keyed.server, base + CWA_PATH)
+        val addresses = if (base.endsWith(CWA_PATH) || base.endsWith(KOMGA_PATH)) {
+            listOf(keyed.server)
+        } else {
+            listOf(keyed.server, base + CWA_PATH, base + KOMGA_PATH)
+        }
         var failure: KoSyncException? = null
         for (address in addresses) {
             val account = keyed.copy(server = address)
@@ -118,8 +123,10 @@ class KoSyncClient(
 
     /** Checks the login. */
     suspend fun authorize(account: KoSyncAccount) {
-        val (status, _) = request(account, "GET", "/users/auth")
+        val (status, text) = request(account, "GET", "/users/auth")
         if (status != 200) throw unexpected(status)
+        // Komga's web interface answers 200 (a page) at any address: that is no sync server.
+        if (text.trimStart().startsWith("<")) throw KoSyncException(KoSyncException.Reason.NETWORK, "Not a sync server")
     }
 
     /** The latest position saved for [document], or null if there is none. */
@@ -214,7 +221,8 @@ class KoSyncClient(
             }
             val status = connection.responseCode
             NetworkLog.shared.answered(NetworkPurpose.PROGRESS_SYNC, url.toString(), status, connection.contentLengthLong)
-            if (status == 401) throw KoSyncException(KoSyncException.Reason.UNAUTHORIZED, "Wrong login")
+            // Komga answers 403, not 401, to a missing or wrong login.
+            if (status == 401 || status == 403) throw KoSyncException(KoSyncException.Reason.UNAUTHORIZED, "Wrong login")
             val stream = if (status >= 400) connection.errorStream else connection.inputStream
             val text = stream?.use { input ->
                 // Not readNBytes: that needs Android 13.
@@ -258,6 +266,7 @@ class KoSyncClient(
         private const val ACCEPT = "application/vnd.koreader.v1+json"
         private const val MAX_ANSWER_BYTES = 64 * 1024
         private const val CWA_PATH = "/kosync"
+        private const val KOMGA_PATH = "/koreader"
         private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
         /** The server address as typed (with or without a trailing slash, https:// added if missing) plus [path]. */
