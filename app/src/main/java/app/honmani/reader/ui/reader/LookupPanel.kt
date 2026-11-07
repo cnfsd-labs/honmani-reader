@@ -2,6 +2,9 @@ package app.honmani.reader.ui.reader
 
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -89,6 +92,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -124,6 +128,9 @@ import app.honmani.reader.lookup.PitchMora
 import app.honmani.reader.lookup.RubySegment
 import app.honmani.reader.lookup.Sense
 import app.honmani.reader.ui.theme.HonmaniTheme
+import app.honmani.reader.ui.theme.LocalMotionEnabled
+import app.honmani.reader.ui.theme.motionSpring
+import app.honmani.reader.ui.theme.motionTween
 
 /**
  * Dictionary results for the last tap, at the bottom of the reader. The book stays tappable.
@@ -199,6 +206,8 @@ fun LookupPanel(
         extra = 0f
     }
     val scope = rememberCoroutineScope()
+    // The drag's settle: the usual spring, a jump in E-ink mode.
+    val settleSpec = motionSpring<Float>(stiffness = Spring.StiffnessMedium)
     val listState = rememberLazyListState()
     val swipe = remember { SwipeState() }
     // A new word (a referenced one, or back) starts at the top.
@@ -237,7 +246,7 @@ fun LookupPanel(
 
     suspend fun settleExtra(velocity: Float) {
         val target = if (PanelSizing.settlesExpanded(extra, maxExtra.value, velocity, closeVelocity)) maxExtra.value else 0f
-        animate(extra, target, initialVelocity = -velocity) { value, _ -> extra = value }
+        animate(extra, target, initialVelocity = -velocity, animationSpec = settleSpec) { value, _ -> extra = value }
     }
 
     suspend fun settle(velocity: Float) {
@@ -248,12 +257,12 @@ fun LookupPanel(
         val closes = offset > closeDistance || offset > height[0] * CLOSE_FRACTION ||
             (velocity > closeVelocity && offset > 0f)
         if (closes) {
-            animate(offset, maxOf(height[0], offset), initialVelocity = maxOf(velocity, 0f)) { value, _ ->
+            animate(offset, maxOf(height[0], offset), initialVelocity = maxOf(velocity, 0f), animationSpec = settleSpec) { value, _ ->
                 offset = value
             }
             onClose()
         } else {
-            animate(offset, 0f, initialVelocity = velocity) { value, _ -> offset = value }
+            animate(offset, 0f, initialVelocity = velocity, animationSpec = settleSpec) { value, _ -> offset = value }
         }
     }
 
@@ -285,12 +294,26 @@ fun LookupPanel(
         }
     }
 
+    // Opening: slides up from its own height with a quick fade, by a graphics layer only (no layout
+    // change, so the page behind never moves). Plays when the panel is composed, not when the word
+    // changes; closing is the drag's own animation. Not at all in E-ink mode.
+    val motion = LocalMotionEnabled.current
+    val entered = remember { Animatable(if (motion) 0f else 1f) }
+    val enterSpec = motionTween<Float>(ENTER_MS, LinearOutSlowInEasing)
+    LaunchedEffect(Unit) { entered.animateTo(1f, enterSpec) }
     val copy = rememberCopy()
     // Outside the sheet, so its rounded clip can't cut the bubble; the empty space beside it takes no touches.
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .offset { IntOffset(0, offset.roundToInt()) },
+            .offset { IntOffset(0, offset.roundToInt()) }
+            .graphicsLayer {
+                val progress = entered.value
+                if (progress < 1f) {
+                    translationY = (1f - progress) * size.height
+                    alpha = progress
+                }
+            },
     ) {
     selectionBubble(state)?.let { bubble ->
         SelectionBubbleRow(
@@ -736,6 +759,7 @@ private val CLOSE_VELOCITY = 600.dp
 
 /** Pushed down by this share of its height, the panel closes on release. */
 private const val CLOSE_FRACTION = 0.25f
+private const val ENTER_MS = 180
 
 /** Whether the current touch on the results began with them scrolled to the top. */
 private class SwipeState {

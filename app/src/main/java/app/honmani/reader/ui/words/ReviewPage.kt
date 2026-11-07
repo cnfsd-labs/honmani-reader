@@ -1,5 +1,14 @@
 package app.honmani.reader.ui.words
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,6 +56,7 @@ import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.settings.ReviewSettingsSection
+import app.honmani.reader.ui.theme.LocalMotionEnabled
 
 /** What the Review page tells and whether Start works. */
 enum class ReviewPageMode {
@@ -127,7 +137,22 @@ fun ReviewPage(
             Spacer(Modifier.weight(1f))
             when (state.mode) {
                 ReviewPageMode.Due -> {
-                    Text(due.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+                    val motion = LocalMotionEnabled.current
+                    AnimatedContent(
+                        targetState = due,
+                        transitionSpec = {
+                            if (!motion) {
+                                EnterTransition.None togetherWith ExitTransition.None
+                            } else {
+                                val up = targetState < initialState
+                                (fadeIn(tween(180)) + slideInVertically(tween(220)) { if (up) it / 2 else -it / 2 }) togetherWith
+                                    (fadeOut(tween(120)) + slideOutVertically(tween(220)) { if (up) -it / 2 else it / 2 })
+                            }
+                        },
+                        label = "due count",
+                    ) { count ->
+                        Text(count.toString(), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
+                    }
                     Text(pluralStringResource(R.plurals.review_page_due, due), style = MaterialTheme.typography.titleMedium)
                     Text(
                         pluralStringResource(R.plurals.review_card_new, newShown, newShown),

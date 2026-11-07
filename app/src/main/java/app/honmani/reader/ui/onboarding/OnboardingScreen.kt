@@ -1,6 +1,5 @@
 package app.honmani.reader.ui.onboarding
 
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
@@ -58,7 +57,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -76,6 +74,7 @@ import app.honmani.reader.ui.dictionaries.DictionariesUiState
 import app.honmani.reader.ui.dictionaries.DictionariesViewModel
 import app.honmani.reader.ui.theme.HonmaniTheme
 import app.honmani.reader.ui.rememberWithNotifications
+import app.honmani.reader.ui.theme.LocalMotionEnabled
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -392,10 +391,7 @@ private fun PackStatus(pack: StarterPackState, onRetry: () -> Unit) {
  */
 @Composable
 private fun Modifier.welcomeGlow(color: Color): Modifier {
-    val context = LocalContext.current
-    val animate = remember(context) {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
-    }
+    val animate = LocalMotionEnabled.current
     // Read only while drawing, so the glow redraws without recomposing the screen.
     val phase: State<Float> = if (animate) {
         rememberInfiniteTransition(label = "welcome glow").animateFloat(

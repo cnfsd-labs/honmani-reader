@@ -137,6 +137,7 @@ import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.FrequencyBadge
 import app.honmani.reader.ui.reader.GlossLines
 import app.honmani.reader.ui.theme.HonmaniTheme
+import app.honmani.reader.ui.theme.LocalMotionEnabled
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -715,26 +716,29 @@ private fun WordList(
             }
             items(words, key = { it.id }) { word ->
                 val expanded = word.id == uiState.expanded
-                WordRow(
-                    word = word,
-                    now = now,
-                    steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
-                    memory = if (filter == WordFilter.LEARNING) uiState.memory[word.id] else null,
-                    frequency = uiState.frequencies[word.id],
-                    due = word.id in dueIds,
-                    expanded = expanded,
-                    lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
-                    onToggleExpanded = { onToggleExpanded(word.id) },
-                    onSetStarred = { onSetStarred(word.id, it) },
-                    onMarkLearned = { onMarkLearned(word) },
-                    onMarkLearning = { onMarkLearning(word.id) },
-                    onDelete = { onDelete(word.id) },
-                    onIgnore = { onIgnore(word) },
-                    onAddToAnki = { lookup -> onAddToAnki(word, lookup) },
-                    ankiEnabled = ankiEnabled,
-                    adding = word.id in uiState.addingToAnki,
-                )
-                HorizontalDivider()
+                // Removals and reorders glide; still in E-ink mode.
+                Column(if (LocalMotionEnabled.current) Modifier.animateItem() else Modifier) {
+                    WordRow(
+                        word = word,
+                        now = now,
+                        steps = if (filter == WordFilter.LEARNING) uiState.steps[word.id] else null,
+                        memory = if (filter == WordFilter.LEARNING) uiState.memory[word.id] else null,
+                        frequency = uiState.frequencies[word.id],
+                        due = word.id in dueIds,
+                        expanded = expanded,
+                        lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
+                        onToggleExpanded = { onToggleExpanded(word.id) },
+                        onSetStarred = { onSetStarred(word.id, it) },
+                        onMarkLearned = { onMarkLearned(word) },
+                        onMarkLearning = { onMarkLearning(word.id) },
+                        onDelete = { onDelete(word.id) },
+                        onIgnore = { onIgnore(word) },
+                        onAddToAnki = { lookup -> onAddToAnki(word, lookup) },
+                        ankiEnabled = ankiEnabled,
+                        adding = word.id in uiState.addingToAnki,
+                    )
+                    HorizontalDivider()
+                }
             }
             items(knownByReading, key = { "read:" + it.first }) { (expression, reads) ->
                 ReadWordRow(
@@ -814,6 +818,7 @@ private fun WordProgressBar(progress: Float) {
         ProgressBar(
             progress = { progress },
             modifier = Modifier.width(96.dp),
+            growIn = false,
         )
         Text(
             text = stringResource(R.string.word_progress, WordProgress.shownPercent(progress)),

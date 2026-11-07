@@ -50,7 +50,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             val accent by appearance.accent.collectAsStateWithLifecycle()
             val customHue by appearance.customHue.collectAsStateWithLifecycle()
-            HonmaniTheme(accent = accent, customHue = customHue) {
+            val eInk by appearance.eInk.collectAsStateWithLifecycle()
+            HonmaniTheme(accent = accent, customHue = customHue, eInk = eInk) {
                 CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
                     HonmaniApp()
                 }

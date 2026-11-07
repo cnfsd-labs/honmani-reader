@@ -178,6 +178,20 @@ class AppearanceSettings(
     /** Whether short interface sounds play (reviews, milestones); off until switched on. */
     val sounds: StateFlow<Boolean> = _sounds.asStateFlow()
 
+    private val _eInk = MutableStateFlow(devicePreferences.getBoolean(KEY_EINK, false))
+
+    /**
+     * Whether the reader's E-ink mode is on, mirrored from ttu's storage (where the setting lives)
+     * so the interface can drop its animations too. Tied to ttu's copy on this phone, so not backed up.
+     */
+    val eInk: StateFlow<Boolean> = _eInk.asStateFlow()
+
+    fun setEInk(on: Boolean) {
+        if (on == _eInk.value) return
+        _eInk.value = on
+        devicePreferences.edit().putBoolean(KEY_EINK, on).apply()
+    }
+
     fun setSounds(on: Boolean) {
         _sounds.value = on
         preferences.edit().putBoolean(KEY_SOUNDS, on).apply()
@@ -232,6 +246,7 @@ class AppearanceSettings(
         const val KEY_SHOW_WORD_FREQUENCY = "show_word_frequency"
         const val KEY_SHOW_EXAMPLES = "show_examples"
         const val KEY_SOUNDS = "ui_sounds"
+        const val KEY_EINK = "eink_mirror"
         const val KEY_LIBRARY_SORT = "library_sort"
         const val KEY_CUSTOM_HUE = "accent_custom_hue"
 

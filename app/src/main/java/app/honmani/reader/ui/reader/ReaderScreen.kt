@@ -1,5 +1,8 @@
 package app.honmani.reader.ui.reader
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.graphicsLayer
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
@@ -19,6 +22,8 @@ import app.honmani.reader.readaloud.LiveVoice
 import app.honmani.reader.readaloud.ReadAloudController
 import app.honmani.reader.readaloud.ReadAloudPhase
 import app.honmani.reader.readaloud.SpokenSentence
+import app.honmani.reader.ui.theme.LocalMotionEnabled
+import app.honmani.reader.ui.theme.motionTween
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -47,6 +52,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -459,7 +465,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val appSettings by produceState(ReaderSettings(), atLibrary, readerSettings, settingsVersion) {
         if (atLibrary || readerSettings) return@produceState
         value = try {
-            ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings())
+            ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings()).also {
+                // The rest of the app drops its animations in E-ink mode too.
+                container.appearanceSettings.setEInk(it.eInk)
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -799,6 +808,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 // In landscape (wider than tall) the tabs go at the side and the screens get no bottom bar.
                 val atTheSide = maxWidth > maxHeight
+                val motionOn = LocalMotionEnabled.current
+                val firstTab = remember { booleanArrayOf(true) }
                 val bottomBar = @Composable {
                     if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
                     // With the tabs at the side: what a screen pins above the bar stays clear of the system's.
@@ -809,9 +820,21 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
+                            // Opaque, so the book's page behind never shows while a tab fades in.
+                            .background(MaterialTheme.colorScheme.background)
                             // The rail keeps clear of the system bars on its side.
                             .then(if (atTheSide) Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start)) else Modifier),
                     ) {
+                        // The tab you switch to fades in over the background (150 ms, from 40 %); the first
+                        // tab shown, and E-ink mode, have no fade. A tab is tappable from its first frame.
+                        key(tab) {
+                            val fade = remember { Animatable(if (motionOn && !firstTab[0]) TAB_FADE_START else 1f) }
+                            val fadeSpec = motionTween<Float>(TAB_FADE_MS)
+                            LaunchedEffect(Unit) {
+                                firstTab[0] = false
+                                fade.animateTo(1f, fadeSpec)
+                            }
+                            Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
                         when (tab) {
                             HomeTab.LIBRARY -> LibraryScreen(
                                 bottomBar = bottomBar,
@@ -857,6 +880,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                     context.startActivity(Intent.createChooser(share, shareTitle))
                                 },
                             )
+                        }
+                            }
                         }
                     }
                 }
@@ -1219,6 +1244,8 @@ private val FOOTER_HEIGHT = 32.dp
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"
+private const val TAB_FADE_MS = 150
+private const val TAB_FADE_START = 0.4f
 
 /** How often the audiobook checks where the audio is, in milliseconds. */
 private const val AUDIOBOOK_TICK_MS = 200L

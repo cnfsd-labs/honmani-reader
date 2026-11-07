@@ -260,7 +260,7 @@ private fun HeaderRow(book: LibraryBook, timeToRead: String?) {
         Box(
             modifier = Modifier
                 .width(112.dp)
-                .shadow(10.dp, RoundedCornerShape(6.dp)),
+                .shadow(10.dp, RoundedCornerShape(10.dp)),
         ) {
             Cover(book)
         }

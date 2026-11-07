@@ -1,7 +1,7 @@
 package app.honmani.reader.ui.progress
 
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -64,7 +64,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -91,6 +90,8 @@ import app.honmani.reader.ui.stats.StatisticsContent
 import app.honmani.reader.ui.stats.duration
 import app.honmani.reader.ui.stats.characters
 import app.honmani.reader.ui.stats.number
+import app.honmani.reader.ui.theme.LocalMotionEnabled
+import app.honmani.reader.ui.theme.motionTween
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -220,40 +221,44 @@ private fun LevelCard(state: ProgressUiState) {
             onDismiss = { explaining = false },
         )
     }
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    val onHero = MaterialTheme.colorScheme.onPrimaryContainer
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = onHero,
+        ),
+    ) {
+        Box {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+            ) {
                 LevelRing(level)
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.progress_level, level.level),
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        stringResource(LevelTitles.titleFor(level.level)),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(characters(level.characters), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.progress_to_next, number(level.nextLevelAt - level.characters), level.level + 1),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                InfoButton(onClick = { explaining = true })
+                Text(
+                    stringResource(LevelTitles.titleFor(level.level)),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = onHero,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
+                Text(characters(level.characters), style = MaterialTheme.typography.titleMedium, color = onHero)
+                Text(
+                    stringResource(R.string.progress_to_next, number(level.nextLevelAt - level.characters), level.level + 1),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onHero.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    stringResource(R.string.progress_this_week, state.daysThisWeek),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onHero.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(top = 6.dp),
+                )
             }
-            Text(
-                stringResource(R.string.progress_this_week, state.daysThisWeek),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Box(Modifier.align(Alignment.TopEnd)) { InfoButton(onClick = { explaining = true }) }
         }
     }
 }
@@ -300,20 +305,30 @@ internal fun ReviewTiles(reviews: ReviewSummary, compact: Boolean = false) {
 
 @Composable
 private fun LevelRing(level: ReadingLevel) {
-    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val track = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
     val fill = MaterialTheme.colorScheme.primary
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(88.dp)) {
+    // Sweeps in from empty when the card first appears; the number sits still.
+    val motion = LocalMotionEnabled.current
+    val sweep = remember { Animatable(if (motion) 0f else level.fraction) }
+    val spec = motionTween<Float>(RING_SWEEP_MS)
+    LaunchedEffect(level.fraction) { sweep.animateTo(level.fraction, spec) }
+    val description = stringResource(R.string.progress_level, level.level)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(144.dp).clearAndSetSemantics { contentDescription = description },
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = 8.dp.toPx()
+            val stroke = 12.dp.toPx()
             val inset = stroke / 2
             val arcSize = Size(size.width - stroke, size.height - stroke)
             val topLeft = Offset(inset, inset)
             drawArc(track, 0f, 360f, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke))
-            if (level.fraction > 0f) {
+            val shown = sweep.value
+            if (shown > 0f) {
                 drawArc(
                     fill,
                     startAngle = -90f,
-                    sweepAngle = 360f * level.fraction,
+                    sweepAngle = 360f * shown,
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
@@ -321,9 +336,11 @@ private fun LevelRing(level: ReadingLevel) {
                 )
             }
         }
-        Text("${level.level}", style = MaterialTheme.typography.headlineSmall)
+        Text("${level.level}", style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
+
+private const val RING_SWEEP_MS = 900
 
 /** The closest goals, each with how far along it is. */
 @Composable
@@ -445,10 +462,7 @@ private fun MilestoneTile(milestone: Milestone, dateFormat: DateTimeFormatter, r
  */
 @Composable
 private fun Modifier.recentGlow(color: Color): Modifier {
-    val context = LocalContext.current
-    val animate = remember(context) {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
-    }
+    val animate = LocalMotionEnabled.current
     val alpha: State<Float> = if (animate) {
         rememberInfiniteTransition(label = "milestone glow").animateFloat(
             initialValue = 0.35f,

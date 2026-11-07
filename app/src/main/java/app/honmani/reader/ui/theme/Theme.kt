@@ -9,6 +9,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
@@ -21,6 +22,7 @@ fun HonmaniTheme(
     accent: Accent = Accent.DEFAULT,
     customHue: Float = 0f,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    eInk: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val color = if (accent == Accent.CUSTOM) customAccentColor(customHue) else accent.color
@@ -32,7 +34,10 @@ fun HonmaniTheme(
         }
         else -> accentColorScheme(Color(Accent.DEFAULT.color!!), darkTheme)
     }
-    MaterialTheme(colorScheme = colorScheme, content = content)
+    val animationsOn = motionEnabled(eInk, rememberAnimatorScale())
+    CompositionLocalProvider(LocalMotionEnabled provides animationsOn) {
+        MaterialTheme(colorScheme = colorScheme, content = content)
+    }
 }
 
 /**

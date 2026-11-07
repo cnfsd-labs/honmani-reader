@@ -9,6 +9,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -17,12 +19,14 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -99,6 +103,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -126,6 +131,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -142,6 +148,9 @@ import app.honmani.reader.ui.opds.OpdsViewModel
 import app.honmani.reader.ui.progress.ProgressViewModel
 import app.honmani.reader.ui.progress.milestoneTitle
 import app.honmani.reader.ui.theme.HonmaniTheme
+import app.honmani.reader.ui.theme.LocalMotionEnabled
+import app.honmani.reader.ui.theme.motionSpring
+import app.honmani.reader.ui.theme.pressScale
 import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
@@ -487,8 +496,8 @@ private fun LibraryContent(
                     uiState.continueBook?.let { lastContinue[0] = it }
                     AnimatedVisibility(
                         visible = uiState.continueBook != null && !searching,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically(),
+                        enter = if (LocalMotionEnabled.current) fadeIn() + expandVertically() else EnterTransition.None,
+                        exit = if (LocalMotionEnabled.current) fadeOut() + shrinkVertically() else ExitTransition.None,
                     ) {
                         lastContinue[0]?.let { book -> ContinueBubble(book, onOpen = { onOpen(book.id) }, onDismiss = onDismissContinue) }
                     }
@@ -607,6 +616,7 @@ private fun LibraryContent(
                 ) {
                     items(books, key = { it.id }) { book ->
                         BookCard(
+                            modifier = if (LocalMotionEnabled.current) Modifier.animateItem() else Modifier,
                             book = book,
                             opening = book.id == uiState.opening,
                             onOpen = { onOpen(book.id) },
@@ -1040,6 +1050,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
     var width by remember { mutableIntStateOf(0) }
     val dismissAt = width * DISMISS_FRACTION
     val drag = rememberDraggableState { delta -> offset = (offset + delta).coerceAtLeast(0f) }
+    val settle = motionSpring<Float>()
     Row(
         horizontalArrangement = Arrangement.End,
         modifier = Modifier
@@ -1062,10 +1073,10 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
                     orientation = Orientation.Horizontal,
                     onDragStopped = { velocity ->
                         if (offset > dismissAt || velocity > FLING_VELOCITY) {
-                            animate(offset, width * 1.5f) { value, _ -> offset = value }
+                            animate(offset, width * 1.5f, animationSpec = settle) { value, _ -> offset = value }
                             onDismiss()
                         } else {
-                            animate(offset, 0f) { value, _ -> offset = value }
+                            animate(offset, 0f, animationSpec = settle) { value, _ -> offset = value }
                         }
                     },
                 ),
@@ -1075,7 +1086,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.padding(start = 14.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
             ) {
-                Box(modifier = Modifier.width(24.dp)) { Cover(book) }
+                Box(modifier = Modifier.width(24.dp)) { Cover(book, corner = 4.dp) }
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = stringResource(R.string.library_continue_reading),
@@ -1204,21 +1215,25 @@ private fun EmptyLibrary(onAdd: () -> Unit) {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookCard(
+    modifier: Modifier,
     book: LibraryBook,
     opening: Boolean,
     onOpen: () -> Unit,
     onShowDetails: () -> Unit,
     difficulty: Int? = null,
 ) {
+    val interactions = remember { MutableInteractionSource() }
     Column(
-        modifier = Modifier.combinedClickable(
+        modifier = modifier.combinedClickable(
+            interactionSource = interactions,
+            indication = LocalIndication.current,
             role = Role.Button,
             onClick = onOpen,
             onLongClick = onShowDetails,
         ),
     ) {
-        Box {
-            Cover(book)
+        Box(Modifier.pressScale(interactions)) {
+            Cover(book, elevation = 3.dp)
             if (difficulty != null) {
                 // The book's difficulty, small, in the corner the finished check doesn't use.
                 Surface(
@@ -1261,6 +1276,7 @@ private fun BookCard(
                 ProgressBar(
                     progress = { if (finished) 1f else book.progress },
                     modifier = Modifier.weight(1f),
+                    growIn = false,
                 )
                 Text(
                     text = if (finished) {
@@ -1292,11 +1308,12 @@ private fun BookCard(
 }
 
 @Composable
-internal fun Cover(book: LibraryBook) {
-    val shape = RoundedCornerShape(6.dp)
+internal fun Cover(book: LibraryBook, corner: Dp = 10.dp, elevation: Dp = 0.dp) {
+    val shape = RoundedCornerShape(corner)
     val modifier = Modifier
         .fillMaxWidth()
         .aspectRatio(COVER_ASPECT_RATIO)
+        .then(if (elevation > 0.dp) Modifier.shadow(elevation, shape) else Modifier)
         .clip(shape)
     val image by produceState<ImageBitmap?>(CoverCache.get(book.cover), book.cover) {
         if (value == null) value = CoverCache.load(book.cover)
