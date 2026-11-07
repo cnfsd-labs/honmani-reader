@@ -78,6 +78,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="application/epub+zip" />
             </intent-filter>
+            <!-- Shared text (a browser's article, a message) becomes a text book; the entry beside
+                 "Look up" in the share sheet. -->
+            <intent-filter android:label="@string/share_as_book_label">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
 
         <!-- Looks up words outside a book: text selected in other apps (their selection menu),

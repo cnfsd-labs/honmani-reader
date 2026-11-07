@@ -322,6 +322,17 @@ adb shell bmgr enable false
 - Delete the folder in the file app (or revoke access): the row says "Cannot read ..." in red, the
   library shows no error. "Stop watching" keeps every imported book.
 
+## Shared and pasted text
+
+- In Chrome select an article, Share -> **Add as a book** (beside "Look up"): the library opens the
+  book at once, titled after the page title or the first line. Share the same text again: "already in
+  your library" and the book opens. Share from an app with no title: the first line is the title; with
+  only symbols: "Shared text <date>".
+- Copy some Japanese text, Library -> + -> **Paste text**: dialog shows the length and the start, the
+  Title field is optional (the grey hint is the default). Add: the book opens. With an empty clipboard:
+  "There is no text to add". A very long text (over 5 MB): "too long" message, no book added.
+- Aozora-style text with ruby (`漢字《かんじ》`) pasted: becomes an EPUB with furigana like a file.
+
 ## Tabs, Progress, Appearance
 
 - Tapping the open tab: Words and Progress go to their next page and wrap (Words restarts at Review);

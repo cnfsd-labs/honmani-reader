@@ -6,7 +6,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 
 - Dictionaries with one tap on the first start (English or Japanese definitions), or any
   Yomitan dictionary
-- EPUB and text files (Aozora Bunko too), vertical or horizontal text, furigana, reader fonts; pages
+- EPUB and text files (Aozora Bunko too); text shared from another app or pasted from the clipboard
+  becomes a book; vertical or horizontal text, furigana, reader fonts; pages
   turn with a tap, a swipe or the volume buttons. Optional: immersive mode (hides the status and
   navigation bars), e-ink mode (black on white, no animations, grey marks), your own CSS for the book
   text. A tap on a picture (a cover too) opens it full screen with pinch zoom, double-tap zoom and
@@ -100,7 +101,8 @@ complete bundled reader, and no Play-restricted permissions.
   underneath.
 - **Library.** Honmani keeps the book files (named by SHA-256) and feeds them to ttu, whose storage is
   only a cache. Text files are converted to UTF-8; Aozora Bunko texts become EPUBs with furigana,
-  headings and notation (`data/library/`).
+  headings and notation (`data/library/`). Shared or pasted text (`ui/library/SharedText`, at most
+  5 MB) takes the same way in as a text file named after its title.
 - **Lookup.** Honmani's own deinflection rules (`lookup/Deinflector`, test corpus in
   `app/src/test/resources/`) over Yomitan dictionaries imported into Room (`data/dictionary/`,
   definitions stored compressed). The panel draws Yomitan's structured content natively. Optional

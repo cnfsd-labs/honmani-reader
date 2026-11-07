@@ -415,6 +415,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             library.addOpened(uris)
         }
     }
+    // Text shared from other apps becomes a book and opens.
+    LaunchedEffect(library) {
+        container.openedBooks.receivedText.collect { shared ->
+            tab = HomeTab.LIBRARY
+            library.addText(shared.text, shared.title)
+        }
+    }
     // The launcher's "Search" shortcut: Words with its search field focused, out of an open book.
     var focusSearch by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(container) {

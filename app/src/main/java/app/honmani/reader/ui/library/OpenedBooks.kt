@@ -17,8 +17,17 @@ class OpenedBooks {
 
     val received: Flow<List<Uri>> = files.receiveAsFlow()
 
-    /** Takes the book files of [intent], if it has any; true if it had. */
+    private val texts = Channel<SharedText.Shared>(Channel.UNLIMITED)
+
+    /** Text shared with Honmani, to become a book. */
+    val receivedText: Flow<SharedText.Shared> = texts.receiveAsFlow()
+
+    /** Takes the book files or the shared text of [intent], if it has any; true if it had. */
     fun receive(intent: Intent?): Boolean {
+        SharedText.fromIntent(intent)?.let {
+            texts.trySend(it)
+            return true
+        }
         val uris = bookUris(intent)
         if (uris.isEmpty()) return false
         files.trySend(uris)

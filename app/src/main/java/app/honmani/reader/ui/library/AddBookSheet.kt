@@ -31,6 +31,7 @@ fun AddBookSheet(
     catalogs: List<OpdsCatalog>,
     onPickFiles: () -> Unit,
     onPickFolder: () -> Unit,
+    onPasteText: () -> Unit,
     onExport: () -> Unit,
     onOpenCatalog: (OpdsCatalog) -> Unit,
     onEditCatalog: (OpdsCatalog) -> Unit,
@@ -53,6 +54,13 @@ fun AddBookSheet(
                 supportingContent = { Text(stringResource(R.string.add_book_folder_details)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onPickFolder),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_paste), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.add_book_paste)) },
+                supportingContent = { Text(stringResource(R.string.add_book_paste_details)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onPasteText),
             )
             for (catalog in catalogs) {
                 ListItem(

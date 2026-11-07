@@ -115,6 +115,7 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -185,6 +186,10 @@ fun LibraryScreen(
     val autoImport by viewModel.autoImport.collectAsStateWithLifecycle()
     val opdsState by opds.uiState.collectAsStateWithLifecycle()
     var choosingSource by rememberSaveable { mutableStateOf(false) }
+    // Text taken from the clipboard, waiting for a title; not saved, it can be megabytes.
+    var pastedText by remember { mutableStateOf<String?>(null) }
+    val clipboard = LocalClipboard.current
+    val pasteScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) {
         if (it.isNotEmpty()) viewModel.add(it)
@@ -343,6 +348,18 @@ fun LibraryScreen(
         }
     }
 
+    pastedText?.let { text ->
+        PasteTextDialog(
+            text = text,
+            suggestedTitle = SharedText.title(null, text, stringResource(R.string.shared_text_title, java.time.LocalDate.now().toString())),
+            onAdd = { title ->
+                pastedText = null
+                viewModel.addText(text, title.ifBlank { null })
+            },
+            onDismiss = { pastedText = null },
+        )
+    }
+
     if (choosingSource) {
         AddBookSheet(
             catalogs = opdsState.catalogs,
@@ -365,6 +382,14 @@ fun LibraryScreen(
             onPickFolder = {
                 choosingSource = false
                 folderPicker.launch(null)
+            },
+            onPasteText = {
+                choosingSource = false
+                pasteScope.launch {
+                    val text = clipboard.getClipEntry()?.clipData?.takeIf { it.itemCount > 0 }
+                        ?.getItemAt(0)?.coerceToText(appContext)?.toString()
+                    if (text.isNullOrBlank()) viewModel.addText(null, null) else pastedText = text
+                }
             },
             onExport = {
                 choosingSource = false
@@ -426,6 +451,8 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
             ),
         )
     }
+    LibraryNotice.TextEmpty -> stringResource(R.string.library_text_empty)
+    LibraryNotice.TextTooLarge -> stringResource(R.string.library_text_too_large, SharedText.MAX_BYTES / (1024 * 1024))
     LibraryNotice.NoBooksInFolder -> stringResource(R.string.library_folder_no_books)
     LibraryNotice.NothingToExport -> stringResource(R.string.library_export_empty)
     LibraryNotice.FolderUnusable -> stringResource(R.string.library_folder_unusable)

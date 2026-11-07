@@ -163,6 +163,16 @@
 
     <string name="add_book_files">Files on this phone</string>
     <string name="add_book_files_details">EPUB or text files (Aozora Bunko)</string>
+    <string name="add_book_paste">Paste text</string>
+    <string name="add_book_paste_details">Make a book of the text you copied</string>
+    <string name="paste_text_title">Add the copied text</string>
+    <string name="paste_text_summary">%1$s characters, starting “%2$s”</string>
+    <string name="paste_text_title_label">Title</string>
+    <string name="paste_text_add">Add</string>
+    <string name="shared_text_title">Shared text %1$s</string>
+    <string name="share_as_book_label">Add as a book</string>
+    <string name="library_text_empty">There is no text to add. Copy some text first.</string>
+    <string name="library_text_too_large">That text is too long for one book (the limit is %1$d MB).</string>
     <string name="add_book_catalog_details">Your Calibre-Web or another OPDS book server</string>
     <string name="catalog_add_title">Add a book server</string>
     <string name="catalog_edit_title">Change book server</string>

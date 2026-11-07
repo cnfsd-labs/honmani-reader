@@ -186,6 +186,25 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun sharedTextBecomesATextBookAndOpens() = runBlocking {
+        viewModel.addText("吾輩は猫である。\n名前はまだ無い。", null)
+
+        val book = eventually { dao.books.value.singleOrNull()?.takeIf { it.lastOpenedAt != null } }
+        assertEquals("吾輩は猫である。", book.title)
+        assertEquals(app.honmani.reader.data.library.BookFormat.TXT, book.format)
+        assertEquals("/b?id=${book.ttuId}", page.loads.single())
+    }
+
+    @Test
+    fun emptyOrHugeSharedTextOnlyGetsAMessage() = runBlocking {
+        viewModel.addText("  \n ", "Title")
+        assertEquals(LibraryNotice.TextEmpty, viewModel.notices.first())
+        viewModel.addText("あ".repeat(SharedText.MAX_BYTES), null)
+        assertEquals(LibraryNotice.TextTooLarge, viewModel.notices.first())
+        assertEquals(0, dao.books.value.size)
+    }
+
+    @Test
     fun aCopyOfTheBookFileIsSavedWhereTheReaderPicked() = runBlocking {
         val saved = HashMap<String, ByteArray>()
         viewModel = LibraryViewModel(

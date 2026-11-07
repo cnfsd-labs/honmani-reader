@@ -39,6 +39,7 @@ import app.honmani.reader.lookup.TextReading
 import app.honmani.reader.ui.reader.TtuBook
 import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuLibraryException
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -165,6 +166,12 @@ sealed interface LibraryNotice {
     /** The library has no book to export. */
     data object NothingToExport : LibraryNotice
 
+    /** Shared or pasted text had nothing to read. */
+    data object TextEmpty : LibraryNotice
+
+    /** Shared or pasted text is longer than [SharedText.MAX_BYTES]. */
+    data object TextTooLarge : LibraryNotice
+
     /** The chosen folder cannot be read or written. */
     data object FolderUnusable : LibraryNotice
 }
@@ -240,6 +247,8 @@ class LibraryViewModel(
     private val folderView: LibraryFolderView? = null,
     /** The folder looked at for new books when the library opens; null: none. */
     private val watchedFolder: WatchedFolder? = null,
+    /** The title of a shared or pasted text that has none of its own, by default with today's date. */
+    private val textTitle: () -> String = { "Shared text" },
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -359,6 +368,25 @@ class LibraryViewModel(
         viewModelScope.launch {
             val books = uris.map { uri -> addMutex.withLock { addOne(uri) } }
             books.singleOrNull()?.let { open(it.id) }
+        }
+    }
+
+    /**
+     * Adds [text] (shared or pasted) as a text book titled [title], or after its first line if
+     * that is null, and opens it (also if it is in the library already).
+     */
+    fun addText(text: String?, title: String?) {
+        viewModelScope.launch {
+            when (val prepared = SharedText.prepare(text, title, textTitle())) {
+                SharedText.Prepared.Empty -> _notices.send(LibraryNotice.TextEmpty)
+                SharedText.Prepared.TooLarge -> _notices.send(LibraryNotice.TextTooLarge)
+                is SharedText.Prepared.Ready -> {
+                    val book = addMutex.withLock {
+                        add(PickedFile(prepared.fileName, ByteArrayInputStream(prepared.bytes)))
+                    }
+                    book?.let { open(it.id) }
+                }
+            }
         }
     }
 
@@ -835,6 +863,9 @@ class LibraryViewModel(
                     folders = container.folders,
                     folderView = container.libraryFolderView,
                     watchedFolder = container.watchedFolder,
+                    textTitle = {
+                        application.getString(R.string.shared_text_title, java.time.LocalDate.now().toString())
+                    },
                     openTree = { uri ->
                         try {
                             ResolverDocumentTree(application.contentResolver, uri)
