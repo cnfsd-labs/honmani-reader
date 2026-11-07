@@ -48,7 +48,9 @@ async function tapChar(page, selector, char, occurrence = 0) {
   await page.mouse.click(x, y);
 }
 
-const messages = (page) => page.evaluate(() => window.__messages);
+// The haptic cue of a long press ("reader.longPress") is checked on its own; lookups are what the rest asserts.
+const allMessages = (page) => page.evaluate(() => window.__messages);
+const messages = (page) => page.evaluate(() => window.__messages.filter((m) => m.type !== 'reader.longPress'));
 
 test('vertical text: scans forward from the tapped character, skipping furigana', async ({ page }) => {
   await tapChar(page, '#v1', '吾');
@@ -721,6 +723,7 @@ test.describe('long press (own selection)', () => {
     expect(await marked(page)).toBe(true);
     expect(await markedText(page)).not.toBe('');
     expect(await messages(page)).toEqual([]);
+    expect(await allMessages(page)).toEqual([{ type: 'reader.longPress' }]);
     expect(await page.evaluate(() => window.getSelection().toString())).toBe('');
 
     await touchUp(cdp);
