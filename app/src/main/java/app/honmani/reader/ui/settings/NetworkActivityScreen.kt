@@ -32,6 +32,7 @@ private fun NetworkPurpose.title(): Int = when (this) {
     NetworkPurpose.BOOK_SERVER -> R.string.network_purpose_book_server
     NetworkPurpose.PROGRESS_SYNC -> R.string.network_purpose_sync
     NetworkPurpose.GOOGLE_VOICE -> R.string.network_purpose_voice
+    NetworkPurpose.WANIKANI -> R.string.network_purpose_wanikani
 }
 
 /**

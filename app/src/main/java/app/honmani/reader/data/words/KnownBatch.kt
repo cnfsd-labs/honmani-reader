@@ -24,6 +24,7 @@ enum class KnownSource {
     ANKI_DECK,
     WORD_LIST,
     TOP_N,
+    WANIKANI,
 
     /** For the quick quiz, which is not built yet. */
     QUIZ,

@@ -10,6 +10,7 @@ enum class NetworkPurpose {
     BOOK_SERVER,
     PROGRESS_SYNC,
     GOOGLE_VOICE,
+    WANIKANI,
 }
 
 /**

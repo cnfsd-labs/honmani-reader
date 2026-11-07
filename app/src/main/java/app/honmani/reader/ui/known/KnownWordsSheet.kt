@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -41,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.AppContainer
@@ -51,10 +54,13 @@ import app.honmani.reader.data.words.KnownBatchEntity
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.known.KnownPlan
+import app.honmani.reader.known.KnownWords
 import app.honmani.reader.known.PlacementQuiz
 import app.honmani.reader.known.QuizAnswer
 import app.honmani.reader.known.QuizSetup
 import app.honmani.reader.known.TopNResult
+import app.honmani.reader.known.WaniKaniException
+import app.honmani.reader.known.WaniKaniProblem
 import app.honmani.reader.known.WordListTooLargeException
 import app.honmani.reader.known.WordListParser
 import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
@@ -89,6 +95,9 @@ internal class KnownWordsFlow(
 
         data object Paste : Step
 
+        /** Asks for the WaniKani token (kept only in the dialog, never saved). */
+        data object WaniKani : Step
+
         data class Review(val plan: KnownPlan, val dictionary: String? = null) : Step
 
         data class Problem(val message: String) : Step
@@ -107,6 +116,30 @@ internal class KnownWordsFlow(
 
     fun showPaste() {
         step = Step.Paste
+    }
+
+    fun showWaniKani() {
+        step = Step.WaniKani
+    }
+
+    /** Reads the reader's WaniKani items at Guru and above with [token], which is not kept anywhere. */
+    fun waniKani(token: String, includeKanji: Boolean) = work {
+        try {
+            container.knownWords.planWaniKani(token, includeKanji)?.let { Step.Review(it) }
+                ?: Step.Problem(context.getString(R.string.known_wanikani_empty))
+        } catch (e: WaniKaniException) {
+            Step.Problem(
+                context.getString(
+                    when (e.problem) {
+                        WaniKaniProblem.NO_TOKEN -> R.string.known_wanikani_no_token
+                        WaniKaniProblem.BAD_TOKEN -> R.string.known_wanikani_bad_token
+                        WaniKaniProblem.OFFLINE -> R.string.known_wanikani_offline
+                        WaniKaniProblem.RATE_LIMITED -> R.string.known_wanikani_rate_limited
+                        WaniKaniProblem.FAILED -> R.string.known_wanikani_failed
+                    },
+                ),
+            )
+        }
     }
 
     fun topN(n: Int) = work {
@@ -273,6 +306,11 @@ fun KnownWordsSheet(onDismiss: () -> Unit) {
                 modifier = Modifier.clickable(onClick = knownFromAnki::start),
             )
             ListItem(
+                headlineContent = { Text(stringResource(R.string.known_wanikani)) },
+                supportingContent = { Text(stringResource(R.string.known_wanikani_details)) },
+                modifier = Modifier.clickable(onClick = flow::showWaniKani),
+            )
+            ListItem(
                 headlineContent = { Text(stringResource(R.string.known_quiz)) },
                 supportingContent = { Text(stringResource(R.string.known_quiz_details)) },
                 modifier = Modifier.clickable(onClick = flow::startQuiz),
@@ -308,6 +346,9 @@ private fun batchTitle(batch: KnownBatchEntity): String = when (batch.source) {
     KnownSource.TOP_N -> stringResource(R.string.known_batch_top, batch.detail)
     KnownSource.ANKI_DECK -> stringResource(R.string.known_batch_anki, batch.detail)
     KnownSource.WORD_LIST -> stringResource(R.string.known_batch_list, batch.detail)
+    KnownSource.WANIKANI -> stringResource(
+        if (batch.detail == KnownWords.WANIKANI_KANJI) R.string.known_batch_wanikani_kanji else R.string.known_batch_wanikani,
+    )
     KnownSource.QUIZ -> stringResource(R.string.known_batch_quiz, "%,d".format(batch.detail.toIntOrNull() ?: 0))
 }
 
@@ -337,6 +378,40 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                 },
                 confirmButton = {
                     TextButton(onClick = { flow.pasted(text) }, enabled = text.isNotBlank()) { Text(stringResource(R.string.known_check)) }
+                },
+                dismissButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_cancel)) } },
+            )
+        }
+        KnownWordsFlow.Step.WaniKani -> {
+            // Not rememberSaveable: the token must not be written to the saved instance state.
+            var token by remember { mutableStateOf("") }
+            var kanji by remember { mutableStateOf(false) }
+            AlertDialog(
+                onDismissRequest = flow::cancel,
+                title = { Text(stringResource(R.string.known_wanikani)) },
+                text = {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.known_wanikani_intro))
+                        OutlinedTextField(
+                            value = token,
+                            onValueChange = { token = it },
+                            label = { Text(stringResource(R.string.known_wanikani_token)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { kanji = !kanji },
+                        ) {
+                            Checkbox(checked = kanji, onCheckedChange = { kanji = it })
+                            Text(stringResource(R.string.known_wanikani_kanji))
+                        }
+                        Text(stringResource(R.string.known_wanikani_privacy), style = MaterialTheme.typography.bodySmall)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { flow.waniKani(token, kanji) }, enabled = token.isNotBlank()) { Text(stringResource(R.string.known_check)) }
                 },
                 dismissButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_cancel)) } },
             )
@@ -400,6 +475,9 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                                 KnownSource.TOP_N -> stringResource(R.string.known_review_top, plan.detail, step.dictionary.orEmpty())
                                 KnownSource.QUIZ -> stringResource(R.string.known_quiz_review, "%,d".format(plan.detail.toIntOrNull() ?: 0), step.dictionary.orEmpty())
                                 KnownSource.ANKI_DECK -> stringResource(R.string.known_review_anki, plan.detail)
+                                KnownSource.WANIKANI -> stringResource(
+                                    if (plan.detail == KnownWords.WANIKANI_KANJI) R.string.known_review_wanikani_kanji else R.string.known_review_wanikani,
+                                )
                                 else -> stringResource(R.string.known_review_list, plan.detail)
                             },
                         )

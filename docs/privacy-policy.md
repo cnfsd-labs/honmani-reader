@@ -64,6 +64,10 @@ Honmani only connects to the internet for these things, and only to these places
   (texttospeech.googleapis.com), over an encrypted connection. Google's privacy policy applies. The default voice is your
   phone's own, which works offline. Sound that a flashcard plays by itself (the "Play audio by itself" setting) always uses
   the phone's voice and never reaches Google.
+- **WaniKani, only when you start it** (Settings or Words → Tell Honmani what you already know → WaniKani):
+  Honmani sends the read-only API token you pasted to WaniKani (api.wanikani.com), over an encrypted connection, and
+  reads back which vocabulary words (and, if you ask, kanji) you have at Guru (stage 5) or above, to mark them as known. The token
+  is used for that one run only and is not stored, backed up or logged. WaniKani's privacy policy applies.
 
 The book reader itself never loads anything from the internet.
 

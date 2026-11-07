@@ -72,7 +72,20 @@ class KnownWords(
     private val frequencyDictionary: suspend () -> Pair<Long, String>?,
     /** The words ranked [maxRank] or better in a frequency dictionary, most common first. */
     private val topWords: suspend (dictionary: Long, maxRank: Int) -> List<RankedWord>,
+    private val waniKani: WaniKaniClient = WaniKaniClient(),
 ) {
+    /**
+     * The WaniKani items at Guru (stage 5) or above, read with the reader's [token] (used for this call
+     * only). The plan's detail is [WANIKANI_KANJI] if kanji are included, else [WANIKANI_VOCABULARY];
+     * null if there are no such items. Throws [WaniKaniException].
+     */
+    suspend fun planWaniKani(token: String, includeKanji: Boolean, onProgress: (Int) -> Unit = {}): KnownPlan? {
+        val items = waniKani.knownItems(token, includeKanji)
+        if (items.isEmpty()) return null
+        val wanted = items.map { WantedWord(it.characters, it.reading) }
+        return plan(KnownSource.WANIKANI, if (includeKanji) WANIKANI_KANJI else WANIKANI_VOCABULARY, wanted, deinflect = false, skipped = 0, onProgress)
+    }
+
     suspend fun planWordList(name: String, list: ParsedWordList, onProgress: (Int) -> Unit = {}): KnownPlan =
         plan(KnownSource.WORD_LIST, name, list.entries.map { WantedWord(it.word, it.reading) }, deinflect = true, skipped = list.skippedLines, onProgress)
 
@@ -175,8 +188,12 @@ class KnownWords(
         return KnownPlan(source, detail, resolved, batches.preview(resolved.words), skipped)
     }
 
-    private companion object {
+    companion object {
+        /** [KnownPlan.detail] of a WaniKani plan with vocabulary only, and with kanji too. */
+        const val WANIKANI_VOCABULARY = "vocabulary"
+        const val WANIKANI_KANJI = "vocabulary and kanji"
+
         /** A frequency dictionary with fewer ranked words than this cannot place anyone. */
-        const val MIN_QUIZ_WORDS = 500
+        private const val MIN_QUIZ_WORDS = 500
     }
 }

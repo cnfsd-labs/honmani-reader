@@ -91,6 +91,11 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   deck -> preview (matched, new, already known, not found) before "Mark as known". "Earlier steps" Undo
   removes what the step added, moves back what it moved, keeps words changed since. Top 1000 -> Known
   filter and book "% known" rise; Undo -> fall.
+- **WaniKani** (same sheet; needs a read-only API token from wanikani.com, no permissions): paste
+  token (masked; not kept after the dialog closes or on rotation) -> preview of vocabulary at Guru
+  (stage 5) and above; kanji off by default, tick it for kanji too. Bad token -> readable message;
+  airplane mode -> "Could not reach WaniKani". Batch "WaniKani vocabulary", Undo removes it. Settings
+  -> Network activity lists "WaniKani" with host api.wanikani.com only. Backup/restore carries no token.
 - **Quick quiz** (~45 content words, no particles or pronouns; I know it / I don't, Undo last) -> "You seem to know about N words" +
   slider; Continue -> preview, nothing marked before "Mark as known". "Don't know" never marked, "know"
   always. Know up to a point: estimate near it; batch "Quick quiz: about N words", Undo removes it.
