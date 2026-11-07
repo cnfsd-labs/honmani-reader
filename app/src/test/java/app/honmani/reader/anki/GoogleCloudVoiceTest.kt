@@ -146,7 +146,9 @@ class GoogleCloudVoiceTest {
 
     @Test
     fun problemsByStatus() {
-        assertEquals(VoiceProblem.KEY_REJECTED, GoogleCloudVoice.problemFor(403, "SERVICE_DISABLED"))
+        assertEquals(VoiceProblem.SERVICE_DISABLED, GoogleCloudVoice.problemFor(403, "SERVICE_DISABLED"))
+        assertEquals(VoiceProblem.BILLING_DISABLED, GoogleCloudVoice.problemFor(403, """{"error":{"details":[{"reason":"BILLING_DISABLED"}]}}"""))
+        assertEquals(VoiceProblem.KEY_REJECTED, GoogleCloudVoice.problemFor(403, "PERMISSION_DENIED"))
         assertEquals(VoiceProblem.QUOTA, GoogleCloudVoice.problemFor(429, ""))
         assertEquals(VoiceProblem.FAILED, GoogleCloudVoice.problemFor(400, "Voice does not exist"))
         assertEquals(VoiceProblem.FAILED, GoogleCloudVoice.problemFor(500, ""))

@@ -412,6 +412,7 @@
     <string name="network_purpose_book_server">Book server</string>
     <string name="network_purpose_sync">Progress sync</string>
     <string name="network_purpose_voice">Google voice</string>
+    <string name="network_purpose_audiobook">Google audiobook voice</string>
     <string name="network_purpose_wanikani">WaniKani</string>
     <string name="network_purpose_free_books_list">Free books list</string>
     <string name="network_purpose_free_books_book">Free book download</string>
@@ -704,6 +705,8 @@
     <string name="voice_problem_key_rejected">Google didn\'t accept the API key. Check that it is right and that the Cloud Text-to-Speech API is enabled for it</string>
     <string name="voice_problem_quota">the Google Cloud quota is used up for now</string>
     <string name="voice_problem_network">no connection to Google</string>
+    <string name="voice_problem_billing_disabled">billing is not switched on for the Google Cloud project of your key. Link a billing account to it in the Cloud console</string>
+    <string name="voice_problem_service_disabled">the Cloud Text-to-Speech API is not switched on for the project of your key. Enable it in the Cloud console</string>
 
     <string name="settings_anki_cards">Anki cards</string>
     <string name="settings_anki_cards_details">Add words to Anki from the dictionary and the word list. On by default if AnkiDroid is installed; if you use Anki on a computer, turn it on to export your words.</string>

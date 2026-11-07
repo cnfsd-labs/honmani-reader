@@ -48,6 +48,22 @@ class GoogleCloudVoice(
     override val maxInputLength: Int get() = 1_600
 
     override suspend fun speak(text: String, out: File, rate: Double) {
+        val bytes = synthesize(text, rate)
+        out.parentFile?.mkdirs()
+        out.writeBytes(bytes)
+    }
+
+    /**
+     * The MP3 for [text]. With [sampleRateHertz] the service is asked for that rate (the
+     * audiobook joins pieces, which must all share one). [purpose] is how the request shows in the
+     * network log.
+     */
+    suspend fun synthesize(
+        text: String,
+        rate: Double = 1.0,
+        sampleRateHertz: Int? = null,
+        purpose: NetworkPurpose = NetworkPurpose.GOOGLE_VOICE,
+    ): ByteArray {
         val body = buildJsonObject {
             putJsonObject("input") { put("text", text) }
             putJsonObject("voice") {
@@ -57,18 +73,17 @@ class GoogleCloudVoice(
             putJsonObject("audioConfig") {
                 put("audioEncoding", "MP3")
                 if (rate != 1.0) put("speakingRate", rate)
+                if (sampleRateHertz != null) put("sampleRateHertz", sampleRateHertz)
             }
         }
-        val response = request(apiKey, "$baseUrl/v1/text:synthesize", body.toString())
+        val response = request(apiKey, "$baseUrl/v1/text:synthesize", body.toString(), purpose)
         val audio = response["audioContent"]?.jsonPrimitive?.contentOrNull
             ?: throw VoiceException(VoiceProblem.FAILED)
-        val bytes = try {
+        return try {
             Base64.getDecoder().decode(audio)
         } catch (e: IllegalArgumentException) {
             throw VoiceException(VoiceProblem.FAILED, e)
         }
-        out.parentFile?.mkdirs()
-        out.writeBytes(bytes)
     }
 
     companion object {
@@ -101,7 +116,7 @@ class GoogleCloudVoice(
             return if (i < 0) MODELS.size else i
         }
 
-        private suspend fun request(apiKey: String, url: String, body: String?): JsonObject =
+        private suspend fun request(apiKey: String, url: String, body: String?, purpose: NetworkPurpose = NetworkPurpose.GOOGLE_VOICE): JsonObject =
             withContext(Dispatchers.IO) {
                 if (apiKey.isBlank()) throw VoiceException(VoiceProblem.NO_KEY)
                 val connection = try {
@@ -122,10 +137,11 @@ class GoogleCloudVoice(
                         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                     }
                     val status = connection.responseCode
-                    NetworkLog.shared.answered(NetworkPurpose.GOOGLE_VOICE, url, status, connection.contentLengthLong)
+                    NetworkLog.shared.answered(purpose, url, status, connection.contentLengthLong)
                     if (status !in 200..299) {
                         val error = connection.errorStream?.use { it.readBytesAtMost(MAX_ERROR_BYTES).toString(Charsets.UTF_8) }.orEmpty()
-                        throw VoiceException(problemFor(status, error))
+                        val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
+                        throw VoiceException(problemFor(status, error), status = status, retryAfterSeconds = retryAfter)
                     }
                     val text = connection.inputStream.use { it.readBytesAtMost(MAX_RESPONSE_BYTES).toString(Charsets.UTF_8) }
                     Json.parseToJsonElement(text).jsonObject
@@ -134,7 +150,7 @@ class GoogleCloudVoice(
                 } catch (e: TooLargeException) {
                     throw VoiceException(VoiceProblem.FAILED, e)
                 } catch (e: IOException) {
-                    NetworkLog.shared.failed(NetworkPurpose.GOOGLE_VOICE, url, e)
+                    NetworkLog.shared.failed(purpose, url, e)
                     throw VoiceException(VoiceProblem.NETWORK, e)
                 } catch (e: IllegalArgumentException) {
                     // Not JSON, or not an object.
@@ -146,9 +162,12 @@ class GoogleCloudVoice(
 
         /**
          * Google answers a bad key with 400 (reason API_KEY_INVALID), a key without the API
-         * enabled or with too narrow restrictions with 403, and too many requests with 429.
+         * enabled or with too narrow restrictions with 403, and too many requests with 429. A 403
+         * with the reason BILLING_DISABLED or SERVICE_DISABLED says what is missing in the project.
          */
         internal fun problemFor(status: Int, error: String): VoiceProblem = when {
+            "BILLING_DISABLED" in error -> VoiceProblem.BILLING_DISABLED
+            "SERVICE_DISABLED" in error -> VoiceProblem.SERVICE_DISABLED
             status == 429 || "RESOURCE_EXHAUSTED" in error -> VoiceProblem.QUOTA
             status == 401 || status == 403 || "API_KEY_INVALID" in error || "API key not valid" in error ->
                 VoiceProblem.KEY_REJECTED

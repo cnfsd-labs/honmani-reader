@@ -32,9 +32,24 @@ enum class VoiceProblem {
     KEY_REJECTED,
     QUOTA,
     NETWORK,
+
+    /** The Google Cloud project of the key has no billing account (a paid voice needs one). */
+    BILLING_DISABLED,
+
+    /** The Cloud Text-to-Speech API is not switched on in the key's project. */
+    SERVICE_DISABLED,
 }
 
-class VoiceException(val problem: VoiceProblem, cause: Throwable? = null) : IOException(problem.name, cause)
+/**
+ * [status] is the HTTP status of the answer (0 if there was none), [retryAfterSeconds] what the
+ * server's Retry-After header asked for.
+ */
+class VoiceException(
+    val problem: VoiceProblem,
+    cause: Throwable? = null,
+    val status: Int = 0,
+    val retryAfterSeconds: Long? = null,
+) : IOException(problem.name, cause)
 
 /** Turns Japanese text into an audio file for a card. */
 interface CardVoice {

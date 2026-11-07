@@ -32,6 +32,7 @@ private fun NetworkPurpose.title(): Int = when (this) {
     NetworkPurpose.BOOK_SERVER -> R.string.network_purpose_book_server
     NetworkPurpose.PROGRESS_SYNC -> R.string.network_purpose_sync
     NetworkPurpose.GOOGLE_VOICE -> R.string.network_purpose_voice
+    NetworkPurpose.GOOGLE_AUDIOBOOK -> R.string.network_purpose_audiobook
     NetworkPurpose.WANIKANI -> R.string.network_purpose_wanikani
     NetworkPurpose.FREE_BOOKS_LIST -> R.string.network_purpose_free_books_list
     NetworkPurpose.FREE_BOOKS_BOOK -> R.string.network_purpose_free_books_book

@@ -137,6 +137,8 @@ fun VoiceProblem.label(): Int = when (this) {
     VoiceProblem.KEY_REJECTED -> R.string.voice_problem_key_rejected
     VoiceProblem.QUOTA -> R.string.voice_problem_quota
     VoiceProblem.NETWORK -> R.string.voice_problem_network
+    VoiceProblem.BILLING_DISABLED -> R.string.voice_problem_billing_disabled
+    VoiceProblem.SERVICE_DISABLED -> R.string.voice_problem_service_disabled
 }
 
 private fun toast(context: Context, message: String) {
