@@ -22,6 +22,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewLimit
+import app.honmani.reader.data.settings.ReviewAutoPlay
+import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
 
 /** Settings → Flashcards: new words and reviews a day, the front of a card, and when a word counts as known. */
@@ -34,6 +36,8 @@ fun ReviewSettingsSection() {
     val reviewsPerDay by settings.reviewsPerDay.collectAsStateWithLifecycle()
     val showSentence by settings.showSentence.collectAsStateWithLifecycle()
     val speakers by settings.speakers.collectAsStateWithLifecycle()
+    val autoPlay by settings.autoPlay.collectAsStateWithLifecycle()
+    val autoPlayContent by settings.autoPlayContent.collectAsStateWithLifecycle()
     val knownAfter by settings.knownAfterDays.collectAsStateWithLifecycle()
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_new_per_day)) },
@@ -87,6 +91,42 @@ fun ReviewSettingsSection() {
         trailingContent = { Switch(checked = speakers, onCheckedChange = null) },
         modifier = Modifier.toggleable(speakers, role = Role.Switch, onValueChange = settings::setSpeakers),
     )
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.review_settings_auto_play)) },
+        supportingContent = { Text(stringResource(R.string.review_settings_auto_play_details)) },
+    )
+    Chips {
+        val modes = listOf(
+            ReviewAutoPlay.OFF to R.string.review_settings_auto_play_off,
+            ReviewAutoPlay.ON_REVEAL to R.string.review_settings_auto_play_reveal,
+            ReviewAutoPlay.ON_SHOW to R.string.review_settings_auto_play_show,
+        )
+        for ((mode, label) in modes) {
+            FilterChip(
+                selected = mode == autoPlay,
+                onClick = { settings.setAutoPlay(mode) },
+                enabled = speakers,
+                label = { Text(stringResource(label)) },
+            )
+        }
+    }
+    if (autoPlay != ReviewAutoPlay.OFF) {
+        ListItem(headlineContent = { Text(stringResource(R.string.review_settings_auto_play_content)) })
+        Chips {
+            FilterChip(
+                selected = autoPlayContent == ReviewAutoPlayContent.WORD,
+                onClick = { settings.setAutoPlayContent(ReviewAutoPlayContent.WORD) },
+                enabled = speakers,
+                label = { Text(stringResource(R.string.review_settings_auto_play_word)) },
+            )
+            FilterChip(
+                selected = autoPlayContent == ReviewAutoPlayContent.SENTENCE,
+                onClick = { settings.setAutoPlayContent(ReviewAutoPlayContent.SENTENCE) },
+                enabled = speakers,
+                label = { Text(stringResource(R.string.review_settings_auto_play_sentence)) },
+            )
+        }
+    }
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_known_after)) },
         supportingContent = { Text(stringResource(R.string.review_settings_known_after_details)) },

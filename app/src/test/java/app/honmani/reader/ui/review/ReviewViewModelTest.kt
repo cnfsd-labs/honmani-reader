@@ -9,18 +9,22 @@ import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.review.ReviewRepository
+import app.honmani.reader.data.settings.ReviewAutoPlay
+import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -35,17 +39,20 @@ class ReviewViewModelTest {
     private lateinit var database: HonmaniDatabase
     private lateinit var settings: ReviewSettings
     private val audio = FakeAudio()
+    private var ringerNormal = true
 
     /** Records what the speaker buttons ask for; [gate] holds a sound back like a recording still being made. */
     private class FakeAudio : ReviewAudio {
-        val played = mutableListOf<String>()
+        val played = java.util.concurrent.CopyOnWriteArrayList<String>()
         val stops = mutableListOf<String>()
+        val phoneOnly = java.util.concurrent.CopyOnWriteArrayList<Boolean>()
         var gate: CompletableDeferred<Unit>? = null
         var problem: VoiceProblem? = null
 
-        override suspend fun word(text: String): VoiceProblem? {
+        override suspend fun word(text: String, phoneOnly: Boolean): VoiceProblem? {
             gate?.await()
             played += "word:$text"
+            this.phoneOnly += phoneOnly
             return problem
         }
 
@@ -86,7 +93,7 @@ class ReviewViewModelTest {
 
     private fun model(): ReviewViewModel {
         val reviews = ReviewRepository(database)
-        return ReviewViewModel(reviews, WordRepository(database), settings, audio = audio)
+        return ReviewViewModel(reviews, WordRepository(database), settings, audio = audio, ringerNormal = { ringerNormal })
     }
 
     private fun started(): ReviewViewModel = runBlocking {
@@ -207,5 +214,183 @@ class ReviewViewModelTest {
         settings.setSpeakers(false)
 
         assertEquals(false, model().also { it.start() }.state.value.speakers)
+    }
+
+    /** What was played once at least [count] sounds have started: auto-play starts a moment after the card shows. */
+    private fun played(count: Int): List<String> = runBlocking {
+        withTimeout(10_000) { while (audio.played.size < count) delay(10) }
+        audio.played.toList()
+    }
+
+    /** What was played after giving a sound that should not come a moment to show up. */
+    private fun playedAfterAWhile(): List<String> = runBlocking {
+        delay(150)
+        audio.played.toList()
+    }
+
+    private fun autoPlay(mode: ReviewAutoPlay, content: ReviewAutoPlayContent = ReviewAutoPlayContent.WORD) {
+        settings.setAutoPlay(mode)
+        settings.setAutoPlayContent(content)
+    }
+
+    private fun nextCard(model: ReviewViewModel) {
+        val first = model.state.value.card!!.wordId
+        model.gotIt()
+        waitFor(model) { it.card?.wordId != first }
+    }
+
+    @Test
+    fun autoPlayIsOffByDefault_andOffPlaysNothing() {
+        val model = started()
+
+        model.reveal()
+
+        assertEquals(ReviewAutoPlay.OFF, settings.autoPlay.value)
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+    }
+
+    @Test
+    fun onReveal_theWordPlaysOnceWithThePhoneVoice_whenTheAnswerShows() {
+        autoPlay(ReviewAutoPlay.ON_REVEAL)
+        val model = started()
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+
+        model.reveal()
+        model.reveal()
+
+        assertEquals(listOf("word:ねこ"), playedAfterAWhile())
+        assertEquals(listOf(true), audio.phoneOnly)
+    }
+
+    @Test
+    fun theButtonsKeepTheChosenVoice() {
+        val model = started()
+
+        model.speakWord()
+
+        assertEquals(listOf(false), audio.phoneOnly)
+    }
+
+    @Test
+    fun onReveal_aRotationOrAnEditDoesNotPlayAgain() {
+        autoPlay(ReviewAutoPlay.ON_REVEAL)
+        val model = started()
+        model.reveal()
+
+        model.editMeaning("a cat")
+        waitFor(model) { it.card?.gloss == "a cat" }
+        model.reveal()
+        // The screen asks for the queue again after a rotation, and the answer is hidden again.
+        model.start()
+        waitFor(model) { it.card != null }
+        model.reveal()
+
+        assertEquals(listOf("word:ねこ"), playedAfterAWhile())
+    }
+
+    @Test
+    fun onCardShow_theFrontPlaysAtOnce_notTheReveal_andAnEditOrRotationDoesNotRepeatIt() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        val model = started()
+        assertEquals(listOf("word:ねこ"), played(1))
+
+        model.reveal()
+        model.editMeaning("a cat")
+        waitFor(model) { it.card?.gloss == "a cat" }
+        model.start()
+        waitFor(model) { it.card != null }
+
+        assertEquals(listOf("word:ねこ"), playedAfterAWhile())
+    }
+
+    @Test
+    fun onCardShow_eachNewCardPlays_andUndoPlaysTheFrontAgain() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        val model = started()
+
+        nextCard(model)
+        assertEquals(listOf("word:ねこ", "word:いぬ"), played(2))
+        model.undo()
+        waitFor(model) { it.card?.expression == "猫" }
+
+        assertEquals(listOf("word:ねこ", "word:いぬ", "word:ねこ"), played(3))
+    }
+
+    @Test
+    fun onCardShow_aRecordingOfTheOldCardNeverPlaysOverTheNextOne() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        audio.gate = CompletableDeferred()
+        val model = started()
+
+        nextCard(model)
+        audio.gate!!.complete(Unit)
+
+        assertEquals(listOf("word:いぬ"), playedAfterAWhile())
+    }
+
+    @Test
+    fun leavingCancelsAnAutoPlayOnItsWay() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        audio.gate = CompletableDeferred()
+        val model = started()
+
+        model.stopAudio("background")
+        audio.gate!!.complete(Unit)
+
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+    }
+
+    @Test
+    fun autoPlayCanSayTheSentence() {
+        autoPlay(ReviewAutoPlay.ON_REVEAL, ReviewAutoPlayContent.SENTENCE)
+        val model = started()
+
+        model.reveal()
+
+        assertEquals(listOf("sentence:猫が好き。:null"), played(1))
+    }
+
+    @Test
+    fun aSentenceAutoPlayIsQuietWhenTheFrontShowsTheWordAlone() {
+        autoPlay(ReviewAutoPlay.ON_REVEAL, ReviewAutoPlayContent.SENTENCE)
+        settings.setShowSentence(false)
+        val model = started()
+
+        model.reveal()
+
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+    }
+
+    @Test
+    fun aSilentPhoneSkipsAutoPlay_butNotTheButtons() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        ringerNormal = false
+        val model = started()
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+
+        model.speakWord()
+
+        assertEquals(listOf("word:ねこ"), played(1))
+    }
+
+    @Test
+    fun autoPlayNeedsTheSpeakers() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        settings.setSpeakers(false)
+        val model = started()
+
+        model.reveal()
+
+        assertEquals(emptyList<String>(), playedAfterAWhile())
+    }
+
+    @Test
+    fun aFailedAutoPlayOnlyGoesToTheLog() {
+        autoPlay(ReviewAutoPlay.ON_SHOW)
+        audio.problem = VoiceProblem.NO_ENGINE
+        val model = started()
+
+        assertEquals(listOf("word:ねこ"), played(1))
+        assertEquals(null, runBlocking { withTimeoutOrNull(300) { model.voiceProblems.first() } })
     }
 }

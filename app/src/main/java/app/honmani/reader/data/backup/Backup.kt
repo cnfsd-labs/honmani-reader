@@ -543,6 +543,8 @@ class Backup(
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,
             ReviewSettings.KEY_SPEAKERS to BackupValue.BOOLEAN,
+            ReviewSettings.KEY_AUTO_PLAY to BackupValue.STRING,
+            ReviewSettings.KEY_AUTO_PLAY_CONTENT to BackupValue.STRING,
             ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
             DaySettings.KEY_START_HOUR to BackupValue.INT,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,

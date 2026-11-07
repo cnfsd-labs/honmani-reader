@@ -286,7 +286,8 @@ class BackupTest {
                 ),
             ),
         )
-        settings.edit().putInt("review_new_per_day", 20).putBoolean("review_show_sentence", false).putInt("review_known_after_days", 30).putBoolean("review_speakers", false).apply()
+        settings.edit().putInt("review_new_per_day", 20).putBoolean("review_show_sentence", false).putInt("review_known_after_days", 30).putBoolean("review_speakers", false)
+            .putString("review_auto_play", "ON_REVEAL").putString("review_auto_play_content", "SENTENCE").apply()
     }
 
     @Test
@@ -313,6 +314,8 @@ class BackupTest {
         assertEquals(false, new.settings.getBoolean("review_show_sentence", true))
         assertEquals(30, new.settings.getInt("review_known_after_days", 0))
         assertEquals(false, new.settings.getBoolean("review_speakers", true))
+        assertEquals("ON_REVEAL", new.settings.getString("review_auto_play", null))
+        assertEquals("SENTENCE", new.settings.getString("review_auto_play_content", null))
     }
 
     @Test

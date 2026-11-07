@@ -7,6 +7,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+/** When a review card says its audio without a button press. */
+enum class ReviewAutoPlay { OFF, ON_REVEAL, ON_SHOW }
+
+/** What review auto-play says. */
+enum class ReviewAutoPlayContent { WORD, SENTENCE }
+
 /** Settings → Flashcards: how many new cards and reviews a day, what the front shows, when a word counts as known. */
 class ReviewSettings(private val preferences: SharedPreferences) {
     private val _newPerDay = MutableStateFlow(storedNewPerDay())
@@ -26,6 +32,16 @@ class ReviewSettings(private val preferences: SharedPreferences) {
 
     /** The card shows speaker buttons for the word and the sentence. */
     val speakers: StateFlow<Boolean> = _speakers.asStateFlow()
+
+    private val _autoPlay = MutableStateFlow(storedAutoPlay())
+
+    /** When a card plays its audio by itself; needs [speakers]. */
+    val autoPlay: StateFlow<ReviewAutoPlay> = _autoPlay.asStateFlow()
+
+    private val _autoPlayContent = MutableStateFlow(storedAutoPlayContent())
+
+    /** What auto-play says. */
+    val autoPlayContent: StateFlow<ReviewAutoPlayContent> = _autoPlayContent.asStateFlow()
 
     private val _knownAfterDays = MutableStateFlow(storedKnownAfter())
 
@@ -52,6 +68,16 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         preferences.edit().putBoolean(KEY_SPEAKERS, value).apply()
     }
 
+    fun setAutoPlay(value: ReviewAutoPlay) {
+        _autoPlay.value = value
+        preferences.edit().putString(KEY_AUTO_PLAY, value.name).apply()
+    }
+
+    fun setAutoPlayContent(value: ReviewAutoPlayContent) {
+        _autoPlayContent.value = value
+        preferences.edit().putString(KEY_AUTO_PLAY_CONTENT, value.name).apply()
+    }
+
     fun setKnownAfterDays(value: Int) {
         _knownAfterDays.value = if (value in KNOWN_AFTER_CHOICES) value else ReviewRules.DEFAULT_KNOWN_AFTER_DAYS
         preferences.edit().putInt(KEY_KNOWN_AFTER, _knownAfterDays.value).apply()
@@ -63,8 +89,17 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         _reviewsPerDay.value = storedReviewsPerDay()
         _showSentence.value = preferences.getBoolean(KEY_SENTENCE, true)
         _speakers.value = preferences.getBoolean(KEY_SPEAKERS, true)
+        _autoPlay.value = storedAutoPlay()
+        _autoPlayContent.value = storedAutoPlayContent()
         _knownAfterDays.value = storedKnownAfter()
     }
+
+    private fun storedAutoPlay() = ReviewAutoPlay.entries.firstOrNull { it.name == preferences.getString(KEY_AUTO_PLAY, null) }
+        ?: ReviewAutoPlay.OFF
+
+    private fun storedAutoPlayContent() =
+        ReviewAutoPlayContent.entries.firstOrNull { it.name == preferences.getString(KEY_AUTO_PLAY_CONTENT, null) }
+            ?: ReviewAutoPlayContent.WORD
 
     private fun storedNewPerDay() = preferences.getInt(KEY_NEW_PER_DAY, DEFAULT_NEW_PER_DAY).coerceIn(0, MAX_NEW_PER_DAY)
 
@@ -78,6 +113,8 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         const val KEY_REVIEWS_PER_DAY = "review_reviews_per_day"
         const val KEY_SENTENCE = "review_show_sentence"
         const val KEY_SPEAKERS = "review_speakers"
+        const val KEY_AUTO_PLAY = "review_auto_play"
+        const val KEY_AUTO_PLAY_CONTENT = "review_auto_play_content"
         const val KEY_KNOWN_AFTER = "review_known_after_days"
         const val DEFAULT_NEW_PER_DAY = 10
         const val MAX_NEW_PER_DAY = 200

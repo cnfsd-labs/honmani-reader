@@ -44,8 +44,12 @@ class WordAudio(
     /** A recording is playing right now (UI sounds keep quiet meanwhile). */
     val playing: Boolean get() = player != null
 
-    /** Plays [text]; returns why it couldn't, or null once it plays. */
-    suspend fun play(text: String): VoiceProblem? = play(text, voice(), keep = true, rate = 1.0)
+    /**
+     * Plays [text]; returns why it couldn't, or null once it plays. [phoneOnly] says it with the phone's own
+     * voice whatever voice the user chose (what plays by itself never costs money or leaves the phone).
+     */
+    suspend fun play(text: String, phoneOnly: Boolean = false): VoiceProblem? =
+        play(text, if (phoneOnly) sentenceVoice() else voice(), keep = true, rate = 1.0)
 
     /** Reads the sentence [text] aloud with the phone's voice; returns why it couldn't, or null once it plays. */
     suspend fun playSentence(text: String): VoiceProblem? {

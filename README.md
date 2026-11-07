@@ -45,7 +45,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Flashcard review of the words you are learning, with the sentence you met them in: two buttons
   (Forgot / Got it), a memory model (FSRS) that also counts words you read in books, new words ordered
   by the book you are reading, a daily review limit (50, 100, 200 or none), words due today tinted in the
-  book, cards known for a year retired, and a book's words learned before you read it (book sheet)
+  book, cards known for a year retired, speaker buttons for the word and the sentence (optionally played by
+  themselves, with the phone's voice), and a book's words learned before you read it (book sheet)
 - Reading statistics (time, characters, speed), a reading level with titles, milestones (a banner celebrates them) and optional soft sounds, a day that can start
   later than midnight (Settings, Goal and time); reading time per day and book can be exported as a CSV
   for the Refold app (Progress, Statistics)

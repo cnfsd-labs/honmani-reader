@@ -144,6 +144,13 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   back. Other audio ducks meanwhile and comes back after. Home, Back or a new card stops the sound; a press
   without a voice shows a message. Logs: `adb logcat -s ReviewAudio` (`play word|sentence source=... rate=...`,
   `focus ...`, `stopped reason=...`).
+- Auto-play (Settings -> Flashcards -> "Play audio by itself": Off default / On reveal (suggested) / On card
+  show, then Word or Sentence; the chips are disabled with "Speakers on cards" off). On reveal: Show answer
+  says the card once; rotate, edit the meaning, reveal again: no replay. On card show: each new front plays
+  (reading is given away), Undo plays the front again, a fast Got it never lets the old card's sound play over
+  the next. Always the phone voice, even with a Google key voice chosen. With the ringer on silent or vibrate
+  nothing plays (log `ReviewAudio auto skipped ringer`); the speaker buttons still do. Logs prove the path,
+  not the sound: listen once on a real phone, ringer normal.
 - "Reviews only": due cards, no new ones. Chips other than these two (This book, A book..., Starred, All
   learning) review early, ignore the limit.
 - "Reviews per day" (50/100 default/200/No limit): 120 due, 100 chosen -> Words and badge say 100,

@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.review
 
+import android.util.Log
+import android.media.AudioManager
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -17,6 +19,8 @@ import app.honmani.reader.data.review.ReviewSentences
 import app.honmani.reader.data.review.ReviewSession
 import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewState
+import app.honmani.reader.data.settings.ReviewAutoPlay
+import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.FuriganaOverride
@@ -72,7 +76,7 @@ class ReviewNotice(@StringRes val message: Int, val word: String, val undoable: 
 
 /** No sound (the default where there is no player). */
 object NoReviewAudio : ReviewAudio {
-    override suspend fun word(text: String): VoiceProblem? = null
+    override suspend fun word(text: String, phoneOnly: Boolean): VoiceProblem? = null
 
     override suspend fun sentence(text: String, bookId: Long?, bookTitle: String?): VoiceProblem? = null
 
@@ -90,6 +94,8 @@ class ReviewViewModel(
     private val withNew: () -> Boolean = { true },
     /** What the speaker buttons play. */
     private val audio: ReviewAudio = NoReviewAudio,
+    /** True while the phone's ringer is on: auto-play stays silent on a phone set to vibrate or silent. */
+    private val ringerNormal: () -> Boolean = { true },
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
@@ -122,12 +128,16 @@ class ReviewViewModel(
                 )
                 next.start(filter(), withNew())
                 session = next
-                publish(next)
+                publish(next, restart = true)
             }
         }
     }
 
-    fun reveal() = _state.update { if (it.card != null) it.copy(revealed = true) else it }
+    fun reveal() {
+        if (_state.value.card == null) return
+        _state.update { it.copy(revealed = true) }
+        autoPlay(AutoTrigger.REVEAL, _state.value)
+    }
 
     fun answer(grade: Grade) = act(answered = true, gotIt = grade != Grade.AGAIN) { it.answer(grade) }
 
@@ -175,6 +185,39 @@ class ReviewViewModel(
         audioJob = viewModelScope.launch { play()?.let { _voiceProblems.send(it) } }
     }
 
+    private enum class AutoTrigger { SHOW, REVEAL }
+
+    // What auto-play has already said, per card and trigger. It outlives start(), which the screen calls again after a
+    // rotation, so turning the phone or editing a card never says it twice.
+    private val autoPlayed = mutableSetOf<Pair<Long, AutoTrigger>>()
+    private var shownWordId: Long? = null
+
+    /** Says the card by itself when the setting asks for [trigger]: once per card and trigger, the phone's voice only. */
+    private fun autoPlay(trigger: AutoTrigger, state: ReviewUiState) {
+        val card = state.card ?: return
+        val wanted = when (settings.autoPlay.value) {
+            ReviewAutoPlay.OFF -> return
+            ReviewAutoPlay.ON_REVEAL -> AutoTrigger.REVEAL
+            ReviewAutoPlay.ON_SHOW -> AutoTrigger.SHOW
+        }
+        if (wanted != trigger || !settings.speakers.value) return
+        if (!autoPlayed.add(card.wordId to trigger)) return
+        if (!ringerNormal()) {
+            Log.d(AUDIO_TAG, "auto skipped ringer")
+            return
+        }
+        val sentence = card.sentence?.takeIf { state.showSentence }
+        val text = card.shownReading.ifBlank { card.expression }
+        val sayWord = settings.autoPlayContent.value == ReviewAutoPlayContent.WORD
+        if (!sayWord && sentence == null) return
+        audioJob?.cancel()
+        // A failed auto-play only goes to the log; the reader didn't ask for it.
+        audioJob = viewModelScope.launch {
+            val problem = if (sayWord) audio.word(text, phoneOnly = true) else audio.sentence(sentence!!.text, sentence.bookId, sentence.bookTitle)
+            problem?.let { Log.w(AUDIO_TAG, "auto-play failed: $it") }
+        }
+    }
+
     /** Stops the sound and any recording on its way: the app went to the background, the screen closed, the card changed. */
     fun stopAudio(reason: String) {
         audioJob?.cancel()
@@ -200,9 +243,11 @@ class ReviewViewModel(
         }
     }
 
-    private suspend fun publish(active: ReviewSession, keepRevealed: Boolean = false) {
+    private suspend fun publish(active: ReviewSession, keepRevealed: Boolean = false, restart: Boolean = false) {
         // An edit keeps the card (and its sound); an answer or an undo shows another front.
-        if (!keepRevealed) stopAudio("card")
+        // The same card again after an edit or a restart of the screen is not a new showing.
+        val sameCard = active.current?.word?.id == shownWordId && (keepRevealed || restart)
+        if (!keepRevealed && !sameCard) stopAudio("card")
         val item = active.current
         val card = item?.let {
             val lookups = words.latestLookups(it.word.id)
@@ -217,7 +262,9 @@ class ReviewViewModel(
                 isNew = it.card.state == ReviewState.NEW,
             )
         }
-        _state.update {
+        if (!sameCard) autoPlayed.clear()
+        shownWordId = card?.wordId
+        val shown = _state.value.let {
             it.copy(
                 loading = false,
                 card = card,
@@ -229,9 +276,14 @@ class ReviewViewModel(
                 remembered = active.remembered,
             )
         }
+        // The sound is asked for before the card shows, so whoever sees the card knows the sound is on its way.
+        if (!keepRevealed) autoPlay(AutoTrigger.SHOW, shown)
+        _state.value = shown
     }
 
     companion object {
+        private const val AUDIO_TAG = "ReviewAudio"
+
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
@@ -242,6 +294,10 @@ class ReviewViewModel(
                     filter = { container.reviewFilter(container.reviewScope.value) },
                     withNew = { container.reviewScope.value != ReviewScope.DueOnly },
                     audio = WordAudioReview(container.wordAudio) { id, title, text -> container.sentenceClips.clip(id, title, text) },
+                    ringerNormal = {
+                        val manager = (this[APPLICATION_KEY] as HonmaniApplication).getSystemService(AudioManager::class.java)
+                        manager == null || manager.ringerMode == AudioManager.RINGER_MODE_NORMAL
+                    },
                 )
             }
         }

@@ -8,8 +8,8 @@ import kotlin.coroutines.cancellation.CancellationException
 
 /** What the speaker buttons of a review card play. Each call returns why it couldn't, or null once the sound plays. */
 interface ReviewAudio {
-    /** Says a word (its reading). */
-    suspend fun word(text: String): VoiceProblem?
+    /** Says a word (its reading); [phoneOnly]: with the phone's own voice, not the one chosen for cards. */
+    suspend fun word(text: String, phoneOnly: Boolean = false): VoiceProblem?
 
     /** Plays a card's sentence: the audiobook's recording if the book has one, else the phone's voice. */
     suspend fun sentence(text: String, bookId: Long?, bookTitle: String?): VoiceProblem?
@@ -24,7 +24,8 @@ class WordAudioReview(
     /** The recording of the sentence cut from the book's paired audiobook; null if there is none. */
     private val clip: suspend (bookId: Long?, bookTitle: String?, sentence: String) -> File? = { _, _, _ -> null },
 ) : ReviewAudio {
-    override suspend fun word(text: String): VoiceProblem? = guarded("word") { audio.play(text) }
+    override suspend fun word(text: String, phoneOnly: Boolean): VoiceProblem? =
+        guarded("word") { audio.play(text, phoneOnly) }
 
     override suspend fun sentence(text: String, bookId: Long?, bookTitle: String?): VoiceProblem? = guarded("sentence") {
         val found = try {

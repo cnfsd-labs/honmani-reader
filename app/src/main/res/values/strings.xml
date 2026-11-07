@@ -945,6 +945,14 @@
     <string name="review_settings_front_word">The word alone</string>
     <string name="review_settings_speakers">Speakers on cards</string>
     <string name="review_settings_speakers_details">Buttons on a card that say the word and read the sentence aloud. A sentence from a book with a paired audiobook is played from the audiobook.</string>
+    <string name="review_settings_auto_play">Play audio by itself</string>
+    <string name="review_settings_auto_play_details">Needs speakers on cards. Always uses the phone\'s voice, and stays quiet when the phone is on silent or vibrate. Playing when a card shows gives away the reading.</string>
+    <string name="review_settings_auto_play_off">Off</string>
+    <string name="review_settings_auto_play_reveal">On reveal (suggested)</string>
+    <string name="review_settings_auto_play_show">On card show</string>
+    <string name="review_settings_auto_play_content">What to play</string>
+    <string name="review_settings_auto_play_word">Word</string>
+    <string name="review_settings_auto_play_sentence">Sentence</string>
     <string name="review_settings_known_after">Known after</string>
     <string name="review_settings_known_after_details">A word moves to Known once you can wait this long between reviews.</string>
     <string name="review_settings_days">%1$d days</string>

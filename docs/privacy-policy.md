@@ -59,10 +59,11 @@ Honmani only connects to the internet for these things, and only to these places
   Signing out deletes the stored login.
   The server's operator's privacy policy applies.
 - **Google Cloud text-to-speech, only if you turn it on** and enter your own Google Cloud API
-  key: to make audio for Anki cards, and to say a word when you tap its speaker in a lookup,
-  Honmani sends the word or example sentence and your key to Google
+  key: to make audio for Anki cards, and to say a word when you tap its speaker in a lookup or on a
+  flashcard, Honmani sends the word or example sentence and your key to Google
   (texttospeech.googleapis.com), over an encrypted connection. Google's privacy policy applies. The default voice is your
-  phone's own, which works offline.
+  phone's own, which works offline. Sound that a flashcard plays by itself (the "Play audio by itself" setting) always uses
+  the phone's voice and never reaches Google.
 
 The book reader itself never loads anything from the internet.
 
