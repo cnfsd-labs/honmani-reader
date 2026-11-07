@@ -3,6 +3,35 @@ package app.honmani.reader.ui.review
 import androidx.activity.compose.BackHandler
 import android.util.Log
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import app.honmani.reader.ui.theme.LocalMotionEnabled
+import app.honmani.reader.ui.theme.motionSpring
+import app.honmani.reader.ui.theme.motionTween
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -37,7 +66,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -49,12 +77,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -149,6 +174,18 @@ fun ReviewScreen(
     }
     BackHandler(onBack = onClose)
 
+    // A card answered with motion on leaves as a ghost while the next one is already shown; the answer
+    // itself is recorded at once, so a tap during the animation works.
+    val motionOn = LocalMotionEnabled.current
+    var leaving by remember { mutableStateOf<Leaving?>(null) }
+    val answer: (Boolean, Float) -> Unit = { gotIt, from ->
+        val shown = state.card
+        if (motionOn && shown != null && state.revealed) {
+            leaving = Leaving(shown, state.showSentence, cardKey(state), gotIt, from)
+        }
+        if (gotIt) viewModel.gotIt() else viewModel.forgot()
+    }
+
     Surface(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
@@ -173,8 +210,8 @@ fun ReviewScreen(
                         AnswerButtons(
                             revealed = state.revealed,
                             onReveal = viewModel::reveal,
-                            onForgot = viewModel::forgot,
-                            onGotIt = viewModel::gotIt,
+                            onForgot = { answer(false, 0f) },
+                            onGotIt = { answer(true, 0f) },
                         )
                     }
                 }
@@ -190,15 +227,38 @@ fun ReviewScreen(
             ) {
                 val card = state.card
                 if (card != null) {
-                    CardFace(
-                        card = card,
-                        revealed = state.revealed,
-                        showSentence = state.showSentence,
-                        onReveal = viewModel::reveal,
-                        onForgot = viewModel::forgot,
-                        onGotIt = viewModel::gotIt,
-                        modifier = Modifier.weight(1f),
-                    )
+                    val shownKey = cardKey(state)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        // A fresh state per card; the one after an answered card comes in with a small scale and fade.
+                        key(shownKey) {
+                            val entering = remember { leaving != null }
+                            if (leaving?.key != shownKey) {
+                                CardFace(
+                                    card = card,
+                                    revealed = state.revealed,
+                                    showSentence = state.showSentence,
+                                    entering = entering,
+                                    onReveal = viewModel::reveal,
+                                    onAnswer = answer,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                        leaving?.let { gone ->
+                            key(gone) {
+                                CardFace(
+                                    card = gone.card,
+                                    revealed = true,
+                                    showSentence = gone.showSentence,
+                                    leave = gone,
+                                    onLeft = { if (leaving === gone) leaving = null },
+                                    onReveal = {},
+                                    onAnswer = { _, _ -> },
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                    }
                 } else if (!state.loading) {
                     Finished(state, onClose, modifier = Modifier.weight(1f))
                 }
@@ -375,16 +435,27 @@ private fun CardFace(
     revealed: Boolean,
     showSentence: Boolean,
     onReveal: () -> Unit,
-    onForgot: () -> Unit,
-    onGotIt: () -> Unit,
+    /** Graded: got it (right) or forgot (left), and how far the card had been dragged. */
+    onAnswer: (gotIt: Boolean, from: Float) -> Unit,
     modifier: Modifier = Modifier,
+    /** Comes in with a small scale and fade (the card after an answered one). */
+    entering: Boolean = false,
+    /** Not a live card but the one that was just answered, leaving in the direction of its answer. */
+    leave: Leaving? = null,
+    onLeft: () -> Unit = {},
 ) {
     val sentence = card.sentence.takeIf { showSentence }
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val revealedNow by rememberUpdatedState(revealed)
-    val forgotNow by rememberUpdatedState(onForgot)
-    val gotItNow by rememberUpdatedState(onGotIt)
+    val answerNow by rememberUpdatedState(onAnswer)
+    val settle = motionSpring<Float>()
+    val settleNow by rememberUpdatedState(settle)
+    val motionOn = LocalMotionEnabled.current
+    val enter = remember { Animatable(if (entering && motionOn) 0f else 1f) }
+    val leaveSpec = motionTween<Float>(LEAVE_MS)
+    val leaveProgress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { enter.animateTo(1f, tween(ENTER_MS)) }
     val frontText = sentence?.text ?: card.expression
     val description = if (revealed) {
         val meaning = card.gloss.ifBlank { stringResource(R.string.review_no_meaning) }
@@ -401,62 +472,86 @@ private fun CardFace(
     val showLabel = stringResource(R.string.review_show_answer)
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val distance = constraints.maxWidth * SWIPE_FRACTION
-        val progress = (offset.value / distance).coerceIn(-1f, 1f)
+        if (leave != null) {
+            LaunchedEffect(leave) {
+                leaveProgress.animateTo(1f, leaveSpec)
+                onLeft()
+            }
+        }
+        val leaveTarget = (if (leave?.gotIt == true) 1f else -1f) * constraints.maxWidth
+        val x = if (leave != null) leave.from + (leaveTarget - leave.from) * leaveProgress.value else offset.value
+        val progress = (x / distance).coerceIn(-1f, 1f)
         val tint = when {
             progress < 0 -> MaterialTheme.colorScheme.errorContainer
             else -> MaterialTheme.colorScheme.primaryContainer
         }
-        OutlinedCard(
+        Card(
+            shape = RoundedCornerShape(28.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    translationX = offset.value
+                    translationX = x
                     rotationZ = progress * 4f
+                    val appear = enter.value
+                    scaleX = ENTER_SCALE + (1f - ENTER_SCALE) * appear
+                    scaleY = scaleX
+                    alpha = appear * (1f - leaveProgress.value)
                 }
-                .clip(MaterialTheme.shapes.medium)
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            val moved = offset.value
-                            scope.launch {
-                                when {
-                                    revealedNow && moved <= -distance -> forgotNow()
-                                    revealedNow && moved >= distance -> gotItNow()
-                                }
-                                offset.snapTo(0f)
+                .then(
+                    if (leave != null) {
+                        Modifier.clearAndSetSemantics {}
+                    } else {
+                        Modifier
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = {
+                                        val moved = offset.value
+                                        scope.launch {
+                                            when {
+                                                revealedNow && moved <= -distance -> answerNow(false, moved)
+                                                revealedNow && moved >= distance -> answerNow(true, moved)
+                                                else -> offset.animateTo(0f, settleNow)
+                                            }
+                                        }
+                                    },
+                                    onDragCancel = { scope.launch { offset.animateTo(0f, settleNow) } },
+                                    onHorizontalDrag = { change, amount ->
+                                        change.consume()
+                                        if (revealedNow) scope.launch { offset.snapTo((offset.value + amount).coerceIn(-distance * 1.4f, distance * 1.4f)) }
+                                    },
+                                )
                             }
-                        },
-                        onDragCancel = { scope.launch { offset.animateTo(0f) } },
-                        onHorizontalDrag = { change, amount ->
-                            change.consume()
-                            if (revealedNow) scope.launch { offset.snapTo((offset.value + amount).coerceIn(-distance * 1.4f, distance * 1.4f)) }
-                        },
-                    )
-                }
-                .clearAndSetSemantics {
-                    contentDescription = description
-                    role = Role.Button
-                    if (!revealed) onClick(label = showLabel) { onReveal(); true }
-                    if (revealed) {
-                        customActions = listOf(
-                            CustomAccessibilityAction(forgotLabel) { onForgot(); true },
-                            CustomAccessibilityAction(gotItLabel) { onGotIt(); true },
-                        )
-                    }
-                },
-            colors = androidx.compose.material3.CardDefaults.outlinedCardColors(
-                containerColor = lerp(MaterialTheme.colorScheme.surface, tint, abs(progress) * 0.8f),
+                            .clearAndSetSemantics {
+                                contentDescription = description
+                                role = Role.Button
+                                if (!revealed) onClick(label = showLabel) { onReveal(); true }
+                                if (revealed) {
+                                    customActions = listOf(
+                                        CustomAccessibilityAction(forgotLabel) { answerNow(false, 0f); true },
+                                        CustomAccessibilityAction(gotItLabel) { answerNow(true, 0f); true },
+                                    )
+                                }
+                            }
+                    },
+                ),
+            colors = CardDefaults.cardColors(
+                containerColor = lerp(MaterialTheme.colorScheme.surfaceContainerHigh, tint, abs(progress) * 0.8f),
             ),
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (!revealed) Modifier.clickable(onClick = onReveal) else Modifier)
+                    .then(if (!revealed && leave == null) Modifier.clickable(onClick = onReveal) else Modifier)
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
+              // The answer appears under the front with a fade and a small rise; the height eases with it.
+              Column(
+                modifier = Modifier.animateContentSize(motionTween(REVEAL_MS)),
+                horizontalAlignment = Alignment.CenterHorizontally,
+              ) {
                 if (card.isNew) {
                     Text(
                         stringResource(R.string.review_new_label),
@@ -474,7 +569,16 @@ private fun CardFace(
                 } else {
                     Text(card.expression, style = MaterialTheme.typography.displaySmall, textAlign = TextAlign.Center)
                 }
-                if (revealed) {
+                AnimatedVisibility(
+                    visible = revealed,
+                    enter = if (motionOn) {
+                        fadeIn(tween(REVEAL_MS)) + slideInVertically(tween(REVEAL_MS)) { it / 12 }
+                    } else {
+                        EnterTransition.None
+                    },
+                    exit = ExitTransition.None,
+                ) {
+                  Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(Modifier.height(16.dp))
                     HorizontalDivider()
                     Spacer(Modifier.height(16.dp))
@@ -513,7 +617,9 @@ private fun CardFace(
                             textAlign = TextAlign.Center,
                         )
                     }
+                  }
                 }
+              }
             }
         }
     }
@@ -570,15 +676,76 @@ private fun AnswerButtons(revealed: Boolean, onReveal: () -> Unit, onForgot: () 
 
 @Composable
 private fun Finished(state: ReviewUiState, onClose: () -> Unit, modifier: Modifier = Modifier) {
+    val answered = state.forgotten + state.remembered
+    val motionOn = LocalMotionEnabled.current
+    // Plays once when the session ends; the saved flag keeps a rotation from playing it again.
+    var played by rememberSaveable { mutableStateOf(false) }
+    val rewarding = motionOn && !played && answered > 0
+    val pop = remember { Animatable(if (rewarding) 0f else 1f) }
+    val burst = remember { Animatable(if (rewarding) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (rewarding) {
+            played = true
+            launch { pop.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow)) }
+            burst.animateTo(1f, tween(BURST_MS, easing = LinearOutSlowInEasing))
+        }
+    }
+    val accents = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.tertiary,
+        MaterialTheme.colorScheme.secondary,
+    )
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        Box(Modifier.size(BURST_AREA), contentAlignment = Alignment.Center) {
+            // Dots fly out from behind the check; with motion off (or on the way back) there are none.
+            if (motionOn && burst.value < 1f) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val t = burst.value
+                    val centre = Offset(size.width / 2f, size.height / 2f)
+                    val from = CHECK_SIZE.toPx() / 4f
+                    val reach = size.minDimension / 2f
+                    for (i in 0 until BURST_DOTS) {
+                        val angle = i * (2f * PI.toFloat() / BURST_DOTS) + (i % 3) * 0.07f
+                        val far = from + (reach - from) * (0.65f + 0.35f * ((i * 7) % 5) / 4f)
+                        val r = from + (far - from) * t
+                        drawCircle(
+                            color = accents[i % accents.size],
+                            radius = (if (i % 2 == 0) 4.dp else 3.dp).toPx() * (1f - 0.5f * t),
+                            center = Offset(centre.x + cos(angle) * r, centre.y + sin(angle) * r),
+                            alpha = (1f - t * t).coerceIn(0f, 1f),
+                        )
+                    }
+                }
+            }
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .size(CHECK_SIZE)
+                    .graphicsLayer {
+                        scaleX = pop.value
+                        scaleY = pop.value
+                    },
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(CHECK_SIZE / 2),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.review_done_title), style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
         Text(
-            if (state.forgotten + state.remembered > 0) {
+            if (answered > 0) {
                 stringResource(R.string.review_done_counts, state.forgotten, state.remembered)
             } else {
                 stringResource(R.string.review_done_empty)
@@ -591,6 +758,28 @@ private fun Finished(state: ReviewUiState, onClose: () -> Unit, modifier: Modifi
     }
 }
 
+/** A card that was just answered, kept on screen while it leaves. [key] is the card's [cardKey]. */
+private class Leaving(
+    val card: ReviewCardUi,
+    val showSentence: Boolean,
+    val key: Pair<Long, Int>,
+    val gotIt: Boolean,
+    /** Where the card was when answered (a swipe's drag), 0 for a button. */
+    val from: Float,
+)
+
+/** Identifies the card shown: the same word can come back after a lapse, but not at the same count. */
+private fun cardKey(state: ReviewUiState): Pair<Long, Int> =
+    (state.card?.wordId ?: 0L) to (state.forgotten + state.remembered)
+
+private const val LEAVE_MS = 160
+private const val ENTER_MS = 180
+private const val REVEAL_MS = 180
+private const val ENTER_SCALE = 0.96f
+private const val BURST_MS = 900
+private const val BURST_DOTS = 24
+private val CHECK_SIZE = 72.dp
+private val BURST_AREA = 200.dp
 private val BUTTON_HEIGHT = 56.dp
 private const val SWIPE_FRACTION = 0.3f
 private const val SCRIM_ALPHA = 0.32f

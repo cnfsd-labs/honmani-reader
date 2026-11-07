@@ -2,7 +2,8 @@ package app.honmani.reader.ui.reader
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.key
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
@@ -834,10 +835,18 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 firstTab[0] = false
                                 fade.animateTo(1f, fadeSpec)
                             }
-                            Box(Modifier.fillMaxSize().graphicsLayer { alpha = fade.value }) {
+                            // The fade is a background-coloured veil over the tab's content, not an alpha on the
+                            // tab: the bottom bar (inside the screen) stays solid. It stops above the bar.
+                            var barHeight by remember { mutableIntStateOf(0) }
+                            val tabBar = @Composable {
+                                Box(Modifier.onSizeChanged { barHeight = it.height }) { bottomBar() }
+                                DisposableEffect(Unit) { onDispose { barHeight = 0 } }
+                            }
+                            val veil = MaterialTheme.colorScheme.background
+                            Box(Modifier.fillMaxSize()) {
                         when (tab) {
                             HomeTab.LIBRARY -> LibraryScreen(
-                                bottomBar = bottomBar,
+                                bottomBar = tabBar,
                                 viewModel = library,
                                 addBookOnStart = addBookOnStart,
                                 onAddBookStarted = { addBookOnStart = null },
@@ -845,7 +854,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 scrollToTop = libraryTaps,
                             )
                             HomeTab.WORDS -> WordsScreen(
-                                bottomBar = bottomBar,
+                                bottomBar = tabBar,
                                 pageCycle = wordsTaps,
                                 focusSearch = focusSearch,
                                 onSearchFocused = { focusSearch = false },
@@ -858,9 +867,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                     container.reviewScope.value = it
                                 },
                             )
-                            HomeTab.PROGRESS -> ProgressTab(bottomBar = bottomBar, onOpenBook = library::open, pageCycle = progressTaps)
+                            HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
                             HomeTab.SETTINGS -> SettingsScreen(
-                                bottomBar = bottomBar,
+                                bottomBar = tabBar,
                                 showingDictionaries = dictionariesShown,
                                 onShowDictionaries = { dictionariesShown = it },
                                 onOpenReaderSettings = {
@@ -881,6 +890,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 },
                             )
                         }
+                                if (fade.value < 1f) {
+                                    Box(
+                                        Modifier.fillMaxSize().drawBehind {
+                                            drawRect(
+                                                veil,
+                                                size = Size(size.width, (size.height - barHeight).coerceAtLeast(0f)),
+                                                alpha = 1f - fade.value,
+                                            )
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
