@@ -158,6 +158,8 @@ fun WordsScreen(
     /** Ids of the words due today, marked with a dot in the list. */
     dueIds: Set<Long> = emptySet(),
     onStartReview: () -> Unit = {},
+    /** The Review page's Stats button. */
+    onShowStats: () -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
@@ -293,8 +295,7 @@ fun WordsScreen(
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    // Review is the first tab, but the screen opens on the Words list.
-    val pager = rememberPagerState(initialPage = WordsPage.WORDS.ordinal) { WordsPage.entries.size }
+    val pager = rememberPagerState(initialPage = WordsPage.REVIEW.ordinal) { WordsPage.entries.size }
     val scope = rememberCoroutineScope()
     // The field takes focus once the Dictionary page is there: a tap on its tab or the launcher's shortcut.
     var focusWanted by remember { mutableStateOf(false) }
@@ -333,9 +334,9 @@ fun WordsScreen(
     LaunchedEffect(searchPanel) {
         searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
-    // Back from Review or Dictionary goes to Words, as Progress's sections go to the first.
-    BackHandler(enabled = panel == null && pager.currentPage != WordsPage.WORDS.ordinal) {
-        scope.launch { pager.animateScrollToPage(WordsPage.WORDS.ordinal) }
+    // Back from Words or Dictionary goes to Review, the page the tab opens on, as Progress's sections go to the first.
+    BackHandler(enabled = panel == null && pager.currentPage != WordsPage.REVIEW.ordinal) {
+        scope.launch { pager.animateScrollToPage(WordsPage.REVIEW.ordinal) }
     }
     val searchWords = remember(searchQuery, uiState.learning, uiState.known) {
         searchWords(uiState.learning.orEmpty() + uiState.known.orEmpty(), searchQuery).take(MAX_WORDS_IN_SEARCH)
@@ -422,6 +423,9 @@ fun WordsScreen(
                     starredLearning = uiState.learning.orEmpty().count { it.starred },
                     onStart = onStartReview,
                     choice = reviewChoice,
+                    // Unknown until both lists are loaded: no flash of the empty page.
+                    hasWords = uiState.learning?.isEmpty() != true || uiState.known?.isEmpty() != true,
+                    onShowStats = onShowStats,
                 )
                 WordsPage.DICTIONARY -> DictionaryPage(
                     padding = padding,

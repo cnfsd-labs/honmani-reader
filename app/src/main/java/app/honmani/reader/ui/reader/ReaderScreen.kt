@@ -593,6 +593,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
                 )
             }
+            // The audiobook's bar goes the same way: Back closes it, the book stays.
+            BackHandler(enabled = audiobookBarShown) { audiobook.close() }
             if (audiobookBarShown) {
                 val problem = audiobookState.problem
                 val audiobookPhase = audiobookState.phase
@@ -828,6 +830,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 reviewNew = reviewNew,
                                 dueIds = dueToday.mapTo(HashSet()) { it.id },
                                 onStartReview = { reviewShown = true },
+                                onShowStats = { tab = HomeTab.PROGRESS },
                                 reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
                                     container.reviewScope.value = it
                                 },

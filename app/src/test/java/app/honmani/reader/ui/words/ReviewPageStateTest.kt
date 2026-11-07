@@ -46,4 +46,13 @@ class ReviewPageStateTest {
         assertEquals(ReviewPageMode.Ahead, state.mode)
         assertTrue(state.canStart)
     }
+
+    @Test
+    fun noSavedWordsShowsTheEmptyPageWhateverTheChip() {
+        for (scope in listOf(ReviewScope.Due, ReviewScope.Starred, ReviewScope.AllLearning)) {
+            val state = reviewPageState(scope, due = 0, newWords = 0, starredLearning = 0, hasWords = false)
+            assertEquals(ReviewPageMode.NoWords, state.mode)
+            assertFalse(state.canStart)
+        }
+    }
 }

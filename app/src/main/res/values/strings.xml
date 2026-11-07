@@ -879,6 +879,9 @@
     <string name="review_page_no_starred_title">No starred words</string>
     <string name="review_page_no_starred_body">None of the words you are learning is starred. Star a word in your Words list or in the lookup panel, then come back.</string>
     <string name="review_page_settings">Review settings</string>
+    <string name="review_page_stats">Stats</string>
+    <string name="review_page_no_words_title">No words yet</string>
+    <string name="review_page_no_words_body">Words you tap while reading show up here, and you can practise them in a review.</string>
     <string name="review_start">Start</string>
     <string name="review_start_description">Start the review: %1$d due, %2$d new</string>
     <string name="review_chip_due">Due</string>

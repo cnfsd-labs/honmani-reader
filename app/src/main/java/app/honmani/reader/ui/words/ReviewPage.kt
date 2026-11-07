@@ -42,13 +42,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.ui.PullDownSheet
-import app.honmani.reader.ui.progress.ProgressViewModel
-import app.honmani.reader.ui.progress.ReviewTiles
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.settings.ReviewSettingsSection
 
@@ -65,12 +61,25 @@ enum class ReviewPageMode {
 
     /** The Starred chip while no learning word is starred. */
     NoStarred,
+
+    /** No word saved yet: nothing to start, nothing to choose. */
+    NoWords,
 }
 
 class ReviewPageState(val mode: ReviewPageMode, val canStart: Boolean)
 
-/** The page for the chosen [scope]; [starredLearning] counts the starred words in Learning. */
-fun reviewPageState(scope: ReviewScope, due: Int, newWords: Int, starredLearning: Int): ReviewPageState = when {
+/**
+ * The page for the chosen [scope]; [starredLearning] counts the starred words in Learning.
+ * [hasWords] is false for a person who has saved no word at all.
+ */
+fun reviewPageState(
+    scope: ReviewScope,
+    due: Int,
+    newWords: Int,
+    starredLearning: Int,
+    hasWords: Boolean = true,
+): ReviewPageState = when {
+    !hasWords -> ReviewPageState(ReviewPageMode.NoWords, false)
     scope == ReviewScope.Due || scope == ReviewScope.DueOnly ->
         if (due + (if (scope == ReviewScope.DueOnly) 0 else newWords) == 0) ReviewPageState(ReviewPageMode.Nothing, false) else ReviewPageState(ReviewPageMode.Due, true)
     scope == ReviewScope.Starred && starredLearning == 0 -> ReviewPageState(ReviewPageMode.NoStarred, false)
@@ -79,7 +88,7 @@ fun reviewPageState(scope: ReviewScope, due: Int, newWords: Int, starredLearning
 
 /**
  * The Review page of Words: how many cards are due and how many new words wait, Start, what to
- * work on, how the reviews went, and the review's settings. Start opens the review screen.
+ * work on, the review's settings and a way to the statistics. Start opens the review screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,12 +99,14 @@ fun ReviewPage(
     onStart: () -> Unit,
     choice: ReviewScopeChoice,
     modifier: Modifier = Modifier,
-    progress: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
+    /** False while no word is saved: the page then explains where words come from. */
+    hasWords: Boolean = true,
+    /** The Stats button: on to the Progress tab. */
+    onShowStats: () -> Unit = {},
 ) {
-    val state = reviewPageState(choice.scope, due, newWords, starredLearning)
+    val state = reviewPageState(choice.scope, due, newWords, starredLearning, hasWords)
     // Reviews only starts no new word.
     val newShown = if (choice.scope == ReviewScope.DueOnly) 0 else newWords
-    val summary = progress.uiState.collectAsStateWithLifecycle().value?.reviews
     var pickBook by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     // Under another chip the counts would be wrong: the button reads plain "Start".
@@ -113,11 +124,6 @@ fun ReviewPage(
                 .heightIn(min = maxHeight)
                 .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            if (summary != null && summary.any) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    ReviewTiles(summary, compact = true)
-                }
-            }
             Spacer(Modifier.weight(1f))
             when (state.mode) {
                 ReviewPageMode.Due -> {
@@ -132,10 +138,11 @@ fun ReviewPage(
                 ReviewPageMode.Nothing -> Message(R.string.review_page_nothing_title, R.string.review_page_nothing_body)
                 ReviewPageMode.Ahead -> Message(R.string.review_page_ahead_title, R.string.review_page_ahead_body)
                 ReviewPageMode.NoStarred -> Message(R.string.review_page_no_starred_title, R.string.review_page_no_starred_body)
+                ReviewPageMode.NoWords -> Message(R.string.review_page_no_words_title, R.string.review_page_no_words_body)
             }
             Spacer(Modifier.weight(1f))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            if (state.mode != ReviewPageMode.NoWords) FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 @Composable
@@ -161,7 +168,7 @@ fun ReviewPage(
                 chip(ReviewScope.Starred, stringResource(R.string.review_chip_starred))
                 chip(ReviewScope.AllLearning, stringResource(R.string.review_chip_all_learning))
             }
-            Button(
+            if (state.mode != ReviewPageMode.NoWords) Button(
                 onClick = onStart,
                 enabled = state.canStart,
                 modifier = Modifier
@@ -169,7 +176,13 @@ fun ReviewPage(
                     .heightIn(min = 64.dp)
                     .then(if (startDescription != null) Modifier.semantics { contentDescription = startDescription } else Modifier),
             ) { Text(stringResource(R.string.review_start), style = MaterialTheme.typography.titleLarge) }
-            TextButton(onClick = { settings = true }) { Text(stringResource(R.string.review_page_settings)) }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                TextButton(onClick = { settings = true }) { Text(stringResource(R.string.review_page_settings)) }
+                TextButton(onClick = onShowStats) { Text(stringResource(R.string.review_page_stats)) }
+            }
         }
     }
     if (settings) {
