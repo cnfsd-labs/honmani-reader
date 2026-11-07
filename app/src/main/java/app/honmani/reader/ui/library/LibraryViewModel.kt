@@ -380,14 +380,22 @@ class LibraryViewModel(
             when (val prepared = SharedText.prepare(text, title, textTitle())) {
                 SharedText.Prepared.Empty -> _notices.send(LibraryNotice.TextEmpty)
                 SharedText.Prepared.TooLarge -> _notices.send(LibraryNotice.TextTooLarge)
-                is SharedText.Prepared.Ready -> {
-                    val book = addMutex.withLock {
-                        add(PickedFile(prepared.fileName, ByteArrayInputStream(prepared.bytes)))
-                    }
-                    book?.let { open(it.id) }
-                }
+                is SharedText.Prepared.Ready -> addAndOpen(prepared.fileName, prepared.bytes)
             }
         }
+    }
+
+    /**
+     * Adds a file the app downloaded (a free book from the catalogue) as if it had been picked,
+     * named [fileName], and opens the book (also if it is in the library already, which is told).
+     */
+    fun addDownloaded(fileName: String, bytes: ByteArray) {
+        viewModelScope.launch { addAndOpen(fileName, bytes) }
+    }
+
+    private suspend fun addAndOpen(fileName: String, bytes: ByteArray) {
+        val book = addMutex.withLock { add(PickedFile(fileName, ByteArrayInputStream(bytes))) }
+        book?.let { open(it.id) }
     }
 
     /** Adds a sample book and opens it (also if it is in the library already). */

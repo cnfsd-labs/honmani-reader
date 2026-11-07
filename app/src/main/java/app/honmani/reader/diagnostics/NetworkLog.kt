@@ -11,6 +11,8 @@ enum class NetworkPurpose {
     PROGRESS_SYNC,
     GOOGLE_VOICE,
     WANIKANI,
+    FREE_BOOKS_LIST,
+    FREE_BOOKS_BOOK,
 }
 
 /**

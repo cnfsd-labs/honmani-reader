@@ -32,6 +32,7 @@ fun AddBookSheet(
     onPickFiles: () -> Unit,
     onPickFolder: () -> Unit,
     onPasteText: () -> Unit,
+    onFreeBooks: () -> Unit,
     onExport: () -> Unit,
     onOpenCatalog: (OpdsCatalog) -> Unit,
     onEditCatalog: (OpdsCatalog) -> Unit,
@@ -61,6 +62,13 @@ fun AddBookSheet(
                 supportingContent = { Text(stringResource(R.string.add_book_paste_details)) },
                 colors = colors,
                 modifier = Modifier.clickable(onClick = onPasteText),
+            )
+            ListItem(
+                leadingContent = { Icon(painterResource(R.drawable.ic_cloud), contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.add_book_aozora)) },
+                supportingContent = { Text(stringResource(R.string.add_book_aozora_details)) },
+                colors = colors,
+                modifier = Modifier.clickable(onClick = onFreeBooks),
             )
             for (catalog in catalogs) {
                 ListItem(

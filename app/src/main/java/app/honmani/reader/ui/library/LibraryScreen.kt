@@ -140,6 +140,7 @@ import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.aozora.AozoraScreen
 import app.honmani.reader.ui.opds.CatalogBrowser
 import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.ui.opds.CatalogDialog
@@ -186,6 +187,8 @@ fun LibraryScreen(
     val autoImport by viewModel.autoImport.collectAsStateWithLifecycle()
     val opdsState by opds.uiState.collectAsStateWithLifecycle()
     var choosingSource by rememberSaveable { mutableStateOf(false) }
+    // The free books catalogue (Aozora Bunko) replaces the library while it is open.
+    var freeBooks by rememberSaveable { mutableStateOf(false) }
     // Text taken from the clipboard, waiting for a title; not saved, it can be megabytes.
     var pastedText by remember { mutableStateOf<String?>(null) }
     val clipboard = LocalClipboard.current
@@ -288,7 +291,15 @@ fun LibraryScreen(
         }
     }
 
-    if (browsing != null) {
+    if (freeBooks) {
+        AozoraScreen(
+            onBack = { freeBooks = false },
+            onBook = {
+                freeBooks = false
+                viewModel.addDownloaded(it.fileName, it.bytes)
+            },
+        )
+    } else if (browsing != null) {
         CatalogBrowser(
             state = browsing,
             downloads = opdsState.downloads,
@@ -316,6 +327,7 @@ fun LibraryScreen(
             autoImport = autoImport,
             snackbarHostState = snackbarHostState,
             onAdd = { choosingSource = true },
+            onFreeBooks = { freeBooks = true },
             onCancelBatch = viewModel::cancelBatch,
             onOpen = viewModel::open,
             onRemove = viewModel::remove,
@@ -382,6 +394,10 @@ fun LibraryScreen(
             onPickFolder = {
                 choosingSource = false
                 folderPicker.launch(null)
+            },
+            onFreeBooks = {
+                choosingSource = false
+                freeBooks = true
             },
             onPasteText = {
                 choosingSource = false
@@ -471,6 +487,7 @@ private fun LibraryContent(
     snackbarHostState: SnackbarHostState,
     autoImport: AutoImportStatus? = null,
     onAdd: () -> Unit,
+    onFreeBooks: () -> Unit = {},
     onCancelBatch: () -> Unit = {},
     onOpen: (id: Long) -> Unit,
     /** Removes a book; its reading statistics too if the flag is set. */
@@ -628,7 +645,7 @@ private fun LibraryContent(
                     CircularProgressIndicator()
                 }
                 uiState.totalBooks == 0 -> if (uiState.adding == null) {
-                    Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd) }
+                    Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd, onFreeBooks) }
                 }
                 books.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     val statusFilter = uiState.filter
@@ -1244,7 +1261,7 @@ private fun AddingRow(text: String, progress: Float? = null, detail: String? = n
 }
 
 @Composable
-private fun EmptyLibrary(onAdd: () -> Unit) {
+private fun EmptyLibrary(onAdd: () -> Unit, onFreeBooks: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1266,6 +1283,9 @@ private fun EmptyLibrary(onAdd: () -> Unit) {
         Button(onClick = onAdd) {
             Icon(Icons.Filled.Add, contentDescription = null)
             Text(stringResource(R.string.action_add_book), modifier = Modifier.padding(start = 8.dp))
+        }
+        TextButton(onClick = onFreeBooks, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.library_empty_aozora))
         }
     }
 }
