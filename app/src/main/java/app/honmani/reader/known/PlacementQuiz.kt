@@ -37,6 +37,34 @@ object PlacementQuiz {
             .distinct()
     }
 
+    /** How many ranks past a drawn one the quiz looks for a word it may ask. */
+    const val MAX_STEP = 40
+
+    /**
+     * Moves each drawn rank in [ranks] forward to the nearest rank, within [maxStep], for which
+     * [askable] holds (words that carry no information, such as particles, are skipped); a rank
+     * is used once and the ranks stay those of the full list, so [estimate] is not skewed by the
+     * skipped words. [askable] gets all ranks of one round at once and answers for each, in order.
+     * Ranks with no askable word within reach are dropped.
+     */
+    suspend fun stepToAskable(
+        ranks: List<Int>,
+        size: Int,
+        maxStep: Int = MAX_STEP,
+        askable: suspend (List<Int>) -> List<Boolean>,
+    ): List<Int> {
+        val chosen = sortedSetOf<Int>()
+        var open = ranks
+        for (step in 0..maxStep) {
+            val tried = open.filter { it + step <= size }
+            if (tried.isEmpty()) break
+            val answers = askable(tried.map { it + step })
+            // A rank another draw already took is stepped past, like one that is not askable.
+            open = tried.filterIndexed { i, rank -> !(answers[i] && chosen.add(rank + step)) }
+        }
+        return chosen.toList()
+    }
+
     /**
      * The rank where knowing turns into not knowing: the cut-off that disagrees with the fewest
      * answers (a known word below it or an unknown one above it counts against it); between equal

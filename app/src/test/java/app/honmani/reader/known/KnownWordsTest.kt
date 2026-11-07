@@ -274,6 +274,32 @@ class KnownWordsTest {
     }
 
     @Test
+    fun theQuizAsksContentWordsOnly_eachWithItsOwnRank() = runTest {
+        // JMdict-style: the word classes are the definition tags.
+        val rows = listOf(
+            listOf("の", "の", "prt", "of"),
+            listOf("猫", "ねこ", "n", "cat"),
+            listOf("には", "には", "prt conj", "in"),
+            listOf("食べる", "たべる", "v1 vt", "to eat"),
+            listOf("んです", "んです", "exp", "it is that"),
+            listOf("きれい", "きれい", "adj-na n", "pretty"),
+        )
+        val bank = rows.withIndex().joinToString(",", "[", "]") { (i, row) ->
+            val (expression, reading, tags, gloss) = row
+            """["$expression","$reading","$tags","",10,["$gloss"],${i + 1},""]"""
+        }
+        DictionaryImporter(database).import(writeZip(temp.root, mapOf("index.json" to index("JMdict"), "term_bank_1.json" to bank), "JMdict.zip"))
+        val ranks = (1..700).map { Triple(rows[it % rows.size][0] as String, rows[it % rows.size][1] as String, it) }
+        jiten(*ranks.toTypedArray())
+
+        val setup = known.prepareQuiz(kotlin.random.Random(1))!!
+
+        val asked = setup.questions.map { it.word.expression }
+        assertTrue("asked $asked", asked.isNotEmpty() && asked.all { it in setOf("猫", "食べる", "きれい") })
+        for (question in setup.questions) assertEquals(ranks[question.rank - 1].first, question.word.expression)
+    }
+
+    @Test
     fun quizNeedsAFrequencyDictionaryWithEnoughWords() = runTest {
         jmdict()
         assertNull(known.prepareQuiz())

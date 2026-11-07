@@ -105,9 +105,22 @@ class KnownWords(
         // asked (女性 as じょせい, not にょしょう). The ranks stay those of the list, which planQuiz cuts.
         val firstReading = HashMap<String, String?>()
         for (row in ranked) if (row.written !in firstReading) firstReading[row.written] = row.reading
-        val questions = PlacementQuiz.sampleRanks(ranked.size, random).mapNotNull { rank ->
+        // The drawn ranks are spread over the whole list, function words included, so that the
+        // estimate stays in ranks of the full list; each moves forward to the nearest word that
+        // says something about vocabulary and is asked with its own rank. The word classes are
+        // looked up for these candidates only. A dictionary set without any word class (a
+        // frequency list alone) asks whatever the ranks give.
+        var hasClasses: Boolean? = null
+        val askable = PlacementQuiz.stepToAskable(PlacementQuiz.sampleRanks(ranked.size, random), ranked.size) { batch ->
+            val rows = batch.map { ranked[it - 1] }
+            val firstReadings = rows.map { firstReading[it.written] == it.reading }
+            val classes = resolver.wordClasses(rows.filterIndexed { i, _ -> firstReadings[i] }.map { WantedWord(it.written, it.reading) }).iterator()
+            val perRow = firstReadings.map { if (it) classes.next() else null }
+            if (hasClasses == null) hasClasses = perRow.any { entries -> entries?.any { it.isNotEmpty() } == true }
+            perRow.map { entries -> entries != null && (hasClasses == false || PartsOfSpeech.isAskable(entries)) }
+        }
+        val questions = askable.mapNotNull { rank ->
             val row = ranked[rank - 1]
-            if (firstReading[row.written] != row.reading) return@mapNotNull null
             val word = resolver.resolve(listOf(WantedWord(row.written, row.reading)), deinflect = false).words.firstOrNull()
             if (word != null && seen.add(word.expression)) QuizQuestion(rank, word, usuallyKana = row.usuallyKana) else null
         }

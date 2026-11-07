@@ -67,6 +67,25 @@ class KnownWordResolver(private val lookup: DictionaryLookup) {
         return ResolvedWords(words.values.toList(), unmatched, names)
     }
 
+    /**
+     * For each of [words]: the word class codes ([PartsOfSpeech.codes]) of each of its entries in the
+     * dictionaries (the entries of its reading where it has any), names left out. Empty where no
+     * dictionary has the word. One batch of queries for all words.
+     */
+    suspend fun wordClasses(words: List<WantedWord>): List<List<Set<String>>> {
+        val byExpression = lookup.entriesFor(words.map { it.text }).filterNot { DictionaryCatalog.isNames(it.dictionary.title) }
+            .groupBy { it.term.expression }
+        return words.map { word ->
+            val written = byExpression[word.text].orEmpty()
+            val reading = word.reading?.let(::hiragana)
+            val ofReading = if (reading == null) written else written.filter { hiragana(it.term.reading) == reading }.ifEmpty { written }
+            ofReading.filterNot { it.isFormsList() }.map { entry ->
+                val term = lookup.unpack(entry).term
+                PartsOfSpeech.codes(term.definitionTags, term.glossary.json)
+            }
+        }
+    }
+
     /** An inflected form (食べた, 高くない): the dictionary form it comes from, if the whole text is one word. */
     private suspend fun deinflected(word: WantedWord): List<KnownCandidate>? {
         val result = lookup.lookup(word.text, maxLength = word.text.length)
