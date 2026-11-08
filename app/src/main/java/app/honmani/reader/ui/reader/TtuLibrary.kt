@@ -292,7 +292,7 @@ class TtuLibrary(
 
         private const val PAGE_TIMEOUT_MS = 20_000L
 
-        /** A little longer than the bridge's own import timeout. */
-        private const val IMPORT_TIMEOUT_MS = 190_000L
+        /** A little longer than the bridge's own waits (15 s for ttu's input plus 180 s to import, library-bridge.js). */
+        private const val IMPORT_TIMEOUT_MS = 210_000L
     }
 }
