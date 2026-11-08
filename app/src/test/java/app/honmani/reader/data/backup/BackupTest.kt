@@ -634,6 +634,33 @@ class BackupTest {
     }
 
     @Test
+    fun aBlankDeckOrVoiceOrAnUnknownNameIsSkipped_theLocalValueStays() = runTest {
+        fun text(value: String) = BackupValue(BackupValue.STRING, JsonPrimitive(value))
+        val backup = throughFile(
+            BackupFile(
+                exportedAt = 1,
+                settings = mapOf(
+                    "anki_deck" to text("  "),
+                    "anki_google_voice" to text(""),
+                    "anki_audio" to text("LOUD"),
+                    "anki_card_style" to text("NOPE"),
+                    "review_auto_play" to text("SOMETIMES"),
+                    "anki_sentence_speed" to text("SLOWER"),
+                ),
+            ),
+        )
+        val new = Phone("new")
+        new.settings.edit().putString("anki_deck", "Mining").putString("anki_audio", "GOOGLE").apply()
+
+        new.backup.restore(backup)
+
+        assertEquals(
+            mapOf("anki_deck" to "Mining", "anki_audio" to "GOOGLE", "anki_sentence_speed" to "SLOWER"),
+            new.settings.all,
+        )
+    }
+
+    @Test
     fun aRestoreThatIsCancelledAfterItStartedStillFinishesItsFileSteps() = runTest {
         val old = oldPhone()
         val backup = throughFile(old.backup.export(readerSettings = null))

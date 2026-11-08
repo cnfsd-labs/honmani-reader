@@ -3,6 +3,9 @@ package app.honmani.reader.data.backup
 import android.content.SharedPreferences
 import androidx.room.withTransaction
 import app.honmani.reader.anki.AnkiSettings
+import app.honmani.reader.anki.CardAudio
+import app.honmani.reader.anki.CardStyle
+import app.honmani.reader.anki.SentenceSpeed
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.library.BookEntity
@@ -16,13 +19,18 @@ import app.honmani.reader.data.review.ReadDayEntity
 import app.honmani.reader.data.review.ReviewCardEntity
 import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.review.ReviewState
+import app.honmani.reader.data.settings.Accent
+import app.honmani.reader.data.settings.AccentRandom
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.DaySettings
 import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
+import app.honmani.reader.data.settings.ReviewAutoPlay
+import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
+import app.honmani.reader.ui.library.LibrarySort
 import app.honmani.reader.data.library.BOOKMARK_NAME_MAX
 import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HIGHLIGHT_COLORS
@@ -545,7 +553,7 @@ class Backup(
             if (SETTING_TYPES[key] != typed.type) continue
             val value = typed.value as? JsonPrimitive ?: continue
             when (typed.type) {
-                BackupValue.STRING -> value.contentOrNull?.let { editor.putString(key, it) }
+                BackupValue.STRING -> value.contentOrNull?.takeIf { validString(key, it) }?.let { editor.putString(key, it) }
                 BackupValue.BOOLEAN -> value.booleanOrNull?.let { editor.putBoolean(key, it) }
                 BackupValue.FLOAT -> value.doubleOrNull?.let { editor.putFloat(key, it.toFloat()) }
                 BackupValue.INT -> value.intOrNull?.let { editor.putInt(key, it) }
@@ -555,6 +563,28 @@ class Backup(
     }
 
     internal companion object {
+        private fun names(entries: List<Enum<*>>): (String) -> Boolean = { value -> entries.any { it.name == value } }
+
+        /**
+         * Text settings that must be one of a few names or not blank; a damaged backup's other value
+         * is skipped, so the phone keeps its own.
+         */
+        private val STRING_CHECKS: Map<String, (String) -> Boolean> = mapOf(
+            AppearanceSettings.KEY_ACCENT to names(Accent.entries),
+            AppearanceSettings.KEY_ACCENT_RANDOM to names(AccentRandom.entries),
+            AppearanceSettings.KEY_LIBRARY_SORT to names(LibrarySort.entries),
+            ReviewSettings.KEY_AUTO_PLAY to names(ReviewAutoPlay.entries),
+            ReviewSettings.KEY_AUTO_PLAY_CONTENT to names(ReviewAutoPlayContent.entries),
+            AnkiSettings.KEY_AUDIO to names(CardAudio.entries),
+            AnkiSettings.KEY_SENTENCE_SPEED to names(SentenceSpeed.entries),
+            AnkiSettings.KEY_CARD_STYLE to names(CardStyle.entries),
+            AnkiSettings.KEY_GOOGLE_VOICE to { it.isNotBlank() },
+            AnkiSettings.KEY_DECK to { it.isNotBlank() },
+            AnkiSettings.KEY_CUSTOM_NOTE_TYPE_NAME to { it.isNotBlank() },
+        )
+
+        private fun validString(key: String, value: String) = STRING_CHECKS[key]?.invoke(value) ?: true
+
         /** The `settings` preferences a backup brings back, and their types. Add new settings here. */
         val SETTING_TYPES = mapOf(
             AppearanceSettings.KEY_ACCENT to BackupValue.STRING,
