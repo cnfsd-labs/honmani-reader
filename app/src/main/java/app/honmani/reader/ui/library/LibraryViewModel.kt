@@ -133,10 +133,11 @@ sealed interface LibraryNotice {
 
     data class Unreadable(val fileName: String) : LibraryNotice
 
-    data class ResetFailed(val title: String) : LibraryNotice
+    /** Progress could not be reset; [bookId] lets the snackbar offer a retry. */
+    data class ResetFailed(val title: String, val bookId: Long? = null) : LibraryNotice
 
     /** ッツ Ebook Reader could not import or open the book. */
-    data class ReaderFailed(val title: String) : LibraryNotice
+    data class ReaderFailed(val title: String, val bookId: Long? = null) : LibraryNotice
 
     data class CopySaved(val title: String) : LibraryNotice
 
@@ -636,7 +637,7 @@ class LibraryViewModel(
                 val ttuBook = try {
                     adder.ensureInReader(book, known)
                 } catch (_: TtuLibraryException) {
-                    _notices.send(LibraryNotice.ReaderFailed(book.title))
+                    _notices.send(LibraryNotice.ReaderFailed(book.title, book.id))
                     return@launch
                 }
                 if (ttuBook != known) adder.link(book, ttuBook)
@@ -652,7 +653,7 @@ class LibraryViewModel(
                 ttu.open(ttuBook.id)
                 dao.setLastOpened(book.id, now())
             } catch (_: TtuLibraryException) {
-                _notices.send(LibraryNotice.ReaderFailed(dao.find(id)?.title.orEmpty()))
+                _notices.send(LibraryNotice.ReaderFailed(dao.find(id)?.title.orEmpty(), id))
             } finally {
                 opening.value = null
             }
@@ -764,7 +765,7 @@ class LibraryViewModel(
                 book.ttuId?.let { ttu.resetProgress(it) }
                 dao.clearProgress(book.id)
             } catch (_: TtuLibraryException) {
-                _notices.send(LibraryNotice.ResetFailed(book.title))
+                _notices.send(LibraryNotice.ResetFailed(book.title, book.id))
             }
         }
     }

@@ -565,6 +565,16 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun aFailedProgressReset_namesTheBookSoTheNoticeCanRetry() = runBlocking {
+        val book = addAndWait("neko.epub", TestBooks.epub())
+        page.failResets = true
+
+        viewModel.resetProgress(book.id)
+
+        assertEquals(LibraryNotice.ResetFailed("吾輩は猫である", book.id), viewModel.notices.first())
+    }
+
+    @Test
     fun removingABookDeletesItEverywhere() = runBlocking {
         val book = addAndWait("neko.epub", TestBooks.epub())
 
@@ -670,6 +680,7 @@ private class FakeReaderPage(private val ttu: TtuLibrary) : TtuPage {
     val commands = mutableListOf<Pair<String, JsonObject>>()
     val loads = mutableListOf<String>()
     var failImports = false
+    var failResets = false
     var lastTtuId = 0L
 
     override fun evaluate(script: String) {
@@ -695,7 +706,8 @@ private class FakeReaderPage(private val ttu: TtuLibrary) : TtuPage {
                 }
             }
             "remove" -> ttu.onMessage(LibraryMessage.Removed(requestId))
-            "resetProgress" -> ttu.onMessage(LibraryMessage.ProgressReset(requestId))
+            // A page that never answers makes the library time out, which is how a reset fails.
+            "resetProgress" -> if (!failResets) ttu.onMessage(LibraryMessage.ProgressReset(requestId))
         }
     }
 

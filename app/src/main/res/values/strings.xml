@@ -157,7 +157,7 @@
     <string name="library_copy_saved">A copy of “%1$s” is saved.</string>
     <string name="library_copy_failed">“%1$s” could not be saved. Try another folder.</string>
     <string name="action_save_copy">Save a copy</string>
-    <string name="library_reset_failed">The progress of “%1$s” could not be reset. Try again in a moment.</string>
+    <string name="library_reset_failed">The progress of “%1$s” could not be reset.</string>
     <string name="action_remove">Remove</string>
     <string name="remove_book_title">Remove “%1$s”?</string>
     <string name="remove_book_message">The book and your reading position are deleted from Honmani. The file you added it from stays on your phone. Your reading time, words and statistics stay.</string>

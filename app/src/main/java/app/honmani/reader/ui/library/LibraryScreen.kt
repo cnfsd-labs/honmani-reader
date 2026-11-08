@@ -246,10 +246,26 @@ fun LibraryScreen(
         }
     }
     val noticeText = notice?.let { noticeText(it) }
+    val retryLabel = stringResource(R.string.onboarding_retry)
     LaunchedEffect(noticeText) {
         if (noticeText != null) {
-            snackbarHostState.showSnackbar(noticeText)
+            // A failure that can be repeated gets a Retry action; failures stay up longer than a plain notice.
+            val failed = notice
+            val retry: (() -> Unit)? = when (failed) {
+                is LibraryNotice.ReaderFailed -> failed.bookId?.let { id -> { viewModel.open(id) } }
+                is LibraryNotice.ResetFailed -> failed.bookId?.let { id -> { viewModel.resetProgress(id) } }
+                else -> null
+            }
+            val longLived = retry != null || failed is LibraryNotice.ReaderFailed ||
+                failed is LibraryNotice.ResetFailed || failed is LibraryNotice.CopyFailed
+            val result = snackbarHostState.showSnackbar(
+                message = noticeText,
+                actionLabel = if (retry != null) retryLabel else null,
+                withDismissAction = retry != null,
+                duration = if (longLived) SnackbarDuration.Long else SnackbarDuration.Short,
+            )
             notice = null
+            if (result == SnackbarResult.ActionPerformed) retry?.invoke()
         }
     }
 
@@ -261,7 +277,6 @@ fun LibraryScreen(
     val starterFailure = StarterPackState.failedDownload(dictionariesState)
     val starterFailureText = starterFailure?.takeIf { !freeBooks && browsing == null }
         ?.let { stringResource(R.string.library_dictionaries_failed, stringResource(it.reason.messageRes())) }
-    val retryLabel = stringResource(R.string.onboarding_retry)
     val withNotifications = rememberWithNotifications()
     LaunchedEffect(starterFailure?.id, starterFailureText != null) {
         val failure = starterFailure
