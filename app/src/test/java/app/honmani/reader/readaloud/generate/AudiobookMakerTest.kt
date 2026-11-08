@@ -231,6 +231,23 @@ class AudiobookMakerTest {
     }
 
     @Test
+    fun aVoiceThatKeepsSendingUnusableAudioStopsTheJobInsteadOfPausingIt() {
+        val maker = maker("unusable")
+        val all = sentences(3)
+        val secondText = all[1].spoken
+        // A 200 answer with audio that is not MP3 at all.
+        behave = { _, text -> if (text == secondText) "200 OK|{\"audioContent\":\"${Base64.getEncoder().encodeToString(ByteArray(10))}\"}" else null }
+        maker.freeze(plan(sentences = all))
+        val result = runBlocking { maker.run("book", voice) }
+        assertTrue(result.toString(), result is MakerResult.Stopped)
+        result as MakerResult.Stopped
+        assertEquals(VoiceProblem.FAILED, result.problem)
+        assertEquals("The voice could not make the audio.", result.message)
+        assertEquals(calls.count { it == secondText }, AudiobookMaker.MAX_TRIES)
+        assertEquals(1, (maker.status("book") as MakerStatus.Partial).done)
+    }
+
+    @Test
     fun billingNotSwitchedOnStopsTheJobButKeepsWhatIsDone() {
         val maker = maker("billing")
         val all = sentences()

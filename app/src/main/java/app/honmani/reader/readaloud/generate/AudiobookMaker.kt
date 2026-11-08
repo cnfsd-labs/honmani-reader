@@ -238,6 +238,8 @@ class AudiobookMaker(
                     }
                 } catch (e: Mp3Exception) {
                     log("Unusable audio for a sentence: ${e.message}")
+                    // The voice itself keeps failing: waiting and paying again won't help, so stop instead of pausing.
+                    if (attempt >= MAX_TRIES) throw Halt(MakerResult.Stopped(VoiceProblem.FAILED, stopReason(VoiceProblem.FAILED)))
                     problem = VoiceProblem.FAILED
                 }
                 if (attempt >= MAX_TRIES) throw Halt(MakerResult.Paused(problem))
