@@ -55,6 +55,9 @@ jobs:
 
       - name: Browser tests (tap bridge, ttu end-to-end)
         working-directory: web-tests
+        env:
+          # ubuntu-latest moved to 26.04, which Playwright has no Chromium build for yet.
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
           npm ci
           npx playwright install --with-deps chromium
