@@ -1486,6 +1486,9 @@
     <string name="sync_folder_synced">Synced with %1$s, %2$s</string>
     <string name="sync_folder_newer">%1$s has a newer Honmani: update it here</string>
     <string name="sync_folder_unavailable">Folder unavailable: choose it again</string>
+    <string name="sync_folder_held">%1$s has dates in the future, up to %2$s. Its clock may be wrong. Merge anyway (the dates are set back to today) or skip this file?</string>
+    <string name="sync_folder_held_merge">Merge</string>
+    <string name="sync_folder_held_skip">Skip</string>
     <string name="backup_failed_title">Not restored</string>
     <string name="backup_not_a_backup">This file is not a Honmani backup, or it comes from a newer version of Honmani. Update Honmani and try again.</string>
     <string name="backup_failed">The file could not be read or written. Try again, or pick another place for it.</string>

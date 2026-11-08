@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ import app.honmani.reader.data.backup.RestoreSummary
 import app.honmani.reader.data.backup.SyncFolderState
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.launch
 
 /**
  * Settings → Back up and restore: settings, progress, statistics and saved words in one file the
@@ -147,6 +149,7 @@ private fun SyncFolderRow() {
     val context = LocalContext.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val syncFolder = container.syncFolder
+    val scope = rememberCoroutineScope()
     val state by syncFolder.state.collectAsStateWithLifecycle()
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         // Right away, so the folder has the file before the app next goes to the background.
@@ -171,6 +174,13 @@ private fun SyncFolderRow() {
                             },
                         )
                         current.newerDevice?.let { Text(stringResource(R.string.sync_folder_newer, it)) }
+                        current.held?.let { held ->
+                            Text(stringResource(R.string.sync_folder_held, held.device, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(held.latest))))
+                            Row {
+                                TextButton(onClick = { scope.launch { syncFolder.mergeHeld() } }) { Text(stringResource(R.string.sync_folder_held_merge)) }
+                                TextButton(onClick = { scope.launch { syncFolder.skipHeld() } }) { Text(stringResource(R.string.sync_folder_held_skip)) }
+                            }
+                        }
                     }
                     is SyncFolderState.Unavailable -> {
                         current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }

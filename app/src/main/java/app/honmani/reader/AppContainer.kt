@@ -816,7 +816,7 @@ class AppContainer(context: Context) {
     }
 
     private val syncMerge: SyncMerge by lazy {
-        SyncMerge(database, milestoneStore, readStretches, wordProgressStore, restoredBooks, ::installationId)
+        SyncMerge(database, milestoneStore, readStretches, wordProgressStore, restoredBooks, installationId = ::installationId)
     }
 
     private val syncSettings: SyncSettings by lazy { SyncSettings(settingsPreferences, devicePreferences) }

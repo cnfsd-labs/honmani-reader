@@ -39,7 +39,7 @@ import java.time.LocalDate
  * only ever adds, it passes on edits and deletions: of two edits the later one wins, a deletion marker
  * removes older rows and a newer row beats the marker (on equal times the deletion wins, on every
  * phone). Merging the same file again changes nothing, so phones settle instead of writing back and
- * forth. Everything is written through the DAOs' row methods, which keep the other phone's times.
+ * forth. Times in the file beyond a day from now are set back to that ([SyncStamps]). Everything is written through the DAOs' row methods, which keep the other phone's times.
  */
 class SyncMerge(
     private val database: HonmaniDatabase,
@@ -47,6 +47,7 @@ class SyncMerge(
     private val stretches: ReadStretchStore,
     private val wordProgress: WordProgressStore,
     private val restored: RestoredBooks,
+    private val now: () -> Long = System::currentTimeMillis,
     private val installationId: () -> String,
 ) {
     private val dao = database.backupDao()
@@ -86,7 +87,9 @@ class SyncMerge(
         }
     }
 
-    suspend fun merge(file: BackupFile) {
+    suspend fun merge(incoming: BackupFile) {
+        // Another phone's clock may be wrong: no time of its file counts for more than a day from now.
+        val file = SyncStamps.clamp(incoming, SyncStamps.ceiling(now()))
         val positions = ArrayList<Pair<BookEntity, Long>>()
         val progress = HashMap<Long, WordStep>()
         val progressBefore = wordProgress.load()

@@ -26,11 +26,16 @@ sealed interface SyncFolderState {
         val syncedAt: Long? = null,
         /** A phone whose file this Honmani is too old to read. */
         val newerDevice: String? = null,
+        /** A file with dates far in the future, waiting for the reader's decision ([SyncFolder.mergeHeld], [SyncFolder.skipHeld]). */
+        val held: HeldFile? = null,
     ) : SyncFolderState
 
     /** The last write failed: the folder is gone, or the right to write to it. */
     data class Unavailable(val name: String?) : SyncFolderState
 }
+
+/** A phone's file held back because its dates lie in the future: the phone, and the latest date in the file (epoch ms). */
+data class HeldFile(val device: String, val latest: Long)
 
 /**
  * Keeps this phone in step with the reader's other phones through a folder they chose (a Syncthing,
@@ -44,6 +49,11 @@ sealed interface SyncFolderState {
  * changes; one that fails (still being copied, say) is tried again next time. The own file is written
  * only if the content changed. A failure only shows as [SyncFolderState.Unavailable]. The folder is
  * tied to this phone ("device" preferences, not backed up).
+ *
+ * A phone with a wrong clock writes edit times in the future, which would beat every later edit once
+ * its clock is right. A file with a time more than a day ahead ([SyncStamps]) is therefore not merged
+ * but held ([SyncFolderState.On.held]): [mergeHeld] takes it with those times set back to the ceiling,
+ * [skipHeld] leaves it (it is looked at again only when the file changes). Other files go on meanwhile.
  */
 class SyncFolder(
     private val device: SharedPreferences,
@@ -78,6 +88,9 @@ class SyncFolder(
                 device.getString(KEY_SYNCED_WITH, null),
                 device.getLong(KEY_SYNCED_AT, 0L).takeIf { it > 0 },
                 device.getString(KEY_NEWER, null),
+                device.getString(KEY_HELD_STAMP, null)?.let {
+                    HeldFile(device.getString(KEY_HELD_NAME, null) ?: ANOTHER_PHONE, device.getLong(KEY_HELD_LATEST, 0L))
+                },
             )
         }
     }
@@ -101,6 +114,7 @@ class SyncFolder(
             .remove(KEY_SYNCED_WITH)
             .remove(KEY_SYNCED_AT)
             .remove(KEY_NEWER)
+            .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST)
             .putBoolean(KEY_FAILED, false)
             .apply()
         _state.value = read()
@@ -111,7 +125,8 @@ class SyncFolder(
     fun disable() {
         device.getString(KEY_FOLDER, null)?.let(target::release)
         device.edit().remove(KEY_FOLDER).remove(KEY_NAME).remove(KEY_LAST).remove(KEY_FINGERPRINT).remove(KEY_FAILED)
-            .remove(KEY_SEEN).remove(KEY_SYNCED_WITH).remove(KEY_SYNCED_AT).remove(KEY_NEWER).apply()
+            .remove(KEY_SEEN).remove(KEY_SYNCED_WITH).remove(KEY_SYNCED_AT).remove(KEY_NEWER)
+            .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST).apply()
         _state.value = SyncFolderState.Off
     }
 
@@ -138,16 +153,32 @@ class SyncFolder(
         }
     }
 
+    /** Merges [backup] (times beyond the ceiling set back) and notes who it was with. */
+    private suspend fun mergeFile(backup: BackupFile) {
+        merge(SyncStamps.clamp(backup, SyncStamps.ceiling(now())))
+        device.edit()
+            .putString(KEY_SYNCED_WITH, backup.deviceName ?: ANOTHER_PHONE)
+            .putLong(KEY_SYNCED_AT, now())
+            .apply()
+    }
+
     private suspend fun readOthers(folder: String) {
         val id = installationId()
         val seen = device.getStringSet(KEY_SEEN, null).orEmpty()
         val nowSeen = HashSet<String>()
         var newer: String? = null
+        val heldStamp = device.getString(KEY_HELD_STAMP, null)
+        var held: Held? = heldStamp?.let { Held(it, device.getString(KEY_HELD_ADDRESS, null).orEmpty(), device.getString(KEY_HELD_NAME, null) ?: ANOTHER_PHONE, device.getLong(KEY_HELD_LATEST, 0L)) }
+        var heldPresent = false
         for (file in target.list(folder)) {
             if (!OTHER_FILE.matches(file.name) || file.name == fileName(id)) continue
             val stamp = "${file.address}|${file.size}|${file.modified}"
             if (stamp in seen) {
                 nowSeen += stamp
+                continue
+            }
+            if (stamp == heldStamp) {
+                heldPresent = true
                 continue
             }
             try {
@@ -156,12 +187,17 @@ class SyncFolder(
                     backup.syncFormat == null || backup.deviceId == id -> nowSeen += stamp
                     backup.syncFormat > FORMAT -> newer = backup.deviceName ?: ANOTHER_PHONE
                     else -> {
-                        merge(backup)
-                        nowSeen += stamp
-                        device.edit()
-                            .putString(KEY_SYNCED_WITH, backup.deviceName ?: ANOTHER_PHONE)
-                            .putLong(KEY_SYNCED_AT, now())
-                            .apply()
+                        val latest = SyncStamps.latest(backup)
+                        if (latest > SyncStamps.ceiling(now())) {
+                            // One question at a time; a second such file is looked at again once this one is settled.
+                            if (held == null) {
+                                held = Held(stamp, file.address, backup.deviceName ?: ANOTHER_PHONE, latest)
+                                heldPresent = true
+                            }
+                        } else {
+                            mergeFile(backup)
+                            nowSeen += stamp
+                        }
                     }
                 }
             } catch (e: CancellationException) {
@@ -173,7 +209,46 @@ class SyncFolder(
                 logWarning("Honmani.sync", "Merging a sync file failed", e)
             }
         }
-        device.edit().putStringSet(KEY_SEEN, nowSeen).putString(KEY_NEWER, newer).apply()
+        // A held file that changed or went away is no longer the one the reader was asked about.
+        if (!heldPresent) held = null
+        val edit = device.edit().putStringSet(KEY_SEEN, nowSeen).putString(KEY_NEWER, newer)
+        val keep = held
+        if (keep == null) {
+            edit.remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST)
+        } else {
+            edit.putString(KEY_HELD_STAMP, keep.stamp).putString(KEY_HELD_ADDRESS, keep.address)
+                .putString(KEY_HELD_NAME, keep.name).putLong(KEY_HELD_LATEST, keep.latest)
+        }
+        edit.apply()
+    }
+
+    private class Held(val stamp: String, val address: String, val name: String, val latest: Long)
+
+    /** Takes in the held file with its future dates set back to a day from now, then writes this phone's file. Never throws. */
+    suspend fun mergeHeld() = settleHeld(take = true)
+
+    /** Leaves the held file out; it is asked about again only if the file changes. Never throws. */
+    suspend fun skipHeld() = settleHeld(take = false)
+
+    private suspend fun settleHeld(take: Boolean) {
+        mutex.withLock {
+            val stamp = device.getString(KEY_HELD_STAMP, null) ?: return
+            val address = device.getString(KEY_HELD_ADDRESS, null).orEmpty()
+            withContext(Dispatchers.IO) {
+                try {
+                    if (take) mergeFile(target.read(address).use { BackupCodec.read(it) })
+                    val seen = device.getStringSet(KEY_SEEN, null).orEmpty() + stamp
+                    device.edit().putStringSet(KEY_SEEN, seen)
+                        .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST).apply()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Still being copied, say: the question stays.
+                    logWarning("Honmani.sync", "Merging the held sync file failed", e)
+                }
+            }
+            writeLocked()
+        }
     }
 
     private suspend fun writeLocked() {
@@ -237,6 +312,10 @@ class SyncFolder(
         private const val KEY_SYNCED_WITH = "sync_folder_synced_with"
         private const val KEY_SYNCED_AT = "sync_folder_synced_at"
         private const val KEY_NEWER = "sync_folder_newer"
+        private const val KEY_HELD_STAMP = "sync_folder_held_stamp"
+        private const val KEY_HELD_ADDRESS = "sync_folder_held_address"
+        private const val KEY_HELD_NAME = "sync_folder_held_name"
+        private const val KEY_HELD_LATEST = "sync_folder_held_latest"
         private const val KEY_FOLDER = "sync_folder_uri"
         private const val KEY_NAME = "sync_folder_name"
         private const val KEY_LAST = "sync_folder_last"

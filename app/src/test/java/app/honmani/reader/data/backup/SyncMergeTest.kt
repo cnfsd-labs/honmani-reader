@@ -63,7 +63,7 @@ class SyncMergeTest {
         private val progress = WordProgressStore(dir.resolve("progress.json"))
         val restored = RestoredBooks(dir.resolve("restored.json"))
         val backup = Backup(db, settings, milestones, stretches, progress, restored, { emptyMap() }, { id }, { clock })
-        private val merger = SyncMerge(db, milestones, stretches, progress, restored) { id }
+        private val merger = SyncMerge(db, milestones, stretches, progress, restored, now = { clock }) { id }
         private val syncSettings = SyncSettings(settings, device) { clock }
         val address = "$folderName/${SyncFolder.fileName(id)}"
         var merges = 0
@@ -144,6 +144,91 @@ class SyncMergeTest {
     fun tearDown() {
         phones.forEach { it.close() }
         UpdateClock.source = System::currentTimeMillis
+    }
+
+    // Clocks that are wrong
+
+    private val oneDay = SyncStamps.DAY_MS
+    private val tenYears = 3650 * oneDay
+
+    /** Phone a has a wrong clock and stars the word; b (right clock) has read a's file. */
+    private suspend fun starredInTheFuture(): Pair<Phone, Phone> {
+        val a = phone("a")
+        val b = phone("b")
+        val wa = a.addWord()
+        b.addWord()
+        clock = tenYears
+        a.db.wordDao().setStarred(wa, true)
+        a.sync()
+        clock = 2_000
+        b.sync()
+        return a to b
+    }
+
+    @Test
+    fun aFileWithDatesInTheFutureIsHeldNotMerged() = runBlocking<Unit> {
+        val (_, b) = starredInTheFuture()
+
+        assertFalse(b.findWord()!!.starred)
+        val held = (b.sync.state.value as SyncFolderState.On).held
+        assertEquals("Phone a", held?.device)
+        assertEquals(tenYears, held?.latest)
+        assertEquals(0, b.merges)
+        // Asking again changes nothing, and does not read the file again as new.
+        b.sync()
+        assertEquals(0, b.merges)
+        assertEquals(held, (b.sync.state.value as SyncFolderState.On).held)
+    }
+
+    @Test
+    fun mergingTheHeldFileSetsItsDatesBackAndALaterLocalEditWins() = runBlocking<Unit> {
+        val (_, b) = starredInTheFuture()
+
+        b.sync.mergeHeld()
+
+        assertNull((b.sync.state.value as SyncFolderState.On).held)
+        assertTrue(b.findWord()!!.starred)
+        assertEquals(2_000 + oneDay, b.findWord()!!.updatedAt)
+        // b's own edit, two days on, beats the clamped date; a's file is not merged again.
+        clock = 2_000 + 2 * oneDay
+        b.db.wordDao().setStarred(b.findWord()!!.id, false)
+        b.sync()
+        assertFalse(b.findWord()!!.starred)
+        assertEquals(1, b.merges)
+    }
+
+    @Test
+    fun skippingTheHeldFileLeavesLocalDataAndDoesNotAskAgainUntilItChanges() = runBlocking<Unit> {
+        val (a, b) = starredInTheFuture()
+
+        b.sync.skipHeld()
+        b.sync()
+        b.sync()
+
+        assertNull((b.sync.state.value as SyncFolderState.On).held)
+        assertFalse(b.findWord()!!.starred)
+        assertEquals(0, b.merges)
+        // The file changes: that is a new question.
+        clock = tenYears + 5
+        a.db.wordDao().setNote(a.findWord()!!.id, "again")
+        a.sync()
+        clock = 3_000
+        b.sync()
+        assertEquals("Phone a", (b.sync.state.value as SyncFolderState.On).held?.device)
+    }
+
+    @Test
+    fun aFileWithNormalDatesIsMergedWithoutAsking() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        val wa = a.addWord()
+        b.addWord()
+        clock = 2_000
+        a.db.wordDao().setStarred(wa, true)
+        settle(a, b)
+
+        assertTrue(b.findWord()!!.starred)
+        assertNull((b.sync.state.value as SyncFolderState.On).held)
     }
 
     // Words

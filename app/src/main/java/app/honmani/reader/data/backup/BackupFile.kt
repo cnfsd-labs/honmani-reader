@@ -299,6 +299,11 @@ object BackupCodec {
     /** The JSON a zip holds; also what [SyncFolder] fingerprints to tell whether anything changed. */
     fun toJson(backup: BackupFile): String = json.encodeToString(BackupFile.serializer(), backup)
 
+    /** The file as a JSON tree and back, for code that edits values across the whole file ([SyncStamps]). */
+    fun toTree(backup: BackupFile): JsonElement = json.encodeToJsonElement(BackupFile.serializer(), backup)
+
+    fun fromTree(tree: JsonElement): BackupFile = json.decodeFromJsonElement(BackupFile.serializer(), tree)
+
     fun write(backup: BackupFile, output: OutputStream) {
         val zip = ZipOutputStream(output)
         zip.putNextEntry(ZipEntry(ENTRY))
