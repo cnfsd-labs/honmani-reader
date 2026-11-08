@@ -147,6 +147,14 @@ test('a highlight never colours furigana: one range per run of base text, none t
   ).toEqual([1, null]);
 });
 
+test('counts the same characters as ttu\'s regex (and EpubPositions.count) at the edges', async ({ page }) => {
+  await openBook(page, '<div id="ttu-a"><p>a</p></div>');
+  // The same table as EpubPositionsTest: the long s and the Kelvin sign fold to s and k under ttu's /iu flags;
+  // compatibility ideographs and the Hangzhou numerals are not unified ideographs.
+  expect(await page.evaluate(() => window.honmaniHighlights.count('\u017F\u212A\uFA0E\uFF66\u3007'))).toBe(5);
+  expect(await page.evaluate(() => window.honmaniHighlights.count('\uF900\uFAD9\u3021\u3038\u303A\u303C\u30FB\u{2F800}'))).toBe(0);
+});
+
 test('a gaiji picture counts as one character', async ({ page }) => {
   await openBook(page, `<div id="ttu-a"><p>東<img class="gaiji" src="${GIF}" width="20" height="20">京都。</p></div>`);
   await send(page, [['ttu-a', 0]], [{ id: 1, start: 1, end: 3, color: 1 }]);

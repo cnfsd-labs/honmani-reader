@@ -28,6 +28,13 @@ class EpubPositionsTest {
     }
 
     @Test
+    fun countsTheSameCharactersAsTtusRegexAtTheEdges() {
+        // Same table as web-tests/tests/highlights.spec.js (ttu's /i/u regex, run in Chromium).
+        assertEquals(5, EpubPositions.count("\u017F\u212A\uFA0E\uFF66\u3007"))
+        assertEquals(0, EpubPositions.count("\uF900\uFAD9\u3021\u3038\u303A\u303C\u30FB\uD87E\uDC00"))
+    }
+
+    @Test
     fun readsKoreaderPositions() {
         assertEquals(18, positions.charactersAt("/body/DocFragment[2]/body/p/text().3"))
         assertEquals(12, positions.charactersAt("/body/DocFragment[1]/body/div/p[2]/text()[2].1"))

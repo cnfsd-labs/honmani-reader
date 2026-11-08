@@ -493,17 +493,30 @@ class EpubPositions private constructor(
         }
 
         /**
-         * ttu's `isNotJapaneseRegex`, inverted: digits, Latin letters (either case), ○◯, 々〆〇〻,
+         * ttu's `isNotJapaneseRegex`, inverted (flags `iu`, so the case folding counts U+017F and the
+         * Kelvin sign as the letters s and k): digits, Latin letters (either case), ○◯, 々〆〇〻,
          * kana, the long vowel mark, full-width digits and letters, half-width katakana, CJK
-         * radicals and ideographs.
+         * radicals and the Unicode unified ideographs. highlights.js has the same set.
          */
         internal fun isCounted(cp: Int): Boolean = when (cp) {
             in '0'.code..'9'.code, in 'A'.code..'Z'.code, in 'a'.code..'z'.code -> true
+            0x017F, 0x212A -> true
             0x25CB, 0x25EF, in 0x3005..0x3007, 0x303B -> true
             in 0x3041..0x3096, in 0x309D..0x309E, in 0x30A1..0x30FA, 0x30FC -> true
             in 0xFF10..0xFF19, in 0xFF21..0xFF3A, in 0xFF41..0xFF5A, in 0xFF66..0xFF9D -> true
             in 0x2E80..0x2E99, in 0x2E9B..0x2EF3, in 0x2F00..0x2FD5 -> true
-            else -> Character.isIdeographic(cp) && Character.UnicodeScript.of(cp) == Character.UnicodeScript.HAN
+            else -> isUnifiedIdeograph(cp)
+        }
+
+        /** Han ideographs without the compatibility ideographs (except the twelve that are unified) and the Hangzhou numerals. */
+        private fun isUnifiedIdeograph(cp: Int): Boolean {
+            if (!Character.isIdeographic(cp) || Character.UnicodeScript.of(cp) != Character.UnicodeScript.HAN) return false
+            return when (cp) {
+                in 0x3021..0x3029, in 0x3038..0x303A -> false
+                0xFA0E, 0xFA0F, 0xFA11, 0xFA13, 0xFA14, 0xFA1F, 0xFA21, 0xFA23, 0xFA24, 0xFA27, 0xFA28, 0xFA29 -> true
+                in 0xF900..0xFAFF, in 0x2F800..0x2FA1F -> false
+                else -> true
+            }
         }
 
         private fun resolve(base: String, href: String): String {
