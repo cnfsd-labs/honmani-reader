@@ -64,6 +64,51 @@ class DigestChallengeTest {
         assertEquals("n1", params["nonce"])
     }
 
+    @Test
+    fun prefersSha256OverMd5_andNamesNoAlgorithmWhenTheServerDidNot() {
+        val both = DigestChallenge.from(
+            listOf("Digest realm=\"r\", nonce=\"n\", algorithm=MD5", "Digest realm=\"r\", nonce=\"n\", algorithm=sha-256"),
+        )!!
+        val header = both.authorization("u", "p", "GET", "/a", "c")
+        assertTrue(header, "algorithm=sha-256" in header)
+        assertEquals(sha256("${sha256("u:r:p")}:n:${sha256("GET:/a")}"), responseOf(header))
+
+        val plain = DigestChallenge.from(listOf("Digest realm=\"r\", nonce=\"n\""))!!.authorization("u", "p", "GET", "/a")
+        assertTrue(plain, "algorithm" !in plain)
+    }
+
+    /** The "-sess" variants hash the nonce and cnonce into the first hash. */
+    @Test
+    fun answersTheSessVariant() {
+        val challenge = DigestChallenge.from(listOf("Digest realm=\"r\", nonce=\"n\", qop=auth, algorithm=MD5-sess"))!!
+        val header = challenge.authorization("u", "p", "GET", "/a", "cn")
+        val ha1 = md5("${md5("u:r:p")}:n:cn")
+        assertEquals(md5("$ha1:n:00000001:cn:auth:${md5("GET:/a")}"), responseOf(header))
+        assertTrue(header, "algorithm=MD5-sess" in header)
+    }
+
+    @Test
+    fun qopListWithAuthIsAnswered_andCredentialsAreEscaped() {
+        val challenge = DigestChallenge.from(listOf("Digest realm=\"r\", nonce=\"n\", qop=\"auth-int,auth\""))!!
+        val header = challenge.authorization("a\"b", "p", "GET", "/a", "cn")
+        assertTrue(header, "qop=auth," in header)
+        assertTrue(header, "username=\"a\\\"b\"" in header)
+    }
+
+    @Test
+    fun ignoresMalformedHeaders() {
+        assertNull(DigestChallenge.from(emptyList()))
+        assertNull(DigestChallenge.from(listOf("")))
+        assertNull(DigestChallenge.from(listOf("Digest")))
+        assertNull(DigestChallenge.from(listOf("abc123==")))
+        assertEquals("r", DigestChallenge.from(listOf("DIGEST REALM=\"r\", NONCE=\"n\""))!!.realm)
+    }
+
+    private fun responseOf(header: String) = Regex("""response="([0-9a-f]+)"""").find(header)!!.groupValues[1]
+
+    private fun sha256(text: String) =
+        MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
+
     private fun md5(text: String) =
         MessageDigest.getInstance("MD5").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }
