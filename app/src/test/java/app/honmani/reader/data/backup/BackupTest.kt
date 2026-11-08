@@ -38,13 +38,18 @@ import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -68,14 +73,30 @@ class BackupTest {
         const val LAST_OPENED = 1_700_000_000_000L
     }
 
+    /** [preferences] whose edits throw, as a full or damaged phone does. */
+    private fun failingEdits(preferences: android.content.SharedPreferences): android.content.SharedPreferences =
+        java.lang.reflect.Proxy.newProxyInstance(
+            javaClass.classLoader,
+            arrayOf(android.content.SharedPreferences::class.java),
+        ) { _, method, args ->
+            if (method.name == "edit") throw IllegalStateException("No space left on device")
+            try {
+                method.invoke(preferences, *(args ?: emptyArray()))
+            } catch (e: java.lang.reflect.InvocationTargetException) {
+                throw e.targetException
+            }
+        } as android.content.SharedPreferences
+
     /** One installation of the app: its database, preferences and files. */
-    private inner class Phone(name: String) {
+    private inner class Phone(name: String, milestoneFails: Boolean = false, installationId: () -> String = { name }) {
         private val context = ApplicationProvider.getApplicationContext<Context>()
         val database: HonmaniDatabase = Room.inMemoryDatabaseBuilder(context, HonmaniDatabase::class.java)
             .allowMainThreadQueries()
             .build()
         val settings = context.getSharedPreferences("$name-settings", Context.MODE_PRIVATE)
-        val milestones = MilestoneStore(context.getSharedPreferences("$name-device", Context.MODE_PRIVATE))
+        val milestones = MilestoneStore(
+            context.getSharedPreferences("$name-device", Context.MODE_PRIVATE).let { if (milestoneFails) failingEdits(it) else it },
+        )
         private val files = folder.newFolder(name)
         val stretches = ReadStretchStore(files.resolve("read-stretches.txt"))
         val progress = WordProgressStore(files.resolve("word-progress.json"))
@@ -89,7 +110,7 @@ class BackupTest {
             wordProgress = progress,
             restored = restored,
             grades = { emptyMap() },
-            installationId = { name },
+            installationId = installationId,
             now = { 1_800_000_000_000L },
         )
 
@@ -610,6 +631,37 @@ class BackupTest {
         new.backup.restore(backup)
 
         assertEquals(mapOf("anki_deck" to "Mining"), new.settings.all)
+    }
+
+    @Test
+    fun aRestoreThatIsCancelledAfterItStartedStillFinishesItsFileSteps() = runTest {
+        val old = oldPhone()
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        lateinit var job: Job
+        val cancelling = Phone("cancelling", installationId = { job.cancel(); "cancelling" })
+
+        job = launch(Dispatchers.Unconfined) { cancelling.backup.restore(backup) }
+        job.join()
+
+        // Cancelled inside the database part, yet the steps after it ran.
+        assertEquals(old.milestones.seen.value, cancelling.milestones.seen.value)
+        assertEquals(old.progress.load(), cancelling.progress.load())
+        assertEquals(old.stretches.all().mapValues { it.value.toList() }, cancelling.stretches.all().mapValues { it.value.toList() })
+        assertEquals(old.days().sumOf { it.characters }, cancelling.days().sumOf { it.characters })
+        assertTrue(cancelling.milestones.seen.value.isNotEmpty())
+    }
+
+    @Test
+    fun aFileStepThatThrowsDoesNotSkipTheOthers_andTheRestoreFailsAfterwards() = runTest {
+        val old = oldPhone()
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new", milestoneFails = true)
+
+        assertThrows(IllegalStateException::class.java) { runBlocking { new.backup.restore(backup) } }
+
+        assertEquals(old.progress.load(), new.progress.load())
+        assertEquals(old.stretches.all().mapValues { it.value.toList() }, new.stretches.all().mapValues { it.value.toList() })
+        assertEquals("TEAL", new.settings.getString("accent", null))
     }
 
     @Test

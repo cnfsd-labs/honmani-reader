@@ -31,6 +31,7 @@ import java.io.OutputStream
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,10 +113,18 @@ class BackupViewModel(
         restoreOffered(container.autoBackup) { restore(it) }
     }
 
-    /** Merges [backup] into this phone's data and hands positions and reader settings to ttu. */
-    private suspend fun restore(backup: BackupFile): BackupState {
-        val summary = container.backup.restore(backup)
-        reloadSettings()
+    /**
+     * Merges [backup] into this phone's data and hands positions and reader settings to ttu. It
+     * runs to the end even if the screen is left meanwhile: a half-finished restore would leave
+     * positions and settings behind.
+     */
+    private suspend fun restore(backup: BackupFile): BackupState = withContext(NonCancellable) {
+        val summary = try {
+            container.backup.restore(backup)
+        } finally {
+            // Also after a failed step: the settings that did come back are in the preferences.
+            reloadSettings()
+        }
         val ttu = container.ttuLibrary
         // Books in the library whose position moved forward: ttu opens them there, unless progress
         // sync has a newer one when the book opens (the position keeps the time it was read).
@@ -151,7 +160,7 @@ class BackupViewModel(
             }
         }
         if (summary.catalogsAdded > 0) container.opdsAutoImport.start(force = true)
-        return BackupState.Restored(summary)
+        BackupState.Restored(summary)
     }
 
     private fun reloadSettings() {

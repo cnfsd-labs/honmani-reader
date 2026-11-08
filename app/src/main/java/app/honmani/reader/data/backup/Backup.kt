@@ -48,7 +48,10 @@ import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.data.words.WordStep
 import app.honmani.reader.lookup.FuriganaOverride
+import app.honmani.reader.diagnostics.logWarning
 import java.time.LocalDate
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -232,8 +235,14 @@ class Backup(
         )
     }
 
-    /** Merges [backup] into what this phone has; ttu's reader settings are the caller's. */
-    suspend fun restore(backup: BackupFile): RestoreSummary {
+    /**
+     * Merges [backup] into what this phone has; ttu's reader settings are the caller's. A restore
+     * that has started finishes even if the caller is cancelled (the screen was left): the data
+     * and the files must not end up half merged.
+     */
+    suspend fun restore(backup: BackupFile): RestoreSummary = withContext(NonCancellable) { restoreNow(backup) }
+
+    private suspend fun restoreNow(backup: BackupFile): RestoreSummary {
         val newWaiting = ArrayList<WaitingBook>()
         val positions = ArrayList<BookEntity>()
         val savedAt = HashMap<Long, Long>()
@@ -449,13 +458,29 @@ class Backup(
             restored.addWaiting(newWaiting)
         }
         // The database came first: a failed restore leaves the settings and files as they were.
-        restoreSettings(backup.settings)
-        milestones.restore(
-            backup.milestones.mapNotNull { (id, day) -> runCatching { id to LocalDate.parse(day) }.getOrNull() }.toMap(),
-        )
-        stretches.merge(backup.stretches.mapValues { (_, steps) -> steps.toIntArray() })
-        for (book in positions) restored.setPosition(book.contentHash, position(book, savedAt[book.id] ?: backup.exportedAt))
-        wordProgress.restore(progress)
+        // One step failing (a file that can't be written) must not skip the others: the first
+        // failure is thrown at the end, and a second restore of the same backup repeats what is missing.
+        var failure: Exception? = null
+        fun step(name: String, block: () -> Unit) {
+            try {
+                block()
+            } catch (e: Exception) {
+                logWarning("Honmani.backup", "Restore step $name failed", e)
+                failure?.addSuppressed(e) ?: run { failure = e }
+            }
+        }
+        step("settings") { restoreSettings(backup.settings) }
+        step("milestones") {
+            milestones.restore(
+                backup.milestones.mapNotNull { (id, day) -> runCatching { id to LocalDate.parse(day) }.getOrNull() }.toMap(),
+            )
+        }
+        step("stretches") { stretches.merge(backup.stretches.mapValues { (_, steps) -> steps.toIntArray() }) }
+        for (book in positions) {
+            step("position") { restored.setPosition(book.contentHash, position(book, savedAt[book.id] ?: backup.exportedAt)) }
+        }
+        step("word progress") { wordProgress.restore(progress) }
+        failure?.let { throw it }
         return RestoreSummary(
             booksInLibrary = booksInLibrary,
             booksWaiting = newWaiting.count { it.details != null },
