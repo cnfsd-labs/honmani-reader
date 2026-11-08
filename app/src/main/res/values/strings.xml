@@ -142,7 +142,7 @@
     <string name="sample_books_hint">Easiest first. A tap adds the book to your library and opens it.</string>
 
     <string name="library_empty_title">No books yet</string>
-    <string name="library_empty_message">Add an EPUB or a text file (Aozora Bunko works too) from your phone or your book server. Then open it and tap any word to look it up.</string>
+    <string name="library_empty_message">Add an EPUB or a text file from your phone, or start with the sample book. Then open it and tap any word to look it up.</string>
     <string name="action_add_book">Add book</string>
     <string name="library_adding">Adding %1$s…</string>
     <string name="library_progress">%1$d%%</string>
@@ -173,7 +173,8 @@
     <string name="paste_text_add">Add</string>
     <string name="add_book_aozora">Free books (Aozora Bunko)</string>
     <string name="add_book_aozora_details">Search 17,000 Japanese books in the public domain</string>
-    <string name="library_empty_aozora">Browse free books</string>
+    <string name="library_empty_aozora">Free classics from Aozora Bunko</string>
+    <string name="library_empty_sample">Read the sample book</string>
     <string name="aozora_title">Free books</string>
     <string name="aozora_refresh">Refresh list</string>
     <string name="aozora_intro_title">Free books from Aozora Bunko</string>

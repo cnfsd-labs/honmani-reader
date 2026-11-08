@@ -78,6 +78,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -328,6 +329,7 @@ fun LibraryScreen(
             snackbarHostState = snackbarHostState,
             onAdd = { choosingSource = true },
             onFreeBooks = { freeBooks = true },
+            onSample = viewModel::addSample,
             onCancelBatch = viewModel::cancelBatch,
             onOpen = viewModel::open,
             onRemove = viewModel::remove,
@@ -488,6 +490,7 @@ private fun LibraryContent(
     autoImport: AutoImportStatus? = null,
     onAdd: () -> Unit,
     onFreeBooks: () -> Unit = {},
+    onSample: () -> Unit = {},
     onCancelBatch: () -> Unit = {},
     onOpen: (id: Long) -> Unit,
     /** Removes a book; its reading statistics too if the flag is set. */
@@ -645,7 +648,7 @@ private fun LibraryContent(
                     CircularProgressIndicator()
                 }
                 uiState.totalBooks == 0 -> if (uiState.adding == null) {
-                    Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd, onFreeBooks) }
+                    Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd, onFreeBooks, onSample) }
                 }
                 books.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     val statusFilter = uiState.filter
@@ -1261,7 +1264,7 @@ private fun AddingRow(text: String, progress: Float? = null, detail: String? = n
 }
 
 @Composable
-private fun EmptyLibrary(onAdd: () -> Unit, onFreeBooks: () -> Unit) {
+private fun EmptyLibrary(onAdd: () -> Unit, onFreeBooks: () -> Unit, onSample: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1284,7 +1287,10 @@ private fun EmptyLibrary(onAdd: () -> Unit, onFreeBooks: () -> Unit) {
             Icon(Icons.Filled.Add, contentDescription = null)
             Text(stringResource(R.string.action_add_book), modifier = Modifier.padding(start = 8.dp))
         }
-        TextButton(onClick = onFreeBooks, modifier = Modifier.padding(top = 8.dp)) {
+        OutlinedButton(onClick = onSample, modifier = Modifier.padding(top = 8.dp)) {
+            Text(stringResource(R.string.library_empty_sample))
+        }
+        TextButton(onClick = onFreeBooks) {
             Text(stringResource(R.string.library_empty_aozora))
         }
     }
