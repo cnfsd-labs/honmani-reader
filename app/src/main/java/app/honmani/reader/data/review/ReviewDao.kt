@@ -41,6 +41,12 @@ interface ReviewDao : TombstoneWriter {
     @Query("SELECT * FROM review_card")
     fun observeAll(): Flow<List<ReviewCardEntity>>
 
+    @Query("SELECT COUNT(*) FROM review_card")
+    fun observeCardCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM review_card WHERE state = 'REVIEW'")
+    fun observeCardsInReviewCount(): Flow<Int>
+
     /** Creates the card if the word has none; -1 if it already has one. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertCardRow(card: ReviewCardEntity): Long

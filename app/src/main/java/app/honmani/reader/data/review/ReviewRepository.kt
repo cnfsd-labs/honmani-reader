@@ -6,8 +6,10 @@ import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordScheduler
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
@@ -144,17 +146,25 @@ class ReviewRepository(
 
     suspend fun card(wordId: Long): ReviewCardEntity? = dao.find(wordId)
 
-    /** Today's reviews, retention and time for the Progress tab, again after each review. */
-    fun observeSummary(): Flow<ReviewSummary> {
-        val time = now()
-        return combine(
-            dao.observeLogsSince(time - (ReviewStats.RETENTION_DAYS + 1) * ReviewRules.DAY_MS),
-            dao.observeAll(),
-            dao.observeFirstReviewsSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())),
-        ) { logs, cards, firstReviews ->
-            ReviewStats.summary(
-                logs, cards.count { it.state == ReviewState.REVIEW }, cards.isNotEmpty(), firstReviews, now(), zone(), startHour(),
-            )
+    /**
+     * Today's reviews, retention and time for the Progress tab, again after each review and when the
+     * next day starts (a screen left open moves on to the new day).
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun observeSummary(): Flow<ReviewSummary> = flow {
+        while (true) {
+            emit(ReviewRules.startOfDay(now(), zone(), startHour = startHour()))
+            val next = ReviewRules.startOfDay(now(), zone(), 1, startHour())
+            delay((next - now()).coerceAtLeast(1_000L))
+        }
+    }.distinctUntilChanged().flatMapLatest { dayStart ->
+        combine(
+            dao.observeLogsSince(dayStart - (ReviewStats.RETENTION_DAYS + 1) * ReviewRules.DAY_MS),
+            dao.observeCardCount(),
+            dao.observeCardsInReviewCount(),
+            dao.observeFirstReviewsSince(dayStart),
+        ) { logs, cards, inReview, firstReviews ->
+            ReviewStats.summary(logs, inReview, cards > 0, firstReviews, now(), zone(), startHour())
         }
     }
 

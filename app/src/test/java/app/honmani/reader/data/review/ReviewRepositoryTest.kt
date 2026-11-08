@@ -8,7 +8,13 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordScheduler
 import java.time.LocalDateTime
 import java.time.ZoneId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -337,6 +343,33 @@ class ReviewRepositoryTest {
         now = LocalDateTime.of(2026, 5, 2, 4, 0).atZone(zone).toInstant().toEpochMilli()
         assertEquals(0, shifted.newWordsToday())
         assertEquals(0, shifted.reviewsToday())
+    }
+
+    @Test
+    fun theSummaryCountsCardsInTheDatabaseAndMovesOnWhenTheDayChanges() = runTest {
+        assertFalse(repository.observeSummary().first().any)
+        val id = word("猫")
+        repository.introduce(id)
+        assertEquals(0, repository.observeSummary().first().inReview)
+        assertTrue(repository.observeSummary().first().any)
+        repository.record(id, Grade.GOOD)
+        val seen = mutableListOf<ReviewSummary>()
+        backgroundScope.launch { repository.observeSummary().toList(seen) }
+        suspend fun waitFor(count: Int) = withContext(Dispatchers.Default) { withTimeout(10_000) { while (seen.size < count) delay(10) } }
+        waitFor(1)
+        assertEquals(1, seen.last().today)
+        assertEquals(1, seen.last().newToday)
+        assertEquals(1, seen.last().inReview)
+
+        // The screen stays open past midnight: the day's counts start again without a new subscription.
+        val tomorrow = ReviewRules.startOfDay(now, zone, 1)
+        val wait = tomorrow - now + 1_000
+        now = tomorrow + 1_000
+        testScheduler.advanceTimeBy(wait)
+        waitFor(2)
+        assertEquals(0, seen.last().today)
+        assertEquals(0, seen.last().newToday)
+        assertEquals(1, seen.last().inReview)
     }
 
     @Test
