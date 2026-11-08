@@ -273,12 +273,12 @@ class ReadingTracker(
 
     /**
      * Credits [read] characters to the days the time went to, in proportion to that time; a page
-     * read on one day (or with no time known) goes to today.
+     * read on one day goes to that day (not the day of the write), with no time known to today.
      */
     private suspend fun addCharacters(ttuId: Long, read: Long, byDay: Map<String, Long>) {
         val days = byDay.toSortedMap().filterValues { it > 0 }
         val total = days.values.sum()
-        if (days.size < 2) return safely { store.add(ttuId, day(clock()), 0, read) }
+        if (days.size < 2) return safely { store.add(ttuId, days.keys.firstOrNull() ?: day(clock()), 0, read) }
         var left = read
         val last = days.keys.last()
         for ((day, millis) in days) {

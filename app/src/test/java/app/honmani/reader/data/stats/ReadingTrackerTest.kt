@@ -403,6 +403,24 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun aPageTurnAfterMidnightPutsCharactersOnTheDayTheTimeWasCountedOn() = runTest {
+        val tracker = tracker()
+        store.positions[7] = 1_000
+        now = DAY_START + 15 * 60 * 60_000L + 50 * 60_000L // 23:50
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        now += 20 * 60_000L // 00:10: the idle cap counted only 23:50 to 23:55
+        tracker.onPage(7, 1_500, null)
+        tracker.setVisible(false)
+        advanceUntilIdle()
+
+        assertEquals(ReadingTracker.IDLE_MS / 1_000, store.seconds[7L to DAY])
+        assertEquals(500L, store.characters[7L to DAY])
+        assertEquals(null, store.characters[7L to NEXT_DAY])
+    }
+
+    @Test
     fun withADayStartOf4_readingAt0200CountsForThePreviousDay() = runTest {
         startHour = 4
         val tracker = tracker()
