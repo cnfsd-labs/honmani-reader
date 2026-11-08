@@ -14,7 +14,11 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** A download failed; [message] says why in a way that can be shown to the user. */
-class DownloadException(message: String, cause: Throwable? = null) : IOException(message, cause)
+class DownloadException(
+    message: String,
+    cause: Throwable? = null,
+    val reason: FailureReason = FailureReason.OTHER,
+) : IOException(message, cause)
 
 /**
  * Downloads dictionary files over HTTPS. GitHub release and Hugging Face links redirect to a CDN, so
@@ -69,10 +73,14 @@ class DictionaryDownloader(
             } catch (e: DownloadException) {
                 throw e
             } catch (e: IOException) {
-                throw DownloadException("The download was interrupted: ${e.message}", e)
+                throw DownloadException(
+                    "The download was interrupted: ${e.message}",
+                    e,
+                    FailureReason.ofStorage(e, otherwise = FailureReason.OFFLINE),
+                )
             }
             if (total > 0 && done != total) {
-                throw DownloadException("The download was incomplete ($done of $total bytes)")
+                throw DownloadException("The download was incomplete ($done of $total bytes)", reason = FailureReason.OFFLINE)
             }
             onProgress(done, total)
         } finally {
@@ -103,7 +111,7 @@ class DictionaryDownloader(
             } catch (e: DownloadException) {
                 throw e
             } catch (e: IOException) {
-                throw DownloadException("The download was interrupted: ${e.message}", e)
+                throw DownloadException("The download was interrupted: ${e.message}", e, FailureReason.OFFLINE)
             }
             bytes.toString(Charsets.UTF_8)
         } finally {
@@ -132,14 +140,14 @@ class DictionaryDownloader(
                     setRequestProperty("User-Agent", USER_AGENT)
                 }
             } catch (e: IOException) {
-                throw DownloadException("Could not connect: ${e.message}", e)
+                throw DownloadException("Could not connect: ${e.message}", e, FailureReason.OFFLINE)
             }
             val status = try {
                 connection.responseCode
             } catch (e: IOException) {
                 NetworkLog.shared.failed(NetworkPurpose.DICTIONARY, current.toString(), e)
                 connection.disconnect()
-                throw DownloadException("Could not connect: ${e.message}", e)
+                throw DownloadException("Could not connect: ${e.message}", e, FailureReason.OFFLINE)
             }
             NetworkLog.shared.answered(NetworkPurpose.DICTIONARY, current.toString(), status, connection.contentLengthLong)
             when {
@@ -147,16 +155,16 @@ class DictionaryDownloader(
                 status in REDIRECTS -> {
                     val location = connection.getHeaderField("Location")
                     connection.disconnect()
-                    if (++redirects > MAX_REDIRECTS) throw DownloadException("The server redirected too many times")
+                    if (++redirects > MAX_REDIRECTS) throw DownloadException("The server redirected too many times", reason = FailureReason.SERVER)
                     current = try {
-                        current.resolve(location ?: throw DownloadException("The server redirected without saying where"))
+                        current.resolve(location ?: throw DownloadException("The server redirected without saying where", reason = FailureReason.SERVER))
                     } catch (_: IllegalArgumentException) {
-                        throw DownloadException("The server sent a bad redirect")
+                        throw DownloadException("The server sent a bad redirect", reason = FailureReason.SERVER)
                     }
                 }
                 else -> {
                     connection.disconnect()
-                    throw DownloadException("The server answered $status for $url")
+                    throw DownloadException("The server answered $status for $url", reason = FailureReason.SERVER)
                 }
             }
         }

@@ -20,6 +20,44 @@ enum class ImportError {
     FAILED,
 }
 
+/** What went wrong with a download or import, in a few plain kinds for the UI. */
+enum class FailureReason {
+    /** No connection, a timeout or a download cut short. */
+    OFFLINE,
+
+    /** The server answered with an error or something unexpected. */
+    SERVER,
+
+    /** The phone ran out of space. */
+    NO_SPACE,
+
+    OTHER,
+    ;
+
+    companion object {
+        /** [NO_SPACE] if [error] is a full disk or database, else [otherwise]. */
+        fun ofStorage(error: Throwable, otherwise: FailureReason = OTHER): FailureReason {
+            var current: Throwable? = error
+            var depth = 0
+            while (current != null && depth++ < 5) {
+                val message = current.message.orEmpty()
+                if (current is android.database.sqlite.SQLiteFullException ||
+                    message.contains("No space left", ignoreCase = true) ||
+                    message.contains("ENOSPC") ||
+                    message.contains("database or disk is full", ignoreCase = true)
+                ) {
+                    return NO_SPACE
+                }
+                current = current.cause
+            }
+            return otherwise
+        }
+
+        /** The reason saved with a failed work item; [OTHER] if missing or unknown. */
+        fun parse(name: String?): FailureReason = entries.firstOrNull { it.name == name } ?: OTHER
+    }
+}
+
 sealed interface ImportStatus {
     /** Unique per import, so the UI can tell one failure from the next. */
     val id: String
@@ -39,6 +77,7 @@ sealed interface ImportStatus {
         val detail: String?,
         /** The catalog dictionary whose download failed; null for imports of files and updates. */
         val dictionaryId: String? = null,
+        val reason: FailureReason = FailureReason.OTHER,
     ) : ImportStatus
 }
 

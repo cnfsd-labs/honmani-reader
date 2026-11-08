@@ -111,12 +111,12 @@ class DictionaryDownloaderTest {
 
     @Test
     fun httpErrorsAreReported() = runTest {
-        assertDownloadFails("$base/missing.zip", "The server answered 404")
+        assertDownloadFails("$base/missing.zip", "The server answered 404", reason = FailureReason.SERVER)
     }
 
     @Test
     fun incompleteDownloadsAreReported() = runTest {
-        assertDownloadFails("$base/truncated.zip", "The download was")
+        assertDownloadFails("$base/truncated.zip", "The download was", reason = FailureReason.OFFLINE)
     }
 
     @Test
@@ -195,6 +195,7 @@ class DictionaryDownloaderTest {
         messageStart: String,
         maxBytes: Long = DictionaryDownloader.MAX_DOWNLOAD_BYTES,
         redirectHosts: Set<String> = emptySet(),
+        reason: FailureReason? = null,
     ) {
         try {
             DictionaryDownloader(
@@ -208,6 +209,7 @@ class DictionaryDownloaderTest {
             fail("expected DownloadException")
         } catch (e: DownloadException) {
             assertTrue(e.message, e.message!!.startsWith(messageStart))
+            if (reason != null) assertEquals(reason, e.reason)
         }
     }
 }

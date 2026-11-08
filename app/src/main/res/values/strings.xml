@@ -1314,7 +1314,12 @@
     <string name="onboarding_download">Download</string>
     <string name="onboarding_downloading">Getting dictionary %1$d of %2$d. You can start reading meanwhile; keep Honmani open until this is done, as some phones pause apps in the background.</string>
     <string name="onboarding_ready">Dictionaries ready</string>
-    <string name="onboarding_failed">The download failed. Check your connection and try again.</string>
+    <string name="download_failed_offline">There is no internet connection. Connect to Wi-Fi or mobile data and try again.</string>
+    <string name="download_failed_server">The download server did not answer properly. Try again in a while.</string>
+    <string name="download_failed_no_space">There is not enough free space on this phone. Free some space and try again.</string>
+    <string name="download_failed_other">The download failed. Try again.</string>
+    <string name="onboarding_failed_skip">You can skip this: dictionaries can be added later in Settings → Dictionaries.</string>
+    <string name="library_dictionaries_failed">The dictionaries were not downloaded. %1$s</string>
     <string name="onboarding_retry">Try again</string>
     <string name="onboarding_book_title">Open a book</string>
     <string name="onboarding_book_message">Try 手袋を買いに (Niimi Nankichi), a short children\'s story, or add your own: an EPUB or text file, or the books on your Calibre-Web or other OPDS server.</string>

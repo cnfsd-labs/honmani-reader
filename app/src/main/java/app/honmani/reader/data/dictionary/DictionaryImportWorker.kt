@@ -75,7 +75,7 @@ class DictionaryImportWorker(
             willRetry = true
             throw e
         } catch (e: DownloadException) {
-            return failure(ImportError.DOWNLOAD_FAILED, e.message)
+            return failure(ImportError.DOWNLOAD_FAILED, e.message, e.reason)
         } catch (e: InvalidDictionaryException) {
             return failure(ImportError.INVALID, e.message)
         } catch (e: DictionaryAlreadyInstalledException) {
@@ -83,13 +83,13 @@ class DictionaryImportWorker(
         } catch (e: NoTermsException) {
             return failure(ImportError.NO_TERMS, e.title)
         } catch (e: IOException) {
-            return failure(ImportError.FAILED, e.message)
+            return failure(ImportError.FAILED, e.message, FailureReason.ofStorage(e))
         } catch (e: SecurityException) {
             // Access to the picked document was lost, e.g. after a reboot.
             return failure(ImportError.FAILED, e.message)
         } catch (e: SQLException) {
             // Typically a full disk.
-            return failure(ImportError.FAILED, e.message)
+            return failure(ImportError.FAILED, e.message, FailureReason.ofStorage(e))
         } finally {
             copy.delete()
             if (uri != null && !willRetry) {
@@ -149,9 +149,8 @@ class DictionaryImportWorker(
         }
     }
 
-    private fun failure(error: ImportError, detail: String?) = Result.failure(
-        workDataOf(KEY_ERROR to error.name, KEY_DETAIL to detail),
-    )
+    private fun failure(error: ImportError, detail: String?, reason: FailureReason = FailureReason.OTHER) =
+        Result.failure(workDataOf(KEY_ERROR to error.name, KEY_DETAIL to detail, KEY_REASON to reason.name))
 
     companion object {
         private const val KEY_URI = "uri"
@@ -163,6 +162,7 @@ class DictionaryImportWorker(
         private const val KEY_BYTES_TOTAL = "bytesTotal"
         private const val KEY_ERROR = "error"
         private const val KEY_DETAIL = "detail"
+        private const val KEY_REASON = "reason"
         private const val KEY_TITLE = "title"
         private const val KEY_PERCENT = "percent"
 
@@ -201,6 +201,8 @@ class DictionaryImportWorker(
             val title = data.getString(KEY_TITLE) ?: return null
             return ImportProgress(title, data.getInt(KEY_PERCENT, 0))
         }
+
+        fun reasonOf(data: Data): FailureReason = FailureReason.parse(data.getString(KEY_REASON))
 
         fun errorOf(data: Data): Pair<ImportError, String?> {
             val error = data.getString(KEY_ERROR)
@@ -248,7 +250,7 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
                         val (error, detail) = DictionaryImportWorker.errorOf(info.outputData)
                         val dictionaryId = info.tags.firstOrNull { it.startsWith(DICTIONARY_TAG) }
                             ?.removePrefix(DICTIONARY_TAG)
-                        ImportStatus.Failed(id, error, detail, dictionaryId)
+                        ImportStatus.Failed(id, error, detail, dictionaryId, DictionaryImportWorker.reasonOf(info.outputData))
                     }
                     WorkInfo.State.SUCCEEDED, WorkInfo.State.CANCELLED -> null
                 }

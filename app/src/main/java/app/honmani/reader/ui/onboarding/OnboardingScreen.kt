@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -67,6 +68,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.dictionary.CatalogDictionary
 import app.honmani.reader.data.dictionary.DictionaryCatalog
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.data.dictionary.ImportStatus
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.dictionaries.CatalogItem
@@ -83,11 +85,15 @@ import kotlin.math.sin
 sealed interface StarterPackState {
     data object NotStarted : StarterPackState
 
-    data class Downloading(val installed: Int, val total: Int) : StarterPackState
+    /**
+     * [fraction] is how far the whole pack is (0 to 1), or null while the running step reports
+     * nothing yet (the bar is then indeterminate).
+     */
+    data class Downloading(val installed: Int, val total: Int, val fraction: Float? = null) : StarterPackState
 
     data object Ready : StarterPackState
 
-    data object Failed : StarterPackState
+    data class Failed(val reason: FailureReason = FailureReason.OTHER) : StarterPackState
 
     companion object {
         /** The pack's state from the Dictionaries screen's state; [started] once requested. */
@@ -95,16 +101,54 @@ sealed interface StarterPackState {
             val loaded = state as? DictionariesUiState.Loaded ?: return NotStarted
             val items = loaded.catalog.filter { it.dictionary in pack }
             val installed = items.count { it.state == CatalogItem.State.INSTALLED }
+            val downloading = Downloading(installed, pack.size, fractionOf(installed, pack.size, loaded.imports))
             return when {
                 installed == pack.size -> Ready
                 !started -> NotStarted
                 // Failed only once nothing is left running; a failure beside running downloads waits.
-                items.any { it.state == CatalogItem.State.IN_PROGRESS } -> Downloading(installed, pack.size)
-                loaded.imports.any { it is ImportStatus.Failed } -> Failed
-                else -> Downloading(installed, pack.size)
+                items.any { it.state == CatalogItem.State.IN_PROGRESS } -> downloading
+                loaded.imports.any { it is ImportStatus.Failed } ->
+                    Failed(loaded.imports.filterIsInstance<ImportStatus.Failed>().first().reason)
+                else -> downloading
             }
         }
+
+        /**
+         * The pack's progress from the running import: its download is the first half of a step,
+         * writing it to the database the second. Null when nothing reports a size yet.
+         */
+        fun fractionOf(installed: Int, total: Int, imports: List<ImportStatus>): Float? {
+            val running = imports.filterIsInstance<ImportStatus.Running>().firstOrNull() ?: return null
+            val step = when {
+                running.download != null && running.download.bytesTotal > 0 ->
+                    0.5f * (running.download.bytesDone.toFloat() / running.download.bytesTotal).coerceIn(0f, 1f)
+                running.download != null -> return null
+                running.progress != null -> 0.5f + 0.5f * (running.progress.percent / 100f).coerceIn(0f, 1f)
+                else -> return null
+            }
+            return ((installed + step) / total).coerceIn(0f, 1f)
+        }
+
+        /**
+         * The first failed download of a starter pack (either language) whose dictionary is still
+         * missing, for a notice after the first-start screen is gone; null if there is none.
+         */
+        fun failedDownload(state: DictionariesUiState): ImportStatus.Failed? {
+            val loaded = state as? DictionariesUiState.Loaded ?: return null
+            val ids = (DictionaryCatalog.starterPack(false) + DictionaryCatalog.starterPack(true)).map { it.id }.toSet()
+            val installed = loaded.catalog.filter { it.state == CatalogItem.State.INSTALLED }.map { it.dictionary.id }.toSet()
+            return loaded.imports.filterIsInstance<ImportStatus.Failed>()
+                .firstOrNull { it.dictionaryId != null && it.dictionaryId in ids && it.dictionaryId !in installed }
+        }
     }
+}
+
+/** The sentence for why a download failed, as a string resource. */
+fun FailureReason.messageRes(): Int = when (this) {
+    FailureReason.OFFLINE -> R.string.download_failed_offline
+    FailureReason.SERVER -> R.string.download_failed_server
+    FailureReason.NO_SPACE -> R.string.download_failed_no_space
+    FailureReason.OTHER -> R.string.download_failed_other
 }
 
 /** The two steps of the first start, one screen each. */
@@ -357,7 +401,15 @@ private fun PackStatus(pack: StarterPackState, onRetry: () -> Unit) {
     when (pack) {
         StarterPackState.NotStarted -> Unit
         is StarterPackState.Downloading -> {
-            ProgressBar(progress = { (pack.installed + 0.5f) / pack.total }, modifier = Modifier.fillMaxWidth())
+            val fraction = pack.fraction
+            if (fraction != null) {
+                ProgressBar(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+            } else if (LocalMotionEnabled.current) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                // No moving bar without animations: the finished dictionaries so far.
+                ProgressBar(progress = { pack.installed.toFloat() / pack.total }, modifier = Modifier.fillMaxWidth())
+            }
             Text(
                 stringResource(R.string.onboarding_downloading, pack.installed + 1, pack.total),
                 style = MaterialTheme.typography.bodySmall,
@@ -371,11 +423,16 @@ private fun PackStatus(pack: StarterPackState, onRetry: () -> Unit) {
             Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.onboarding_ready))
         }
-        StarterPackState.Failed -> {
+        is StarterPackState.Failed -> {
             Text(
-                stringResource(R.string.onboarding_failed),
+                stringResource(pack.reason.messageRes()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+            )
+            Text(
+                stringResource(R.string.onboarding_failed_skip),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             OutlinedButton(onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.onboarding_retry))
