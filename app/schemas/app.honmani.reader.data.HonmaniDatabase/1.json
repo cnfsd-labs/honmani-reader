@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "fd18bac6047e8956c9318b57d2ea843a",
+    "identityHash": "29c0742775a58b4f1adf03b393abbf99",
     "entities": [
       {
         "tableName": "dictionary",
@@ -729,13 +729,13 @@
         "indices": [
           {
             "name": "index_bookmark_content_hash_characters",
-            "unique": false,
+            "unique": true,
             "columnNames": [
               "content_hash",
               "characters"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_bookmark_content_hash_characters` ON `${TABLE_NAME}` (`content_hash`, `characters`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_bookmark_content_hash_characters` ON `${TABLE_NAME}` (`content_hash`, `characters`)"
           }
         ]
       },
@@ -807,14 +807,15 @@
         },
         "indices": [
           {
-            "name": "index_highlight_content_hash_start",
-            "unique": false,
+            "name": "index_highlight_content_hash_start_end_position",
+            "unique": true,
             "columnNames": [
               "content_hash",
-              "start"
+              "start",
+              "end_position"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_highlight_content_hash_start` ON `${TABLE_NAME}` (`content_hash`, `start`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_highlight_content_hash_start_end_position` ON `${TABLE_NAME}` (`content_hash`, `start`, `end_position`)"
           }
         ]
       },
@@ -1791,7 +1792,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fd18bac6047e8956c9318b57d2ea843a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '29c0742775a58b4f1adf03b393abbf99')"
     ]
   }
 }

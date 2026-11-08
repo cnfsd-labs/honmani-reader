@@ -1052,4 +1052,22 @@ class BackupTest {
         phone.backup.restore(without)
         assertEquals("猫[びょう]", phone.words.find("猫", "よみ")!!.furigana)
     }
+
+    @Test
+    fun repeatedBookmarksAndHighlightsInABackup_comeBackOnce() = runTest {
+        val old = Phone("old")
+        val mark = BackupBookmark(hash = "h", name = "first", characters = 5, total = 10)
+        val line = BackupHighlight(hash = "h", start = 5, end = 9, color = 1, text = "t", total = 10)
+        val backup = throughFile(old.backup.export(readerSettings = null)).copy(
+            bookmarks = listOf(mark, mark.copy(name = "again")),
+            highlights = listOf(line, line.copy(color = 2)),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(listOf("first"), new.database.backupDao().bookmarks().map { it.name })
+        assertEquals(listOf(1), new.database.backupDao().highlights().map { it.color })
+    }
 }

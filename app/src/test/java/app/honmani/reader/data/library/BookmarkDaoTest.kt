@@ -81,4 +81,37 @@ class BookmarkDaoTest {
         assertEquals(emptyList<BookmarkEntity>(), dao.observe("a").first())
         assertEquals(1, dao.observe("b").first().size)
     }
+
+    @Test
+    fun savingAnotherBookmarkAtTheSamePlace_replacesIt_andLeavesOneRow() = runTest {
+        dao.put(mark("a", "first", 100))
+        dao.put(mark("a", "second", 100))
+        dao.put(mark("b", "other book", 100))
+
+        assertEquals(listOf("second"), dao.observe("a").first().map { it.name })
+        assertEquals(1, dao.observe("b").first().size)
+    }
+
+    @Test
+    fun undoingADeleteOverANewBookmarkAtThatPlace_doesNotCrashAndKeepsOneRow() = runTest {
+        val id = dao.put(mark("a", "old", 100))
+        val old = dao.byId(id)!!
+        dao.delete(id)
+        dao.put(mark("a", "new", 100))
+
+        dao.put(old)
+
+        assertEquals(listOf("old"), dao.observe("a").first().map { it.name })
+    }
+
+    @Test
+    fun restoringRowsWithAPlaceThatIsThereOrRepeated_keepsTheFirstAndDoesNotThrow() = runTest {
+        dao.put(mark("a", "mine", 100))
+
+        database.backupDao().insertBookmarks(
+            listOf(mark("a", "theirs", 100), mark("a", "new", 200), mark("a", "new again", 200)),
+        )
+
+        assertEquals(listOf("mine", "new"), dao.observe("a").first().map { it.name })
+    }
 }

@@ -121,4 +121,36 @@ class HighlightDaoTest {
         assertEquals(emptyList<HighlightEntity>(), dao.observe("a").first())
         assertEquals(1, dao.observe("b").first().size)
     }
+
+    @Test
+    fun savingAHighlightOverTheSameRange_replacesIt_andLeavesOneRow() = runTest {
+        dao.put(mark("a", 100, 130, color = 0))
+        dao.put(mark("a", 100, 130, color = 2))
+        dao.put(mark("a", 100, 140, color = 1))
+
+        assertEquals(listOf(2, 1), dao.observe("a").first().map { it.color })
+    }
+
+    @Test
+    fun undoingADeleteOverANewHighlightOnThatRange_doesNotCrashAndKeepsOneRow() = runTest {
+        val id = dao.put(mark("a", 100, 130, color = 0))
+        val old = dao.byId(id)!!
+        dao.delete(id)
+        dao.put(mark("a", 100, 130, color = 3))
+
+        dao.put(old)
+
+        assertEquals(listOf(0), dao.observe("a").first().map { it.color })
+    }
+
+    @Test
+    fun restoringRowsWithARangeThatIsThereOrRepeated_keepsTheFirstAndDoesNotThrow() = runTest {
+        dao.put(mark("a", 100, 130, color = 0))
+
+        database.backupDao().insertHighlights(
+            listOf(mark("a", 100, 130, color = 1), mark("a", 200, 230, color = 2), mark("a", 200, 230, color = 3)),
+        )
+
+        assertEquals(listOf(0, 2), dao.observe("a").first().map { it.color })
+    }
 }

@@ -20,9 +20,10 @@ const val BOOKMARK_NAME_MAX = 100
 /**
  * A named place the reader saved in a book (not ttu's single reading-position bookmark). Keyed
  * by the book's content hash like the other per-book data, so a backup brings it back once the
- * same file is in the library; it goes when the book is removed.
+ * same file is in the library; it goes when the book is removed. One per place: the index is
+ * unique because sync identifies a bookmark by (book, characters), so [BookmarkDao.put] replaces.
  */
-@Entity(tableName = "bookmark", indices = [Index(value = ["content_hash", "characters"])])
+@Entity(tableName = "bookmark", indices = [Index(value = ["content_hash", "characters"], unique = true)])
 data class BookmarkEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "content_hash") val contentHash: String,

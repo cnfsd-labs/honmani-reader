@@ -954,4 +954,47 @@ class SyncMergeTest {
     }
 
     private fun zip(file: BackupFile) = ByteArrayOutputStream().also { BackupCodec.write(file, it) }.toByteArray()
+
+    @Test
+    fun repeatedBookmarksAndHighlightsInAFile_leaveOneRowEachAndTheNewestWins() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        a.addWord()
+        a.sync()
+        val file = BackupCodec.read(ByteArrayInputStream(folder.files.getValue(a.address)))
+        val mark = BackupBookmark(hash = hash, name = "newer", characters = 10, total = 100, createdAt = 1, updatedAt = 900)
+        val line = BackupHighlight(hash = hash, start = 5, end = 9, color = 2, text = "t", total = 100, createdAt = 1, updatedAt = 900)
+        val repeated = file.copy(
+            bookmarks = listOf(mark.copy(name = "older", updatedAt = 500), mark, mark.copy(name = "oldest", updatedAt = 100)),
+            highlights = listOf(line.copy(color = 1, updatedAt = 500), line, line.copy(color = 3, updatedAt = 100)),
+        )
+
+        b.merge(repeated)
+        b.merge(repeated)
+
+        assertEquals(listOf("newer"), b.db.bookmarkDao().forBook(hash).map { it.name })
+        assertEquals(listOf(2), b.db.highlightDao().forBook(hash).map { it.color })
+    }
+
+    @Test
+    fun aNewerLocalBookmarkAndHighlightSurviveAnOlderOneInAFile() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        clock = 2_000
+        b.db.bookmarkDao().put(BookmarkEntity(contentHash = hash, name = "mine", characters = 10, total = 100, createdAt = 1))
+        b.db.highlightDao().put(HighlightEntity(contentHash = hash, start = 5, end = 9, color = 3, text = "t", total = 100, createdAt = 1))
+        a.addWord()
+        a.sync()
+        val file = BackupCodec.read(ByteArrayInputStream(folder.files.getValue(a.address)))
+
+        b.merge(
+            file.copy(
+                bookmarks = listOf(BackupBookmark(hash, "theirs", 10, 100, 1, updatedAt = 500)),
+                highlights = listOf(BackupHighlight(hash, 5, 9, 0, "t", 100, 1, updatedAt = 500)),
+            ),
+        )
+
+        assertEquals(listOf("mine"), b.db.bookmarkDao().forBook(hash).map { it.name })
+        assertEquals(listOf(3), b.db.highlightDao().forBook(hash).map { it.color })
+    }
 }

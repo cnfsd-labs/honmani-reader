@@ -24,9 +24,10 @@ const val HIGHLIGHT_COLORS = 4
  * A passage the reader marked in a book. Keyed by the book's content hash like bookmarks, so a
  * backup brings it back once the same file is in the library; it goes when the book is removed.
  * The range is in ttu's character counting (see EpubPositions), so it survives any change to
- * font, size, theme, orientation or custom CSS.
+ * font, size, theme, orientation or custom CSS. One per range: the index is unique because sync
+ * identifies a highlight by (book, start, end), so [HighlightDao.put] replaces.
  */
-@Entity(tableName = "highlight", indices = [Index(value = ["content_hash", "start"])])
+@Entity(tableName = "highlight", indices = [Index(value = ["content_hash", "start", "end_position"], unique = true)])
 data class HighlightEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "content_hash") val contentHash: String,

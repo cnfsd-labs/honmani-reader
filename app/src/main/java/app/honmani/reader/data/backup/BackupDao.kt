@@ -135,7 +135,8 @@ interface BackupDao : TombstoneWriter {
     @Query("SELECT * FROM bookmark ORDER BY content_hash, characters, id")
     suspend fun bookmarks(): List<BookmarkEntity>
 
-    @Insert
+    /** A place already there stays (the unique index would otherwise throw). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertBookmarkRows(bookmarks: List<BookmarkEntity>)
 
     /** Stamped now, and the marker of a deleted bookmark there goes. */
@@ -149,7 +150,8 @@ interface BackupDao : TombstoneWriter {
     @Query("SELECT * FROM highlight ORDER BY content_hash, start, id")
     suspend fun highlights(): List<HighlightEntity>
 
-    @Insert
+    /** A range already there stays (the unique index would otherwise throw). */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertHighlightRows(highlights: List<HighlightEntity>)
 
     @Transaction
