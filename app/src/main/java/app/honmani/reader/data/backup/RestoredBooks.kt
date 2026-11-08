@@ -2,7 +2,9 @@ package app.honmani.reader.data.backup
 
 import app.honmani.reader.data.readStored
 import app.honmani.reader.data.writeTextAtomically
+import app.honmani.reader.diagnostics.logWarning
 import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,8 +93,9 @@ class RestoredBooks(private val file: File) {
             val before = current()
             val after = change(before)
             if (after == before) return@synchronized false
+            // Memory follows the file: a change that could not be written (full storage) is dropped.
+            if (!save(after)) return@synchronized false
             loaded = after
-            save(after)
             true
         }
         if (changed) changes.update { it + 1 }
@@ -103,8 +106,12 @@ class RestoredBooks(private val file: File) {
 
     private fun load(): State = readStored(file, State()) { json.decodeFromString(State.serializer(), it.readText()) }
 
-    private fun save(state: State) {
+    /** True if [state] is in the file. */
+    private fun save(state: State): Boolean = try {
         writeTextAtomically(file, json.encodeToString(State.serializer(), state))
+    } catch (e: IOException) {
+        logWarning("Honmani.files", "Could not write ${file.name}", e)
+        false
     }
 
     private companion object {

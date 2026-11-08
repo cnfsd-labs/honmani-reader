@@ -25,4 +25,18 @@ class RestoredBooksTest {
         assertEquals(RestoredPosition(200, 0.2f), reloaded.takePosition("b"))
         assertEquals(listOf("waiting"), reloaded.waiting().map { it.key })
     }
+
+    @Test
+    fun aChangeThatCouldNotBeWrittenIsNotKeptInMemory() {
+        // A non-empty directory cannot be replaced by the file, so the write fails.
+        val file = folder.newFolder("restored-books.json")
+        file.resolve("inner").writeText("x")
+        val restored = RestoredBooks(file)
+
+        restored.addWaiting(listOf(WaitingBook(key = "waiting", id = -1)))
+        restored.setPosition("a", RestoredPosition(100, 0.1f))
+
+        assertEquals(emptyList<WaitingBook>(), restored.waiting())
+        assertNull(restored.takePosition("a"))
+    }
 }
