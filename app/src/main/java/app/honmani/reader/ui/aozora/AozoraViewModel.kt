@@ -84,7 +84,11 @@ class AozoraViewModel(
     init {
         viewModelScope.launch {
             val kept = repository.cached()
-            if (kept != null) show(kept)
+            if (kept != null) {
+                show(kept)
+                // The kept list is on screen only with its first results, not for a moment without them.
+                searchJob?.join()
+            }
             state.update { it.copy(starting = false) }
         }
     }
