@@ -658,4 +658,43 @@ class ReaderViewModelTest {
             model.panel.value,
         )
     }
+
+    @Test
+    fun twoFailingStarsLeaveTheMarkAsSaved() {
+        val gates = ArrayDeque<CompletableDeferred<Unit>>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            saveStar = { _, _, _ -> CompletableDeferred<Unit>().also { gates += it }.await() },
+        )
+        model.onTap(tap("食べました。"))
+        val group = (model.panel.value as LookupPanelState.Results).groups.single()
+        val key = WordRepository.key("食べる", "食べる")
+
+        model.setStarred(group, true)
+        model.setStarred(group, false)
+        gates.removeFirst().completeExceptionally(IllegalStateException("disk full"))
+        gates.removeFirst().completeExceptionally(IllegalStateException("disk full"))
+
+        // Nothing was saved, so the word is not starred.
+        assertFalse(key in (model.panel.value as LookupPanelState.Results).starred)
+    }
+
+    @Test
+    fun aFailingIgnoreIsTakenBackToTheSavedValue() {
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            ignoredAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.toSet() },
+            saveIgnored = { _, _, _ -> error("disk full") },
+        )
+        model.onTap(tap("食べました。"))
+        val group = (model.panel.value as LookupPanelState.Results).groups.single()
+        val key = WordRepository.key("食べる", "食べる")
+        assertTrue(key in (model.panel.value as LookupPanelState.Results).ignored)
+
+        model.setIgnored(group, false)
+
+        assertTrue(key in (model.panel.value as LookupPanelState.Results).ignored)
+    }
 }

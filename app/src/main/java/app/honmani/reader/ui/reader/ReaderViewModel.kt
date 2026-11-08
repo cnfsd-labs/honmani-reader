@@ -580,18 +580,23 @@ class ReaderViewModel(
         val state = _panel.value as? LookupPanelState.Results ?: return
         val tap = state.tap
         val key = WordRepository.key(group.expression, group.reading)
+        val saved = beginToggle(starPending, key, key in state.starred)
         updateResults(tap) { it.copy(starred = if (starred) it.starred + key else it.starred - key) }
         keep(key)
         viewModelScope.launch {
             try {
                 if (state.previous == null) record(tap, group).join()
                 saveStar(group.expression, group.reading, starred)
+                saved.value = starred
                 if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log("Starring a word failed: $e")
-                updateResults(tap) { it.copy(starred = if (starred) it.starred - key else it.starred + key) }
+                // Back to what is saved, not a flip of whatever the panel shows now.
+                updateResults(tap) { it.copy(starred = if (saved.value) it.starred + key else it.starred - key) }
+            } finally {
+                endToggle(starPending, key, saved)
             }
         }
     }
@@ -652,18 +657,22 @@ class ReaderViewModel(
         val state = _panel.value as? LookupPanelState.Results ?: return
         val tap = state.tap
         val key = WordRepository.key(group.expression, group.reading)
+        val saved = beginToggle(ignorePending, key, key in state.ignored)
         updateResults(tap) { it.copy(ignored = if (ignored) it.ignored + key else it.ignored - key) }
         keep(key)
         viewModelScope.launch {
             try {
                 if (state.previous == null) record(tap, group).join()
                 saveIgnored(group.expression, group.reading, ignored)
+                saved.value = ignored
                 if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log("Ignoring a word failed: $e")
-                updateResults(tap) { it.copy(ignored = if (ignored) it.ignored - key else it.ignored + key) }
+                updateResults(tap) { it.copy(ignored = if (saved.value) it.ignored + key else it.ignored - key) }
+            } finally {
+                endToggle(ignorePending, key, saved)
             }
         }
     }
