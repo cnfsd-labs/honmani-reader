@@ -598,6 +598,21 @@ class BackupTest {
     }
 
     @Test
+    fun theReadAloudSpeedComesBackWithTheSettings() = runTest {
+        val backup = throughFile(
+            BackupFile(
+                exportedAt = 1,
+                settings = mapOf("read_aloud_rate" to BackupValue(BackupValue.FLOAT, JsonPrimitive(1.5))),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        assertEquals(mapOf("read_aloud_rate" to 1.5f), new.settings.all)
+    }
+
+    @Test
     fun theOwnNoteTypeAndItsMappingsComeBackWithTheSettings_butNotItsId() = runTest {
         val mappings = app.honmani.reader.anki.FieldMapping.toJson(
             mapOf(

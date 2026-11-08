@@ -19,6 +19,7 @@ import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.DaySettings
 import app.honmani.reader.data.settings.HighlightSettings
+import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.ReviewSettings
@@ -543,6 +544,7 @@ class Backup(
             AppearanceSettings.KEY_SOUNDS to BackupValue.BOOLEAN,
             AppearanceSettings.KEY_ANIMATIONS to BackupValue.BOOLEAN,
             HighlightSettings.KEY_EXTENT to BackupValue.STRING,
+            ReadAloudSettings.KEY_RATE to BackupValue.FLOAT,
             ReviewSettings.KEY_NEW_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,
