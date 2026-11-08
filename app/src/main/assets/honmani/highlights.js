@@ -254,15 +254,21 @@
   function rangeAt(start, end) {
     const roots = sectionRoots();
     if (roots.length === 0 || !Number.isFinite(start) || !Number.isFinite(end) || end <= start) return {};
+    let missed = false;
     for (const { element, start: from } of roots) {
       const next = sectionStarts.find((other) => other > from);
       if (start < from || (next !== undefined && start >= next)) continue;
       const index = indexOf(element);
       const last = Math.min(end - from, index.total);
-      if (start - from >= index.total || last <= start - from) return {};
+      // A section without counted text (a cover) can share its start with the next one: look on.
+      if (start - from >= index.total || last <= start - from) {
+        missed = true;
+        continue;
+      }
       const range = rangeOf(index, start - from, last);
       return range ? { range } : {};
     }
+    if (missed) return {};
     return { direction: start >= Math.max(...roots.map((r) => r.start)) ? 1 : -1 };
   }
 

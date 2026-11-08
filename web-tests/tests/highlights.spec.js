@@ -249,6 +249,15 @@ test('paginated: only the section on the page is drawn, and a turn to the next o
   expect(await drawn(page, 0)).toEqual([]);
 });
 
+test('rangeAt looks past a section without text that shares its start with the next one', async ({ page }) => {
+  await openBook(page, '<div id="ttu-cover"><img alt=""></div><div id="ttu-a"><p>吾輩は猫である。</p></div>');
+  await send(page, [['ttu-cover', 0], ['ttu-a', 0]], []);
+  const text = await page.evaluate(() => window.honmaniHighlights.rangeAt(2, 4).range?.toString());
+  expect(text).toBe('は猫');
+  // Text that is not there is still no answer.
+  expect(await page.evaluate(() => window.honmaniHighlights.rangeAt(50, 52))).toEqual({});
+});
+
 test.describe('e-ink', () => {
   const greys = (page) =>
     page.evaluate(() => {
