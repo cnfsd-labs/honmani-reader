@@ -262,6 +262,8 @@ class AudiobookMakerTest {
 
         // A raised cap rewrites the plan file; the new cap shows even if the file keeps its size.
         maker.files("book").writePlan(plan(sentences = sentences(7), cap = 3.5))
+        // A rewrite in the same clock tick as the last one would look unchanged: make the time differ.
+        maker.files("book").plan.let { it.setLastModified(it.lastModified() + 5000) }
         assertEquals(MakerStatus.Partial(0, 7, 0.0, 3.5), maker.status("book"))
     }
 

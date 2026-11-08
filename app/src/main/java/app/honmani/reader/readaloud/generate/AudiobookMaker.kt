@@ -95,6 +95,7 @@ class AudiobookMaker(
         val files = files(plan.bookHash)
         if (files.plan.isFile) return false
         files.writePlan(plan)
+        summaries.remove(files.plan.path)
         return true
     }
 
@@ -150,6 +151,7 @@ class AudiobookMaker(
         if (capUsd != null && capUsd > plan.capUsd) {
             plan = plan.copy(capUsd = capUsd)
             files.writePlan(plan)
+            summaries.remove(files.plan.path)
         }
         if (plan.pricePerMillionUsd <= 0 || plan.sentences.isEmpty()) {
             return@withContext MakerResult.Stopped(null, "There is nothing to make: no price or no text.")
