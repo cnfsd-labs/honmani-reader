@@ -372,13 +372,14 @@ class Backup(
             val wordIds = dao.words().associate { WordRepository.key(it.expression, it.reading) to it.id }
             for (batch in backup.knownBatches) {
                 val source = KnownSource.entries.firstOrNull { it.name == batch.source } ?: continue
-                if (!batchesHere.add(Triple(source, batch.detail, batch.createdAt))) continue
+                val detail = batch.detail.take(KNOWN_DETAIL_MAX)
+                if (!batchesHere.add(Triple(source, detail, batch.createdAt))) continue
                 val entries = batch.words.mapNotNull { entry ->
                     val id = wordIds[WordRepository.key(entry.expression, entry.reading)] ?: return@mapNotNull null
                     KnownBatchWordEntity(0, id, entry.created, entry.previousStatus?.let { status(it) }, entry.lookupCount.coerceAtLeast(0))
                 }
                 if (entries.isEmpty()) continue
-                val id = dao.insertKnownBatch(KnownBatchEntity(source = source, detail = batch.detail.take(KNOWN_DETAIL_MAX), createdAt = batch.createdAt, count = entries.size))
+                val id = dao.insertKnownBatch(KnownBatchEntity(source = source, detail = detail, createdAt = batch.createdAt, count = entries.size))
                 dao.insertKnownBatchWords(entries.map { it.copy(batchId = id) })
             }
 

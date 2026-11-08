@@ -67,4 +67,14 @@ class ReadStretchesTest {
         assertArrayEquals(intArrayOf(0, 100), store.all().getValue("b"))
         assertArrayEquals(intArrayOf(1_000, 4_000, 9_000, 10_000), ReadStretchStore(file).all().getValue("a"))
     }
+
+    @Test
+    fun aRestoredKeyWithWhitespaceCannotPlantStretchesUnderAnotherBook() {
+        val file = File(Files.createTempDirectory("stretches").toFile(), "read-stretches.json")
+        val store = ReadStretchStore(file)
+
+        store.merge(mapOf("x 1 2\nreal 0 9999" to intArrayOf(0, 100), "ok" to intArrayOf(0, 100)))
+
+        assertEquals(setOf("ok"), ReadStretchStore(file).all().keys)
+    }
 }

@@ -372,6 +372,21 @@ class BackupTest {
     }
 
     @Test
+    fun aKnownBatchWithALongDetailIsRestoredOnlyOnce() = runTest {
+        val old = Phone("old")
+        old.words.record(lookup("猫", null))
+        KnownBatchRepository(old.database, now = { 5_000 })
+            .apply(KnownSource.WORD_LIST, "x".repeat(300), listOf(KnownCandidate("猫", "よみ")))
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+        new.backup.restore(backup)
+
+        assertEquals(1, new.database.backupDao().knownBatches().size)
+    }
+
+    @Test
     fun finishedBooksRemovedFromTheLibraryComeBackOnceAndKeepTheirDate() = runTest {
         val old = Phone("old")
         old.database.finishedBookDao().record(FinishedBookEntity("gone", "Gone", 5_000))

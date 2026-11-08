@@ -88,6 +88,8 @@ class ReadStretchStore(private val file: File) {
         synchronized(lock) {
             val updated = current().toMutableMap()
             for ((hash, steps) in other) {
+                // The file is line based: a key with a space or newline would plant stretches under another book.
+                if (hash.isEmpty() || hash.any { it.isWhitespace() }) continue
                 var merged = updated[hash] ?: ReadStretches.NONE
                 for (i in 0 until steps.size - 1 step 2) merged = ReadStretches.addSteps(merged, steps[i], steps[i + 1])
                 updated[hash] = merged
