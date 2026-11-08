@@ -97,7 +97,7 @@ fun StatisticsContent(
         viewModel.exported.collect { worked ->
             Toast.makeText(
                 context,
-                if (worked) R.string.csv_stats_exported else R.string.anki_export_failed,
+                if (worked) R.string.csv_stats_exported else R.string.csv_stats_failed,
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -118,7 +118,7 @@ fun StatisticsContent(
                 StatisticsViewModel.RefoldEvent.NoReading ->
                     Toast.makeText(context, R.string.refold_nothing, Toast.LENGTH_LONG).show()
                 StatisticsViewModel.RefoldEvent.Failed ->
-                    Toast.makeText(context, R.string.anki_export_failed, Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, R.string.refold_failed, Toast.LENGTH_LONG).show()
             }
         }
     }

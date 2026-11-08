@@ -400,7 +400,7 @@
         <item quantity="one">%1$d word saved as an Anki package. In Anki on a computer: File → Import.</item>
         <item quantity="other">%1$d words saved as an Anki package. In Anki on a computer: File → Import.</item>
     </plurals>
-    <string name="anki_export_failed">The file could not be saved.</string>
+    <string name="anki_export_failed">The file could not be saved. Check that there is free space, or pick another place.</string>
     <string name="anki_package_file_name">Honmani words.apkg</string>
     <string name="anki_package_progress">Saving for Anki: %1$d of %2$d…</string>
     <string name="anki_export_file_name">Honmani words.txt</string>
@@ -526,6 +526,7 @@
         <item quantity="one">%d word saved to a CSV file.</item>
         <item quantity="other">%d words saved to a CSV file.</item>
     </plurals>
+    <string name="csv_stats_failed">The statistics could not be saved. Check that there is free space, or pick another place.</string>
     <string name="csv_stats_exported">Reading statistics saved to a CSV file.</string>
     <string name="refold_export">Export for Refold (CSV)</string>
     <string name="refold_share">Export for Refold</string>
@@ -538,6 +539,7 @@
         <item quantity="other">Export new reading (%d rows)</item>
     </plurals>
     <string name="refold_all">Export everything again</string>
+    <string name="refold_failed">The Refold file could not be prepared. Check that there is free space on this phone, then try again.</string>
     <string name="refold_nothing">No new reading to export.</string>
     <string name="export_package">Anki package</string>
     <string name="export_package_detail">Cards with audio, for Anki on a computer (.apkg)</string>
