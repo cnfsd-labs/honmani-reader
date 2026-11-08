@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.data.dictionary.FailureReason
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -617,7 +618,7 @@ class AnkiExporterTest {
     fun errorsFromAnkiDroidAreReported_notThrown() = runBlocking {
         anki.failure = IllegalStateException("collection closed")
 
-        assertEquals(AnkiResult.Failed("collection closed"), exporter.add(savedWord()))
+        assertEquals(AnkiResult.Failed(FailureReason.OTHER), exporter.add(savedWord()))
     }
 
     @Test

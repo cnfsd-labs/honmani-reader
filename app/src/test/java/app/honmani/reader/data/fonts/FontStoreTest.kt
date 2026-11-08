@@ -1,5 +1,6 @@
 package app.honmani.reader.data.fonts
 
+import app.honmani.reader.data.dictionary.FailureReason
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -87,7 +88,7 @@ class FontStoreTest {
         val store = store()
         store.download(font)
         advanceUntilIdle()
-        assertEquals(FontState.Failed("offline"), store.states.value[font.id])
+        assertEquals(FontState.Failed(FailureReason.OTHER), store.states.value[font.id])
 
         failure = null
         store.download(font)

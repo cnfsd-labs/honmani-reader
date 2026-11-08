@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
@@ -34,8 +35,8 @@ sealed interface AnkiResult {
      */
     data class CustomUnusable(val name: String, val problem: CustomProblem) : AnkiResult
 
-    /** Something unexpected went wrong; [reason] is for the message (and a bug report). */
-    data class Failed(val reason: String) : AnkiResult
+    /** Something unexpected went wrong on AnkiDroid's side; [reason] picks the sentence (the detail goes to logcat). */
+    data class Failed(val reason: FailureReason) : AnkiResult
 }
 
 /**
@@ -181,7 +182,8 @@ class AnkiExporter(
                 throw e
             } catch (e: Exception) {
                 // AnkiDroid's provider throws for problems on its side; never let that close the app.
-                AnkiResult.Failed(e.message ?: e.javaClass.simpleName)
+                logWarning("Honmani.anki", "Adding a card failed", e)
+                AnkiResult.Failed(FailureReason.of(e))
             }
         }
     }

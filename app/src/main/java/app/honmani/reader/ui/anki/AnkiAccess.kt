@@ -24,6 +24,7 @@ import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.AnkiSettings
 import app.honmani.reader.anki.CustomProblem
 import app.honmani.reader.anki.VoiceProblem
+import app.honmani.reader.data.dictionary.FailureReason
 
 /** Runs an action that needs AnkiDroid once it is installed and Honmani may add cards. */
 class AnkiAccess internal constructor(
@@ -94,7 +95,9 @@ fun showAnkiResult(context: Context, expression: String, result: AnkiResult) {
         AnkiResult.NoPermission -> context.getString(R.string.anki_no_permission)
         AnkiResult.Refused -> context.getString(R.string.anki_refused)
         is AnkiResult.CustomUnusable -> context.getString(customProblemMessage(result.problem), result.name)
-        is AnkiResult.Failed -> context.getString(R.string.anki_failed, result.reason)
+        is AnkiResult.Failed -> context.getString(
+            if (result.reason == FailureReason.NO_SPACE) R.string.anki_failed_no_space else R.string.anki_failed,
+        )
     }
     toast(context, message)
 }

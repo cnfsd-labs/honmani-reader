@@ -1,5 +1,6 @@
 package app.honmani.reader.data.fonts
 
+import app.honmani.reader.data.dictionary.FailureReason
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -25,7 +26,7 @@ sealed interface FontState {
 
     data object Installed : FontState
 
-    data class Failed(val message: String) : FontState
+    data class Failed(val reason: FailureReason) : FontState
 }
 
 /**
@@ -72,7 +73,7 @@ class FontStore(
             } catch (e: IOException) {
                 part.delete()
                 // A cancelled download (the font was deleted meanwhile) is not a failure.
-                if (isActive) set(font, FontState.Failed(e.message ?: e.javaClass.simpleName))
+                if (isActive) set(font, FontState.Failed(FailureReason.of(e)))
             } finally {
                 jobs.remove(font.id)
             }

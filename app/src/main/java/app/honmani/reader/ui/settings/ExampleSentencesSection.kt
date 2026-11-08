@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.examples.ExampleState
+import app.honmani.reader.ui.onboarding.messageRes
 
 /**
  * Settings → Reading: example sentences in the lookup panel, off until switched on. Switching on
@@ -59,7 +60,7 @@ fun ExampleSentencesSection() {
                         TextButton(onClick = { cancel(container) }) { Text(stringResource(R.string.action_cancel)) }
                     }
                     is ExampleState.Failed -> Text(
-                        stringResource(R.string.examples_failed, current.message),
+                        stringResource(current.reason.messageRes()),
                         color = MaterialTheme.colorScheme.error,
                     )
                     else -> Text(stringResource(R.string.settings_examples_details))

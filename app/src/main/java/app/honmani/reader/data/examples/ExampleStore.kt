@@ -1,5 +1,6 @@
 package app.honmani.reader.data.examples
 
+import app.honmani.reader.data.dictionary.FailureReason
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -47,7 +48,7 @@ sealed interface ExampleState {
 
     data object Installed : ExampleState
 
-    data class Failed(val message: String) : ExampleState
+    data class Failed(val reason: FailureReason) : ExampleState
 }
 
 /**
@@ -99,7 +100,7 @@ class ExampleStore(
                 _state.value = ExampleState.Installed
             } catch (e: IOException) {
                 // A cancelled download is not a failure (the state is set by [delete]).
-                if (isActive) _state.value = ExampleState.Failed(e.message ?: e.javaClass.simpleName)
+                if (isActive) _state.value = ExampleState.Failed(FailureReason.of(e))
             } finally {
                 gz.delete()
                 unpacked.delete()

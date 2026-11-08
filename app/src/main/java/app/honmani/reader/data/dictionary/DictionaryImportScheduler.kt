@@ -53,6 +53,30 @@ enum class FailureReason {
             return otherwise
         }
 
+        /**
+         * The plain kind of any download or file failure: a full disk, what a [DownloadException] says,
+         * no connection ([java.net.UnknownHostException], timeouts, TLS), else [OTHER]. The exception's
+         * own text never reaches the UI.
+         */
+        fun of(error: Throwable): FailureReason {
+            val storage = ofStorage(error)
+            if (storage != OTHER) return storage
+            var current: Throwable? = error
+            var depth = 0
+            while (current != null && depth++ < 5) {
+                when (current) {
+                    is DownloadException -> return current.reason
+                    is java.net.UnknownHostException,
+                    is java.net.SocketException,
+                    is java.net.SocketTimeoutException,
+                    is javax.net.ssl.SSLException,
+                    -> return OFFLINE
+                }
+                current = current.cause
+            }
+            return OTHER
+        }
+
         /** The reason saved with a failed work item; [OTHER] if missing or unknown. */
         fun parse(name: String?): FailureReason = entries.firstOrNull { it.name == name } ?: OTHER
     }

@@ -67,6 +67,7 @@ import app.honmani.reader.data.settings.ReaderSettings
 import app.honmani.reader.data.settings.ReaderTheme
 import app.honmani.reader.data.words.WordMarksMode
 import app.honmani.reader.ui.HonmaniTopAppBar
+import app.honmani.reader.ui.onboarding.messageRes
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -335,7 +336,7 @@ private fun FontList(selected: String, fonts: ReaderFonts, onSelect: (String) ->
             FontRow(
                 name = font.name,
                 details = when (state) {
-                    is FontState.Failed -> stringResource(R.string.reader_settings_font_failed, state.message)
+                    is FontState.Failed -> stringResource(state.reason.messageRes())
                     else -> stringResource(fontStyleLabel(font.style)) + " · " +
                         stringResource(R.string.reader_settings_font_size, font.sizeBytes / 1_000_000.0)
                 },

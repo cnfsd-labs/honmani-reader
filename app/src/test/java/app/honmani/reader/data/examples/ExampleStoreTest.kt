@@ -1,5 +1,6 @@
 package app.honmani.reader.data.examples
 
+import app.honmani.reader.data.dictionary.FailureReason
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -76,7 +77,7 @@ class ExampleStoreTest {
         store.download()
         advanceUntilIdle()
 
-        assertEquals(ExampleState.Failed("The downloaded file is damaged"), store.state.value)
+        assertEquals(ExampleState.Failed(FailureReason.OTHER), store.state.value)
         assertFalse(store.file.exists())
         assertTrue(File(folder.root, "examples").listFiles().orEmpty().isEmpty())
     }
@@ -106,7 +107,7 @@ class ExampleStoreTest {
         val store = store()
         store.download()
         advanceUntilIdle()
-        assertEquals(ExampleState.Failed("offline"), store.state.value)
+        assertEquals(ExampleState.Failed(FailureReason.OTHER), store.state.value)
 
         failure = null
         store.download()

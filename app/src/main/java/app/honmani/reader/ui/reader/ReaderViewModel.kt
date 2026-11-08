@@ -10,6 +10,7 @@ import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.CardContent
 import app.honmani.reader.anki.VoiceProblem
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.LookupUndo
@@ -662,7 +663,7 @@ class ReaderViewModel(
                 throw e
             } catch (e: Exception) {
                 log("Adding to Anki failed: $e")
-                AnkiResult.Failed(e.message ?: e.javaClass.simpleName)
+                AnkiResult.Failed(FailureReason.of(e))
             }
             val added = result is AnkiResult.Added || result == AnkiResult.AlreadyInAnki
             _panel.update { panel ->

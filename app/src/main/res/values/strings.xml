@@ -87,7 +87,6 @@
     <string name="examples_download_title">Download example sentences, %1$s?</string>
     <string name="examples_download_message">The Japanese sentences with English translations come from Tatoeba and are downloaded once from GitHub. You can delete them again here.</string>
     <string name="examples_downloading">Downloading… %1$d%%</string>
-    <string name="examples_failed">Download failed: %1$s</string>
     <string name="examples_delete_title">Delete the example sentences?</string>
     <string name="examples_delete_message">The downloaded file (%1$s) is removed from this phone. You can download it again.</string>
     <string name="examples_keep">Keep file</string>
@@ -699,7 +698,8 @@
     <string name="known_card_details">Mark the most common words, a word list or an Anki deck as known, so new words stand out.</string>
     <string name="known_card_open">Choose</string>
     <string name="known_card_dismiss">Not now</string>
-    <string name="anki_failed">Adding to Anki failed: %1$s</string>
+    <string name="anki_failed">The card could not be added. Open AnkiDroid once, then try again.</string>
+    <string name="anki_failed_no_space">The card could not be added: there is not enough free space on this phone.</string>
     <string name="anki_added_without_audio">%1$s added to Anki, without audio: %2$s</string>
     <string name="voice_problem_no_engine">this phone has no text-to-speech voice</string>
     <string name="voice_problem_no_japanese">the phone\'s voice has no Japanese. Install Japanese voice data in Android\'s text-to-speech settings</string>
@@ -739,7 +739,6 @@
     <string name="reader_settings_font_rounded">Rounded</string>
     <string name="reader_settings_font_handwritten">Handwritten, kanji as written by hand</string>
     <string name="reader_settings_font_size">%1$.1f MB</string>
-    <string name="reader_settings_font_failed">Download failed: %1$s</string>
     <string name="reader_settings_font_licence">The downloadable fonts cover kana, kanji and Latin letters. Free fonts under the SIL Open Font License, from Google Fonts.</string>
     <string name="sentence_speed">Sentence speed</string>
     <string name="sentence_speed_details">How fast the example sentence on new cards is spoken. The word itself stays at normal speed.</string>
