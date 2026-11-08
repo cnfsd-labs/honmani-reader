@@ -48,6 +48,17 @@ class AutoBackupTest {
     }
 
     @Test
+    fun aBackupDatedInTheFutureDoesNotBlockSaving() = runBlocking {
+        auto.checkOffer()
+        assertTrue(auto.saveIfDue { backup() })
+        // The clock was set back: the file now looks newer than the present.
+        assertTrue(auto.file.setLastModified(clock + 10 * AutoBackup.MIN_INTERVAL_MS))
+
+        assertTrue(auto.saveIfDue { backup() })
+        assertEquals(clock, auto.read().exportedAt)
+    }
+
+    @Test
     fun readerSettingsOfTheLastBackupSurviveAnotherWithoutThePage() = runBlocking {
         auto.checkOffer()
         val settings = mapOf("fontSize" to "22", "theme" to null)

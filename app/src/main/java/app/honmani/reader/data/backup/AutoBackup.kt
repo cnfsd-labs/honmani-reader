@@ -71,7 +71,8 @@ class AutoBackup(
     suspend fun saveIfDue(force: Boolean = false, make: suspend () -> BackupFile): Boolean = mutex.withLock {
         if (!device.getBoolean(KEY_ANSWERED, false)) return false
         val last = withContext(Dispatchers.IO) { file.takeIf { it.isFile }?.lastModified() }
-        if (!force && last != null && now() - last < MIN_INTERVAL_MS) return false
+        // A backup dated in the future (the clock was set back) is not recent: it would block saving.
+        if (!force && last != null && now() - last in 0 until MIN_INTERVAL_MS) return false
         val made = try {
             make()
         } catch (e: CancellationException) {

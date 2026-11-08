@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -94,7 +95,7 @@ class RestoredBooks(private val file: File) {
             save(after)
             true
         }
-        if (changed) changes.value++
+        if (changed) changes.update { it + 1 }
     }
 
     /** Under [lock]. */
