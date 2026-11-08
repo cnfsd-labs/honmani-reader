@@ -128,11 +128,31 @@ object AozoraEpub {
 
     private val AozoraStyle.cssClass get() = name.lowercase().replace('_', '-')
 
-    private fun escape(text: String) = text
+    /** Escapes markup and drops what XML 1.0 cannot hold (control characters, U+FFFE/U+FFFF, lone surrogates). */
+    private fun escape(text: String) = withoutForbiddenXml(text)
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
+
+    private fun withoutForbiddenXml(text: String): String {
+        val out = StringBuilder(text.length)
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            when {
+                Character.isHighSurrogate(c) && i + 1 < text.length && Character.isLowSurrogate(text[i + 1]) -> {
+                    out.append(c).append(text[i + 1])
+                    i++
+                }
+                Character.isSurrogate(c) || c == '\uFFFE' || c == '\uFFFF' -> {}
+                c < ' ' && c != '\t' && c != '\n' && c != '\r' -> {}
+                else -> out.append(c)
+            }
+            i++
+        }
+        return out.toString()
+    }
 
     private const val XHTML_START = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE html>\n" +
         "<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" " +

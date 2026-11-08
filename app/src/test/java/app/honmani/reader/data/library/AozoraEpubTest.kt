@@ -37,6 +37,46 @@ class AozoraEpubTest {
     )
 
     @Test
+    fun dropsCharactersXmlCannotHoldSoTheXhtmlStaysWellFormed() {
+        val dirty = AozoraBook(
+            title = "題\u0000名",
+            author = "作\u000C者",
+            chapters = listOf(
+                AozoraChapter(
+                    "章\u0001",
+                    listOf(
+                        AozoraBlock.Paragraph(
+                            listOf(
+                                AozoraInline.Text("あ\u000Cい\u0000う\u000B\u001F\uFFFE\uFFFF\uD800え\uDC00お"),
+                                AozoraInline.Text("\uD83D\uDE00\t"),
+                                AozoraInline.Ruby("漢\u0008", "かん\u000E"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val file = folder.newFile("dirty.epub")
+        AozoraEpub.write(dirty, "urn:sha256:d\u0000", file)
+
+        ZipFile(file).use { zip ->
+            val factory = javax.xml.parsers.DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            for (name in listOf("OEBPS/chapter-1.xhtml", "OEBPS/content.opf", "OEBPS/nav.xhtml")) {
+                val entry = zip.getEntry(name) ?: continue
+                val builder = factory.newDocumentBuilder()
+                builder.setErrorHandler(null)
+                zip.getInputStream(entry).use { builder.parse(it) }
+            }
+            val chapter = zip.getInputStream(zip.getEntry("OEBPS/chapter-1.xhtml")).readBytes().toString(Charsets.UTF_8)
+            assertTrue(chapter, "<p>あいうえお\uD83D\uDE00\t<ruby>漢<rt>かん</rt></ruby></p>" in chapter)
+        }
+        val metadata = EpubMetadata.read(file)
+        assertEquals("題名", metadata.title)
+        assertEquals("作者", metadata.author)
+    }
+
+    @Test
     fun writesAnEpubTheLibraryCanRead() {
         val file = folder.newFile("neko.epub")
         AozoraEpub.write(book, "urn:sha256:abc", file)
