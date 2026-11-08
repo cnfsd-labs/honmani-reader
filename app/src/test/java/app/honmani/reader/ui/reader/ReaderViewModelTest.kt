@@ -591,4 +591,71 @@ class ReaderViewModelTest {
         pending.getValue("犬").complete(LookupResult(listOf(entry("犬", "犬"))))
         assertEquals(listOf("猫", "犬"), recorded.map { it.expression })
     }
+
+    /** Exceptions nobody caught in a launched coroutine (they would crash the app) while [block] runs. */
+    private fun uncaughtDuring(block: () -> Unit): List<Throwable> {
+        val caught = mutableListOf<Throwable>()
+        val before = Thread.getDefaultUncaughtExceptionHandler()
+        val thread = Thread.currentThread()
+        val own = thread.uncaughtExceptionHandler
+        thread.uncaughtExceptionHandler = Thread.UncaughtExceptionHandler { _, e -> caught += e }
+        try {
+            block()
+        } finally {
+            thread.uncaughtExceptionHandler = own
+            Thread.setDefaultUncaughtExceptionHandler(before)
+        }
+        return caught
+    }
+
+    private fun damagedAfterTheFirstLookup(broken: MutableSet<String>) = ReaderViewModel(
+        lookup = { text, _ ->
+            if (text in broken) error("damaged glossary")
+            LookupResult(listOf(entry("食べる", text)).takeIf { text.startsWith("食べ") }.orEmpty())
+        },
+        compute = Dispatchers.Unconfined,
+    )
+
+    @Test
+    fun aDamagedRowOnLongerOrShorter_leavesThePanelAsItWas() {
+        val broken = mutableSetOf<String>()
+        val model = damagedAfterTheFirstLookup(broken)
+        model.onTap(tap("食べました。"))
+        val before = model.panel.value as LookupPanelState.Results
+        broken += setOf("食べ", "食べま", "食べまし", "食べました", "食べました。")
+
+        val uncaught = uncaughtDuring {
+            model.changeMatch(longer = true)
+            model.changeMatch(longer = false)
+        }
+
+        assertEquals(emptyList<Throwable>(), uncaught)
+        assertEquals(before, model.panel.value)
+    }
+
+    @Test
+    fun aDamagedRowOnAReferencedWord_leavesThePanelAsItWas() {
+        val broken = mutableSetOf<String>()
+        val model = damagedAfterTheFirstLookup(broken)
+        model.onTap(tap("食べる"))
+        val before = model.panel.value
+        broken += "食べ物"
+
+        val uncaught = uncaughtDuring { model.lookupWord("食べ物") }
+
+        assertEquals(emptyList<Throwable>(), uncaught)
+        assertEquals(before, model.panel.value)
+    }
+
+    @Test
+    fun aDamagedRowOnASearchedWord_showsNothingFound() {
+        val model = damagedAfterTheFirstLookup(mutableSetOf("食べる"))
+
+        model.showSearched("食べる", "たべる")
+
+        assertEquals(
+            LookupPanelState.NothingFound(TapLookup(text = "食べる", sentence = "", sentenceOffset = 0)),
+            model.panel.value,
+        )
+    }
 }

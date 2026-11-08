@@ -344,22 +344,31 @@ class ReaderViewModel(
         val lookupId = ++lookupCount
         lookupJob = viewModelScope.launch {
             var found: LookupResult? = null
-            for (candidate in candidates) {
-                val result = withContext(compute) {
-                    lookup(tap.text.substring(0, candidate), tap.ruby.filter { it.end <= candidate })
+            val groups = try {
+                for (candidate in candidates) {
+                    val result = withContext(compute) {
+                        lookup(tap.text.substring(0, candidate), tap.ruby.filter { it.end <= candidate })
+                    }
+                    // Longer: a prefix that matches nothing new is passed over for the next.
+                    if (result.entries.isNotEmpty() && (!longer || result.matchedLength > length)) {
+                        found = result
+                        break
+                    }
                 }
-                // Longer: a prefix that matches nothing new is passed over for the next.
-                if (result.entries.isNotEmpty() && (!longer || result.matchedLength > length)) {
-                    found = result
-                    break
-                }
+                val match = found
+                if (match == null) null else withContext(compute) { LookupGroups.from(match) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A damaged dictionary row must not take the app down: the panel stays as it was.
+                log("Changing the match failed: $e")
+                return@launch
             }
-            if (found == null) {
+            if (found == null || groups == null) {
                 // Nothing there: hide the button instead of leaving one that does nothing.
                 updateResults(tap) { if (longer) it.copy(longestMatch = length) else it.copy(shortestMatch = length) }
                 return@launch
             }
-            val groups = withContext(compute) { LookupGroups.from(found) }
             if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
@@ -393,10 +402,18 @@ class ReaderViewModel(
         lookupJob?.cancel()
         stopReading()
         lookupJob = viewModelScope.launch {
-            val result = withContext(compute) { lookup(expression, emptyList()) }
-            val groups = withContext(compute) { LookupGroups.from(result) }
-                .filter { it.expression == expression }
-                .sortedBy { it.reading != reading }
+            val groups = try {
+                val result = withContext(compute) { lookup(expression, emptyList()) }
+                withContext(compute) { LookupGroups.from(result) }
+                    .filter { it.expression == expression }
+                    .sortedBy { it.reading != reading }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A damaged dictionary row must not take the app down on a search result.
+                log("Showing a searched word failed: $e")
+                emptyList()
+            }
             if (groups.isEmpty()) {
                 show(LookupPanelState.NothingFound(TapLookup(text = expression, sentence = "", sentenceOffset = 0)))
             } else {
@@ -457,9 +474,17 @@ class ReaderViewModel(
         val current = _panel.value as? LookupPanelState.Results ?: return
         lookupJob?.cancel()
         lookupJob = viewModelScope.launch {
-            val result = withContext(compute) { lookup(word, emptyList()) }
-            if (result.entries.isEmpty()) return@launch
-            val groups = withContext(compute) { LookupGroups.from(result) }
+            val groups = try {
+                val result = withContext(compute) { lookup(word, emptyList()) }
+                if (result.entries.isEmpty()) return@launch
+                withContext(compute) { LookupGroups.from(result) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // A damaged dictionary row must not take the app down: the panel stays as it was.
+                log("Looking up a referenced word failed: $e")
+                return@launch
+            }
             show(
                 current.copy(
                     groups = groups,
@@ -531,6 +556,20 @@ class ReaderViewModel(
     } catch (e: Exception) {
         log("Checking starred words failed: $e")
         emptySet()
+    }
+
+    /** The last saved value of a star or ignore mark with saves in flight, and how many are. */
+    private class PendingToggle(var value: Boolean, var count: Int = 0)
+
+    private val starPending = HashMap<String, PendingToggle>()
+    private val ignorePending = HashMap<String, PendingToggle>()
+
+    /** [shown] is the mark before this toggle; with saves already in flight, their last saved value stands. */
+    private fun beginToggle(pending: HashMap<String, PendingToggle>, key: String, shown: Boolean): PendingToggle =
+        pending.getOrPut(key) { PendingToggle(shown) }.also { it.count++ }
+
+    private fun endToggle(pending: HashMap<String, PendingToggle>, key: String, toggle: PendingToggle) {
+        if (--toggle.count == 0 && pending[key] === toggle) pending.remove(key)
     }
 
     /**
