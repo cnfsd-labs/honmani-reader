@@ -141,6 +141,9 @@ class DictionariesViewModel(
         pack.filter { it.id in failed }.forEach(::download)
     }
 
+    /** The id of the failed starter-pack download the Library already told the reader about. */
+    var announcedFailure: String? = null
+
     fun dismissFailures() {
         // A failed download may be retried.
         requested.value = emptySet()

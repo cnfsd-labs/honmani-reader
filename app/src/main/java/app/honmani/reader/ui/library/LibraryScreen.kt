@@ -82,8 +82,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -140,14 +142,19 @@ import app.honmani.reader.R
 import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
+import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.aozora.AozoraScreen
+import app.honmani.reader.ui.dictionaries.DictionariesViewModel
+import app.honmani.reader.ui.onboarding.StarterPackState
+import app.honmani.reader.ui.onboarding.messageRes
 import app.honmani.reader.ui.opds.CatalogBrowser
 import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.ui.opds.CatalogDialog
 import app.honmani.reader.ui.opds.OpdsViewModel
 import app.honmani.reader.ui.progress.ProgressViewModel
 import app.honmani.reader.ui.progress.milestoneTitle
+import app.honmani.reader.ui.rememberWithNotifications
 import app.honmani.reader.ui.theme.HonmaniTheme
 import app.honmani.reader.ui.theme.LocalMotionEnabled
 import app.honmani.reader.ui.theme.motionSpring
@@ -177,6 +184,7 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     opds: OpdsViewModel = viewModel(factory = OpdsViewModel.Factory),
     progress: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
+    dictionaries: DictionariesViewModel = viewModel(factory = DictionariesViewModel.Factory),
     /** Adds a book right away, from the first-start screen; null: nothing to do. */
     addBookOnStart: AddBookStart? = null,
     onAddBookStarted: () -> Unit = {},
@@ -246,6 +254,30 @@ fun LibraryScreen(
     }
 
     val browsing = opdsState.browsing
+
+    // The starter dictionaries failed to download after the first-start screen was left: say so once
+    // (Settings, Dictionaries, shows it too), with a way to retry. Nothing while it runs or after it finished.
+    val dictionariesState by dictionaries.uiState.collectAsStateWithLifecycle()
+    val starterFailure = StarterPackState.failedDownload(dictionariesState)
+    val starterFailureText = starterFailure?.takeIf { !freeBooks && browsing == null }
+        ?.let { stringResource(R.string.library_dictionaries_failed, stringResource(it.reason.messageRes())) }
+    val retryLabel = stringResource(R.string.onboarding_retry)
+    val withNotifications = rememberWithNotifications()
+    LaunchedEffect(starterFailure?.id, starterFailureText != null) {
+        val failure = starterFailure
+        if (starterFailureText == null || failure == null || failure.id == dictionaries.announcedFailure) return@LaunchedEffect
+        dictionaries.announcedFailure = failure.id
+        val result = snackbarHostState.showSnackbar(
+            message = starterFailureText,
+            actionLabel = retryLabel,
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            val pack = DictionaryCatalog.starterPack(false) + DictionaryCatalog.starterPack(true)
+            withNotifications { dictionaries.retryFailed(pack) }
+        }
+    }
 
     // Milestones reached since the library was last on screen, quietly, once the books show.
     val milestones by progress.pending.collectAsStateWithLifecycle()
