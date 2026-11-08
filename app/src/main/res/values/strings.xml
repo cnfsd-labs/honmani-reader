@@ -1498,6 +1498,7 @@
     <string name="sync_folder_held_skip">Skip</string>
     <string name="backup_failed_title">Not restored</string>
     <string name="backup_not_a_backup">This file is not a Honmani backup, or it comes from a newer version of Honmani. Update Honmani and try again.</string>
+    <string name="backup_failed_no_space">There is not enough free space on this phone. Free some space, or pick another place, then try again.</string>
     <string name="backup_failed">The file could not be read or written. Try again, or pick another place for it.</string>
     <string name="sync_error_unauthorized">The server did not accept the user name or password.</string>
     <string name="sync_error_network">No sync server answered at this address. Check the address and your connection.</string>

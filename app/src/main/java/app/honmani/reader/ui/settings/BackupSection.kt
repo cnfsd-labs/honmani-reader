@@ -94,7 +94,12 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
             },
         )
     }
-    BackupStateDialog(state, onDismiss = viewModel::dismiss, onConfirm = { confirm, withCatalogs -> viewModel.confirmRestore(confirm.backup, withCatalogs) })
+    BackupStateDialog(
+        state,
+        onDismiss = viewModel::dismiss,
+        onConfirm = { confirm, withCatalogs -> viewModel.confirmRestore(confirm.backup, withCatalogs) },
+        onRetry = viewModel::retry,
+    )
     FolderBackupRow()
     SyncFolderRow()
 }
@@ -207,6 +212,7 @@ fun BackupStateDialog(
     state: BackupState,
     onDismiss: () -> Unit,
     onConfirm: (BackupState.Confirm, Boolean) -> Unit = { _, _ -> },
+    onRetry: () -> Unit = {},
 ) {
     when (val current = state) {
         BackupState.Idle -> Unit
@@ -239,10 +245,24 @@ fun BackupStateDialog(
                     BackupState.Saved -> Text(stringResource(R.string.backup_saved))
                     is BackupState.Restored -> RestoredText(current.summary)
                     BackupState.NotABackup -> Text(stringResource(R.string.backup_not_a_backup))
+                    is BackupState.Failed -> Text(
+                        stringResource(if (current.noSpace) R.string.backup_failed_no_space else R.string.backup_failed),
+                    )
                     else -> Text(stringResource(R.string.backup_failed))
                 }
             },
-            confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+            confirmButton = {
+                if (current is BackupState.Failed) {
+                    TextButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+                } else {
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+                }
+            },
+            dismissButton = if (current is BackupState.Failed) {
+                { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } }
+            } else {
+                null
+            },
         )
     }
 }
@@ -280,7 +300,7 @@ fun AutoBackupOffer(viewModel: BackupViewModel = viewModel(factory = BackupViewM
         BackupStateDialog(state, onDismiss = {
             restoring = false
             viewModel.dismiss()
-        })
+        }, onRetry = viewModel::retry)
     }
 }
 

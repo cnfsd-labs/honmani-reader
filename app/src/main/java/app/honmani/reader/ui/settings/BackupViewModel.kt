@@ -21,6 +21,7 @@ import app.honmani.reader.data.backup.RestoreSummary
 import app.honmani.reader.data.backup.contents
 import app.honmani.reader.data.backup.withoutCatalogs
 import app.honmani.reader.data.fonts.FontCatalog
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.data.fonts.FontState
 import app.honmani.reader.data.settings.ReaderFont
 import app.honmani.reader.ui.reader.TtuLibraryException
@@ -48,7 +49,8 @@ sealed interface BackupState {
 
     data object NotABackup : BackupState
 
-    data object Failed : BackupState
+    /** The file could not be read or written; [noSpace] when the phone's storage is full. */
+    data class Failed(val noSpace: Boolean = false) : BackupState
 }
 
 /**
@@ -158,8 +160,11 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         _state.value = BackupState.Idle
     }
 
+    private var lastWork: (suspend () -> BackupState)? = null
+
     private fun launchWork(work: suspend () -> BackupState) {
         if (_state.value == BackupState.Working) return
+        lastWork = work
         _state.value = BackupState.Working
         viewModelScope.launch {
             _state.value = try {
@@ -170,16 +175,25 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
                 BackupState.NotABackup
             } catch (e: OutOfMemoryError) {
                 logWarning("Honmani.backup", "Backup was too large to restore", e)
-                BackupState.Failed
+                BackupState.Failed()
             } catch (e: Exception) {
                 logWarning("Honmani.backup", "Backup could not be read or restored", e)
                 // IOException, SecurityException, or whatever the picked file's app throws.
-                BackupState.Failed
+                failedState(e)
             }
         }
     }
 
+    /** Repeats the work that just failed (the failure dialog's "Try again"). */
+    fun retry() {
+        if (_state.value is BackupState.Failed) lastWork?.let { launchWork(it) }
+    }
+
     companion object {
+        /** The failure state for [error]: a full phone gets its own sentence. */
+        fun failedState(error: Throwable): BackupState.Failed =
+            BackupState.Failed(noSpace = FailureReason.ofStorage(error) == FailureReason.NO_SPACE)
+
         /** ttu's localStorage key for the font (see `ReaderSettings`). */
         private const val FONT_KEY = "fontFamilyGroupOne"
 
