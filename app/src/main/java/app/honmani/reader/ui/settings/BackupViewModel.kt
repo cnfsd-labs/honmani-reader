@@ -10,10 +10,12 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
+import app.honmani.reader.data.backup.AutoBackup
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.BackupFile
 import app.honmani.reader.data.backup.BackupFormatException
 import app.honmani.reader.data.backup.BackupContents
+import app.honmani.reader.data.backup.FolderBackupState
 import app.honmani.reader.data.backup.ReaderSettingsCheck
 import app.honmani.reader.data.backup.RestoreSummary
 import app.honmani.reader.data.backup.contents
@@ -56,6 +58,12 @@ sealed interface BackupState {
 class BackupViewModel(private val container: AppContainer, private val resolver: ContentResolver) : ViewModel() {
     private val _state = MutableStateFlow<BackupState>(BackupState.Idle)
     val state: StateFlow<BackupState> = _state.asStateFlow()
+
+    /** Whether the automatic backup is over Android's 10 MB limit (see [AutoBackup.tooLarge]). */
+    val tooLarge: StateFlow<Boolean> = container.autoBackup.tooLarge
+
+    /** The folder backup, to tell whether it is on; its copy has no size limit. */
+    val folderState: StateFlow<FolderBackupState> = container.folderBackup.state
 
     /** The file name offered when saving. */
     fun fileName(today: LocalDate = LocalDate.now()) = "honmani-backup-$today.zip"

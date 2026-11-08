@@ -6,6 +6,7 @@ import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -160,5 +161,60 @@ class AutoBackupTest {
 
         assertFalse(File(dir, "${AutoBackup.FILE_NAME}.part").exists())
         assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+    }
+
+    /** A backup that zip can't shrink: random text, about three quarters of its size after zip. */
+    private fun hugeBackup() = BackupFile(
+        exportedAt = clock,
+        settings = mapOf("noise" to BackupValue(BackupValue.STRING, JsonPrimitive(randomText((AutoBackup.MAX_BYTES * 3 / 2).toInt())))),
+    )
+
+    private fun randomText(length: Int): String {
+        val random = java.util.Random(1)
+        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        return String(CharArray(length) { chars[random.nextInt(chars.length)] })
+    }
+
+    @Test
+    fun aBackupOverTheLimitKeepsTheLastOneAndIsKeptApart() = runBlocking {
+        auto.checkOffer()
+        assertEquals(AutoBackup.Outcome.Saved, auto.save { backup() })
+        val before = auto.file.readBytes()
+        assertFalse(auto.tooLarge.value)
+
+        clock += AutoBackup.MIN_INTERVAL_MS
+        assertEquals(AutoBackup.Outcome.Large, auto.save { hugeBackup() })
+
+        assertTrue(auto.tooLarge.value)
+        assertTrue(before.contentEquals(auto.file.readBytes()))
+        assertTrue(auto.largeFile.length() > AutoBackup.MAX_BYTES)
+        assertEquals(clock - AutoBackup.MIN_INTERVAL_MS, auto.read().exportedAt)
+        assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+        assertFalse(auto.saveIfDue { hugeBackup() })
+
+        // The large file counts as the last backup: no new export until the interval has passed.
+        clock += AutoBackup.MIN_INTERVAL_MS / 2
+        assertEquals(AutoBackup.Outcome.Skipped, auto.save { throw AssertionError("exported too early") })
+
+        // Back to a normal size: the large file goes and the note with it.
+        clock += AutoBackup.MIN_INTERVAL_MS
+        assertEquals(AutoBackup.Outcome.Saved, auto.save { backup() })
+        assertFalse(auto.largeFile.exists())
+        assertFalse(auto.tooLarge.value)
+        assertEquals(clock, auto.read().exportedAt)
+    }
+
+    @Test
+    fun aLargeBackupFromEarlierIsRememberedAfterARestart() = runBlocking {
+        auto.checkOffer()
+        assertEquals(AutoBackup.Outcome.Large, auto.save { hugeBackup() })
+
+        assertTrue(AutoBackup(dir, device, now = { clock }).tooLarge.value)
+    }
+
+    @Test
+    fun theLargeBackupIsNotInTheDirectoryAndroidBacksUp() {
+        assertFalse(auto.largeFile.parentFile == dir)
+        assertFalse(AutoBackup.LARGE_DIRECTORY.startsWith(AutoBackup.DIRECTORY + "/"))
     }
 }

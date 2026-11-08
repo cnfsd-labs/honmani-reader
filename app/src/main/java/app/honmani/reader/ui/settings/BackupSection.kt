@@ -49,6 +49,8 @@ import java.util.Date
 @Composable
 fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewModel.Factory)) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val tooLarge by viewModel.tooLarge.collectAsStateWithLifecycle()
+    val folderState by viewModel.folderState.collectAsStateWithLifecycle()
     var choosing by rememberSaveable { mutableStateOf(false) }
     val save = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(BackupCodec.MIME_TYPE)) { uri ->
         uri?.let(viewModel::export)
@@ -59,7 +61,15 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
 
     ListItem(
         headlineContent = { Text(stringResource(R.string.backup_title)) },
-        supportingContent = { Text(stringResource(R.string.backup_details)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.backup_details))
+                if (tooLarge) {
+                    Text(stringResource(R.string.backup_too_large))
+                    if (folderState is FolderBackupState.On) Text(stringResource(R.string.backup_too_large_folder))
+                }
+            }
+        },
         modifier = Modifier.clickable { choosing = true },
     )
     if (choosing) {

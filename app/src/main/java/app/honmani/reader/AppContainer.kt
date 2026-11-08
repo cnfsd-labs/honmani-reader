@@ -782,7 +782,12 @@ class AppContainer(context: Context) {
      * app start; the stored grades are read first, for the book sheets.
      */
     /** Honmani's own backup of itself, taken along by Android's backup; see [AutoBackup]. */
-    val autoBackup: AutoBackup by lazy { AutoBackup(File(appContext.filesDir, AutoBackup.DIRECTORY), devicePreferences, mutex = backupLock) }
+    val autoBackup: AutoBackup by lazy { AutoBackup(
+            File(appContext.filesDir, AutoBackup.DIRECTORY),
+            devicePreferences,
+            mutex = backupLock,
+            largeDir = File(appContext.filesDir, AutoBackup.LARGE_DIRECTORY),
+        ) }
 
     /** One writer of backup and sync files at a time. */
     private val backupLock = Mutex()
@@ -832,7 +837,7 @@ class AppContainer(context: Context) {
      */
     fun saveAutoBackup(force: Boolean = false) {
         applicationScope.launch(Dispatchers.Main) {
-            val wrote = autoBackup.saveIfDue(force) {
+            val outcome = autoBackup.save(force) {
                 val readerSettings = try {
                     ttuLibrary.readSettings()
                 } catch (_: TtuLibraryException) {
@@ -842,7 +847,14 @@ class AppContainer(context: Context) {
             }
             // The same file, also into the folder the reader chose (if any); not into the sync
             // folder: that has the sync files, and one copy of the backup per phone isn't wanted there.
-            if (wrote && (folderBackup.folder == null || folderBackup.folder != syncFolder.folder)) folderBackup.copy(autoBackup.file)
+            // A backup over Android's 10 MB limit isn't kept for Android, but the folder has no limit.
+            if (folderBackup.folder == null || folderBackup.folder != syncFolder.folder) {
+                when (outcome) {
+                    AutoBackup.Outcome.Saved -> folderBackup.copy(autoBackup.file)
+                    AutoBackup.Outcome.Large -> folderBackup.copy(autoBackup.largeFile)
+                    AutoBackup.Outcome.Skipped -> Unit
+                }
+            }
             syncFolder.write()
         }
     }

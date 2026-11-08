@@ -22,6 +22,10 @@ import kotlinx.coroutines.withContext
  * After a new install with such a file from the old phone, the reader is asked once whether to
  * restore it ([offer]); until they answer it is not overwritten, so starting the app doesn't
  * replace the old phone's backup with an empty one.
+ *
+ * A backup over [MAX_BYTES] would make Android skip all of the app's backup, so it never goes into
+ * [dir]: the last smaller one stays there, and the big one is kept in [largeDir] (outside the backup
+ * rules) for [FolderBackup], which has no such limit. [tooLarge] tells the reader.
  */
 class AutoBackup(
     private val dir: File,
@@ -30,8 +34,30 @@ class AutoBackup(
     private val now: () -> Long = System::currentTimeMillis,
     /** Shared with the other writers of backup files, so they never run at once. */
     private val mutex: Mutex = Mutex(),
+    /** Where a backup over [MAX_BYTES] is kept; must not be among the directories Android backs up. */
+    private val largeDir: File = File(dir.parentFile, dir.name + "-large"),
 ) {
     val file = File(dir, FILE_NAME)
+
+    /** The newest backup when it was too large for [file]; exists only while [tooLarge]. */
+    val largeFile = File(largeDir, FILE_NAME)
+
+    private val _tooLarge = MutableStateFlow(largeFile.isFile)
+
+    /** Whether the newest backup is over [MAX_BYTES], so Android's copy stays at an older, smaller one. */
+    val tooLarge: StateFlow<Boolean> = _tooLarge.asStateFlow()
+
+    /** What [save] did. */
+    enum class Outcome {
+        /** Nothing was written (not due, an offer waits, the backup couldn't be made or written). */
+        Skipped,
+
+        /** [file] is the new backup. */
+        Saved,
+
+        /** The new backup was over [MAX_BYTES]: it is in [largeFile], and [file] is unchanged. */
+        Large,
+    }
 
     private val _offer = MutableStateFlow<Long?>(null)
 
@@ -63,30 +89,37 @@ class AutoBackup(
     /** Reads the backup to offer; throws [BackupFormatException] or an IOException if it can't. */
     suspend fun read(): BackupFile = withContext(Dispatchers.IO) { file.inputStream().buffered().use(BackupCodec::read) }
 
+    /** [save] as a yes or no: whether a new backup went into [file]. */
+    suspend fun saveIfDue(force: Boolean = false, make: suspend () -> BackupFile): Boolean =
+        save(force, make) == Outcome.Saved
+
     /**
      * Writes a new backup with [make] if the last one is older than [MIN_INTERVAL_MS] (or [force]),
-     * unless an offer waits for an answer. Too large a backup (over [MAX_BYTES], which Android's
-     * limit for all of an app's backup would reject) is not kept. Returns whether it wrote one.
+     * unless an offer waits for an answer. A backup over [MAX_BYTES], which Android's limit for all
+     * of an app's backup would reject, does not replace [file]: it goes to [largeFile] and counts as
+     * the last backup for the interval.
      */
-    suspend fun saveIfDue(force: Boolean = false, make: suspend () -> BackupFile): Boolean = mutex.withLock {
-        if (!device.getBoolean(KEY_ANSWERED, false)) return false
-        val last = withContext(Dispatchers.IO) { file.takeIf { it.isFile }?.lastModified() }
+    suspend fun save(force: Boolean = false, make: suspend () -> BackupFile): Outcome = mutex.withLock {
+        if (!device.getBoolean(KEY_ANSWERED, false)) return Outcome.Skipped
+        val last = withContext(Dispatchers.IO) {
+            listOf(file, largeFile).filter { it.isFile }.maxOfOrNull { it.lastModified() }
+        }
         // A backup dated in the future (the clock was set back) is not recent: it would block saving.
-        if (!force && last != null && now() - last in 0 until MIN_INTERVAL_MS) return false
+        if (!force && last != null && now() - last in 0 until MIN_INTERVAL_MS) return Outcome.Skipped
         val made = try {
             make()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             logWarning("Honmani.backup", "Automatic backup failed", e)
-            return false
+            return Outcome.Skipped
         }
         // The reader page wasn't loaded, so ttu's settings are missing: keep the ones the last
         // backup had rather than dropping them.
         val backup = if (made.readerSettings != null) made else {
             val earlier = withContext(Dispatchers.IO) {
                 try {
-                    file.takeIf { it.isFile }?.inputStream()?.buffered()?.use(BackupCodec::read)?.readerSettings
+                    listOf(file, largeFile).filter { it.isFile }.maxByOrNull { it.lastModified() }?.inputStream()?.buffered()?.use(BackupCodec::read)?.readerSettings
                 } catch (_: IOException) {
                     null
                 } catch (_: BackupFormatException) {
@@ -103,17 +136,31 @@ class AutoBackup(
                 dir.mkdirs()
                 partial.outputStream().use { BackupCodec.write(backup, it) }
                 if (partial.length() > MAX_BYTES) {
-                    partial.delete()
-                    file.delete()
-                    false
+                    // The last good backup stays in dir; the big one is kept for the backup folder.
+                    largeDir.mkdirs()
+                    if (partial.renameTo(largeFile)) {
+                        largeFile.setLastModified(now())
+                        _tooLarge.value = true
+                        Outcome.Large
+                    } else {
+                        partial.delete()
+                        Outcome.Skipped
+                    }
                 } else {
                     val renamed = partial.renameTo(file)
-                    if (renamed) file.setLastModified(now()) else partial.delete()
-                    renamed
+                    if (renamed) {
+                        file.setLastModified(now())
+                        largeFile.delete()
+                        _tooLarge.value = false
+                        Outcome.Saved
+                    } else {
+                        partial.delete()
+                        Outcome.Skipped
+                    }
                 }
             } catch (_: IOException) {
                 partial.delete()
-                false
+                Outcome.Skipped
             }
         }
     }
@@ -121,6 +168,9 @@ class AutoBackup(
     companion object {
         /** The directory in app storage (`files/`), as the backup rules name it. */
         const val DIRECTORY = "auto-backup"
+
+        /** Beside [DIRECTORY] (`DIRECTORY-large`), not in it: the backup rules include only [DIRECTORY]. */
+        const val LARGE_DIRECTORY = "auto-backup-large"
         const val FILE_NAME = "honmani-backup.zip"
         const val MIN_INTERVAL_MS = 6 * 60 * 60 * 1000L
 

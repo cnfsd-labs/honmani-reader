@@ -1473,6 +1473,8 @@
     <string name="backup_folder_title">Back up to a folder</string>
     <string name="backup_folder_details">Also copies the automatic backup into a folder you choose, such as one on an SD card or in a cloud app. One file, replaced each time</string>
     <string name="backup_folder_waiting">Folder chosen. The next automatic backup is copied there.</string>
+    <string name="backup_too_large">Your backup is bigger than the 10 MB Android\'s cloud backup allows, so Google\'s copy stays at the last smaller one.</string>
+    <string name="backup_too_large_folder">The copy in your folder is up to date.</string>
     <string name="backup_folder_last">Last folder backup: %1$s</string>
     <string name="backup_folder_unavailable">Folder not available, choose it again</string>
     <string name="backup_folder_switch_off">Switch off</string>
