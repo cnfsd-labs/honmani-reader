@@ -248,6 +248,24 @@ class AudiobookMakerTest {
     }
 
     @Test
+    fun theStatusFollowsAPlanThatIsReplacedOrWhoseCapIsRaised() {
+        val maker = maker("status-cache")
+        maker.freeze(plan(sentences = sentences(4), cap = 1.0))
+        assertEquals(MakerStatus.Partial(0, 4, 0.0, 1.0), maker.status("book"))
+        // The same status again comes from the cache and is unchanged.
+        assertEquals(MakerStatus.Partial(0, 4, 0.0, 1.0), maker.status("book"))
+
+        maker.delete("book")
+        assertEquals(MakerStatus.None, maker.status("book"))
+        maker.freeze(plan(sentences = sentences(7), cap = 2.5))
+        assertEquals(MakerStatus.Partial(0, 7, 0.0, 2.5), maker.status("book"))
+
+        // A raised cap rewrites the plan file; the new cap shows even if the file keeps its size.
+        maker.files("book").writePlan(plan(sentences = sentences(7), cap = 3.5))
+        assertEquals(MakerStatus.Partial(0, 7, 0.0, 3.5), maker.status("book"))
+    }
+
+    @Test
     fun billingNotSwitchedOnStopsTheJobButKeepsWhatIsDone() {
         val maker = maker("billing")
         val all = sentences()

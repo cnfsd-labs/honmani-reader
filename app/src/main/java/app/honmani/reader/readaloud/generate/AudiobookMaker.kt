@@ -11,6 +11,7 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -97,14 +98,33 @@ class AudiobookMaker(
         return true
     }
 
+    /** What [status] needs of a plan; parsing a novel's plan.json takes long, and status is asked about every second. */
+    private class PlanSummary(val length: Long, val modified: Long, val sentences: Int, val capUsd: Double)
+
+    private val summaries = ConcurrentHashMap<String, PlanSummary>()
+
+    /** The sentence count and cap of the plan, parsed again only when the plan file changed (null: no plan). */
+    private fun summary(files: GeneratedFiles): PlanSummary? {
+        val key = files.plan.path
+        if (!files.plan.isFile) {
+            summaries.remove(key)
+            return null
+        }
+        val length = files.plan.length()
+        val modified = files.plan.lastModified()
+        summaries[key]?.takeIf { it.length == length && it.modified == modified }?.let { return it }
+        val plan = files.readPlan() ?: return null
+        return PlanSummary(length, modified, plan.sentences.size, plan.capUsd).also { summaries[key] = it }
+    }
+
     fun status(bookHash: String): MakerStatus {
         val files = files(bookHash)
-        val plan = files.readPlan()
+        val plan = summary(files)
         val pairing = store.pairing(bookHash)
         if (files.audio.isFile && pairing != null && pairing.audio == uri(files.audio)) return MakerStatus.Finished(files.audio.length())
         plan ?: return MakerStatus.None
-        val done = if (files.audio.isFile) plan.sentences.size else files.wholeLines().coerceAtMost(plan.sentences.size)
-        return MakerStatus.Partial(done, plan.sentences.size, files.billedMicros() / MICROS, plan.capUsd)
+        val done = if (files.audio.isFile) plan.sentences else files.wholeLines().coerceAtMost(plan.sentences)
+        return MakerStatus.Partial(done, plan.sentences, files.billedMicros() / MICROS, plan.capUsd)
     }
 
     /** Deletes the partial or finished audio of the book, and its pairing if that points to it. */
