@@ -143,6 +143,13 @@
             const id = request.result;
             transaction.addEventListener('complete', () => pending.resolve({ id, title }));
           });
+          // A write ttu's own error handling does not report (e.g. the new title is taken too):
+          // fail now instead of waiting out the import timeout.
+          request.addEventListener('error', () => {
+            if (pendingImport !== pending) return;
+            const reason = request.error && request.error.name;
+            pending.reject(new Error(`Error importing: ttu could not store the book (${reason || 'unknown error'})`));
+          });
         }
         return request;
       };

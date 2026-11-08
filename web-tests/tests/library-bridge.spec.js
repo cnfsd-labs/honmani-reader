@@ -228,6 +228,28 @@ test('two library books with one title keep their own text and reading position 
   expect(rows.find((row) => row.id === b.id).html).toContain('改訂版');
 });
 
+test('a failed write of the suffixed row is reported as failed at once, not after the import timeout', async ({ page }) => {
+  // Before the bridge wraps IDBObjectStore.add: the new row collides with row 1 (a ConstraintError).
+  // ttu logs "Error importing" for this too; the bridge also fails on the request's own error.
+  await page.addInitScript(() => {
+    const add = IDBObjectStore.prototype.add;
+    IDBObjectStore.prototype.add = function (value, ...rest) {
+      return add.call(this, window.__collide ? { ...value, id: 1 } : value, ...rest);
+    };
+  });
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const a = await ensure(page, 'edition-a.epub');
+  await page.evaluate(() => (window.__collide = true));
+
+  const started = Date.now();
+  const reply = await ensure(page, 'edition-b.epub', null, null, { keepIds: [a.id], titleSuffix: ' (2)' });
+
+  expect(reply).toMatchObject({ type: 'library.failed' });
+  expect(Date.now() - started).toBeLessThan(15_000);
+  expect(await storedTexts(page)).toHaveLength(1);
+});
+
 test('a book re-imported under its own id (not another library book\'s) is replaced, not duplicated', async ({ page }) => {
   await setUp(page);
   await page.goto(`${server.url}/manage`);
