@@ -150,6 +150,8 @@ private fun AnkiSettingsContent() {
     val scope = rememberCoroutineScope()
     var keyInput by remember { mutableStateOf("") }
     var check by remember { mutableStateOf<KeyCheck?>(null) }
+    // A new key check replaces one still running; its late result is dropped.
+    val keyChecks = remember { LatestOnly(scope) }
     var sampleError by remember { mutableStateOf<String?>(null) }
     var playing by remember { mutableStateOf(false) }
     val player = remember { arrayOfNulls<MediaPlayer>(1) }
@@ -158,13 +160,16 @@ private fun AnkiSettingsContent() {
     fun checkKey() {
         val key = settings.googleKey() ?: return
         check = KeyCheck.Checking
-        scope.launch {
-            check = try {
-                KeyCheck.Works(GoogleCloudVoice.voices(key))
-            } catch (e: VoiceException) {
-                KeyCheck.Failed(e.problem.label())
-            }
-        }
+        keyChecks.launch(
+            work = {
+                try {
+                    KeyCheck.Works(GoogleCloudVoice.voices(key))
+                } catch (e: VoiceException) {
+                    KeyCheck.Failed(e.problem.label())
+                }
+            },
+            onResult = { check = it },
+        )
     }
 
     fun openCustomNoteType() {
