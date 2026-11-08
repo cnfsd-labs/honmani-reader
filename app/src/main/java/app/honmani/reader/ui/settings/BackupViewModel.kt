@@ -107,26 +107,15 @@ class BackupViewModel(
         restore(if (withCatalogs) backup else backup.withoutCatalogs())
     }
 
-    /** Restores the backup the old phone left ([AutoBackup.offer]); asked once, so it is answered either way. */
+    /** Restores the backup the old phone left ([AutoBackup.offer]); answered once it is restored. */
     fun restoreAutoBackup() = launchWork {
-        try {
-            restore(container.autoBackup.read())
-        } finally {
-            container.autoBackup.answered()
-        }
+        restoreOffered(container.autoBackup) { restore(it) }
     }
 
     /** Merges [backup] into this phone's data and hands positions and reader settings to ttu. */
     private suspend fun restore(backup: BackupFile): BackupState {
         val summary = container.backup.restore(backup)
-        container.appearanceSettings.reload()
-        container.readingGoalSettings.reload()
-        container.readingTimeSettings.reload()
-        container.readAloudSettings.reload()
-        container.highlightSettings.reload()
-        container.ankiSettings.reload()
-        container.reviewSettings.reload()
-        container.daySettings.reload()
+        reloadSettings()
         val ttu = container.ttuLibrary
         // Books in the library whose position moved forward: ttu opens them there, unless progress
         // sync has a newer one when the book opens (the position keeps the time it was read).
@@ -165,6 +154,17 @@ class BackupViewModel(
         return BackupState.Restored(summary)
     }
 
+    private fun reloadSettings() {
+        container.appearanceSettings.reload()
+        container.readingGoalSettings.reload()
+        container.readingTimeSettings.reload()
+        container.readAloudSettings.reload()
+        container.highlightSettings.reload()
+        container.ankiSettings.reload()
+        container.reviewSettings.reload()
+        container.daySettings.reload()
+    }
+
     fun dismiss() {
         _state.value = BackupState.Idle
     }
@@ -199,6 +199,17 @@ class BackupViewModel(
     }
 
     companion object {
+        /**
+         * Restores the backup the old phone left with [restore]. The offer counts as answered only
+         * once it is restored (declining answers it in the dialog): a failed or cancelled restore
+         * leaves it, so the next try or start still offers it.
+         */
+        internal suspend fun restoreOffered(autoBackup: AutoBackup, restore: suspend (BackupFile) -> BackupState): BackupState {
+            val state = restore(autoBackup.read())
+            if (state is BackupState.Restored) autoBackup.answered()
+            return state
+        }
+
         /** The failure state for [error]: a full phone gets its own sentence. */
         fun failedState(error: Throwable): BackupState.Failed =
             BackupState.Failed(noSpace = FailureReason.ofStorage(error) == FailureReason.NO_SPACE)
