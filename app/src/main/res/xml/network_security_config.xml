@@ -9,8 +9,8 @@
             <certificates src="user" />
         </trust-anchors>
     </base-config>
-    <!-- The public services Honmani uses itself (dictionaries, fonts, Google voices with the
-         user's key): https with public certificates only, so a CA installed on the phone (a
+    <!-- The public services Honmani uses itself (dictionaries, fonts, the Aozora list and texts, WaniKani with
+         the user's token, Google voices with the user's key): https with public certificates only, so a CA installed on the phone (a
          company's or school's network, for instance) can't read them. Downloads redirect to
          subdomains (release-assets.githubusercontent.com, cas-bridge.xethub.hf.co). -->
     <domain-config cleartextTrafficPermitted="false">
@@ -20,6 +20,9 @@
         <domain includeSubdomains="true">hf.co</domain>
         <domain includeSubdomains="true">jiten.moe</domain>
         <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">github.io</domain>
+        <domain includeSubdomains="true">aozora.gr.jp</domain>
+        <domain includeSubdomains="true">wanikani.com</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

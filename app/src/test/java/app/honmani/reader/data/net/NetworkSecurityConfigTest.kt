@@ -1,8 +1,10 @@
 package app.honmani.reader.data.net
 
 import app.honmani.reader.anki.GoogleCloudVoice
+import app.honmani.reader.data.aozora.AozoraClient
 import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.fonts.FontCatalog
+import app.honmani.reader.known.WaniKaniClient
 import java.io.File
 import java.net.URI
 import javax.xml.parsers.DocumentBuilderFactory
@@ -30,7 +32,7 @@ class NetworkSecurityConfigTest {
     fun everyBuiltInDownloadIsAPublicDomain() {
         val urls = DictionaryCatalog.dictionaries.map { it.url } +
             FontCatalog.fonts.map { it.url } +
-            GoogleCloudVoice.BASE_URL
+            listOf(GoogleCloudVoice.BASE_URL, AozoraClient.LIST_URL, AozoraClient.BOOKS_URL, WaniKaniClient.BASE_URL)
         for (url in urls) {
             val host = URI(url).host
             assertTrue("$host is not in the domain-config", domains.any { host == it || host.endsWith(".$it") })
