@@ -88,38 +88,38 @@ fun ReaderMenuSheet(
                 leadingContent = { Icon(painterResource(R.drawable.ic_bookmark_add), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_add_bookmark)) },
                 colors = colors,
-                modifier = Modifier.clickable(enabled = place != null, onClick = onAddBookmark),
+                modifier = Modifier.clickable(enabled = place != null, role = Role.Button, onClick = onAddBookmark),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_bookmark), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_bookmarks)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onBookmarks),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onBookmarks),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_highlight), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_highlights)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onHighlights),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onHighlights),
             )
             HorizontalDivider()
             ListItem(
                 leadingContent = { Icon(Icons.Filled.Menu, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_contents)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onContents),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onContents),
             )
             ListItem(
                 leadingContent = { Icon(Icons.Filled.Search, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_search)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onSearch),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onSearch),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_listen), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_read_aloud)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onReadAloud),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onReadAloud),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_listen), contentDescription = null) },
@@ -131,7 +131,7 @@ fun ReaderMenuSheet(
                     )
                 },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onPronunciations),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onPronunciations),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_audiobook), contentDescription = null) },
@@ -140,19 +140,19 @@ fun ReaderMenuSheet(
                     Text(stringResource(if (audiobookPaired) R.string.audiobook_menu_paired else R.string.audiobook_menu_new))
                 },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onAudiobook),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onAudiobook),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_settings)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onSettings),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onSettings),
             )
             ListItem(
                 leadingContent = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.session_open)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onSessionWords),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onSessionWords),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_visible), contentDescription = null) },
@@ -167,7 +167,7 @@ fun ReaderMenuSheet(
                 leadingContent = { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.reader_menu_close_book)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onCloseBook),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onCloseBook),
             )
         }
     }

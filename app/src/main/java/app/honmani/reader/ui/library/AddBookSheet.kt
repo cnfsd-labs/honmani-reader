@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.opds.OpdsCatalog
@@ -47,28 +48,28 @@ fun AddBookSheet(
                 headlineContent = { Text(stringResource(R.string.add_book_files)) },
                 supportingContent = { Text(stringResource(R.string.add_book_files_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onPickFiles),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onPickFiles),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_folder), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.add_book_folder)) },
                 supportingContent = { Text(stringResource(R.string.add_book_folder_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onPickFolder),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onPickFolder),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_paste), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.add_book_paste)) },
                 supportingContent = { Text(stringResource(R.string.add_book_paste_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onPasteText),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onPasteText),
             )
             ListItem(
                 leadingContent = { Icon(painterResource(R.drawable.ic_cloud), contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.add_book_aozora)) },
                 supportingContent = { Text(stringResource(R.string.add_book_aozora_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onFreeBooks),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onFreeBooks),
             )
             for (catalog in catalogs) {
                 ListItem(
@@ -84,7 +85,7 @@ fun AddBookSheet(
                         }
                     },
                     colors = colors,
-                    modifier = Modifier.clickable { onOpenCatalog(catalog) },
+                    modifier = Modifier.clickable(role = Role.Button) { onOpenCatalog(catalog) },
                 )
             }
             ListItem(
@@ -92,7 +93,7 @@ fun AddBookSheet(
                 headlineContent = { Text(stringResource(R.string.catalog_add_title)) },
                 supportingContent = { Text(stringResource(R.string.add_book_catalog_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onAddCatalog),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onAddCatalog),
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             ListItem(
@@ -100,7 +101,7 @@ fun AddBookSheet(
                 headlineContent = { Text(stringResource(R.string.library_export)) },
                 supportingContent = { Text(stringResource(R.string.library_export_details)) },
                 colors = colors,
-                modifier = Modifier.clickable(onClick = onExport),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onExport),
             )
         }
     }

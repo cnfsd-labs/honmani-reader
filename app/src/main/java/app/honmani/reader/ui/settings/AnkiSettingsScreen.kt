@@ -103,7 +103,7 @@ fun AnkiSettingsRow(onClick: () -> Unit) {
             ListItem(
                 headlineContent = { Text(stringResource(R.string.settings_anki)) },
                 supportingContent = { Text(stringResource(R.string.settings_anki_summary, deck, stringResource(audio.label()))) },
-                modifier = Modifier.clickable(onClick = onClick),
+                modifier = Modifier.clickable(role = Role.Button, onClick = onClick),
             )
         }
     }
@@ -262,7 +262,7 @@ private fun AnkiSettingsContent() {
                             ?: stringResource(R.string.custom_note_type_none_chosen),
                     )
                 },
-                modifier = Modifier.clickable(onClick = ::openCustomNoteType),
+                modifier = Modifier.clickable(role = Role.Button, onClick = ::openCustomNoteType),
             )
         }
         customTypes?.let { types ->
@@ -272,7 +272,7 @@ private fun AnkiSettingsContent() {
         ListItem(
             headlineContent = { Text(stringResource(R.string.action_mark_known_from_anki)) },
             supportingContent = { Text(stringResource(R.string.anki_known_summary)) },
-            modifier = Modifier.clickable(onClick = knownFromAnki::start),
+            modifier = Modifier.clickable(role = Role.Button, onClick = knownFromAnki::start),
         )
         KnownFromAnkiDialogs(knownFromAnki)
         Text(
@@ -452,7 +452,7 @@ private fun SentenceEndsRow(ends: String, onChange: (String) -> Unit) {
     ListItem(
         headlineContent = { Text(stringResource(R.string.sentence_ends)) },
         supportingContent = { Text(ends) },
-        modifier = Modifier.clickable { open = true },
+        modifier = Modifier.clickable(role = Role.Button) { open = true },
     )
     if (open) {
         var draft by rememberSaveable { mutableStateOf(ends) }

@@ -576,7 +576,7 @@ private fun CardFace(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(if (!revealed && leave == null) Modifier.clickable(onClick = onReveal) else Modifier)
+                    .then(if (!revealed && leave == null) Modifier.clickable(onClickLabel = showLabel, onClick = onReveal) else Modifier)
                     .verticalScroll(rememberScrollState())
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

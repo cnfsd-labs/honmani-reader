@@ -102,8 +102,10 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -759,11 +761,13 @@ private fun WordList(
  */
 @Composable
 private fun ReadWordRow(expression: String, reads: Int, details: ReadWordDetails?, onToggle: () -> Unit) {
+    val state = stringResource(if (details != null) R.string.lookup_examples_expanded else R.string.lookup_examples_collapsed)
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
+            .clickable(role = Role.Button, onClick = onToggle)
+            .semantics { stateDescription = state }
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1012,10 +1016,12 @@ private fun WordRow(
 ) {
     val highlight = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val state = stringResource(if (expanded) R.string.lookup_examples_expanded else R.string.lookup_examples_collapsed)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggleExpanded)
+            .clickable(role = Role.Button, onClick = onToggleExpanded)
+            .semantics { stateDescription = state }
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
