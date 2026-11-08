@@ -642,6 +642,7 @@ class ReaderViewModel(
             if (fromBook) record(tap, group).join()
             if (fromBook && !recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
             val start = tap.sentenceOffset.coerceIn(0, tap.sentence.length)
+            val cardBook = awaitBook(book)
             val content = CardContent(
                 expression = group.expression,
                 reading = group.reading,
@@ -649,8 +650,8 @@ class ReaderViewModel(
                 sentence = if (fromBook) tap.sentence else "",
                 surfaceStart = if (fromBook) start else 0,
                 surfaceEnd = if (fromBook) (start + group.source.length).coerceAtMost(tap.sentence.length) else 0,
-                bookTitle = awaitBook(book)?.title,
-                bookId = awaitBook(book)?.id,
+                bookTitle = cardBook?.title,
+                bookId = cardBook?.id,
                 pitches = group.pitches,
                 frequency = group.frequencies.firstOrNull()?.label,
                 furigana = state.furigana[key].orEmpty(),
