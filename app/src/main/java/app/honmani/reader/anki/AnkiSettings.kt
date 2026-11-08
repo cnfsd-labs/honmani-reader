@@ -159,12 +159,14 @@ class AnkiSettings(
      */
     fun setCustomNoteType(name: String, id: Long, mapping: FieldMapping) {
         val all = FieldMapping.fromJson(preferences.getString(KEY_FIELD_MAPPINGS, null)) + (name to mapping)
+        // The id first: a kill in between leaves an id that resolveCustomNoteType does not trust
+        // for the old name, never a new name with the old id.
+        setNoteTypeId(CardStyle.CUSTOM, id)
         preferences.edit()
             .putString(KEY_FIELD_MAPPINGS, FieldMapping.toJson(all))
             .putString(KEY_CUSTOM_NOTE_TYPE_NAME, name)
             .putString(KEY_CARD_STYLE, CardStyle.CUSTOM.name)
             .apply()
-        setNoteTypeId(CardStyle.CUSTOM, id)
         _customNoteTypeName.value = name
         _cardStyle.value = CardStyle.CUSTOM
     }

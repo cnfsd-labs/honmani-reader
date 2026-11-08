@@ -266,15 +266,17 @@ sealed interface CustomResolution {
 }
 
 /**
- * The note type chosen in the settings for [CardStyle.CUSTOM]: found by its stored id, else by
- * its name (then the new id is remembered). Nothing here changes the note type in AnkiDroid.
+ * The note type chosen in the settings for [CardStyle.CUSTOM]: found by its stored id if that note
+ * type still has the stored name, else by its name (then the new id is remembered). The id stays
+ * on this phone while the name comes back with a backup, so an id of another name is not trusted.
+ * Nothing here changes the note type in AnkiDroid.
  */
 fun resolveCustomNoteType(anki: AnkiApi, settings: AnkiSettings): CustomResolution {
     val name = settings.customNoteTypeName.value
         ?: return CustomResolution.Unusable("", CustomProblem.NOT_CHOSEN)
     val types = anki.noteTypes()
     val storedId = settings.noteTypeId(CardStyle.CUSTOM)
-    val found = types.firstOrNull { it.id == storedId } ?: types.firstOrNull { it.name == name }
+    val found = types.firstOrNull { it.id == storedId && it.name == name } ?: types.firstOrNull { it.name == name }
         ?: return CustomResolution.Unusable(name, CustomProblem.MISSING)
     if (found.id != storedId) settings.setNoteTypeId(CardStyle.CUSTOM, found.id)
     val mapping = settings.fieldMapping(name).restrictedTo(found.fields)

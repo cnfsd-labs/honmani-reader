@@ -95,6 +95,37 @@ class AnkiSyncTest {
     }
 
     @Test
+    fun ownNoteType_storedIdOfAnotherName_isNotTrusted_afterARestoreChangedTheName() = runBlocking {
+        val fieldsA = listOf("Front", "Back")
+        val fieldsB = listOf("Expression", "Meaning")
+        val a = anki.noteType("A")
+        val b = anki.noteType("B")
+        anki.customFields[a] = fieldsA
+        anki.customFields[b] = fieldsB
+        settings.setCustomNoteType("A", a, FieldMapping(mapOf("Front" to CardSource.WORD)))
+        // A backup from another phone: name and mappings come back, the id stays.
+        settings.setCustomNoteType("B", b, FieldMapping(mapOf("Expression" to CardSource.WORD)))
+        settings.setNoteTypeId(CardStyle.CUSTOM, a)
+
+        val found = resolveCustomNoteType(anki, settings)
+
+        val ready = found as CustomResolution.Ready
+        assertEquals(b, ready.type.id)
+        assertEquals("B", ready.type.name)
+        assertEquals(b, settings.noteTypeId(CardStyle.CUSTOM))
+    }
+
+    @Test
+    fun ownNoteType_storedIdOfAnotherName_andNoNoteTypeOfTheName_isMissing() = runBlocking {
+        val a = anki.noteType("A")
+        anki.customFields[a] = listOf("Front")
+        settings.setCustomNoteType("B", 77, FieldMapping(mapOf("Front" to CardSource.WORD)))
+        settings.setNoteTypeId(CardStyle.CUSTOM, a)
+
+        assertEquals(CustomResolution.Unusable("B", CustomProblem.MISSING), resolveCustomNoteType(anki, settings))
+    }
+
+    @Test
     fun clearsTheMarkOfACardDeletedInAnki_andKeepsOthers() = runBlocking {
         save("名前", "なまえ")
         save("見当", "けんとう")
