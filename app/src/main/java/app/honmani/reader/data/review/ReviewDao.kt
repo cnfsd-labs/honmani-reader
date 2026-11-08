@@ -69,6 +69,17 @@ interface ReviewDao : TombstoneWriter {
         clearCardTombstone(card.wordId)
     }
 
+    /**
+     * Puts back the card an answer started from. A card that was never answered (reps 0) knows nothing:
+     * unstamped like [insertIfMissing], so the blank card can't replace the same word's real review
+     * memory from another phone. Any other card is stamped now, like [upsert].
+     */
+    @Transaction
+    suspend fun restoreBefore(card: ReviewCardEntity) {
+        upsertRow(card.copy(updatedAt = if (card.reps == 0) 0 else UpdateClock.now()))
+        clearCardTombstone(card.wordId)
+    }
+
     @Query("DELETE FROM review_card WHERE word_id = :wordId")
     suspend fun deleteCardRow(wordId: Long)
 

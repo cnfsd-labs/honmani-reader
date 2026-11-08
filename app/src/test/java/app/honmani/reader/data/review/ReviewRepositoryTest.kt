@@ -95,6 +95,24 @@ class ReviewRepositoryTest {
         assertEquals(1, repository.newCards(10).size)
     }
 
+    @Test
+    fun undoingAFirstAnswerLeavesTheBlankCardUnstampedButLaterUndosAreStamped() = runTest {
+        val id = word("猫")
+        val first = repository.record(id, Grade.GOOD)!!
+        assertTrue(repository.card(id)!!.updatedAt > 0)
+        repository.undo(first)
+        // Never answered: nothing to offer sync, so it can't replace another phone's review memory.
+        assertEquals(0, repository.card(id)!!.reps)
+        assertEquals(0L, repository.card(id)!!.updatedAt)
+
+        repository.record(id, Grade.GOOD)
+        now += day
+        val second = repository.record(id, Grade.GOOD)!!
+        repository.undo(second)
+        assertTrue(repository.card(id)!!.reps > 0)
+        assertTrue(repository.card(id)!!.updatedAt > 0)
+    }
+
     /** Five words reviewed one day apart, then 60 days on: all due, the first one the most overdue. */
     private suspend fun fiveDueWords(): List<Long> {
         val ids = listOf("一", "二", "三", "四", "五").map { word(it) }

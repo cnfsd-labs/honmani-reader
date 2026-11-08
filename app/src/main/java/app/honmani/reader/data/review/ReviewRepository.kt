@@ -189,7 +189,7 @@ class ReviewRepository(
     /** Takes back a review made by [record]: the card as it was, without the log row. */
     suspend fun undo(undo: ReviewUndo) = database.withTransaction {
         dao.deleteLog(undo.logId)
-        if (words.find(undo.before.wordId) != null) dao.upsert(undo.before)
+        if (words.find(undo.before.wordId) != null) dao.restoreBefore(undo.before)
     }
 
     /** Hides a card until tomorrow (the next local midnight). */
