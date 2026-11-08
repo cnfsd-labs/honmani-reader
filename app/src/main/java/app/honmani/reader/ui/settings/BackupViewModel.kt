@@ -25,7 +25,9 @@ import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.data.fonts.FontState
 import app.honmani.reader.data.settings.ReaderFont
 import app.honmani.reader.ui.reader.TtuLibraryException
+import java.io.File
 import java.io.IOException
+import java.io.OutputStream
 import java.time.LocalDate
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +59,11 @@ sealed interface BackupState {
  * Settings → Back up and restore: writes a backup to a file the reader picks, or restores one.
  * Runs on the main thread, as the reader page (ttu's settings and positions) needs.
  */
-class BackupViewModel(private val container: AppContainer, private val resolver: ContentResolver) : ViewModel() {
+class BackupViewModel(
+    private val container: AppContainer,
+    private val resolver: ContentResolver,
+    private val cacheDir: File,
+) : ViewModel() {
     private val _state = MutableStateFlow<BackupState>(BackupState.Idle)
     val state: StateFlow<BackupState> = _state.asStateFlow()
 
@@ -79,8 +85,11 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         }
         val backup = container.backup.export(readerSettings)
         withContext(Dispatchers.IO) {
-            val output = resolver.openOutputStream(uri, "wt") ?: throw IOException("Cannot write $uri")
-            output.use { BackupCodec.write(backup, it) }
+            writeViaTemporaryFile(
+                temporary = File(cacheDir, "backup-export.zip"),
+                write = { BackupCodec.write(backup, it) },
+                open = { resolver.openOutputStream(uri, "wt") ?: throw IOException("Cannot write $uri") },
+            )
         }
         BackupState.Saved
     }
@@ -194,13 +203,28 @@ class BackupViewModel(private val container: AppContainer, private val resolver:
         fun failedState(error: Throwable): BackupState.Failed =
             BackupState.Failed(noSpace = FailureReason.ofStorage(error) == FailureReason.NO_SPACE)
 
+        /**
+         * Writes with [write] into [temporary] first and copies that into the stream [open] gives
+         * only when it is complete: a write that fails half way (full storage) must not truncate
+         * a backup the reader picked to overwrite. [open] truncates, so it is called last.
+         */
+        internal fun writeViaTemporaryFile(temporary: File, write: (OutputStream) -> Unit, open: () -> OutputStream) {
+            try {
+                temporary.parentFile?.mkdirs()
+                temporary.outputStream().use(write)
+                open().use { output -> temporary.inputStream().use { it.copyTo(output) } }
+            } finally {
+                temporary.delete()
+            }
+        }
+
         /** ttu's localStorage key for the font (see `ReaderSettings`). */
         private const val FONT_KEY = "fontFamilyGroupOne"
 
         val Factory = viewModelFactory {
             initializer {
                 val application = this[APPLICATION_KEY] as HonmaniApplication
-                BackupViewModel(application.container, application.contentResolver)
+                BackupViewModel(application.container, application.contentResolver, application.cacheDir)
             }
         }
     }
