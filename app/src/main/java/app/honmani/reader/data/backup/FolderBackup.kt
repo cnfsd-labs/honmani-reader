@@ -64,6 +64,7 @@ internal fun FolderTarget.replaceFile(folder: String, name: String, tempName: St
     find(folder, tempName)?.let { delete(it) }
     val temp = create(folder, tempName)
     var complete = false
+    var overwriting = false
     try {
         open(temp).use(write)
         complete = true
@@ -72,13 +73,15 @@ internal fun FolderTarget.replaceFile(folder: String, name: String, tempName: St
             if (old != null && !delete(old)) throw IOException("Cannot replace $old")
             rename(temp, name)
         } else {
+            overwriting = true
             open(old ?: create(folder, name)).use(write)
             delete(temp)
         }
     } catch (e: Exception) {
-        // A finished temporary file may be all that is left if the swap failed: keep it then.
+        // A finished temporary file may be all that is left if the swap failed: keep it then, also
+        // when the overwrite in place died half way and left a damaged old file.
         runCatching {
-            if (!complete || find(folder, name) != null) delete(temp)
+            if (!complete || (!overwriting && find(folder, name) != null)) delete(temp)
         }
         throw e
     }

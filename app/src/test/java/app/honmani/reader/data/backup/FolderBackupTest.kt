@@ -50,13 +50,19 @@ internal class FakeFolder : FolderTarget {
     /** Fails after [failAfter] bytes, as a card pulled out half way would. */
     var failAfter: Int? = null
 
+    /** When set, only the stream that makes [opened] reach [failOnOpen] fails, not every one. */
+    var failOnOpen: Int? = null
+    var opened = 0
+
     override fun open(file: String): OutputStream {
         if (denyWrite) throw SecurityException("permission lost")
         if (file !in files) throw FileNotFoundException(file)
+        opened++
+        val failing = failOnOpen == null || failOnOpen == opened
         val bytes = ByteArrayOutputStream()
         return object : OutputStream() {
             override fun write(b: Int) {
-                if (failAfter != null && bytes.size() >= failAfter!!) throw IOException("gone")
+                if (failing && failAfter != null && bytes.size() >= failAfter!!) throw IOException("gone")
                 bytes.write(b)
             }
 
@@ -157,6 +163,21 @@ class FolderBackupTest {
 
         assertEquals(mapOf(file to "zip two"), folder.files.mapValues { String(it.value) })
         assertEquals(FolderBackupState.On(5_000L), backup.state.value)
+    }
+
+    @Test
+    fun anOverwriteInPlaceThatDiesHalfWayKeepsTheFinishedTemporaryFile() = runBlocking {
+        folder.renamable = false
+        backup.choose("content://tree/a")
+        backup.copy(source)
+        source.writeText("zip two, longer")
+        // The next stream is the temporary file of the second copy, the one after the overwrite.
+        folder.failOnOpen = folder.opened + 2
+        folder.failAfter = 3
+        backup.copy(source)
+
+        assertEquals(FolderBackupState.Unavailable, backup.state.value)
+        assertTrue(folder.files.values.any { String(it) == "zip two, longer" })
     }
 
     @Test
