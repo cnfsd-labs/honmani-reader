@@ -24,6 +24,19 @@ class DifficultyStoreTest {
     private val words = BookWords(listOf("猫"), intArrayOf(5), listOf(shortArrayOf(1, 2)))
 
     @Test
+    fun gradesSavedFromSeveralThreadsAreAllKept() {
+        val store = DifficultyStore(folder.root)
+        val threads = (0 until 8).map { t ->
+            Thread { for (i in 0 until 40) store.save("book-$t-$i", grade()) }
+        }
+
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        assertEquals(320, store.grades.value.size)
+    }
+
+    @Test
     fun forgettingABookDropsItsGradeAndWordsOnly() {
         val store = DifficultyStore(folder.root)
         for (hash in listOf("a", "b")) {

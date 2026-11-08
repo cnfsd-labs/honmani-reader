@@ -8,6 +8,7 @@ import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import org.json.JSONObject
 
 /** A book's grade, with the [LexiconSources.signature] it was computed with. */
@@ -35,7 +36,7 @@ class DifficultyStore(private val directory: File) {
     fun save(contentHash: String, grade: StoredDifficulty) {
         directory.mkdirs()
         writeTextAtomically(File(directory, contentHash + SUFFIX), encode(grade).toString())
-        _grades.value += contentHash to grade
+        _grades.update { it + (contentHash to grade) }
     }
 
     /** Keeps a book's words; save them before the grade, so a graded book has its words. */
@@ -81,7 +82,7 @@ class DifficultyStore(private val directory: File) {
     fun forget(contentHash: String) {
         File(directory, contentHash + SUFFIX).delete()
         File(directory, contentHash + WORDS_SUFFIX).delete()
-        _grades.value -= contentHash
+        _grades.update { it - contentHash }
     }
 
     /** Drops grades and words of books no longer in the library. */
@@ -92,7 +93,7 @@ class DifficultyStore(private val directory: File) {
             File(directory, hash + SUFFIX).delete()
             File(directory, hash + WORDS_SUFFIX).delete()
         }
-        _grades.value -= gone
+        _grades.update { it - gone }
     }
 
     internal companion object {
