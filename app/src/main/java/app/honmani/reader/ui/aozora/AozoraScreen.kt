@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -180,7 +182,7 @@ private fun Browser(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onIncludeOld(!state.includeOld) }
+            .toggleable(state.includeOld, role = Role.Switch, onValueChange = onIncludeOld)
             .padding(horizontal = 16.dp),
     ) {
         Text(
@@ -188,7 +190,7 @@ private fun Browser(
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = state.includeOld, onCheckedChange = onIncludeOld)
+        Switch(checked = state.includeOld, onCheckedChange = null)
     }
     if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
     state.error?.let {

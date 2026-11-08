@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -125,9 +127,12 @@ private fun Details(state: MakeState, model: GeneratedAudiobookModel, sizeText: 
     if (state.spaceShort) {
         Text(stringResource(R.string.audiobook_make_no_space, Formatter.formatShortFileSize(context, state.spaceNeededBytes)), color = MaterialTheme.colorScheme.error)
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(checked = state.mobileData, onCheckedChange = model::setMobileData)
-        Text(stringResource(R.string.audiobook_make_mobile))
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().toggleable(state.mobileData, role = Role.Checkbox, onValueChange = model::setMobileData),
+    ) {
+        Checkbox(checked = state.mobileData, onCheckedChange = null)
+        Text(stringResource(R.string.audiobook_make_mobile), modifier = Modifier.padding(start = 8.dp))
     }
 }
 

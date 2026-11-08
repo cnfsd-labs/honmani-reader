@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -402,10 +404,10 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().clickable { kanji = !kanji },
+                            modifier = Modifier.fillMaxWidth().toggleable(kanji, role = Role.Checkbox) { kanji = it },
                         ) {
-                            Checkbox(checked = kanji, onCheckedChange = { kanji = it })
-                            Text(stringResource(R.string.known_wanikani_kanji))
+                            Checkbox(checked = kanji, onCheckedChange = null)
+                            Text(stringResource(R.string.known_wanikani_kanji), modifier = Modifier.padding(start = 8.dp))
                         }
                         Text(stringResource(R.string.known_wanikani_privacy), style = MaterialTheme.typography.bodySmall)
                     }
