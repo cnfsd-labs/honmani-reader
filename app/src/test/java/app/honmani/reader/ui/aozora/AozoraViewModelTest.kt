@@ -2,6 +2,7 @@ package app.honmani.reader.ui.aozora
 
 import app.honmani.reader.data.aozora.AozoraException
 import app.honmani.reader.data.aozora.AozoraRepository
+import app.honmani.reader.data.aozora.AozoraSort
 import app.honmani.reader.data.aozora.FakeAozoraSource
 import app.honmani.reader.data.aozora.indexJson
 import app.honmani.reader.data.aozora.work
@@ -10,7 +11,10 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -78,8 +82,8 @@ class AozoraViewModelTest {
         val state = vm.uiState.value
         assertTrue(state.hasList)
         assertEquals(3, state.total)
-        // Old kana is hidden by default.
-        assertEquals(listOf("1", "3"), state.results.map { it.id })
+        // Old kana is hidden by default; without a skill or difficulties the order is alphabetical by title reading.
+        assertEquals(listOf("3", "1"), state.results.map { it.id })
         assertTrue(source.asked.isEmpty())
     }
 
@@ -92,7 +96,8 @@ class AozoraViewModelTest {
         assertFalse(state.loading)
         assertNull(state.error)
         assertEquals("2026-11-07", state.generated)
-        assertEquals(listOf("1", "3"), state.results.map { it.id })
+        assertEquals(listOf("3", "1"), state.results.map { it.id })
+        assertFalse(state.hasDifficulty)
     }
 
     @Test
@@ -127,7 +132,7 @@ class AozoraViewModelTest {
         vm.setIncludeOld(true)
         assertEquals(listOf("2"), vm.uiState.value.results.map { it.id })
         vm.setQuery("")
-        assertEquals(listOf("1", "2", "3"), vm.uiState.value.results.map { it.id })
+        assertEquals(listOf("2", "3", "1"), vm.uiState.value.results.map { it.id })
     }
 
     @Test
@@ -142,7 +147,7 @@ class AozoraViewModelTest {
     fun addingABookHandsOverItsTextOnce() {
         val vm = viewModel()
         load(vm)
-        val work = vm.uiState.value.results.first()
+        val work = vm.uiState.value.results.first { it.id == "1" }
         source.books[work.file] = "本文".toByteArray()
         vm.select(work)
         assertEquals(work, vm.uiState.value.selected)
@@ -216,6 +221,66 @@ class AozoraViewModelTest {
     fun fileNamesAreTheTitleWithTxt() {
         val vm = viewModel()
         load(vm)
-        assertEquals("羅生門.txt", AozoraViewModel.fileName(vm.uiState.value.results.last()))
+        assertEquals("羅生門.txt", AozoraViewModel.fileName(vm.uiState.value.results.first { it.id == "3" }))
+    }
+
+    private fun gradedViewModel(skill: Flow<Int?>): AozoraViewModel {
+        val graded = FakeAozoraSource(
+            json = indexJson(
+                works = listOf(
+                    work("1", "あ", "あ", 0, "nn", difficulty = 80),
+                    work("2", "い", "い", 0, "nn", difficulty = 30),
+                    work("3", "う", "う", 0, "nn"),
+                    work("4", "え", "え", 0, "nn", difficulty = 52),
+                ).joinToString(","),
+            ),
+        )
+        val vm = AozoraViewModel(
+            AozoraRepository(File(folder.root, "graded"), graded),
+            graded,
+            worker = Dispatchers.Unconfined,
+            searchDelayMs = 0,
+            skill = skill,
+        )
+        settle(vm)
+        vm.load()
+        runBlocking { withTimeout(5_000) { vm.uiState.first { !it.loading && it.hasList && it.results.isNotEmpty() } } }
+        return vm
+    }
+
+    private fun AozoraViewModel.order() = uiState.value.results.map { it.id }
+
+    @Test
+    fun theOrderPickerNeedsDifficulties() {
+        assertTrue(gradedViewModel(flowOf(null)).uiState.value.hasDifficulty)
+    }
+
+    @Test
+    fun bestFitIsTheDefaultAndFollowsTheSkill() {
+        val skill = MutableStateFlow<Int?>(null)
+        val vm = gradedViewModel(skill)
+        assertEquals(AozoraSort.BEST_FIT, vm.uiState.value.sort)
+        // No skill yet: alphabetical.
+        assertEquals(listOf("1", "2", "3", "4"), vm.order())
+        // Skill 50: a little above it (52) is the best fit, then 30, 80; no difficulty last.
+        skill.value = 50
+        assertEquals(50, vm.uiState.value.skill)
+        assertEquals(listOf("4", "2", "1", "3"), vm.order())
+        skill.value = 90
+        assertEquals(listOf("1", "4", "2", "3"), vm.order())
+    }
+
+    @Test
+    fun theChosenOrderAppliesWithTheSearch() {
+        val vm = gradedViewModel(flowOf(50))
+        vm.setSort(AozoraSort.EASIEST)
+        assertEquals(listOf("2", "4", "1", "3"), vm.order())
+        vm.setSort(AozoraSort.HARDEST)
+        assertEquals(listOf("1", "4", "2", "3"), vm.order())
+        vm.setSort(AozoraSort.ALPHABETICAL)
+        assertEquals(listOf("1", "2", "3", "4"), vm.order())
+        vm.setSort(AozoraSort.EASIEST)
+        vm.setQuery("え")
+        assertEquals(listOf("4"), vm.order())
     }
 }

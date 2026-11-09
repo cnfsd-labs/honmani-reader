@@ -1,8 +1,10 @@
 package app.honmani.reader.data.aozora
 
+import app.honmani.reader.data.stats.Skill
 import app.honmani.reader.lookup.JapaneseText
 import java.io.InputStream
 import java.util.Locale
+import kotlin.math.abs
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -39,6 +41,9 @@ class AozoraWork(
     /** What a search is compared with: title, author and both readings, in plain hiragana. */
     internal val searchKey: String = AozoraSearch.normalize(title) + "\n" + AozoraSearch.normalize(titleReading) + "\n" +
         AozoraSearch.normalize(author) + "\n" + AozoraSearch.normalize(authorReading)
+
+    /** What alphabetical order compares: the title in kana (the title itself if there is no reading). */
+    internal val sortKey: String = AozoraSearch.normalize(titleReading.ifEmpty { title })
 
     override fun toString(): String = "AozoraWork($id, $title, $author)"
 }
@@ -113,6 +118,37 @@ object AozoraIndexParser {
     }
 }
 
+/** The order of the work list. Works without a difficulty come last in the difficulty orders. */
+enum class AozoraSort {
+    /** Nearest to a little above the reader's skill first; alphabetical until there is a skill. */
+    BEST_FIT,
+    EASIEST,
+    ALPHABETICAL,
+    HARDEST,
+    ;
+
+    /** [works] in this order. [skill] is the reader's skill on the 1–100 scale (`Skill`), or null. */
+    fun apply(works: List<AozoraWork>, skill: Int?): List<AozoraWork> = when (this) {
+        BEST_FIT -> if (skill == null) {
+            ALPHABETICAL.apply(works, null)
+        } else {
+            val target = skill + Skill.STRETCH
+            works.sortedWith(
+                compareBy<AozoraWork, Int?>(nullsLast()) { w -> w.difficulty?.let { abs(it - target) } }.then(ALPHABETICAL_ORDER),
+            )
+        }
+        EASIEST -> works.sortedWith(compareBy<AozoraWork, Int?>(nullsLast()) { it.difficulty }.then(ALPHABETICAL_ORDER))
+        HARDEST -> works.sortedWith(compareBy<AozoraWork, Int?>(nullsLast(reverseOrder())) { it.difficulty }.then(ALPHABETICAL_ORDER))
+        ALPHABETICAL -> works.sortedWith(ALPHABETICAL_ORDER)
+    }
+
+    private companion object {
+        /** By title reading, then title, then ID: a total order, so the result never depends on the input order. */
+        val ALPHABETICAL_ORDER: Comparator<AozoraWork> =
+            compareBy<AozoraWork> { it.sortKey }.thenBy { it.title }.thenBy { it.id }
+    }
+}
+
 /** Search in the work list. */
 object AozoraSearch {
     /** Case, white space and the hiragana/katakana difference do not matter. */
@@ -122,12 +158,19 @@ object AozoraSearch {
     /**
      * The works whose title, author or their readings contain every word of [query] (words are
      * separated by white space; none: all works), in the list's order. Works in old kana (旧仮名)
-     * only with [includeOld].
+     * only with [includeOld]. With a [sort] they come in that order ([skill] is for [AozoraSort.BEST_FIT]).
      */
-    fun filter(works: List<AozoraWork>, query: String, includeOld: Boolean): List<AozoraWork> {
+    fun filter(
+        works: List<AozoraWork>,
+        query: String,
+        includeOld: Boolean,
+        sort: AozoraSort? = null,
+        skill: Int? = null,
+    ): List<AozoraWork> {
         val words = query.split(' ', '　', '\t', '\n').map(::normalize).filter { it.isNotEmpty() }
-        return works.filter { work ->
+        val found = works.filter { work ->
             (includeOld || !work.oldKana) && words.all { work.searchKey.contains(it) }
         }
+        return sort?.apply(found, skill) ?: found
     }
 }

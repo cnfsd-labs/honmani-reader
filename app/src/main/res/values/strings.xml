@@ -190,6 +190,7 @@
     <string name="aozora_old_kana">旧仮名</string>
     <string name="aozora_old_kana_details">Old kana usage (旧仮名遣い)</string>
     <string name="aozora_old_kanji_details">Old kanji forms (旧字体)</string>
+    <string name="aozora_sort_no_skill">Alphabetical until your skill is measured</string>
     <string name="aozora_difficulty">Approximate difficulty %1$d</string>
     <string name="aozora_difficulty_details">Approximate difficulty (1–100): %1$s</string>
     <string name="aozora_published">Published on Aozora Bunko: %1$s</string>

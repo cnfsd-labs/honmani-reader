@@ -11,6 +11,7 @@ import app.honmani.reader.data.aozora.AozoraException
 import app.honmani.reader.data.aozora.AozoraIndex
 import app.honmani.reader.data.aozora.AozoraRepository
 import app.honmani.reader.data.aozora.AozoraSearch
+import app.honmani.reader.data.aozora.AozoraSort
 import app.honmani.reader.data.aozora.AozoraSource
 import app.honmani.reader.data.aozora.AozoraWork
 import app.honmani.reader.ui.library.SharedText
@@ -25,6 +26,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -52,6 +56,12 @@ data class AozoraUiState(
     val query: String = "",
     /** Also works in old kana (旧仮名). */
     val includeOld: Boolean = false,
+    /** The order of [results]. */
+    val sort: AozoraSort = AozoraSort.BEST_FIT,
+    /** The reader's skill (1–100) for [AozoraSort.BEST_FIT]; null while it is not measured. */
+    val skill: Int? = null,
+    /** Whether any work of the list has a difficulty (else the order picker is useless). */
+    val hasDifficulty: Boolean = false,
     val results: List<AozoraWork> = emptyList(),
     /** The work whose details are open. */
     val selected: AozoraWork? = null,
@@ -68,6 +78,8 @@ class AozoraViewModel(
     /** Where searching runs. */
     private val worker: CoroutineDispatcher = Dispatchers.Default,
     private val searchDelayMs: Long = SEARCH_DELAY_MS,
+    /** The reader's skill (`SkillTracker`), for the best-fit order. */
+    skill: Flow<Int?> = flowOf(null),
 ) : ViewModel() {
     private val state = MutableStateFlow(AozoraUiState())
     val uiState: StateFlow<AozoraUiState> = state
@@ -82,6 +94,13 @@ class AozoraViewModel(
     private var downloadJob: Job? = null
 
     init {
+        viewModelScope.launch {
+            skill.distinctUntilChanged().collect { value ->
+                state.update { it.copy(skill = value) }
+                // Only the best-fit order depends on it.
+                if (state.value.sort == AozoraSort.BEST_FIT) filter(0)
+            }
+        }
         viewModelScope.launch {
             val kept = repository.cached()
             if (kept != null) {
@@ -112,7 +131,14 @@ class AozoraViewModel(
 
     private fun show(list: AozoraIndex) {
         index = list
-        state.update { it.copy(hasList = true, generated = list.generated, total = list.works.size) }
+        state.update {
+            it.copy(
+                hasList = true,
+                generated = list.generated,
+                total = list.works.size,
+                hasDifficulty = list.works.any { work -> work.difficulty != null },
+            )
+        }
         filter(0)
     }
 
@@ -126,13 +152,20 @@ class AozoraViewModel(
         filter(0)
     }
 
+    fun setSort(sort: AozoraSort) {
+        state.update { it.copy(sort = sort) }
+        filter(0)
+    }
+
     private fun filter(delayMs: Long) {
         val list = index ?: return
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             if (delayMs > 0) delay(delayMs)
-            val (query, includeOld) = state.value.let { it.query to it.includeOld }
-            val found = withContext(worker) { AozoraSearch.filter(list.works, query, includeOld) }
+            val current = state.value
+            val found = withContext(worker) {
+                AozoraSearch.filter(list.works, current.query, current.includeOld, current.sort, current.skill)
+            }
             state.update { it.copy(results = found) }
         }
     }
@@ -187,7 +220,11 @@ class AozoraViewModel(
             initializer {
                 val app = this[APPLICATION_KEY] as HonmaniApplication
                 val client = AozoraClient()
-                AozoraViewModel(AozoraRepository(File(app.filesDir, "aozora"), client), client)
+                AozoraViewModel(
+                    AozoraRepository(File(app.filesDir, "aozora"), client),
+                    client,
+                    skill = app.container.skillTracker.estimate.map { it.current }.distinctUntilChanged(),
+                )
             }
         }
     }

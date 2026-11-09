@@ -205,3 +205,80 @@ class AozoraSearchTest {
         assertEquals(listOf("4"), ids("蜘蛛", old = false))
     }
 }
+
+class AozoraSortTest {
+    private fun w(id: String, reading: String, difficulty: Int?, title: String = reading) =
+        parse(indexJson(works = work(id, title, reading, 0, "nn", difficulty = difficulty))).works.single()
+
+    private val works = listOf(
+        w("a", "ゆき", 40),
+        w("b", "あめ", 70),
+        w("c", "かぜ", null),
+        w("d", "そら", 45),
+        w("e", "くも", 70),
+        w("f", "いし", null),
+        w("g", "つき", 20),
+    )
+
+    private fun ids(sort: AozoraSort, skill: Int? = null) = sort.apply(works, skill).map { it.id }
+
+    @Test
+    fun alphabeticalIsByTitleReadingIgnoringDifficulty() {
+        assertEquals(listOf("b", "f", "c", "e", "d", "g", "a"), ids(AozoraSort.ALPHABETICAL))
+    }
+
+    @Test
+    fun alphabeticalComparesKatakanaAsHiragana() {
+        val list = listOf(w("1", "ウミ", null), w("2", "あめ", null), w("3", "カワ", null), w("4", "いし", null))
+        assertEquals(listOf("2", "4", "1", "3"), AozoraSort.ALPHABETICAL.apply(list, null).map { it.id })
+    }
+
+    @Test
+    fun alphabeticalFallsBackToTheTitleWithoutReadingAndThenTheId() {
+        val list = listOf(w("2", "", null, title = "ぶ"), w("3", "あ", null, title = "z"), w("1", "あ", null, title = "z"))
+        assertEquals(listOf("1", "3", "2"), AozoraSort.ALPHABETICAL.apply(list, null).map { it.id })
+    }
+
+    @Test
+    fun easiestFirstPutsWorksWithoutDifficultyLast() {
+        // Equal difficulties (b, e) and the ungraded keep alphabetical order.
+        assertEquals(listOf("g", "a", "d", "b", "e", "f", "c"), ids(AozoraSort.EASIEST))
+    }
+
+    @Test
+    fun hardestFirstPutsWorksWithoutDifficultyLast() {
+        assertEquals(listOf("b", "e", "d", "a", "g", "f", "c"), ids(AozoraSort.HARDEST))
+    }
+
+    @Test
+    fun bestFitIsNearestToTheSkillPlusAStretch() {
+        // Skill 41: target 43 (Skill.STRETCH is 2): d 45 (2), a 40 (3), g 20 (23), b/e 70 (27).
+        assertEquals(listOf("d", "a", "g", "b", "e", "f", "c"), ids(AozoraSort.BEST_FIT, 41))
+    }
+
+    @Test
+    fun bestFitTiesBetweenAboveAndBelowAreAlphabetical() {
+        // Target 50: 47 and 53 are both 3 away.
+        val list = listOf(w("1", "ろ", 53), w("2", "い", 47), w("3", "は", 50))
+        assertEquals(listOf("3", "2", "1"), AozoraSort.BEST_FIT.apply(list, 48).map { it.id })
+    }
+
+    @Test
+    fun bestFitWithoutASkillIsAlphabetical() {
+        assertEquals(ids(AozoraSort.ALPHABETICAL), ids(AozoraSort.BEST_FIT, null))
+    }
+
+    @Test
+    fun bestFitWithoutAnyDifficultyIsAlphabeticalToo() {
+        val plain = listOf(w("2", "ろ", null), w("1", "い", null))
+        assertEquals(listOf("1", "2"), AozoraSort.BEST_FIT.apply(plain, 50).map { it.id })
+    }
+
+    @Test
+    fun filterAppliesTheSortAfterTheSearch() {
+        val found = AozoraSearch.filter(works, "", false, AozoraSort.EASIEST, null).map { it.id }
+        assertEquals(ids(AozoraSort.EASIEST), found)
+        // Without a sort the list's order stays.
+        assertEquals(works.map { it.id }, AozoraSearch.filter(works, "", false).map { it.id })
+    }
+}

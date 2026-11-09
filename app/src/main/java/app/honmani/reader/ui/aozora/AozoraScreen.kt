@@ -1,24 +1,32 @@
 package app.honmani.reader.ui.aozora
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +34,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -35,10 +44,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
@@ -49,6 +63,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.aozora.AozoraException
+import app.honmani.reader.data.aozora.AozoraSort
 import app.honmani.reader.data.aozora.AozoraWork
 import app.honmani.reader.ui.DifficultyBadge
 import app.honmani.reader.ui.HonmaniTopAppBar
@@ -71,6 +86,7 @@ fun AozoraScreen(
         onLoad = viewModel::load,
         onQuery = viewModel::setQuery,
         onIncludeOld = viewModel::setIncludeOld,
+        onSort = viewModel::setSort,
         onSelect = viewModel::select,
         onDeselect = viewModel::deselect,
         onAdd = viewModel::add,
@@ -85,6 +101,7 @@ private fun AozoraContent(
     onLoad: () -> Unit,
     onQuery: (String) -> Unit,
     onIncludeOld: (Boolean) -> Unit,
+    onSort: (AozoraSort) -> Unit,
     onSelect: (AozoraWork) -> Unit,
     onDeselect: () -> Unit,
     onAdd: () -> Unit,
@@ -113,7 +130,7 @@ private fun AozoraContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) { CircularProgressIndicator() }
                 !state.hasList -> Intro(state, onLoad)
-                else -> Browser(state, onQuery, onIncludeOld, onSelect)
+                else -> Browser(state, onQuery, onIncludeOld, onSort, onSelect)
             }
         }
     }
@@ -164,23 +181,33 @@ private fun Browser(
     state: AozoraUiState,
     onQuery: (String) -> Unit,
     onIncludeOld: (Boolean) -> Unit,
+    onSort: (AozoraSort) -> Unit,
     onSelect: (AozoraWork) -> Unit,
 ) {
-    OutlinedTextField(
-        value = state.query,
-        onValueChange = onQuery,
-        singleLine = true,
-        label = { Text(stringResource(R.string.aozora_search)) },
-        trailingIcon = {
-            if (state.query.isNotEmpty()) {
-                IconButton(onClick = { onQuery("") }) {
-                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear))
-                }
-            }
-        },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-    )
+    ) {
+        OutlinedTextField(
+            value = state.query,
+            onValueChange = onQuery,
+            singleLine = true,
+            label = { Text(stringResource(R.string.aozora_search)) },
+            trailingIcon = {
+                if (state.query.isNotEmpty()) {
+                    IconButton(onClick = { onQuery("") }) {
+                        Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear))
+                    }
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            modifier = Modifier.weight(1f),
+        )
+        // The order only matters once works have a difficulty.
+        if (state.hasDifficulty) {
+            Box(Modifier.padding(start = 8.dp)) { SortButton(state.sort, state.skill, onSort) }
+        }
+    }
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -322,4 +349,76 @@ private fun bookErrorText(reason: AozoraException.Reason): Int = when (reason) {
     AozoraException.Reason.NETWORK -> R.string.aozora_error_book_network
     AozoraException.Reason.TOO_LARGE -> R.string.aozora_error_book_large
     else -> R.string.aozora_error_book
+}
+
+/** The list's order, from the same small rounded menu as the library's; the chosen order is marked and tinted. */
+@Composable
+private fun SortButton(sort: AozoraSort, skill: Int?, onSort: (AozoraSort) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilledTonalIconButton(onClick = { open = true }, modifier = Modifier.size(48.dp)) {
+            Icon(painter = painterResource(R.drawable.ic_sort), contentDescription = stringResource(R.string.action_sort))
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Text(
+                text = stringResource(R.string.action_sort),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 8.dp),
+            )
+            for (entry in AozoraSort.entries) {
+                val selected = entry == sort
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(
+                                text = stringResource(
+                                    when (entry) {
+                                        AozoraSort.BEST_FIT -> R.string.sort_best_fit
+                                        AozoraSort.EASIEST -> R.string.sort_easiest
+                                        AozoraSort.ALPHABETICAL -> R.string.sort_title
+                                        AozoraSort.HARDEST -> R.string.sort_hardest
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            if (entry == AozoraSort.BEST_FIT) {
+                                Text(
+                                    text = if (skill != null) {
+                                        stringResource(R.string.sort_best_fit_detail, skill)
+                                    } else {
+                                        stringResource(R.string.aozora_sort_no_skill)
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                    leadingIcon = {
+                        Box(modifier = Modifier.size(24.dp)) {
+                            if (selected) Icon(Icons.Filled.Check, contentDescription = null)
+                        }
+                    },
+                    colors = MenuDefaults.itemColors(
+                        textColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        leadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                    onClick = {
+                        open = false
+                        onSort(entry)
+                    },
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .then(if (selected) Modifier.background(MaterialTheme.colorScheme.secondaryContainer) else Modifier),
+                )
+            }
+        }
+    }
 }
