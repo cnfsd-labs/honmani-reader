@@ -720,7 +720,7 @@
     <string name="settings_voice_details">The voice behind the listen button in the dictionary, flashcards, Anki cards and audiobooks you make.</string>
     <string name="settings_card_audio">Spoken audio</string>
     <string name="card_audio_off">No audio</string>
-    <string name="card_audio_off_details">Nothing is spoken: no listen button, cards without sound</string>
+    <string name="card_audio_off_details">Cards without sound; the listen button still uses the phone voice</string>
     <string name="card_audio_phone">Phone voice</string>
     <string name="card_audio_phone_details">Free and offline; sounds synthetic</string>
     <string name="card_audio_google">Google Cloud voice</string>
