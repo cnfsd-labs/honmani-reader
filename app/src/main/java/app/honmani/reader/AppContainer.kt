@@ -72,6 +72,7 @@ import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
+import app.honmani.reader.data.settings.ReaderMenuHint
 import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.LibraryFolderView
@@ -227,6 +228,7 @@ class AppContainer(context: Context) {
     val dayClock: DayClock by lazy { DayClock(startHour = { daySettings.startHour.value }) }
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
+    val readerMenuHint: ReaderMenuHint by lazy { ReaderMenuHint(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
     val libraryFolderView: LibraryFolderView by lazy { LibraryFolderView(devicePreferences) }
 

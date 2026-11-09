@@ -113,3 +113,30 @@ test('isMenuSwipe decides on length and straightness', async ({ page }) => {
   });
   expect(results).toEqual([true, false, true, false, false, true]);
 });
+
+test('the footer strip shows a faint grab bar and a tap on it still opens the menu', async ({ page }) => {
+  await openBook(page, { viewMode: 'paginated', writingMode: 'horizontal-tb' });
+  const cue = await page.evaluate(() => {
+    const footer = document.getElementById('ttu-page-footer');
+    const after = getComputedStyle(footer, '::after');
+    return {
+      content: after.content,
+      width: after.width,
+      height: after.height,
+      opacity: after.opacity,
+      events: after.pointerEvents,
+      color: after.backgroundColor === getComputedStyle(footer).color,
+      footer: footer.getBoundingClientRect().height,
+    };
+  });
+  expect(cue.content).not.toBe('none');
+  expect(cue.width).toBe('36px');
+  expect(Number(cue.opacity)).toBeLessThan(0.5);
+  expect(cue.events).toBe('none');
+  expect(cue.color).toBe(true);
+  expect(Number.parseFloat(cue.height)).toBeLessThan(cue.footer);
+  // A tap in the middle of the strip, on the bar itself.
+  const box = await page.locator('#ttu-page-footer').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 7);
+  await expect.poll(() => page.evaluate(() => window.__messages.filter((m) => m.type === 'reader.menu').length)).toBe(1);
+});

@@ -429,6 +429,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var announcedBook by rememberSaveable { mutableStateOf<String?>(null) }
     val audiobookAvailable = stringResource(R.string.audiobook_available)
     val audiobookAvailablePlay = stringResource(R.string.audiobook_available_play)
+    val menuHint = stringResource(R.string.reader_menu_hint)
     LaunchedEffect(bookHash, atLibrary) {
         val hash = bookHash
         if (hash == null) {
@@ -439,13 +440,18 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (atLibrary || announcedBook == hash || id == null) return@LaunchedEffect
         announcedBook = hash
         container.sessionModes.opened(hash)
-        if (container.audiobookStore.pairing(hash) == null) return@LaunchedEffect
-        if (container.sessionModes.takeAutoplay(hash, SystemClock.elapsedRealtime())) {
-            playAudiobook(id)
-        } else {
-            jumpSnackbar.currentSnackbarData?.dismiss()
-            val result = jumpSnackbar.showSnackbar(audiobookAvailable, audiobookAvailablePlay, withDismissAction = true, duration = SnackbarDuration.Long)
-            if (result == SnackbarResult.ActionPerformed) playAudiobook(id)
+        if (container.audiobookStore.pairing(hash) != null) {
+            if (container.sessionModes.takeAutoplay(hash, SystemClock.elapsedRealtime())) {
+                playAudiobook(id)
+            } else {
+                jumpSnackbar.currentSnackbarData?.dismiss()
+                val result = jumpSnackbar.showSnackbar(audiobookAvailable, audiobookAvailablePlay, withDismissAction = true, duration = SnackbarDuration.Long)
+                if (result == SnackbarResult.ActionPerformed) playAudiobook(id)
+            }
+        }
+        // The one-time menu hint queues behind the audiobook snackbar (showSnackbar waits its turn).
+        if (container.readerMenuHint.take()) {
+            jumpSnackbar.showSnackbar(menuHint, withDismissAction = true, duration = SnackbarDuration.Long)
         }
     }
     // The first playback of a session makes the book "listened to" for the library's Continue bubble.

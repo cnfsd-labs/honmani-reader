@@ -6,6 +6,10 @@
  * not passed on to ttu. Taps on book text are not affected: the footer is outside the book, and
  * tap-bridge.js looks up nothing for a tap there.
  *
+ * The strip carries a faint grab bar (a pseudo-element of the footer in the footer's own text colour,
+ * so it follows the reader theme; no pointer events, so a tap on it is a tap on the strip) as the
+ * visible hint that the menu is there.
+ *
  * A long swipe up anywhere on a book page opens the same menu, with { type: 'reader.menuSwipe' }:
  * one finger, at least a quarter of the viewport height up, and mostly straight (|dy| at least
  * twice |dx|), so a page-turn swipe does not trigger it; quick enough not to be a drag of a text
@@ -39,6 +43,34 @@
   function post(message) {
     if (window.honmani) window.honmani.postMessage(JSON.stringify(message));
   }
+
+  const STYLE_ID = 'honmani-menu-cue';
+  const CUE_CSS = `
+    ${FOOTER}::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 6px;
+      width: 36px;
+      height: 4px;
+      margin-left: -18px;
+      border-radius: 2px;
+      background: currentColor;
+      opacity: 0.25;
+      pointer-events: none;
+    }
+  `;
+
+  function addCue() {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = STYLE_ID;
+    style.textContent = CUE_CSS;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  if (document.documentElement) addCue();
+  else document.addEventListener('DOMContentLoaded', addCue);
 
   // Capture phase on window, before ttu's footer handler (which hides the progress counter).
   window.addEventListener(
