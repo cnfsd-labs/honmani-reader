@@ -272,6 +272,15 @@ val buildTtu = tasks.register<BuildTtuTask>("buildTtu") {
 tasks.withType<Test>().configureEach {
     timeout.set(Duration.ofMinutes(10))
     testLogging { events("started", "failed") }
+    // The one-off Aozora grading run (AozoraIndexGrader, scripts/aozora-index/README.md): hours
+    // long, so no timeout, more heap, visible output, and never taken as up to date.
+    if (System.getenv("HONMANI_GRADER_OUT") != null) {
+        timeout.set(Duration.ofHours(12))
+        maxHeapSize = "3g"
+        testLogging.showStandardStreams = true
+        outputs.upToDateWhen { false }
+        outputs.cacheIf { false }
+    }
 }
 
 androidComponents {

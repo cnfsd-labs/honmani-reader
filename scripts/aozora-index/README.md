@@ -72,6 +72,47 @@ CSV (`テキストファイル符号化方式`: 19,185 rows ShiftJIS, 10 UTF-8, 
 - Aozora asks (but does not require) that the file information stays with the text: keep the
   title, author, base text, inputter notes and the `青空文庫作成ファイル：` line.
 
+## Difficulty scores (one-off grading run)
+
+`app/src/test/java/app/honmani/reader/data/difficulty/AozoraIndexGrader.kt` grades every work of
+the index with the app's `Difficulty.measure`, the way an imported Aozora text is graded: download,
+unzip, decode, `AozoraText.parse`, `AozoraEpub.write` (temp file), `EpubPositions.texts`. It is a
+JUnit class that is skipped unless `HONMANI_GRADER_OUT` is set, so CI is unaffected.
+
+Needs the same two dictionaries as the app's default setup, as Yomitan zips (keep them outside the
+repo, e.g. in `~/.cache/honmani-grader/`): Jitendex (`DictionaryCatalog`, `jitendex-yomitan.zip`)
+and the Jiten frequency list
+(`https://api.jiten.moe/api/frequency-list/download?downloadType=yomitan`).
+
+```
+C=~/.cache/honmani-grader
+HONMANI_GRADER_OUT=$C/scores.jsonl HONMANI_GRADER_CACHE=$C/texts \
+HONMANI_GRADER_TERMS=$C/dict/jitendex-yomitan.zip HONMANI_GRADER_FREQ=$C/dict/jiten-frequency.zip \
+./gradlew :app:testDebugUnitTest --tests '*AozoraIndexGrader*' -i
+```
+
+| Variable | Meaning |
+|---|---|
+| `HONMANI_GRADER_OUT` | JSON-lines result file (required; switches the run on). Appended to; ids already in it are skipped, so a stopped run resumes. |
+| `HONMANI_GRADER_TERMS`, `_FREQ` | Term dictionary zip and rank-based frequency zip (required). |
+| `HONMANI_GRADER_CACHE` | Directory for the downloaded files (required), so a second run needs no network. |
+| `HONMANI_GRADER_LIMIT`, `_IDS` | Optional: at most N works, or only these comma-separated work IDs. |
+| `HONMANI_GRADER_DELAY_MS` | Pause before each download, default 700. Cached files are not delayed. |
+| `HONMANI_GRADER_INDEX` | Index file, default `../docs/aozora/index.json` (the test runs in `app/`). |
+
+Requests are one at a time, with a descriptive User-Agent; HTTP 429/503 are retried with a growing
+pause (30 s, then doubling, or the server's `Retry-After`), and the run stops after 5 download
+failures in a row (just run it again). When the variable is set, `app/build.gradle.kts` lifts the
+10 minute test timeout (12 h), gives the test JVM 3 GB and prints the output; the task never counts
+as up to date, so no `--rerun` is needed.
+
+Output: a `{"meta":"lexicon",...}` line per start (version, lexicon size and load time, the
+dictionary files with sizes), then one line per work: `id, score, r95, characters, words, version,
+lexicon` (the dictionaries and revisions used) and `error` when it failed (score 0; `http404`,
+`too_large`, `unreadable`, `too_short`, `error:<exception>`). Works that failed only for network
+reasons (`network`, `http429`, `http5xx`) are tried again on the next start, so the last line of an
+id counts. Re-grade after `Difficulty.VERSION` changes with a new output file.
+
 ## Credits
 
 The work list is CC BY 4.0, "Aozora Bunko work list" (https://www.aozora.gr.jp/index_pages/person_all_extended.html).
