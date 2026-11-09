@@ -45,6 +45,9 @@ async function call(page, command, args = {}) {
   return handle.jsonValue();
 }
 
+/** Two animation frames: what a page turn needs to show. */
+const frames = (page) => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+
 async function setUp(page, settings) {
   await page.addInitScript({ path: path.join(ASSETS, 'text.js') });
   await page.addInitScript((settings) => {
@@ -106,6 +109,15 @@ test('markOnScreen finds nothing for text that is not on screen', async ({ page 
 
 test('a hit that never shows leaves the reader on the page ttu opened, not pages further on', async ({ page }) => {
   await setUp(page, { viewMode: 'paginated', writingMode: 'horizontal-tb' });
+  // The search turns pages forward, then takes the turns back (a key every two frames): it is
+  // over once keys went up and none came for a while.
+  await page.addInitScript(() => {
+    window.__keys = { up: 0, last: 0 };
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'ArrowUp') window.__keys.up++;
+      if (event.code === 'ArrowUp' || event.code === 'ArrowDown') window.__keys.last = performance.now();
+    }, true);
+  });
   await page.goto(`${server.url}/manage`);
   const book = await call(page, 'ensure', { ttuId: null, ttuTitle: null, url: '/honmani-books/search.epub', fileName: 'search.epub' });
   await page.goto(`${server.url}/b?id=${book.id}`);
@@ -120,7 +132,8 @@ test('a hit that never shows leaves the reader on the page ttu opened, not pages
   await page.waitForFunction(() => window.__marked === undefined, undefined, { timeout: 10_000 });
   await expect(page.getByText('第2章40段落')).toBeInViewport({ timeout: 10_000 });
   // After the settling time, the turns forward and the turns back.
-  await page.waitForTimeout(3_000);
+  await page.waitForFunction(() => window.__keys.up > 0 && performance.now() - window.__keys.last > 500, undefined, { timeout: 15_000 });
+  await frames(page);
   await expect(page.getByText('第2章40段落')).toBeInViewport();
 });
 
@@ -140,8 +153,8 @@ test('a jump without text just reloads at the bookmark, with nothing marked and 
   await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByText('第3章80段落')).toBeInViewport({ timeout: 10_000 });
 
-  // Nothing is looked for: no pending hit, no mark, even after the time a mark would take.
-  await page.waitForTimeout(2_500);
+  // Nothing is looked for: no pending hit is stored (so none can be marked or turned to later).
+  await frames(page);
   expect(await page.evaluate(() => sessionStorage.getItem('honmaniSearchHit'))).toBeNull();
   expect(await page.evaluate(() => CSS.highlights.has('honmani-search-hit'))).toBe(false);
   await expect(page.getByText('第3章80段落')).toBeInViewport();

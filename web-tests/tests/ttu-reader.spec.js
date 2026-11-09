@@ -65,6 +65,29 @@ async function importAndOpen(page, file = nekoEpub, title = '吾輩は猫であ�
   await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 3_000 });
 }
 
+/** Runs `action`, then waits for ttu's next page change event; false if none came within `fallbackMs` (the end of the book). */
+async function untilPageChange(page, action, fallbackMs = 300) {
+  const before = await page.evaluate(() => (window.__pageChanges = window.__pageChanges ?? 0));
+  await action();
+  return page
+    .waitForFunction((before) => window.__pageChanges > before, before, { timeout: fallbackMs })
+    .then(() => true, () => false);
+}
+
+/** Counts ttu's page change events (an init script: set up before the book opens). */
+const countPageChanges = (page) =>
+  page.addInitScript(() => {
+    window.__pageChanges = 0;
+    document.addEventListener('ttsu:page.change', () => window.__pageChanges++);
+  });
+
+/**
+ * book-end.js looks at the page 400 ms after the last event that could have changed it. A timer
+ * set in the page after that event, for longer, fires after the look: nothing to guess about the
+ * test machine's speed.
+ */
+const afterBookEndLook = (page, ms = 450) => page.evaluate((ms) => new Promise((resolve) => setTimeout(resolve, ms)), ms);
+
 async function tapChar(page, char) {
   const point = await page.evaluate((char) => {
     const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
@@ -561,6 +584,7 @@ test('a book page has the dark theme background and no loading circle before ttu
 test('reaching the last page reports the book as finished, once', async ({ page }) => {
   await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
   await page.addInitScript({ path: path.join(ASSETS, 'book-end.js') });
+  await countPageChanges(page);
   const paragraphs = Array.from({ length: 40 }, (_, i) => `第${i + 1}段落。吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。`);
   await importAndOpen(page, { ...nekoEpub, name: 'long.epub', buffer: buildEpub({ title: '長い本', paragraphs }) }, '長い本');
   const finished = () => page.evaluate(() => window.__messages.filter((message) => message.type === 'library.finished'));
@@ -568,14 +592,14 @@ test('reaching the last page reports the book as finished, once', async ({ page 
   expect(await finished()).toEqual([]);
 
   const id = Number(new URL(page.url()).searchParams.get('id'));
+  // Turns to the last page: the turns stop changing the page there.
   for (let i = 0; i < 40; i++) {
-    await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(100);
+    if (!(await untilPageChange(page, () => page.keyboard.press('ArrowRight'), 500))) break;
   }
   await expect.poll(finished, { timeout: 5_000 }).toEqual([{ type: 'library.finished', id }]);
-  await page.keyboard.press('ArrowLeft');
-  await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(1_000);
+  await untilPageChange(page, () => page.keyboard.press('ArrowLeft'));
+  await untilPageChange(page, () => page.keyboard.press('ArrowRight'));
+  await afterBookEndLook(page);
   expect(await finished()).toHaveLength(1);
 });
 
@@ -835,7 +859,8 @@ test.describe('settle-time walks in continuous mode give the same answers as wal
       for (const position of [[0, 0], [0.4, 0], [0.9, 0]]) {
         await page.evaluate(scrollTo, position);
         await page.mouse.wheel(0, 1);
-        await page.waitForTimeout(1_500);
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        await afterBookEndLook(page, 700);
         expect(await finished(), `at ${position}`).toEqual([]);
       }
       const id = Number(new URL(page.url()).searchParams.get('id'));

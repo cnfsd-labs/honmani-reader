@@ -600,7 +600,10 @@ async function select(page, selector, from, to) {
   );
 }
 
-const settle = (page) => page.waitForTimeout(700);
+// The page looks up a selection 250 ms (SELECTION_SETTLE) after its last change. A timer set in
+// the page afterwards, for longer, fires after that one: no guess about how fast the machine is.
+const settle = (page) =>
+  page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 300))));
 
 test('a selection is looked up once it has settled, with the selected text as the query', async ({ page }) => {
   // 猫である: the ruby base, then the text after it.
