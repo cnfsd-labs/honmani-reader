@@ -17,6 +17,7 @@ enum class SettingsPage(@StringRes val title: Int, val parent: SettingsPage?) {
     BACKUP(R.string.settings_section_data, MAIN),
     HELP(R.string.settings_section_help, MAIN),
     ANKI(R.string.settings_anki, FLASHCARDS),
+    VOICE(R.string.settings_voice, FLASHCARDS),
     NETWORK(R.string.network_activity_title, HELP),
     ABOUT(R.string.about_title, HELP),
 }

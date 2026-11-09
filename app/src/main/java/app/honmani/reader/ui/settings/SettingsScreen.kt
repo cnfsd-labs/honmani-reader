@@ -124,6 +124,10 @@ fun SettingsScreen(
             AnkiSettingsScreen(onBack = back)
             return
         }
+        SettingsPage.VOICE -> {
+            VoiceSettingsScreen(onBack = back)
+            return
+        }
         else -> Unit
     }
     if (showingDictionaries) {
@@ -163,6 +167,7 @@ fun SettingsScreen(
         onOpenSample = onOpenSample,
         review = { ReviewSettingsSection() },
         anki = { AnkiSettingsRow(onClick = { page = SettingsPage.ANKI }) },
+        voice = { VoiceSettingsRow(onClick = { page = SettingsPage.VOICE }) },
         sync = { ProgressSyncSection() },
         backup = { BackupSection() },
         goal = { ReadingGoalSection() },
@@ -199,6 +204,7 @@ private fun SettingsContent(
     onOpenSample: (SampleBook) -> Unit = {},
     review: @Composable () -> Unit = {},
     anki: @Composable () -> Unit = {},
+    voice: @Composable () -> Unit = {},
     sync: @Composable () -> Unit = {},
     backup: @Composable () -> Unit = {},
     goal: @Composable () -> Unit = {},
@@ -373,6 +379,7 @@ private fun SettingsContent(
                 SettingsPage.FLASHCARDS -> {
                     item { review() }
                     item { anki() }
+                    item { voice() }
                     item { KnownWordsSettingsRow() }
                 }
                 SettingsPage.GOAL -> {
@@ -419,7 +426,7 @@ private fun SettingsContent(
                     }
                 }
                 // Shown by SettingsScreen on their own, without the list.
-                SettingsPage.ANKI, SettingsPage.NETWORK, SettingsPage.ABOUT -> Unit
+                SettingsPage.ANKI, SettingsPage.VOICE, SettingsPage.NETWORK, SettingsPage.ABOUT -> Unit
             }
         }
     }

@@ -240,7 +240,7 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 
 ## Audiobook made with a Google voice
 
-Needs your own Google Cloud API key (Settings -> Anki -> Card audio) with billing on; a short test book
+Needs your own Google Cloud API key (Settings -> Flashcards -> Voice) with billing on; a short test book
 (about 2,000 characters, roughly $0.06 with a Chirp 3 voice) keeps the cost small. Silent: media volume 0.
 
 - Reader menu -> Audiobook: the button "Make one with a Google voice (costs money)". A TXT book: disabled,
