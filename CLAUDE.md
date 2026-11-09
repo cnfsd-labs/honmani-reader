@@ -36,7 +36,7 @@ public: never copy those notes, personal details or discussions into it.
   JSON); an install from before a schema change must be uninstalled (identity-hash crash, "Room cannot
   verify the data integrity": dev machines only, since both backup rule files exclude the DB).
   **Freeze the schema from the first Play upload or closed test, not later** (testers update over old
-  data). Once frozen: a change needs a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test
+  data). Day columns: `reading_day.day` is `yyyy-MM-dd` text, `read_day.day` an epoch-day number (both local dates; permanent once frozen). Once frozen: a change needs a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test
   in `DatabaseMigrationTest` and the exported JSON committed. No destructive fallback.
 - **Android backup** keeps the `settings` preferences and `files/auto-backup/` (`AutoBackup`: the
   Settings backup zip, rewritten at most every 6 h when the app goes to the background, dropped over
