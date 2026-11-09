@@ -456,6 +456,7 @@
     <string name="audiobook_removed">Audiobook removed from this book</string>
     <string name="audiobook_export">Export audiobook</string>
     <string name="audiobook_export_saved">Saved %1$s\'s audiobook to the folder</string>
+    <string name="audiobook_export_saved_no_subtitles">Saved the audio of %1$s, but its subtitle file is no longer on this phone.</string>
     <string name="audiobook_export_nothing">There is no finished audiobook to export for this book.</string>
     <string name="audiobook_export_missing">The audio file could not be read. It may have been moved or deleted; choose it again with Change files.</string>
     <string name="audiobook_export_folder">That folder could not be used. Try another one.</string>

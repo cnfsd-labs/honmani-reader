@@ -89,6 +89,14 @@ class AudiobookExporterTest {
     }
 
     @Test
+    fun aMissingSubtitleCopyIsReportedAndOnlyTheAudioIsWritten() {
+        pairImported()
+        assertTrue(File(folder.root, "audiobook/abc.srt").delete())
+        assertEquals(AudiobookExportResult.SavedWithoutSubtitles("My Book.m4a"), export())
+        assertEquals(setOf("content://tree/root/My Book.m4a"), documents.created.keys)
+    }
+
+    @Test
     fun theExtensionFallsBackToTheMimeTypeAndThenToAudio() {
         pairImported()
         info = AudioInfo("document:42", "audio/mpeg")

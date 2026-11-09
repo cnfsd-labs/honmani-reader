@@ -23,6 +23,9 @@ sealed interface AudiobookExportResult {
     /** The audio and the subtitles are in the folder; [audioName] is the name the audio file asked for. */
     data class Saved(val audioName: String) : AudiobookExportResult
 
+    /** The audio is in the folder, but the book's subtitle copy is gone from this phone, so no subtitle file was written. */
+    data class SavedWithoutSubtitles(val audioName: String) : AudiobookExportResult
+
     /** The book has no audiobook that is ready (none, or a generated one still in the making). */
     data object NothingToExport : AudiobookExportResult
 
@@ -40,6 +43,7 @@ sealed interface AudiobookExportResult {
     /** A readable sentence for a snackbar. */
     fun message(context: Context, title: String): String = when (this) {
         is Saved -> context.getString(R.string.audiobook_export_saved, title)
+        is SavedWithoutSubtitles -> context.getString(R.string.audiobook_export_saved_no_subtitles, title)
         NothingToExport -> context.getString(R.string.audiobook_export_nothing)
         AudioMissing -> context.getString(R.string.audiobook_export_missing)
         FolderUnusable -> context.getString(R.string.audiobook_export_folder)
@@ -109,7 +113,7 @@ class AudiobookExporter(
                     val out2 = openOutput(srt) ?: throw IOException("Cannot write $srt")
                     out2.use { it.write(subtitles.toByteArray(Charsets.UTF_8)) }
                 }
-                AudiobookExportResult.Saved(audioName)
+                if (subtitles != null) AudiobookExportResult.Saved(audioName) else AudiobookExportResult.SavedWithoutSubtitles(audioName)
             } catch (e: Throwable) {
                 withContext(NonCancellable) { created.forEach(documents::delete) }
                 if (e is CancellationException) throw e
