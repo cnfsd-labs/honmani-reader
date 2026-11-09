@@ -820,6 +820,8 @@
     <string name="audiobook_make_estimate">About %1$s of audio, %2$s on this phone. Estimated cost: %3$s.</string>
     <string name="audiobook_make_costs">This costs money. Google bills your key\'s account for every character sent.</string>
     <string name="audiobook_make_free_tier">Google gives some free characters each month; Honmani can\'t see how much you have used. Check prices and usage in the Google Cloud console.</string>
+    <string name="audiobook_make_listen_note">Listen plays one short sentence with the voice above. It is sent to Google with your key and costs a tiny fraction of a cent.</string>
+    <string name="audiobook_make_listen_busy">Pause read aloud or the audiobook to listen to a sample.</string>
     <string name="audiobook_make_sent">Your book\'s text is sent to Google.</string>
     <string name="audiobook_make_cap">Spending cap (USD)</string>
     <string name="audiobook_make_cap_help">Honmani stops before sending anything that would pass this amount.</string>

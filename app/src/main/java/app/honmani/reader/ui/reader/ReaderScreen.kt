@@ -1185,6 +1185,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 title = openBook?.title.orEmpty(),
                 state = makeState,
                 model = make,
+                readerSpeaking = audioPlaying,
                 onStarted = {
                     makeShown = false
                     scope.launch {

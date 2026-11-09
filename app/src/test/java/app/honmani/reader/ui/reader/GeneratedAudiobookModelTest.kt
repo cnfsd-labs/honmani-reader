@@ -79,6 +79,18 @@ class GeneratedAudiobookModelTest {
     }
 
     @Test
+    fun theSampleUsesTheVoiceChosenInTheSheetAndNeedsAKey() {
+        val model = model()
+        assertNull(model.sampleVoice())
+        model.open()
+        assertTrue(model.sampleVoice()!!.id.endsWith(":ja-JP-Chirp3-HD-Aoede"))
+        model.chooseVoice("ja-JP-Neural2-B")
+        assertTrue(model.sampleVoice()!!.id.endsWith(":ja-JP-Neural2-B"))
+        key = null
+        assertNull(model.sampleVoice())
+    }
+
+    @Test
     fun aTextBookIsEpubOnly() {
         val model = model(epub = false)
         assertEquals(MakeBlock.EPUB_ONLY, model.block())

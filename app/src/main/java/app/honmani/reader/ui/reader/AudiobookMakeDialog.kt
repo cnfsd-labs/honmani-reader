@@ -40,6 +40,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.honmani.reader.R
 import app.honmani.reader.ui.anki.label
+import app.honmani.reader.ui.VoiceSampleButton
+import app.honmani.reader.ui.rememberVoiceSamplePlayer
 import app.honmani.reader.ui.rememberWithNotifications
 import java.util.Locale
 
@@ -52,6 +54,8 @@ fun AudiobookMakeDialog(
     title: String,
     state: MakeState,
     model: GeneratedAudiobookModel,
+    /** Read aloud or the audiobook is playing: a sample would talk over it. */
+    readerSpeaking: Boolean,
     onStarted: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -74,7 +78,7 @@ fun AudiobookMakeDialog(
                         state.problem != null ->
                             Text(stringResource(R.string.audiobook_make_key_problem, stringResource(state.problem.label())), color = MaterialTheme.colorScheme.error)
                         state.unreadable -> Text(stringResource(R.string.audiobook_make_unreadable), color = MaterialTheme.colorScheme.error)
-                        else -> Details(state, model, Formatter.formatShortFileSize(context, state.bytes))
+                        else -> Details(state, model, readerSpeaking, Formatter.formatShortFileSize(context, state.bytes))
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -92,12 +96,25 @@ fun AudiobookMakeDialog(
 private val DropdownDialogProperties = DialogProperties(usePlatformDefaultWidth = false)
 
 @Composable
-private fun Details(state: MakeState, model: GeneratedAudiobookModel, sizeText: String) {
+private fun Details(state: MakeState, model: GeneratedAudiobookModel, readerSpeaking: Boolean, sizeText: String) {
     val context = LocalContext.current
     val minutes = state.seconds / 60
     val length = if (minutes >= 60) stringResource(R.string.audiobook_make_hours, minutes / 60, minutes % 60) else stringResource(R.string.audiobook_make_minutes, minutes)
     Text(stringResource(R.string.audiobook_make_chars, java.text.NumberFormat.getIntegerInstance(Locale.forLanguageTag(androidx.compose.ui.text.intl.Locale.current.toLanguageTag())).format(state.chars), length))
     VoicePicker(state, model)
+    // Closing the dialog leaves the composition, which stops a sample.
+    val sample = rememberVoiceSamplePlayer()
+    val sampleText = stringResource(R.string.voice_sample_text)
+    VoiceSampleButton(
+        sample = sample,
+        enabled = !sample.playing && !readerSpeaking && state.voice != null,
+        onClick = { model.sampleVoice()?.let { sample.play(it, sampleText, 1.0) } },
+        horizontalPadding = 0.dp,
+    )
+    Text(
+        stringResource(if (readerSpeaking) R.string.audiobook_make_listen_busy else R.string.audiobook_make_listen_note),
+        style = MaterialTheme.typography.bodySmall,
+    )
     if (state.needsPrice) {
         Text(stringResource(R.string.audiobook_make_price_help), style = MaterialTheme.typography.bodySmall)
         OutlinedTextField(

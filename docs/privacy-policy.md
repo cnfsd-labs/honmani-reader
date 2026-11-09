@@ -88,6 +88,8 @@ Honmani only connects to the internet for these things, and only to these places
   with a Google voice (costs money)"; needs your own Google Cloud API key): Honmani sends the book's text,
   sentence by sentence (with the readings written out in place of furigana), and your key to Google
   (texttospeech.googleapis.com), over an encrypted connection, until the audiobook is done or you stop it.
+  The "Listen" button in the same dialog (and in Settings → Voice) sends one fixed short sample sentence, not
+  your book's text, and your key to Google when you tap it.
   Google charges the account of your key per character sent; Honmani shows an estimate and keeps your
   spending cap, but cannot see your usage or free allowance. The audio stays on your phone, is kept out of
   Android's backup and is deleted with the book or when you delete it. Google's privacy policy applies.

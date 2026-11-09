@@ -1,12 +1,12 @@
 package app.honmani.reader.ui.settings
 
-import android.media.MediaPlayer
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,7 +29,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -39,7 +38,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -58,8 +56,8 @@ import app.honmani.reader.anki.VoiceException
 import app.honmani.reader.readaloud.generate.GeneratedAudiobook
 import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.anki.label
-import java.io.File
-import kotlinx.coroutines.launch
+import app.honmani.reader.ui.VoiceSampleButton
+import app.honmani.reader.ui.rememberVoiceSamplePlayer
 
 
 /** What the Google key check says. */
@@ -108,7 +106,6 @@ fun VoiceSettingsScreen(onBack: () -> Unit) {
 @Composable
 private fun VoiceSettingsContent() {
     val context = LocalContext.current
-    val resources = LocalResources.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val settings = container.ankiSettings
     val audio by settings.audio.collectAsStateWithLifecycle()
@@ -120,10 +117,7 @@ private fun VoiceSettingsContent() {
     var check by remember { mutableStateOf<KeyCheck?>(null) }
     // A new key check replaces one still running; its late result is dropped.
     val keyChecks = remember { LatestOnly(scope) }
-    var sampleError by remember { mutableStateOf<String?>(null) }
-    var playing by remember { mutableStateOf(false) }
-    val player = remember { arrayOfNulls<MediaPlayer>(1) }
-    DisposableEffect(Unit) { onDispose { player[0]?.release() } }
+    val sample = rememberVoiceSamplePlayer()
 
     fun checkKey() {
         val key = settings.googleKey() ?: return
@@ -147,33 +141,10 @@ private fun VoiceSettingsContent() {
     val sampleText = stringResource(R.string.voice_sample_text)
     fun listen() {
         val cardVoice = settings.voice { container.phoneVoice } ?: return
-        playing = true
-        sampleError = null
-        scope.launch {
-            try {
-                val file = File(context.cacheDir, "voice-sample.${cardVoice.extension}")
-                // The sample is a sentence, so it plays at the sentence speed.
-                cardVoice.speak(sampleText, file, sentenceSpeed.rate)
-                player[0]?.release()
-                player[0] = MediaPlayer().apply {
-                    setDataSource(file.path)
-                    setOnCompletionListener { playing = false }
-                    prepare()
-                    start()
-                }
-            } catch (e: VoiceException) {
-                sampleError = resources.getString(R.string.voice_sample_failed, resources.getString(e.problem.label()))
-                playing = false
-            } catch (e: java.io.IOException) {
-                sampleError = resources.getString(R.string.voice_sample_failed, e.message.orEmpty())
-                playing = false
-            } catch (e: IllegalStateException) {
-                // The phone's media player refused the file.
-                sampleError = resources.getString(R.string.voice_sample_failed, e.message.orEmpty())
-                playing = false
-            }
-        }
+        // The sample is a sentence, so it plays at the sentence speed.
+        sample.play(cardVoice, sampleText, sentenceSpeed.rate)
     }
+    val listenEnabled = !sample.playing && (audio != CardAudio.GOOGLE || hasKey)
     Column {
         Text(
             text = stringResource(R.string.settings_voice_details),
@@ -198,6 +169,7 @@ private fun VoiceSettingsContent() {
                 ),
             )
         }
+        if (audio == CardAudio.PHONE) VoiceSampleButton(sample, listenEnabled, ::listen)
         if (audio == CardAudio.GOOGLE) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -247,6 +219,7 @@ private fun VoiceSettingsContent() {
                         onSelect = { settings.setGoogleVoice(it) },
                     )
                 }
+                VoiceSampleButton(sample, listenEnabled, ::listen, horizontalPadding = 0.dp)
                 val allowances = GeneratedAudiobook.FREE_MONTHLY_MILLIONS.joinToString(", ") { (model, millions) -> "$model ${millions}M" }
                 Text(
                     text = stringResource(R.string.google_voice_price_note, allowances),
@@ -262,25 +235,6 @@ private fun VoiceSettingsContent() {
         }
         if (audio != CardAudio.OFF) {
             SentenceSpeedPicker(sentenceSpeed, onSelect = settings::setSentenceSpeed)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            ) {
-                OutlinedButton(
-                    enabled = !playing && (audio != CardAudio.GOOGLE || hasKey),
-                    onClick = { listen() },
-                ) { Text(stringResource(R.string.action_listen)) }
-                if (playing) CircularProgressIndicator(modifier = Modifier.padding(4.dp))
-            }
-            sampleError?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                )
-            }
         }
     }
 }

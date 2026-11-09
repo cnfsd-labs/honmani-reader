@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.anki.CardVoice
 import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.VoiceException
@@ -119,6 +120,7 @@ class GeneratedAudiobookModel(
     private val savedVoice: () -> String?,
     private val scope: CoroutineScope,
     private val io: CoroutineDispatcher = Dispatchers.IO,
+    private val makeVoice: (key: String, voice: String) -> CardVoice = { apiKey, voice -> GoogleCloudVoice(apiKey, voice) },
 ) {
     private val _state = MutableStateFlow(MakeState())
     val state: StateFlow<MakeState> = _state.asStateFlow()
@@ -171,6 +173,13 @@ class GeneratedAudiobookModel(
                 refreshCap()
             }
         }
+    }
+
+    /** The voice chosen in the sheet (not the one in Settings) for a sample, or null without a key or a choice. */
+    fun sampleVoice(): CardVoice? {
+        val apiKey = key()?.takeIf { it.isNotBlank() } ?: return null
+        val name = _state.value.voice ?: return null
+        return makeVoice(apiKey, name)
     }
 
     fun chooseVoice(name: String) {
