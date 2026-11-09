@@ -51,6 +51,7 @@ import app.honmani.reader.R
 import app.honmani.reader.data.aozora.AozoraException
 import app.honmani.reader.data.aozora.AozoraWork
 import app.honmani.reader.ui.HonmaniTopAppBar
+import app.honmani.reader.ui.ProgressBar
 
 /** The free books catalogue: an explanation until the user loads the list, then search and download. */
 @Composable
@@ -267,7 +268,7 @@ private fun WorkDetails(work: AozoraWork, download: AozoraDownload?, onAdd: () -
                 if (progress == null) {
                     LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 16.dp))
                 } else {
-                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
+                    ProgressBar(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
                 }
                 OutlinedButton(onClick = onCancel, modifier = Modifier.padding(top = 12.dp, bottom = 16.dp)) {
                     Text(stringResource(android.R.string.cancel))

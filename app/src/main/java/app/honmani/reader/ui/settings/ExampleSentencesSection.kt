@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -26,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.examples.ExampleState
+import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.onboarding.messageRes
 
 /**
@@ -53,7 +53,7 @@ fun ExampleSentencesSection() {
                     is ExampleState.Downloading -> {
                         val percent = (current.progress * 100).toInt()
                         Text(stringResource(R.string.examples_downloading, percent))
-                        LinearProgressIndicator(
+                        ProgressBar(
                             progress = { current.progress },
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         )
