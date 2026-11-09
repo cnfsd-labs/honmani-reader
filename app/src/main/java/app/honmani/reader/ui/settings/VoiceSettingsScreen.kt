@@ -55,6 +55,7 @@ import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
 import app.honmani.reader.anki.VoiceException
+import app.honmani.reader.readaloud.generate.GeneratedAudiobook
 import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.anki.label
 import java.io.File
@@ -246,6 +247,12 @@ private fun VoiceSettingsContent() {
                         onSelect = { settings.setGoogleVoice(it) },
                     )
                 }
+                val allowances = GeneratedAudiobook.FREE_MONTHLY_MILLIONS.joinToString(", ") { (model, millions) -> "$model ${millions}M" }
+                Text(
+                    text = stringResource(R.string.google_voice_price_note, allowances),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     text = stringResource(R.string.google_key_help),
                     style = MaterialTheme.typography.bodySmall,
@@ -307,7 +314,7 @@ private fun SentenceSpeed.label(): Int = when (this) {
     SentenceSpeed.SLOW -> R.string.sentence_speed_slow
 }
 
-/** Picks a Google voice; listed as "Aoede · Chirp3-HD · female". */
+/** Picks a Google voice; listed as "Aoede · Chirp3-HD · female · $30 per 1M characters". */
 @Composable
 private fun VoicePicker(voices: List<CloudVoiceInfo>, selected: String?, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -330,8 +337,13 @@ private fun VoicePicker(voices: List<CloudVoiceInfo>, selected: String?, onSelec
     }
 }
 
-private fun voiceLabel(voice: CloudVoiceInfo): String =
-    listOfNotNull(voice.shortName, voice.model, voice.gender?.lowercase()).joinToString(" · ")
+@Composable
+private fun voiceLabel(voice: CloudVoiceInfo): String {
+    val price = GeneratedAudiobook.pricePerMillion(voice.name)
+        ?.let { stringResource(R.string.audiobook_make_price, if (it == Math.floor(it)) it.toLong().toString() else it.toString()) }
+        ?: stringResource(R.string.audiobook_make_price_unknown)
+    return listOfNotNull(voice.shortName, voice.model, voice.gender?.lowercase(), price).joinToString(" · ")
+}
 
 private fun CardAudio.label(): Int = when (this) {
     CardAudio.OFF -> R.string.card_audio_off

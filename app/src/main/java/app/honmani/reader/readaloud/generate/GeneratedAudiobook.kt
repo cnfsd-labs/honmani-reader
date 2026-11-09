@@ -14,16 +14,26 @@ object GeneratedAudiobook {
      * USD per million characters by voice model (the part of a voice name between the language and
      * the voice, `CloudVoiceInfo.model`), matched by prefix, case-insensitively.
      *
-     * VERIFY against Google's Cloud Text-to-Speech pricing page before relying on it: prices change.
-     * Free tiers each month (never subtracted here, since Honmani can't see what is already used):
-     * Chirp 3: HD 1M characters, Neural2 1M, WaveNet 4M, Standard 4M. A model not listed (such
-     * as Chirp-HD) has no estimate; the reader must give a cap anyway.
+     * As of 2026-11, checked against Google's Cloud Text-to-Speech pricing page; it does not update
+     * itself, so VERIFY it before relying on it: prices change (the voice settings say so too). A
+     * model not listed (such as Chirp-HD) has no estimate; the reader must give a cap anyway.
      */
     val PRICES: List<Pair<String, Double>> = listOf(
         "Chirp3-HD" to 30.0,
         "Neural2" to 16.0,
         "Wavenet" to 4.0,
         "Standard" to 4.0,
+    )
+
+    /**
+     * Free characters each month by voice model, in millions, matched like [PRICES]; as of 2026-11,
+     * keep it with [PRICES]. Never subtracted from an estimate, since Honmani can't see what is used.
+     */
+    val FREE_MONTHLY_MILLIONS: List<Pair<String, Int>> = listOf(
+        "Chirp3-HD" to 1,
+        "Neural2" to 1,
+        "Wavenet" to 4,
+        "Standard" to 4,
     )
 
     /** The size of the audio the service returns: 32 kbps MP3, 4,000 bytes a second. */
@@ -39,6 +49,12 @@ object GeneratedAudiobook {
     fun pricePerMillion(voice: String): Double? {
         val model = CloudVoiceInfo(voice, null).model
         return PRICES.firstOrNull { model.startsWith(it.first, ignoreCase = true) }?.second
+    }
+
+    /** Free characters per month, in millions, for [voice], or null for a model without a known allowance. */
+    fun freeMonthlyMillions(voice: String): Int? {
+        val model = CloudVoiceInfo(voice, null).model
+        return FREE_MONTHLY_MILLIONS.firstOrNull { model.startsWith(it.first, ignoreCase = true) }?.second
     }
 
     /** The cost in USD of speaking [chars] characters with [voice], or null if its price is not known. */

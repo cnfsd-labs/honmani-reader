@@ -727,6 +727,7 @@
     <string name="card_audio_google_details">Natural voices; needs your own API key (a monthly free allowance, then paid by Google)</string>
     <string name="google_key">Google Cloud API key</string>
     <string name="google_key_saved">Saved key (hidden). Enter a new one to replace it.</string>
+    <string name="google_voice_price_note">Google bills the account of your key for every character sent. The first characters each month are free (%1$s). Prices as of November 2026; Google may change them.</string>
     <string name="google_key_help">How to get a key: open console.cloud.google.com, create a project, enable “Cloud Text-to-Speech API”, then Credentials → Create credentials → API key. Restrict the key to the Cloud Text-to-Speech API. The key is stored encrypted on this phone and only sent to Google.</string>
     <string name="google_key_checking">Checking the key…</string>
     <plurals name="google_key_ok">

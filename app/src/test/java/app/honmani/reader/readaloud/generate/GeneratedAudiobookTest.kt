@@ -20,6 +20,20 @@ class GeneratedAudiobookTest {
     }
 
     @Test
+    fun freeAllowanceFollowsTheModelOfTheVoice() {
+        assertEquals(1, GeneratedAudiobook.freeMonthlyMillions(chirp))
+        assertEquals(1, GeneratedAudiobook.freeMonthlyMillions("ja-JP-Neural2-B"))
+        assertEquals(4, GeneratedAudiobook.freeMonthlyMillions("ja-JP-Wavenet-A"))
+        assertEquals(4, GeneratedAudiobook.freeMonthlyMillions("ja-JP-Standard-D"))
+        assertNull(GeneratedAudiobook.freeMonthlyMillions("ja-JP-Something-Else-A"))
+    }
+
+    @Test
+    fun everyPricedModelHasAnAllowance() {
+        assertEquals(GeneratedAudiobook.PRICES.map { it.first }, GeneratedAudiobook.FREE_MONTHLY_MILLIONS.map { it.first })
+    }
+
+    @Test
     fun estimateIsCharactersTimesPrice() {
         assertEquals(30.0, GeneratedAudiobook.estimateUsd(1_000_000, chirp)!!, 1e-9)
         assertEquals(0.06, GeneratedAudiobook.estimateUsd(2_000, chirp)!!, 1e-9)
