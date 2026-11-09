@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -142,17 +143,18 @@ class WordKnowledgeTrackerTest {
         )
         val seen = mutableListOf<WordKnowledge>()
         val job = launch(Dispatchers.Default) { tracker.knowledge.toList(seen) }
-        delay(300)
+        withTimeout(5_000) { while (seen.size < 1) delay(5) }
         assertEquals(1, rebuilds)
 
         books.value = listOf(book.copy(progress = 0.5f, lastOpenedAt = 5))
         words.value = words.value.map { it.copy(ankiNoteId = 9, starred = true) }
-        delay(300)
+        // Nothing to wait for: several times the 20 ms the tracker waits for more changes.
+        delay(100)
         assertEquals(1, rebuilds)
 
         // A new lookup does.
         words.value = words.value.map { it.copy(lookupCount = 2) }
-        delay(300)
+        withTimeout(5_000) { while (seen.size < 2) delay(5) }
         assertEquals(2, rebuilds)
         job.cancel()
         assertEquals(2, seen.size)

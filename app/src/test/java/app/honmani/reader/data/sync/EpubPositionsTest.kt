@@ -189,7 +189,7 @@ class EpubPositionsTest {
 
     @Test
     fun deeplyNestedMarkupDoesNotOverflowTheStack() {
-        val depth = 200_000
+        val depth = 30_000 // 20,000 already overflows an uncapped recursive walk
         val file = epubWithChapter(
             "deep.epub",
             "<html><body>" + "<div>".repeat(depth) + "<p>吾輩は猫である。</p>" + "</div>".repeat(depth) + "</body></html>",

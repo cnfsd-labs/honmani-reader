@@ -181,7 +181,7 @@ class ProgressSyncTest {
         // ttu opens on the page holding character 18 and saves that page's start.
         sync.onPosition(5, 14)
         sync.flush()
-        Thread.sleep(300)
+        sync.idle()
         assertEquals(0, server.requests.count { it.method == "PUT" })
 
         // Turning back a page afterwards is reading, and is sent.
@@ -197,7 +197,7 @@ class ProgressSyncTest {
         sync.onJump(5, 20)
         sync.onPosition(5, 18)
         sync.flush()
-        Thread.sleep(300)
+        sync.idle()
         assertEquals(0, server.requests.count { it.method == "PUT" })
 
         sync.onPosition(5, 24)
@@ -210,7 +210,7 @@ class ProgressSyncTest {
         pull(local = 7, savedAtMs = 0)
         sync.onPosition(5, 7)
         sync.flush()
-        Thread.sleep(300)
+        sync.idle()
         assertEquals(0, server.requests.count { it.method == "PUT" })
     }
 

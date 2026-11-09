@@ -279,6 +279,12 @@ class ProgressSync(
         }
     }
 
+    /** Returns once no position is waiting to be sent or on its way; tests use it instead of sleeping. */
+    internal suspend fun idle() {
+        while (true) (synchronized(this) { pushJob } ?: break).join()
+        pushLock.withLock { }
+    }
+
     /** Sends the positions that couldn't be sent before: a network is back, or the app started. */
     fun resend() {
         if (settings.account.value == null) return
