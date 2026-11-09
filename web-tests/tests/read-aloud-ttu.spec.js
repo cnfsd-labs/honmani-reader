@@ -253,8 +253,8 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
   });
 }
 
-test('paginated mode goes on into the next chapter and says when the book ends', async ({ page }) => {
-  test.setTimeout(180_000);
+/** Reads the whole book aloud in paginated mode, advancing from chapter to chapter. */
+async function readThroughChapters(page, lateKeys = false) {
   await openBook(page, BOOK, 'paginated', 'horizontal-tb');
   let reply = await ask(page, 'begin', { count: 10 });
   const all = [...reply.items];
@@ -262,7 +262,9 @@ test('paginated mode goes on into the next chapter and says when the book ends',
   let guard = 0;
   while (guard++ < 200) {
     if (reply.end === 'section') {
+      if (lateKeys) await page.evaluate(() => (window.__lateKeys = true));
       reply = await ask(page, 'advance', { count: 10 });
+      if (lateKeys) await page.evaluate(() => (window.__lateKeys = false));
       if (reply.end === 'book' && reply.items.length === 0) break;
     } else if (reply.end === 'book') {
       break;
@@ -280,6 +282,32 @@ test('paginated mode goes on into the next chapter and says when the book ends',
   expect(all[150].text).toBe(sentence(2, 0));
   expect(all[300].text).toBe(sentence(3, 0));
   expect(reply.end).toBe('book');
+}
+
+test('paginated mode goes on into the next chapter and says when the book ends', async ({ page }) => {
+  test.setTimeout(180_000);
+  await readThroughChapters(page);
+});
+
+// A slow phone (or CI runner) can take longer than a couple of frames to load the next section
+// after the page turn past a chapter's end. The position not moving yet was taken for the end of
+// the book (a 300 of 450 sentence failure in CI). Here ttu hears the keys of an advance 500 ms late.
+test('a section that loads late after the last page turn is not taken for the end of the book', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.addInitScript(() => {
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (!window.__lateKeys || event.code !== 'ArrowDown' || event.__late) return;
+        event.stopImmediatePropagation();
+        const late = new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true });
+        late.__late = true;
+        setTimeout(() => window.dispatchEvent(late), 500);
+      },
+      true,
+    );
+  });
+  await readThroughChapters(page, true);
 });
 
 test('continuous mode reads through every chapter to the end of the book', async ({ page }) => {

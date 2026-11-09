@@ -45,6 +45,9 @@
   /** Sentences kept for seeking back. */
   const KEEP_RECORDS = 400;
   const MAX_ADVANCE_TURNS = 40;
+  // How long after a page turn that moved nothing the next section may take to appear before the
+  // book counts as ended (ttu loads it asynchronously; a slow phone needs more than a few frames).
+  const SECTION_LOAD_MS = 2500;
   const LETTER = /[\p{L}\p{N}]/u;
   const BLANK = /^[\s￼]$/;
 
@@ -402,8 +405,18 @@
       await nextFrame();
       await nextFrame();
       if (!session || session.gen !== gen) return;
-      const now = rootElement();
-      const token = now && firstTokenOf(now);
+      let now = rootElement();
+      let token = now && firstTokenOf(now);
+      let here = now && startToken(now);
+      const unmoved = () => !(token && token !== before) && (!here || (last && here.node === last.node && here.offset === last.offset));
+      // Nothing changed yet: the next section may still be loading, so look again for a while.
+      for (const deadline = performance.now() + SECTION_LOAD_MS; unmoved() && performance.now() < deadline; ) {
+        await nextFrame();
+        if (!session || session.gen !== gen) return;
+        now = rootElement();
+        token = now && firstTokenOf(now);
+        here = now && startToken(now);
+      }
       if (token && token !== before) {
         session.run = null;
         session.cands = [];
@@ -412,8 +425,7 @@
         reply(message.count);
         return;
       }
-      const here = now && startToken(now);
-      if (!here || (last && here.node === last.node && here.offset === last.offset)) break; // The end of the book.
+      if (unmoved()) break; // The end of the book.
       last = here;
     }
     post({ type: 'readAloud.sentences', gen, items: [], end: 'book' });
