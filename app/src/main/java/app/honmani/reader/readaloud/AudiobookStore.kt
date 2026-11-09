@@ -65,6 +65,13 @@ class AudiobookStore(
         if (preferences.contains(key(bookHash, AUDIO))) preferences.edit().putLong(key(bookHash, POSITION), ms).apply()
     }
 
+    /** The raw name of how the book was last used ([SessionMode]); null if never recorded. Kept apart from the pairing. */
+    fun lastMode(bookHash: String): String? = preferences.getString(key(bookHash, MODE), null)
+
+    fun saveLastMode(bookHash: String, mode: String) {
+        preferences.edit().putString(key(bookHash, MODE), mode).apply()
+    }
+
     /** The playing speed, kept for all books (one of [app.honmani.reader.data.settings.ReadAloudSettings.RATES]). */
     fun rate(): Float = preferences.getFloat(RATE, 1f).takeIf { it in app.honmani.reader.data.settings.ReadAloudSettings.RATES } ?: 1f
 
@@ -78,6 +85,7 @@ class AudiobookStore(
             .remove(key(bookHash, AUDIO))
             .remove(key(bookHash, SRT))
             .remove(key(bookHash, POSITION))
+            .remove(key(bookHash, MODE))
             .apply()
         deleteFiles(bookHash)
         deleteClips(bookHash)
@@ -108,6 +116,7 @@ class AudiobookStore(
         private const val AUDIO = "audio"
         private const val SRT = "srt"
         private const val POSITION = "position"
+        private const val MODE = "mode"
         private const val RATE = "audiobook.rate"
 
         fun sha256(bytes: ByteArray): String =

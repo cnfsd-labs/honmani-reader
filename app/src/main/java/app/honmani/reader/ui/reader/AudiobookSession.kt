@@ -39,7 +39,8 @@ class AudiobookSession(
     private var job: Job? = null
 
     /** The book playing (its content hash): positions are saved for it even after the reader has moved on. */
-    private var hash: String? = null
+    var hash: String? = null
+        private set
 
     /** Opens the book where a passage is that turning pages can't reach; set by the screen. */
     var navigate: (CueSpan) -> Unit = {}

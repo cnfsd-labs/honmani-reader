@@ -387,7 +387,8 @@ fun LibraryScreen(
             onFreeBooks = { freeBooks = true },
             onSample = viewModel::addSample,
             onCancelBatch = viewModel::cancelBatch,
-            onOpen = viewModel::open,
+            onOpen = { viewModel.open(it) },
+            onOpenListening = { viewModel.open(it, listen = true) },
             onRemove = viewModel::remove,
             onResetProgress = viewModel::resetProgress,
             onMarkFinished = viewModel::markFinished,
@@ -555,6 +556,8 @@ private fun LibraryContent(
     onSample: () -> Unit = {},
     onCancelBatch: () -> Unit = {},
     onOpen: (id: Long) -> Unit,
+    /** Opens the book and starts its audiobook ("Continue listening"). */
+    onOpenListening: (id: Long) -> Unit = onOpen,
     /** Removes a book; its reading statistics too if the flag is set. */
     onRemove: (id: Long, deleteStatistics: Boolean) -> Unit,
     onResetProgress: (id: Long) -> Unit,
@@ -639,7 +642,15 @@ private fun LibraryContent(
                         enter = if (LocalMotionEnabled.current) fadeIn() + expandVertically() else EnterTransition.None,
                         exit = if (LocalMotionEnabled.current) fadeOut() + shrinkVertically() else ExitTransition.None,
                     ) {
-                        lastContinue[0]?.let { book -> ContinueBubble(book, onOpen = { onOpen(book.id) }, onDismiss = onDismissContinue) }
+                        lastContinue[0]?.let { book ->
+                            val listening = uiState.continueListening
+                            ContinueBubble(
+                                book,
+                                listening = listening,
+                                onOpen = { if (listening) onOpenListening(book.id) else onOpen(book.id) },
+                                onDismiss = onDismissContinue,
+                            )
+                        }
                     }
                     // Only once there is a folder: without one the library looks as it always did.
                     // Closed, the chosen folder still shows as one small chip: a filter is never invisible.
@@ -1187,7 +1198,7 @@ private fun floatingChipColors() = FilterChipDefaults.filterChipColors(
  * the thumb, as wide as its title needs, up to the screen's width (480 dp at most).
  */
 @Composable
-private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () -> Unit) {
+private fun ContinueBubble(book: LibraryBook, listening: Boolean, onOpen: () -> Unit, onDismiss: () -> Unit) {
     // Swiped to the right far enough (or flung), it slides off and stays away; otherwise it springs back.
     var offset by remember { mutableFloatStateOf(0f) }
     var width by remember { mutableIntStateOf(0) }
@@ -1232,7 +1243,7 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
                 Box(modifier = Modifier.width(24.dp)) { Cover(book, corner = 4.dp) }
                 Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
-                        text = stringResource(R.string.library_continue_reading),
+                        text = stringResource(if (listening) R.string.library_continue_listening else R.string.library_continue_reading),
                         style = MaterialTheme.typography.labelSmall,
                     )
                     BookTitle(book.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
@@ -1241,7 +1252,8 @@ private fun ContinueBubble(book: LibraryBook, onOpen: () -> Unit, onDismiss: () 
                     text = stringResource(R.string.library_progress, (book.progress * 100).roundToInt()),
                     style = MaterialTheme.typography.labelMedium,
                 )
-                Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                if (listening) Icon(painterResource(R.drawable.ic_listen), contentDescription = null)
+                else Icon(Icons.Filled.PlayArrow, contentDescription = null)
             }
         }
     }

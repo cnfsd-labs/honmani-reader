@@ -101,6 +101,7 @@ import app.honmani.reader.readaloud.AudioInfo
 import app.honmani.reader.readaloud.AudiobookExporter
 import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
+import app.honmani.reader.readaloud.SessionModes
 import app.honmani.reader.readaloud.generate.AudiobookEnvironment
 import app.honmani.reader.readaloud.generate.AudiobookMaker
 import app.honmani.reader.readaloud.generate.AudiobookScheduler
@@ -494,6 +495,7 @@ class AppContainer(context: Context) {
 
     /** Each book's audiobook pairing and the subtitle matching, on this phone only (reader menu → Audiobook). */
     val audiobookStore: AudiobookStore by lazy { AudiobookStore(devicePreferences, File(appContext.filesDir, "audiobook")) }
+    val sessionModes: SessionModes by lazy { SessionModes(audiobookStore::lastMode, audiobookStore::saveLastMode) }
     val audiobookLoader: AudiobookLoader by lazy { AudiobookLoader(audiobookStore) }
 
     /** Makes generated audiobooks (Google voice, one request per sentence) into `files/audiobook/generated`. */

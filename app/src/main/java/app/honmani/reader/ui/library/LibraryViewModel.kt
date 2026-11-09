@@ -107,6 +107,8 @@ data class LibraryUiState(
     val hiddenCount: Int = 0,
     /** The book read last, if the reader is still reading it: offered as "Continue reading". */
     val continueBook: LibraryBook? = null,
+    /** The last session of [continueBook] played its audiobook, which is still there: the bubble says "Continue listening". */
+    val continueListening: Boolean = false,
     val query: String = "",
     val sort: LibrarySort = LibrarySort.RECENT,
     /** The reader's skill, once there is one: for [LibrarySort.BEST_FIT]. */
@@ -257,6 +259,12 @@ class LibraryViewModel(
     private val textTitle: () -> String = { "Shared text" },
     /** Saves a book's audiobook into a folder the reader picked; null: no audiobooks. */
     private val audiobookExporter: AudiobookExporter? = null,
+    /** Whether the book (content hash) should be offered as "Continue listening". */
+    private val continueListening: (contentHash: String) -> Boolean = { false },
+    /** Ticks when that may have changed. */
+    private val listeningChanges: Flow<Int> = flowOf(0),
+    /** The next opening of the book (content hash) starts its audiobook. */
+    private val armAutoplay: (contentHash: String) -> Unit = {},
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -335,6 +343,10 @@ class LibraryViewModel(
                 opening = opening,
                 batch = batch,
             )
+        }.let { base ->
+            combine(base, listeningChanges) { state, _ ->
+                state.copy(continueListening = state.continueBook?.let { continueListening(it.contentHash) } == true)
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     init {
@@ -634,7 +646,8 @@ class LibraryViewModel(
         batchJob?.cancel()
     }
 
-    fun open(id: Long) {
+    /** Opens the book; [listen]: its audiobook starts playing (only after the reader chose "Continue listening"). */
+    fun open(id: Long, listen: Boolean = false) {
         if (opening.value != null) return
         opening.value = id
         viewModelScope.launch {
@@ -657,6 +670,7 @@ class LibraryViewModel(
                         _syncQuestion.value = null
                     }
                 }
+                if (listen) armAutoplay(book.contentHash)
                 ttu.open(ttuBook.id)
                 dao.setLastOpened(book.id, now())
             } catch (_: TtuLibraryException) {
@@ -896,6 +910,15 @@ class LibraryViewModel(
                     folderView = container.libraryFolderView,
                     watchedFolder = container.watchedFolder,
                     audiobookExporter = container.audiobookExporter,
+                    continueListening = { hash ->
+                        container.sessionModes.continueListening(
+                            hash,
+                            container.audiobookStore.pairing(hash) != null,
+                            container.audiobookStore.position(hash),
+                        )
+                    },
+                    listeningChanges = container.sessionModes.changes,
+                    armAutoplay = { hash -> container.sessionModes.armAutoplay(hash, android.os.SystemClock.elapsedRealtime()) },
                     textTitle = {
                         application.getString(R.string.shared_text_title, java.time.LocalDate.now().toString())
                     },

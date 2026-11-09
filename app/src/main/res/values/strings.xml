@@ -333,6 +333,9 @@
         <item quantity="other">%d hidden books · Show</item>
     </plurals>
     <string name="library_continue_reading">Continue reading</string>
+    <string name="library_continue_listening">Continue listening</string>
+    <string name="audiobook_available">This book has an audiobook</string>
+    <string name="audiobook_available_play">Play</string>
     <string name="action_hide_book">Hide</string>
     <string name="action_unhide_book">Unhide</string>
     <string name="action_close_search">Close search</string>
