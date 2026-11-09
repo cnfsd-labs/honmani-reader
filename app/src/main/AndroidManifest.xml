@@ -2,16 +2,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Only for downloading dictionaries and browsing book catalogues (OPDS). The reader WebView
-         blocks network loads and is served entirely from the APK. -->
+    <!-- Only for what docs/privacy-policy.md lists: dictionaries, fonts and example sentences, the
+         free-books list, book servers (OPDS), progress sync, and the optional Google voice and WaniKani
+         features. The reader WebView blocks network loads and is served entirely from the APK. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Which network the phone is on (no Wi-Fi names, no location): over plain http a login
          waits until the server asks for it, again on each new network. -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Dictionary imports run as a data-sync foreground service so they finish when the user
-         leaves the app. Needs a foreground service declaration in the Play Console. -->
+    <!-- Dictionary imports and the audiobook maker run as a data-sync foreground service so they
+         finish when the user leaves the app. Needs a foreground service declaration in the Play Console. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 

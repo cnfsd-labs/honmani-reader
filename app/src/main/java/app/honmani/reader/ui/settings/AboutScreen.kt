@@ -94,6 +94,11 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
             item {
                 Entry(R.string.about_source, SOURCE_URL.removePrefix("https://")) { openUrl(context, SOURCE_URL) }
             }
+            item {
+                Entry(R.string.about_privacy_policy, stringResource(R.string.about_privacy_policy_details)) {
+                    openUrl(context, PRIVACY_POLICY_URL)
+                }
+            }
             item { Heading(R.string.about_built_with) }
             item { Entry(R.string.about_ttu, stringResource(R.string.about_ttu_details)) { open = LicenceText.TTU } }
             item {
@@ -222,6 +227,9 @@ private fun openUrl(context: Context, url: String) {
 
 /** Where Honmani's source is published, as GPL-3.0 asks. */
 const val SOURCE_URL = "https://github.com/cnfsd-labs/honmani-reader"
+
+/** The published privacy policy (`docs/privacy-policy.md`, served by GitHub Pages); the Play listing links the same page. */
+const val PRIVACY_POLICY_URL = "https://cnfsd-labs.github.io/honmani-reader/privacy-policy.html"
 
 private const val TATOEBA_LICENCE_URL = "https://creativecommons.org/licenses/by/2.0/fr/"
 private const val AOZORA_LICENCE_URL = "https://creativecommons.org/licenses/by/4.0/"

@@ -115,6 +115,8 @@
     <string name="about_licence">GNU General Public License v3</string>
     <string name="about_licence_details">The licence of Honmani</string>
     <string name="about_source">Source code</string>
+    <string name="about_privacy_policy">Privacy policy</string>
+    <string name="about_privacy_policy_details">No account, no ads, no tracking. What connects to the internet, and when.</string>
     <string name="about_built_with">Built with</string>
     <string name="about_ttu">ッツ Ebook Reader</string>
     <string name="about_ttu_details">The reader inside Honmani · BSD 3-Clause licence · © ッツ Reader Authors</string>

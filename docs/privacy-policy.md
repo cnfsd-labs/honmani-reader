@@ -19,20 +19,30 @@ them nowhere.
 If you have turned on Android's backup to your Google account (or move to a new phone with
 Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki
 deck) and a copy Honmani keeps of its own backup file (see below: your saved words with their
-sentences, your flashcard reviews, reading progress, statistics and the titles of your books). On a new phone Honmani
+sentences, your flashcard reviews, reading progress, statistics, bookmarks and highlights, the titles of your books
+and the addresses and user names of your book servers). On a new phone Honmani
 offers to restore it. Books, dictionaries, passwords and keys are never part of it.
 
 Settings → Backup writes your settings, reading progress, statistics, saved words
 and flashcard reviews to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
 Honmani sends it nowhere itself. The file holds no passwords or keys; it does hold your saved
-words with their sentences and the titles of your books, so keep it where only you can read it.
+words with their sentences, your bookmarks and highlights, the titles of your books and the addresses and user names
+of your book servers, so keep it where only you can read it.
+
+Settings → Backup → Sync folder: each phone writes one file with your progress, saved words (with their sentences),
+flashcard reviews, reading time, bookmarks and highlights (no passwords or keys) into a folder you choose, and reads the
+files of your other phones from it. The file is not encrypted. Honmani makes no network connection for this; a sync app
+(Syncthing, Nextcloud, Google Drive and the like) that you point at that folder can move the files off your phone.
+
+Exporting your library writes copies of your book files only into the folder you choose.
 
 ## When Honmani connects to the internet
 
 Honmani only connects to the internet for these things, and only to these places:
 
 - **Dictionaries and reader fonts** you choose to download, and a check for dictionary
-  updates when the app starts: GitHub (github.com, raw.githubusercontent.com), Hugging Face
+  updates when the app starts (for dictionaries you imported yourself that offer updates, the check goes to the
+  update address the dictionary names, which can be any https address): GitHub (github.com, raw.githubusercontent.com), Hugging Face
   (huggingface.co) and Jiten (api.jiten.moe), always over an encrypted connection (https).
   These sites see an ordinary download request (your IP address and the app's name); Honmani
   sends no personal data. Their own privacy
@@ -48,7 +58,8 @@ Honmani only connects to the internet for these things, and only to these places
   searches: the search runs on your phone). Neither host is contacted before you tap, and
   the list is kept on your phone until you refresh it. Their own privacy policies apply.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
-  to the addresses you enter. If you give a user name and password, the password is stored
+  to the addresses you enter, when the app starts if automatic import is on (it is by default for a new server) and when you open
+  the catalogue; a search you type in a server's catalogue is sent to that server. If you give a user name and password, the password is stored
   encrypted on your phone and sent only to that server.
   At an unencrypted address (`http://`) anyone on the same network can read a password that
   is sent, and on another Wi-Fi the address can belong to someone else's device. There Honmani
