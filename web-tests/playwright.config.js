@@ -5,7 +5,12 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // One retry on CI only, so a rare timing flake does not fail the run; it is still named
+  // (support/report-flaky.js reads the JSON report).
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI
+    ? [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'test-results/results.json' }]]
+    : 'list',
   use: {
     // A phone-sized Chromium viewport, like the Android WebView the scripts run in.
     ...devices['Pixel 7'],

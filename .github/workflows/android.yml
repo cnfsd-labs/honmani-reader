@@ -53,16 +53,6 @@ jobs:
           scripts/check-apk.sh app/build/outputs/apk/release/app-release-unsigned.apk
           scripts/check-apk.sh app/build/outputs/apk/internal/app-internal.apk
 
-      - name: Browser tests (tap bridge, ttu end-to-end)
-        working-directory: web-tests
-        env:
-          # ubuntu-latest moved to 26.04, which Playwright has no Chromium build for yet.
-          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-          npx playwright test
-
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -71,8 +61,6 @@ jobs:
           path: |
             app/build/reports/
             app/build/test-results/
-            web-tests/playwright-report/
-            web-tests/test-results/
           if-no-files-found: ignore
 
       - name: Upload release APK
@@ -90,3 +78,75 @@ jobs:
           path: |
             app/build/outputs/apk/internal/app-internal.apk
             app/build/outputs/apk/debug/app-debug.apk
+
+  # The browser tests need only the reader's web build (:app:buildTtu), not the APKs, so they run
+  # beside the Android build instead of after it.
+  browser:
+    name: Browser tests (tap bridge, ttu end-to-end)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # ubuntu-latest moved to 26.04, which Playwright has no Chromium build for yet.
+      PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: third_party/ttu-ebook-reader/pnpm-lock.yaml
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the reader (ッツ Ebook Reader with the patches)
+        run: ./gradlew --stacktrace :app:buildTtu
+
+      - name: Install the test dependencies
+        working-directory: web-tests
+        run: npm ci
+
+      - name: Playwright version
+        id: playwright
+        working-directory: web-tests
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # The browser download only; the system libraries below come from apt on every run.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Chromium
+        working-directory: web-tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        working-directory: web-tests
+        run: npx playwright test
+
+      # A test that failed and then passed on the retry is a flake: say so in the run summary.
+      - name: Name flaky tests
+        if: always()
+        working-directory: web-tests
+        run: node support/report-flaky.js test-results/results.json
+
+      - name: Upload browser reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-reports
+          path: |
+            web-tests/playwright-report/
+            web-tests/test-results/
+          if-no-files-found: ignore

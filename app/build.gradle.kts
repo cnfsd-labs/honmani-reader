@@ -91,6 +91,9 @@ android {
 
     lint {
         abortOnError = true
+        // lintDebug (CI's lint gate) checks the same sources; the lintVital run that assemble and
+        // bundle tasks add for release and internal re-analysed them for about 3.5 minutes.
+        checkReleaseBuilds = false
         // Dependency freshness is handled by Dependabot, not by failing lint.
         disable += setOf("GradleDependency", "AndroidGradlePluginVersion", "NewerVersionAvailable")
     }
