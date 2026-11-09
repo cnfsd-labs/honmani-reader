@@ -50,7 +50,8 @@ object DictionaryCatalog {
             titlePrefix = "Jitendex",
             url = "https://github.com/stephenmk/stephenmk.github.io/releases/latest/download/jitendex-yomitan.zip",
             sizeMb = 39,
-            license = "CC BY-SA 4.0",
+            // Its index.json: CC BY-SA 4.0 by Stephen Kraus, with JMdict (EDRDG) and Tatoeba sentences inside.
+            license = "CC BY-SA 4.0 (jitendex.org, Stephen Kraus; includes JMdict and Tatoeba)",
             recommended = true,
         ),
         CatalogDictionary(

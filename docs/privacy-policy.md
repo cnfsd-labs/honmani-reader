@@ -1,6 +1,6 @@
 # Privacy policy for Honmani
 
-*Last updated: 2026-11-04.*
+*Last updated: 2026-11-09.*
 
 Honmani is a free reader for Japanese books, published by CNFSD Labs. It has no account, no ads,
 no analytics and no tracking. CNFSD Labs does not receive any data from the app.
@@ -66,7 +66,7 @@ Honmani only connects to the internet for these things, and only to these places
   Signing out deletes the stored login.
   The server's operator's privacy policy applies.
 - **Google Cloud text-to-speech, only if you turn it on** and enter your own Google Cloud API
-  key: to make audio for Anki cards, and to say a word when you tap its speaker in a lookup or on a
+  key (stored encrypted on your phone, sent only to Google): to make audio for Anki cards, and to say a word when you tap its speaker in a lookup or on a
   flashcard, Honmani sends the word or example sentence and your key to Google
   (texttospeech.googleapis.com), over an encrypted connection. Google's privacy policy applies. The default voice is your
   phone's own, which works offline. Sound that a flashcard plays by itself (the "Play audio by itself" setting) always uses
