@@ -585,7 +585,10 @@ class Backup(
 
         private fun validString(key: String, value: String) = STRING_CHECKS[key]?.invoke(value) ?: true
 
-        /** The `settings` preferences a backup brings back, and their types. Add new settings here. */
+        /**
+         * The `settings` preferences a backup brings back, and their types. Add new settings here. The
+         * names are permanent (backups already made carry them): `BackupSettingKeysTest` pins them.
+         */
         val SETTING_TYPES = mapOf(
             AppearanceSettings.KEY_ACCENT to BackupValue.STRING,
             AppearanceSettings.KEY_ACCENT_RANDOM to BackupValue.STRING,

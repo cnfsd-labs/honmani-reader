@@ -41,7 +41,7 @@ public: never copy those notes, personal details or discussions into it.
 - **Android backup** keeps the `settings` preferences and `files/auto-backup/` (`AutoBackup`: the
   Settings backup zip, rewritten at most every 6 h when the app goes to the background, dropped over
   10 MB, offered once on a new install). Everything tied to this phone (first start, encrypted keys,
-  AnkiDroid ids, sync account) is in `device` preferences, never backed up (`BackupRulesTest`).
+  AnkiDroid ids, sync account) is in `device` preferences, never backed up (`BackupRulesTest`). Backed-up setting names and types, the backup file name and the Anki note type ids are permanent (`BackupSettingKeysTest`).
 - **Application ID** `app.honmani.reader` is permanent. Play bundles come from the "Release bundle"
   workflow (tag `release/*`; run number = version code); other builds stay unsigned or debug-signed.
 - **Versions:** AGP 9.4 with built-in Kotlin (no `org.jetbrains.kotlin.android`), Gradle 9.8, Kotlin
