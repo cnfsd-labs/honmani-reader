@@ -3,6 +3,7 @@
 // work list (CC BY 4.0). No dependencies. See README.md.
 //
 //   node scripts/aozora-index/generate.mjs [--out docs/aozora/index.json] [--zip local-list.zip]
+//                                          [--scores scores.jsonl]
 import { mkdtemp, readFile, writeFile, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
@@ -38,6 +39,23 @@ export function firstZipEntry(buf) {
   throw new Error(`unsupported ZIP method ${method}`);
 }
 
+/**
+ * Difficulty scores from the grader's JSON-lines file (see README.md): work ID -> score. The last line
+ * of an ID wins; lines without an ID (the `meta` lines), broken lines and scores that are not a
+ * whole number above 0 (failed gradings) are skipped.
+ */
+export function parseScores(text) {
+  const scores = new Map();
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    let row;
+    try { row = JSON.parse(line); } catch { continue; }
+    if (!row || typeof row.id !== 'string') continue;
+    scores.set(row.id, Number.isInteger(row.score) && row.score > 0 && !row.error ? row.score : 0);
+  }
+  return scores;
+}
+
 /** RFC 4180 CSV parser (quoted fields may contain commas, quotes and line breaks). */
 export function parseCsv(text) {
   const rows = [];
@@ -64,7 +82,7 @@ const SCRIPTS = { '新字新仮名': 'nn', '新字旧仮名': 'no', '旧字新�
 const toHiragana = (s) => s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-export function buildIndex(csvText, generated) {
+export function buildIndex(csvText, generated, scores = new Map()) {
   const rows = parseCsv(csvText.replace(/^﻿/, ''));
   const header = rows.shift();
   const col = (name) => {
@@ -118,7 +136,10 @@ export function buildIndex(csvText, generated) {
   const list = entries.map((w) => {
     const key = `${w.author}\u0000${w.authorReading}`;
     if (!authorIndex.has(key)) { authorIndex.set(key, authors.length); authors.push([w.author, w.authorReading]); }
-    return { i: w.id, t: w.title, r: w.titleReading, a: authorIndex.get(key), s: w.script, p: w.published, u: w.file };
+    const entry = { i: w.id, t: w.title, r: w.titleReading, a: authorIndex.get(key), s: w.script, p: w.published, u: w.file };
+    const d = scores.get(w.id);
+    if (d > 0) entry.d = d; // difficulty 1-100, left out when the work is not graded
+    return entry;
   });
   return {
     index: {
@@ -129,7 +150,7 @@ export function buildIndex(csvText, generated) {
       authors,
       works: list,
     },
-    stats: { rows: rows.length, workIds: seen.size, notFree: notFree.size, kept: list.length, authors: authors.length },
+    stats: { rows: rows.length, workIds: seen.size, notFree: notFree.size, kept: list.length, authors: authors.length, graded: list.filter((w) => w.d).length },
   };
 }
 
@@ -146,7 +167,9 @@ async function main() {
       await writeFile(join(tmp, 'list.zip'), zip); // kept only for inspection, removed below
     }
     const csv = firstZipEntry(zip).toString('utf8');
-    const { index, stats } = buildIndex(csv, new Date().toISOString().slice(0, 10));
+    const scoresPath = opt('--scores');
+    const scores = scoresPath ? parseScores(await readFile(scoresPath, 'utf8')) : undefined;
+    const { index, stats } = buildIndex(csv, new Date().toISOString().slice(0, 10), scores);
     await mkdir(dirname(outPath), { recursive: true });
     // One work per line keeps diffs readable and the file small.
     const head = JSON.stringify({ ...index, authors: undefined, works: undefined }).slice(0, -1);

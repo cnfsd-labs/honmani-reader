@@ -50,8 +50,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
 import app.honmani.reader.data.aozora.AozoraException
 import app.honmani.reader.data.aozora.AozoraWork
+import app.honmani.reader.ui.DifficultyBadge
 import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.difficultyBand
 
 /** The free books catalogue: an explanation until the user loads the list, then search and download. */
 @Composable
@@ -222,6 +224,14 @@ private fun Browser(
                 ListItem(
                     headlineContent = { Text(work.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(subtitle(work), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    trailingContent = work.difficulty?.let { difficulty ->
+                        {
+                            DifficultyBadge(
+                                difficulty,
+                                description = stringResource(R.string.aozora_difficulty, difficulty),
+                            )
+                        }
+                    },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { onSelect(work) },
                 )
@@ -254,6 +264,17 @@ private fun WorkDetails(work: AozoraWork, download: AozoraDownload?, onAdd: () -
             stringResource(R.string.aozora_old_kana_details).takeIf { work.oldKana },
             stringResource(R.string.aozora_old_kanji_details).takeIf { work.oldKanji },
         )
+        work.difficulty?.let { difficulty ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                DifficultyBadge(difficulty, description = stringResource(R.string.aozora_difficulty, difficulty))
+                Text(
+                    stringResource(R.string.aozora_difficulty_details, difficultyBand(difficulty)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
         for (line in details) {
             Text(
                 line,

@@ -136,6 +136,8 @@
     <string name="about_sounds_details">Made for Honmani from plain sine tones (scripts/sounds in the source code) · GPL-3.0-or-later like the app</string>
     <string name="about_aozora">Free books catalogue (optional)</string>
     <string name="about_aozora_details">Aozora Bunko (aozora.gr.jp): works are public domain; the work list is CC BY 4.0</string>
+    <string name="about_aozora_difficulty">Difficulty of the free books</string>
+    <string name="about_aozora_difficulty_details">Approximate scores worked out with word frequencies from Jiten (jiten.moe) and Jitendex (jitendex.org, Stephen Kraus) · CC BY-SA 4.0</string>
     <string name="about_sample_book">Sample books</string>
     <string name="about_sample_book_details">Texts from Aozora Bunko (aozora.gr.jp), typed and proofread by its volunteers, who are named at the end of each book · public domain (Niimi Nankichi, Miyazawa Kenji, Akutagawa Ryūnosuke, Natsume Sōseki) · covers made for Honmani in Shippori Mincho (SIL Open Font License)</string>
     <string name="settings_sample_books">Sample books</string>
@@ -188,6 +190,8 @@
     <string name="aozora_old_kana">旧仮名</string>
     <string name="aozora_old_kana_details">Old kana usage (旧仮名遣い)</string>
     <string name="aozora_old_kanji_details">Old kanji forms (旧字体)</string>
+    <string name="aozora_difficulty">Approximate difficulty %1$d</string>
+    <string name="aozora_difficulty_details">Approximate difficulty (1–100): %1$s</string>
     <string name="aozora_published">Published on Aozora Bunko: %1$s</string>
     <string name="aozora_add">Add to library</string>
     <string name="aozora_error_list_network">The list could not be loaded. Check your internet connection and try again.</string>

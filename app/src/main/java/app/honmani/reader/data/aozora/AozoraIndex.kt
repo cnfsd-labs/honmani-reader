@@ -24,6 +24,11 @@ class AozoraWork(
     val published: String,
     /** The text file as `<card>/<file>`, below `https://www.aozora.gr.jp/cards/`. */
     val file: String,
+    /**
+     * Approximate difficulty on the app's 1–100 scale (the books' difficulty, graded ahead of time
+     * with the app's own measure), or null if the work has not been graded.
+     */
+    val difficulty: Int? = null,
 ) {
     /** Whether the work is in old kana (旧仮名); a work with an unknown script is not counted as old. */
     val oldKana: Boolean get() = script.getOrNull(1) == 'o'
@@ -62,6 +67,8 @@ object AozoraIndexParser {
         val s: String = "",
         val p: String = "",
         val u: String = "",
+        /** Difficulty, optional (left out for works not graded). */
+        val d: Int? = null,
     )
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -99,6 +106,7 @@ object AozoraIndexParser {
                 script = w.s,
                 published = w.p,
                 file = w.u,
+                difficulty = w.d?.takeIf { it in 1..100 },
             )
         }
         return AozoraIndex(dto.generated, works)

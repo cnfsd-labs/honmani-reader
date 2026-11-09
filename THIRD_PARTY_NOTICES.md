@@ -72,3 +72,9 @@ Kuromoji or Sudachi (Apache-2.0) with their dictionary licenses, AnkiDroid Insta
 (https://www.aozora.gr.jp/index_pages/person_all_extended.html), CC BY 4.0.
 It lists only works Aozora marks as free of copyright. The texts the app downloads from
 https://www.aozora.gr.jp are public domain works (https://www.aozora.gr.jp/guide/kijyunn.html).
+
+The optional difficulty (`d`) of each work in that index is approximate and computed ahead of time
+with the app's own difficulty measure from two dictionaries: the Jiten word frequency list
+(https://jiten.moe, CC BY-SA 4.0) and Jitendex (https://jitendex.org, Stephen Kraus, CC BY-SA 4.0,
+with JMdict and Tatoeba inside). The numbers are derived from them, so they carry this credit;
+none of the dictionaries' own data is published.

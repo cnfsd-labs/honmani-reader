@@ -7,14 +7,15 @@ wire). The app downloads it on request; nothing is fetched at build time.
 ## Regenerate
 
 ```
-node scripts/aozora-index/generate.mjs [--out docs/aozora/index.json] [--zip list.zip]
+node scripts/aozora-index/generate.mjs [--out docs/aozora/index.json] [--zip list.zip] [--scores scores.jsonl]
 ```
 
 Node 24, no dependencies. The script downloads
 `https://www.aozora.gr.jp/index_pages/list_person_all_extended_utf8.zip` into the program's
 memory (a fresh temp directory is created and removed; nothing from the download is executed),
 reads the one CSV in it with a built-in ZIP reader, and writes the index. `--zip` uses a local copy
-instead of downloading. Commit the result; regenerate a few times a year (the list changes daily).
+instead of downloading. `--scores` adds the difficulty (`d`) from a grader output file, see
+"Difficulty scores" below. Commit the result; regenerate a few times a year (the list changes daily).
 
 ## What is listed
 
@@ -34,7 +35,7 @@ instead of downloading. Commit the result; regenerate a few times a year (the li
 {"version":1,"generated":"2026-11-07","source":"...","count":17344,
 "authors":[ ["愛知敬一","あいちけいいち"], ... ],
 "works":[ {"i":"046340","t":"ファラデーの伝","r":"ファラデーのでん","a":0,"s":"nn",
-           "p":"2006-12-24","u":"001234/46340_ruby_24806.zip"}, ... ]}
+           "p":"2006-12-24","u":"001234/46340_ruby_24806.zip","d":96}, ... ]}
 ```
 
 | Key | Meaning |
@@ -50,6 +51,7 @@ instead of downloading. Commit the result; regenerate a few times a year (the li
 | `works[].s` | Script: two letters, kanji forms then kana forms, `n` = modern (新字/新仮名), `o` = old (旧字/旧仮名): `nn`, `no`, `on`, `oo`. Empty for the 16 works Aozora files under `その他`. |
 | `works[].p` | Publication date on Aozora (`公開日`), `YYYY-MM-DD`. |
 | `works[].u` | Text file as `<card>/<file>`. The URL is `https://www.aozora.gr.jp/cards/<card>/files/<file>`. |
+| `works[].d` | Optional: approximate difficulty on the app's 1-100 scale (see "Difficulty scores"). Left out when the work is not graded. Readers must treat it as absent. |
 
 The file has one author or work per line (readable diffs). Works are sorted by author reading
 (katakana compared as hiragana), then author name, then title reading, then ID, so `a` never
@@ -113,7 +115,16 @@ lexicon` (the dictionaries and revisions used) and `error` when it failed (score
 reasons (`network`, `http429`, `http5xx`) are tried again on the next start, so the last line of an
 id counts. Re-grade after `Difficulty.VERSION` changes with a new output file.
 
+`generate.mjs --scores <that file>` puts each work's `score` into the index as `d` (the last line
+of an ID wins; failed works, score 0, get no `d`). Adding `d` keeps the format at version 1: older
+readers ignore the key. The score is approximate (it depends on the dictionaries and on how the
+text was cut into words), so the app labels it that way.
+
 ## Credits
+
+The difficulty scores are computed with word frequencies from Jiten (https://jiten.moe, CC BY-SA 4.0)
+and Jitendex (https://jitendex.org, CC BY-SA 4.0, Stephen Kraus); the app's About screen and
+`THIRD_PARTY_NOTICES.md` credit both.
 
 The work list is CC BY 4.0, "Aozora Bunko work list" (https://www.aozora.gr.jp/index_pages/person_all_extended.html).
 Credit it in the app's About screen and in `THIRD_PARTY_NOTICES.md`. The texts are public domain

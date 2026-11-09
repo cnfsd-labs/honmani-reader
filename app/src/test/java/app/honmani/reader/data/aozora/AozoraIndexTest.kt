@@ -9,8 +9,15 @@ import org.junit.Test
 internal fun indexJson(version: Int = 1, works: String): String =
     """{"version":$version,"generated":"2026-11-07","authors":[["夏目漱石","なつめそうせき"],["芥川龍之介","あくたがわりゅうのすけ"]],"works":[$works]}"""
 
-internal fun work(id: String, title: String, reading: String, author: Int, script: String, file: String = "000148/${id}_ruby.zip") =
-    """{"i":"$id","t":"$title","r":"$reading","a":$author,"s":"$script","p":"2000-01-01","u":"$file"}"""
+internal fun work(
+    id: String,
+    title: String,
+    reading: String,
+    author: Int,
+    script: String,
+    file: String = "000148/${id}_ruby.zip",
+    difficulty: Int? = null,
+) = """{"i":"$id","t":"$title","r":"$reading","a":$author,"s":"$script","p":"2000-01-01","u":"$file"${difficulty?.let { ""","d":$it""" }.orEmpty()}}"""
 
 internal fun parse(json: String): AozoraIndex = AozoraIndexParser.parse(json.byteInputStream())
 
@@ -78,6 +85,34 @@ class AozoraIndexTest {
     fun anAuthorIndexOutOfRangeLeavesTheAuthorEmpty() {
         val list = parse(indexJson(works = work("000001", "題", "だい", 9, "nn")))
         assertEquals("", list.works.single().author)
+    }
+
+    @Test
+    fun difficultyIsOptional() {
+        val list = parse(
+            indexJson(
+                works = listOf(
+                    work("1", "易しい", "やさしい", 0, "nn", difficulty = 35),
+                    work("2", "無印", "むじるし", 0, "nn"),
+                    work("3", "上限", "じょうげん", 0, "nn", difficulty = 100),
+                ).joinToString(","),
+            ),
+        )
+        assertEquals(listOf(35, null, 100), list.works.map { it.difficulty })
+    }
+
+    @Test
+    fun aDifficultyOutsideTheScaleIsIgnored() {
+        val list = parse(
+            indexJson(
+                works = listOf(
+                    work("1", "零", "ぜろ", 0, "nn", difficulty = 0),
+                    work("2", "負", "ふ", 0, "nn", difficulty = -3),
+                    work("3", "超", "ちょう", 0, "nn", difficulty = 101),
+                ).joinToString(","),
+            ),
+        )
+        assertEquals(listOf(null, null, null), list.works.map { it.difficulty })
     }
 
     @Test

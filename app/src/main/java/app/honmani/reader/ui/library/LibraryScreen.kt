@@ -125,8 +125,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,6 +142,7 @@ import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.data.dictionary.DictionaryCatalog
+import app.honmani.reader.ui.DifficultyBadge
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.aozora.AozoraScreen
 import app.honmani.reader.ui.dictionaries.DictionariesViewModel
@@ -1400,23 +1399,7 @@ private fun BookCard(
             Cover(book, elevation = 3.dp)
             if (difficulty != null) {
                 // The book's difficulty, small, in the corner the finished check doesn't use.
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp),
-                ) {
-                    val description = stringResource(R.string.book_difficulty, difficulty)
-                    Text(
-                        text = "$difficulty",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                            .clearAndSetSemantics { contentDescription = description },
-                    )
-                }
+                DifficultyBadge(difficulty, modifier = Modifier.align(Alignment.TopStart).padding(4.dp))
             }
             if (book.status == ReadingStatus.FINISHED) {
                 // A finished book carries a check on its cover, like the filter.
