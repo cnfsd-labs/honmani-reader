@@ -64,9 +64,11 @@ fun AudiobookDialog(
     /** The audiobook made with a Google voice, if the book has one (or one in the making). */
     generated: GeneratedManage? = null,
     generatedActions: GeneratedActions? = null,
+    /** Saves the audio and subtitles into a folder the reader picks; null: nothing to export (no button). */
+    onExport: (() -> Unit)? = null,
 ) {
     if (step == AudiobookStep.MANAGE && generated != null && generatedActions != null) {
-        GeneratedManageDialog(generated, generatedActions, onPlay, onDismiss, onBack)
+        GeneratedManageDialog(generated, generatedActions, onPlay, onDismiss, onBack, onExport.takeIf { generated.partial == null })
         return
     }
     var keyHelp by remember { mutableStateOf(false) }
@@ -94,7 +96,10 @@ fun AudiobookDialog(
                     }
                 }
                 AudiobookStep.SUBTITLES -> Text(stringResource(R.string.audiobook_next_step))
-                AudiobookStep.MANAGE -> Text(stringResource(R.string.audiobook_menu_paired))
+                AudiobookStep.MANAGE -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.audiobook_menu_paired))
+                    if (onExport != null) ExportButton(onExport)
+                }
             }
         },
         confirmButton = {
@@ -115,6 +120,11 @@ fun AudiobookDialog(
     )
 }
 
+@Composable
+private fun ExportButton(onExport: () -> Unit) {
+    OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.audiobook_export)) }
+}
+
 /** The manage step of a generated audiobook: size, where the work is, and what can be done about it. */
 @Composable
 private fun GeneratedManageDialog(
@@ -123,6 +133,7 @@ private fun GeneratedManageDialog(
     onPlay: () -> Unit,
     onDismiss: () -> Unit,
     onBack: (() -> Unit)?,
+    onExport: (() -> Unit)?,
 ) {
     val context = LocalContext.current
     val size = Formatter.formatShortFileSize(context, generated.sizeBytes)
@@ -174,6 +185,7 @@ private fun GeneratedManageDialog(
                     }
                 }
                 Text(stringResource(R.string.audiobook_generated_size, size))
+                if (onExport != null) ExportButton(onExport)
             }
         },
         confirmButton = {

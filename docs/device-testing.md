@@ -235,6 +235,11 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Pause, close the app: audio paused, screen no longer kept on, Play continues. Call/other player
   pauses; a word tap pauses while the panel is open.
 - Read aloud and the audiobook stop each other.
+- Export: the audiobook dialog (reader menu -> Audiobook) and the library book sheet show "Export audiobook"
+  only with a paired or finished generated audiobook (not a partial one, not a book without one). Pick a
+  folder: "<title>.<audio extension>" (.mp3 for a generated one) and "<title>.srt" appear, the audio plays
+  elsewhere, the SRT is UTF-8; exporting again makes "(1)" names. Delete the audio file first: "audio file
+  could not be read", nothing left in the folder. A full folder/volume: readable sentence, no half file.
 - Remove: pairing, subtitle copy, position gone. Delete the audio file, play -> "audio is gone", "Change
   files". Unplayable audio, empty subtitles, non-EPUB -> readable message, no crash.
 

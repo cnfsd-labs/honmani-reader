@@ -415,6 +415,18 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     }.collectAsStateWithLifecycle(null)
     val audiobookStarted = stringResource(R.string.audiobook_started)
     val generatedDeleted = stringResource(R.string.audiobook_generated_deleted)
+    // The audiobook's audio and subtitles saved into a folder the reader picks.
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        val hash = bookHash
+        val title = openBook?.title.orEmpty()
+        if (tree != null && hash != null) {
+            scope.launch {
+                val result = container.audiobookExporter.export(hash, title, tree)
+                jumpSnackbar.currentSnackbarData?.dismiss()
+                jumpSnackbar.showSnackbar(result.message(context, title))
+            }
+        }
+    }
     val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             audiobook.keepAccess(uri)
@@ -1114,6 +1126,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 onChange = { audiobookStep = AudiobookStep.INTRO },
+                onExport = {
+                    audiobookStep = null
+                    exportPicker.launch(null)
+                },
                 onRemove = {
                     audiobookStep = null
                     val hash = bookHash

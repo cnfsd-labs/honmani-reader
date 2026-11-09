@@ -1,6 +1,8 @@
 package app.honmani.reader.ui.library
 
 import app.honmani.reader.diagnostics.logWarning
+import app.honmani.reader.readaloud.AudiobookExportResult
+import app.honmani.reader.readaloud.AudiobookExporter
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -175,6 +177,9 @@ sealed interface LibraryNotice {
 
     /** The chosen folder cannot be read or written. */
     data object FolderUnusable : LibraryNotice
+
+    /** An audiobook export ended with [result]. */
+    data class AudiobookExport(val title: String, val result: AudiobookExportResult) : LibraryNotice
 }
 
 /** The books and what their order depends on. */
@@ -250,6 +255,8 @@ class LibraryViewModel(
     private val watchedFolder: WatchedFolder? = null,
     /** The title of a shared or pasted text that has none of its own, by default with today's date. */
     private val textTitle: () -> String = { "Shared text" },
+    /** Saves a book's audiobook into a folder the reader picked; null: no audiobooks. */
+    private val audiobookExporter: AudiobookExporter? = null,
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -787,6 +794,22 @@ class LibraryViewModel(
         }
     }
 
+    /** Whether the book has an audiobook that can be exported (a finished generated one, or a paired recording). */
+    suspend fun audiobookExportable(contentHash: String): Boolean {
+        val exporter = audiobookExporter ?: return false
+        return contentHash.isNotEmpty() && withContext(Dispatchers.IO) { exporter.canExport(contentHash) }
+    }
+
+    /** Saves the book's audiobook (audio and subtitles) into the folder [tree] the reader picked. */
+    fun exportAudiobook(id: Long, tree: Uri) {
+        val exporter = audiobookExporter ?: return
+        viewModelScope.launch {
+            val book = dao.find(id) ?: return@launch
+            val result = exporter.export(book.contentHash, book.title, tree)
+            _notices.send(LibraryNotice.AudiobookExport(book.title, result))
+        }
+    }
+
     /**
      * Removes a book. Its reading time, characters and the finished count stay in the statistics,
      * unless [deleteStatistics]: then its reading days and finished record go too.
@@ -872,6 +895,7 @@ class LibraryViewModel(
                     folders = container.folders,
                     folderView = container.libraryFolderView,
                     watchedFolder = container.watchedFolder,
+                    audiobookExporter = container.audiobookExporter,
                     textTitle = {
                         application.getString(R.string.shared_text_title, java.time.LocalDate.now().toString())
                     },

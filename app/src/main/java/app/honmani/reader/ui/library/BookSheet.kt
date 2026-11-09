@@ -110,6 +110,10 @@ fun BookSheet(
     onRemove: () -> Unit,
     /** Saves a copy of the book's file on the phone (an OPDS download, say). */
     onSaveCopy: () -> Unit = {},
+    /** Whether the book has an audiobook to export; the button shows only then. */
+    canExportAudiobook: Boolean = false,
+    /** Saves the audiobook's audio and subtitles into a folder the reader picks. */
+    onExportAudiobook: () -> Unit = {},
     folders: List<LibraryFolder> = emptyList(),
     onMoveToFolder: (Long?) -> Unit = {},
     /** Makes a folder with this name and moves the book in; the second argument gets what came of the name. */
@@ -175,6 +179,7 @@ fun BookSheet(
                     folder = folders.firstOrNull { it.id == book.folderId }?.name,
                     onFolder = { pickingFolder = true },
                     onSaveCopy = onSaveCopy,
+                    onExportAudiobook = if (canExportAudiobook) onExportAudiobook else null,
                 )
                 Actions(
                     book = book,
@@ -579,17 +584,22 @@ private fun NewWordsRow(count: Int?, onClick: () -> Unit) {
     }
 }
 
-/** Two equal pills: the book's folder (opening the picker) and "Save a copy". Long names are cut. */
+/** Two equal pills: the book's folder (opening the picker) and "Save a copy"; below them "Export audiobook" if there is one. Long names are cut. */
 @Composable
-private fun FolderAndCopy(folder: String?, onFolder: () -> Unit, onSaveCopy: () -> Unit) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+private fun FolderAndCopy(folder: String?, onFolder: () -> Unit, onSaveCopy: () -> Unit, onExportAudiobook: (() -> Unit)?) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
     ) {
-        PillButton(R.drawable.ic_folder, folder ?: stringResource(R.string.book_folder_add), onFolder, Modifier.weight(1f))
-        PillButton(R.drawable.ic_download, stringResource(R.string.action_save_copy), onSaveCopy, Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            PillButton(R.drawable.ic_folder, folder ?: stringResource(R.string.book_folder_add), onFolder, Modifier.weight(1f))
+            PillButton(R.drawable.ic_download, stringResource(R.string.action_save_copy), onSaveCopy, Modifier.weight(1f))
+        }
+        if (onExportAudiobook != null) {
+            PillButton(R.drawable.ic_audiobook, stringResource(R.string.audiobook_export), onExportAudiobook, Modifier.fillMaxWidth())
+        }
     }
 }
 

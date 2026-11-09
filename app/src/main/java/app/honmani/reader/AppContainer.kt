@@ -44,6 +44,7 @@ import app.honmani.reader.data.difficulty.StoredDifficulty
 import app.honmani.reader.data.examples.ExampleSentences
 import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
+import app.honmani.reader.data.library.ResolverDocumentTree
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.WatchedFolder
 import app.honmani.reader.data.library.BookmarkDao
@@ -96,6 +97,8 @@ import app.honmani.reader.data.sync.ProgressSync
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.data.sync.SectionStarts
 import app.honmani.reader.data.sync.UnsentPositions
+import app.honmani.reader.readaloud.AudioInfo
+import app.honmani.reader.readaloud.AudiobookExporter
 import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
 import app.honmani.reader.readaloud.generate.AudiobookEnvironment
@@ -495,6 +498,35 @@ class AppContainer(context: Context) {
 
     /** Makes generated audiobooks (Google voice, one request per sentence) into `files/audiobook/generated`. */
     val audiobookMaker: AudiobookMaker by lazy { AudiobookMaker(File(appContext.filesDir, "audiobook/generated"), audiobookStore) }
+
+    /** Saves a book's audiobook (audio and subtitles) into a folder the reader picks. */
+    val audiobookExporter: AudiobookExporter by lazy {
+        val resolver = appContext.contentResolver
+        AudiobookExporter(
+            store = audiobookStore,
+            maker = audiobookMaker,
+            openAudio = { resolver.openInputStream(Uri.parse(it)) },
+            audioInfo = { address ->
+                val uri = Uri.parse(address)
+                val name = try {
+                    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                        ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                } catch (_: Exception) {
+                    null
+                }
+                AudioInfo(name, try { resolver.getType(uri) } catch (_: Exception) { null })
+            },
+            openTree = { tree ->
+                try {
+                    ResolverDocumentTree(resolver, tree)
+                } catch (_: IllegalArgumentException) {
+                    // Not a tree address.
+                    null
+                }
+            },
+            openOutput = { resolver.openOutputStream(it, "wt") },
+        )
+    }
 
     /** What the audiobook worker needs; the worker is created by WorkManager, so it asks for this. */
     val audiobookEnvironment: AudiobookEnvironment by lazy {

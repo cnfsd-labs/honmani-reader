@@ -24,6 +24,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   themselves. Previous/next move one subtitle, speed 0.5 to 1.5, the place is remembered per book.
   Subtitles not in the book are skipped; if fewer than half are found, the bar asks whether the files fit.
   Or make one with your own Google Cloud voice (costs money, shown before you start, with a spending cap).
+  "Export audiobook" (the audiobook dialog or a book's sheet in the library) saves the audio and an SRT into a folder you pick
 - Named bookmarks (reader menu): as many places per book as you like, jump from a list, rename or delete
   (Undo); a slider over the book shows the place as % and characters and jumps on release. After a jump,
   "Back to where you were" returns. Bookmarks are in the backup

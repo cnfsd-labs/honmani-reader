@@ -454,6 +454,13 @@
     <string name="audiobook_change">Change files</string>
     <string name="audiobook_remove">Remove</string>
     <string name="audiobook_removed">Audiobook removed from this book</string>
+    <string name="audiobook_export">Export audiobook</string>
+    <string name="audiobook_export_saved">Saved %1$s\'s audiobook to the folder</string>
+    <string name="audiobook_export_nothing">There is no finished audiobook to export for this book.</string>
+    <string name="audiobook_export_missing">The audio file could not be read. It may have been moved or deleted; choose it again with Change files.</string>
+    <string name="audiobook_export_folder">That folder could not be used. Try another one.</string>
+    <string name="audiobook_export_space">The audiobook could not be saved: there is not enough free space there.</string>
+    <string name="audiobook_export_failed">The audiobook could not be saved. Try another folder.</string>
     <string name="audiobook_subtitles_unreadable">Couldn\'t read the subtitle file.</string>
     <string name="audiobook_previous">Previous subtitle</string>
     <string name="audiobook_next">Next subtitle</string>

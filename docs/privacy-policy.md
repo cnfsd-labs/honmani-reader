@@ -12,7 +12,9 @@ on your phone, in Honmani's own app storage. Uninstalling the app deletes them.
 
 If you pair an audiobook with a book (reader menu, Audiobook), Honmani plays the audio file you chose
 where it is (it keeps no copy), and keeps a copy of the subtitle file and where you stopped. These stay
-on your phone, are not part of Android's backup, and are deleted when you remove the audiobook or the book.
+on your phone, are not part of Android's backup, and are deleted when you remove the audiobook or the book. If you
+export an audiobook, Honmani writes the audio and subtitles only into the folder you choose and sends
+them nowhere.
 
 If you have turned on Android's backup to your Google account (or move to a new phone with
 Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki

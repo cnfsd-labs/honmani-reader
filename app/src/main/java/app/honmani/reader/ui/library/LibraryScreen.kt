@@ -139,6 +139,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.readaloud.AudiobookExportResult
 import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.AutoImportStatus
@@ -212,6 +213,13 @@ fun LibraryScreen(
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
         if (it != null) viewModel.exportLibrary(it)
     }
+    // A book's audiobook (audio and subtitles) into a folder the reader picks.
+    var exportingAudiobook by rememberSaveable { mutableStateOf<Long?>(null) }
+    val audiobookPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) {
+        val id = exportingAudiobook
+        exportingAudiobook = null
+        if (it != null && id != null) viewModel.exportAudiobook(id, it)
+    }
     // Books that appeared in the watched folder since the library was last open.
     LaunchedEffect(viewModel) { viewModel.scanWatchedFolder() }
     LaunchedEffect(addBookOnStart) {
@@ -257,7 +265,8 @@ fun LibraryScreen(
                 else -> null
             }
             val longLived = retry != null || failed is LibraryNotice.ReaderFailed ||
-                failed is LibraryNotice.ResetFailed || failed is LibraryNotice.CopyFailed
+                failed is LibraryNotice.ResetFailed || failed is LibraryNotice.CopyFailed ||
+                (failed is LibraryNotice.AudiobookExport && failed.result !is AudiobookExportResult.Saved)
             val result = snackbarHostState.showSnackbar(
                 message = noticeText,
                 actionLabel = if (retry != null) retryLabel else null,
@@ -384,6 +393,11 @@ fun LibraryScreen(
             onMarkFinished = viewModel::markFinished,
             onSetHidden = viewModel::setHidden,
             onSaveCopy = saveCopy,
+            audiobookExportable = { viewModel.audiobookExportable(it.contentHash) },
+            onExportAudiobook = { book ->
+                exportingAudiobook = book.id
+                audiobookPicker.launch(null)
+            },
             onFilter = viewModel::setFilter,
             onSelectFolder = viewModel::selectFolder,
             onSetFoldersOpen = viewModel::setFoldersOpen,
@@ -485,6 +499,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.ResetFailed -> stringResource(R.string.library_reset_failed, notice.title)
     is LibraryNotice.CopySaved -> stringResource(R.string.library_copy_saved, notice.title)
     is LibraryNotice.CopyFailed -> stringResource(R.string.library_copy_failed, notice.title)
+    is LibraryNotice.AudiobookExport -> notice.result.message(LocalContext.current, notice.title)
     is LibraryNotice.PassedWhileReading -> pluralStringResource(R.plurals.passed_while_reading, notice.count, notice.count)
     is LibraryNotice.FolderImported -> {
         val resources = LocalContext.current.resources
@@ -550,6 +565,9 @@ private fun LibraryContent(
     modifier: Modifier = Modifier,
     onSetHidden: (id: Long, hidden: Boolean) -> Unit = { _, _ -> },
     onSaveCopy: (LibraryBook) -> Unit = {},
+    /** Whether the book has an audiobook that can be exported (checked when its sheet opens). */
+    audiobookExportable: suspend (LibraryBook) -> Boolean = { false },
+    onExportAudiobook: (LibraryBook) -> Unit = {},
     onShowHidden: (Boolean) -> Unit = {},
     onSelectFolder: (Long?) -> Unit = {},
     onSetFoldersOpen: (Boolean) -> Unit = {},
@@ -758,6 +776,7 @@ private fun LibraryContent(
 
     // The book as the library has it now, so the sheet follows its changes (finished, hidden).
     detailsFor?.let { id -> books?.firstOrNull { it.id == id } }?.let { book ->
+        val canExportAudiobook by produceState(false, book.id, book.contentHash) { value = audiobookExportable(book) }
         BookSheet(
             book = book,
             onDismiss = { detailsFor = null },
@@ -774,6 +793,8 @@ private fun LibraryContent(
             },
             onRemove = { pendingRemove = book },
             onSaveCopy = { onSaveCopy(book) },
+            canExportAudiobook = canExportAudiobook,
+            onExportAudiobook = { onExportAudiobook(book) },
             folders = uiState.folders,
             onMoveToFolder = { folderId ->
                 onMoveToFolder(book.id, folderId)
