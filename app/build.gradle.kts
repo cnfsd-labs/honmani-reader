@@ -268,9 +268,9 @@ val buildTtu = tasks.register<BuildTtuTask>("buildTtu") {
 
 // A unit test that hangs (a socket or a flow waiting forever) fails the build after a while and
 // is the last one named in the log, instead of holding CI until it is cancelled. The whole
-// suite takes well under a minute.
+// suite takes about three minutes.
 tasks.withType<Test>().configureEach {
-    timeout.set(Duration.ofMinutes(10))
+    timeout.set(Duration.ofMinutes(6))
     testLogging { events("started", "failed") }
     // The one-off Aozora grading run (AozoraIndexGrader, scripts/aozora-index/README.md): hours
     // long, so no timeout, more heap, visible output, and never taken as up to date.

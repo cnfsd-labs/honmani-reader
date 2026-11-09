@@ -98,6 +98,9 @@ class LibraryViewModelTest {
         value
     }
 
+    /** The next notice; fails after a while instead of holding the build when none comes. */
+    private suspend fun nextNotice(): LibraryNotice = withTimeout(5_000) { viewModel.notices.first() }
+
     private suspend fun addAndWait(name: String, bytes: ByteArray): BookEntity {
         val before = dao.books.value.size
         viewModel.add(listOf(pick(name, bytes)))
@@ -133,7 +136,7 @@ class LibraryViewModelTest {
         page.failImports = true
         viewModel.add(listOf(pick("neko.epub", TestBooks.epub())))
 
-        assertEquals(LibraryNotice.ReaderFailed("吾輩は猫である"), viewModel.notices.first())
+        assertEquals(LibraryNotice.ReaderFailed("吾輩は猫である"), nextNotice())
         assertTrue(dao.books.value.isEmpty())
         assertTrue(File(folder.root, "books").list()!!.isEmpty())
     }
@@ -143,7 +146,7 @@ class LibraryViewModelTest {
         addAndWait("neko.epub", TestBooks.epub())
         viewModel.add(listOf(pick("copy.epub", TestBooks.epub())))
 
-        assertEquals(LibraryNotice.AlreadyInLibrary("吾輩は猫である"), viewModel.notices.first())
+        assertEquals(LibraryNotice.AlreadyInLibrary("吾輩は猫である"), nextNotice())
         assertEquals(1, dao.books.value.size)
     }
 
@@ -151,8 +154,8 @@ class LibraryViewModelTest {
     fun unsupportedAndUnreadableFilesAreReported() = runBlocking {
         viewModel.add(listOf(pick("a.pdf", "%PDF".toByteArray()), Uri.parse("content://files/missing.epub")))
 
-        assertEquals(LibraryNotice.Unsupported("a.pdf"), viewModel.notices.first())
-        assertEquals(LibraryNotice.Unreadable("missing.epub"), viewModel.notices.first())
+        assertEquals(LibraryNotice.Unsupported("a.pdf"), nextNotice())
+        assertEquals(LibraryNotice.Unreadable("missing.epub"), nextNotice())
     }
 
     @Test
@@ -198,9 +201,9 @@ class LibraryViewModelTest {
     @Test
     fun emptyOrHugeSharedTextOnlyGetsAMessage() = runBlocking {
         viewModel.addText("  \n ", "Title")
-        assertEquals(LibraryNotice.TextEmpty, viewModel.notices.first())
+        assertEquals(LibraryNotice.TextEmpty, nextNotice())
         viewModel.addText("あ".repeat(SharedText.MAX_BYTES), null)
-        assertEquals(LibraryNotice.TextTooLarge, viewModel.notices.first())
+        assertEquals(LibraryNotice.TextTooLarge, nextNotice())
         assertEquals(0, dao.books.value.size)
     }
 
@@ -222,11 +225,11 @@ class LibraryViewModelTest {
         val book = addAndWait("neko.epub", bytes)
 
         viewModel.saveCopy(book.id, Uri.parse("content://downloads/neko.epub"))
-        assertEquals(LibraryNotice.CopySaved("吾輩は猫である"), viewModel.notices.first())
+        assertEquals(LibraryNotice.CopySaved("吾輩は猫である"), nextNotice())
         assertTrue(bytes.contentEquals(saved.getValue("content://downloads/neko.epub")))
 
         viewModel.saveCopy(book.id, Uri.parse("content://readonly/neko.epub"))
-        assertEquals(LibraryNotice.CopyFailed("吾輩は猫である"), viewModel.notices.first())
+        assertEquals(LibraryNotice.CopyFailed("吾輩は猫である"), nextNotice())
         assertEquals("a_b.txt", LibraryViewModel.copyFileName("a/b", BookFormat.TXT))
     }
 
@@ -271,7 +274,7 @@ class LibraryViewModelTest {
 
         viewModel.importFolder(Uri.parse("content://tree/root"))
 
-        assertEquals(LibraryNotice.FolderImported(3, 1, 1, stopped = false, incomplete = false), viewModel.notices.first())
+        assertEquals(LibraryNotice.FolderImported(3, 1, 1, stopped = false, incomplete = false), nextNotice())
         assertEquals(listOf("A", "B", "C"), dao.books.value.map { it.title })
         assertTrue(dao.books.value.all { it.ttuId != null })
         assertNull(viewModel.uiState.value.batch)
@@ -380,7 +383,7 @@ class LibraryViewModelTest {
 
         viewModel.importFolder(Uri.parse("content://tree/root"))
 
-        assertEquals(LibraryNotice.NoBooksInFolder, viewModel.notices.first())
+        assertEquals(LibraryNotice.NoBooksInFolder, nextNotice())
     }
 
     @Test
@@ -393,7 +396,7 @@ class LibraryViewModelTest {
 
         viewModel.importFolder(Uri.parse("content://tree/root"))
 
-        val notice = viewModel.notices.first() as LibraryNotice.FolderImported
+        val notice = nextNotice() as LibraryNotice.FolderImported
         assertEquals(LibraryNotice.FolderImported(2, 0, 0, stopped = true, incomplete = false), notice)
         assertEquals(2, dao.books.value.size)
         assertNull(eventually { viewModel.uiState.value.takeIf { it.batch == null } }.batch)
@@ -413,7 +416,7 @@ class LibraryViewModelTest {
 
         viewModel.exportLibrary(Uri.parse("content://tree/root"))
 
-        assertEquals(LibraryNotice.LibraryExported(3, 0, stopped = false), viewModel.notices.first())
+        assertEquals(LibraryNotice.LibraryExported(3, 0, stopped = false), nextNotice())
         assertEquals(
             setOf("content://tree/root/Neko (2).epub", "content://tree/root/Neko (3).epub", "content://tree/root/a_b.epub"),
             written.keys,
@@ -430,7 +433,7 @@ class LibraryViewModelTest {
 
         viewModel.exportLibrary(Uri.parse("content://tree/root"))
 
-        assertEquals(LibraryNotice.LibraryExported(1, 1, stopped = false), viewModel.notices.first())
+        assertEquals(LibraryNotice.LibraryExported(1, 1, stopped = false), nextNotice())
         assertEquals(listOf(Uri.parse("content://tree/root/bad.epub")), tree.deleted)
     }
 
@@ -440,7 +443,7 @@ class LibraryViewModelTest {
 
         viewModel.exportLibrary(Uri.parse("content://tree/root"))
 
-        assertEquals(LibraryNotice.NothingToExport, viewModel.notices.first())
+        assertEquals(LibraryNotice.NothingToExport, nextNotice())
     }
 
     @Test
@@ -571,7 +574,7 @@ class LibraryViewModelTest {
 
         viewModel.resetProgress(book.id)
 
-        assertEquals(LibraryNotice.ResetFailed("吾輩は猫である", book.id), viewModel.notices.first())
+        assertEquals(LibraryNotice.ResetFailed("吾輩は猫である", book.id), nextNotice())
     }
 
     @Test

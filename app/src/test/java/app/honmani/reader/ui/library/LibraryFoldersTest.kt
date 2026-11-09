@@ -61,8 +61,12 @@ class LibraryFoldersTest {
 
     @After
     fun tearDown() {
-        database.close()
-        Dispatchers.resetMain()
+        // setUp may have failed before the database existed; do not hide that error with a second one.
+        try {
+            if (::database.isInitialized) database.close()
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     private suspend fun addBook(title: String, progress: Float = 0f) = database.bookDao().insert(

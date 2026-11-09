@@ -6,6 +6,8 @@ import java.util.zip.ZipOutputStream
 
 /** Builds small EPUBs for tests. */
 object TestBooks {
+    private const val FIXED_TIME = 1_700_000_000_000L
+
     /** A 1×1 PNG. */
     val PNG: ByteArray = byteArrayOf(
         0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -56,7 +58,9 @@ object TestBooks {
         val out = ByteArrayOutputStream()
         ZipOutputStream(out).use { zip ->
             for ((name, bytes) in entries) {
-                zip.putNextEntry(ZipEntry(name))
+                // A fixed time: the same book built twice must hash the same (a ZipEntry without a
+                // time takes the clock, so two builds across a 2 s tick were different files).
+                zip.putNextEntry(ZipEntry(name).apply { time = FIXED_TIME })
                 zip.write(bytes)
                 zip.closeEntry()
             }
