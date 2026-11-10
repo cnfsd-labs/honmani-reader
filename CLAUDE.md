@@ -92,8 +92,7 @@ public: never copy those notes, personal details or discussions into it.
   don't push while someone waits for an APK.
 - **Test APKs:** artifact `honmani-test-apks` of a green run -> `app-internal.apk`; every run signs with
   a new key (uninstall the old build first). Give the direct link `.../actions/runs/<run>/artifacts/<id>`.
-- CI flake: `read-aloud-ttu.spec.js` "paginated mode goes on into the next chapter" fails now and then
-  and passes locally; the token cannot rerun jobs, so push a small commit to get a new run.
+- CI flake: the token cannot rerun jobs, so push a small commit to get a new run.
 - Cloud sandbox: Google Maven is blocked, so CI is the only Android compiler. Linux's default CJK font
   has broken vertical metrics: tests use `IPAGothic`.
 

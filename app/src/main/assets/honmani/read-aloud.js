@@ -387,6 +387,12 @@
     }
     session.gen = message.gen;
     const gen = message.gen;
+    // A mark still turning pages to its sentence would turn back the page turns below, and the
+    // section that does not come would be taken for the end of the book: let it finish first
+    // (marks not yet started are dropped, they belong to the old generation).
+    const current = session;
+    await current.queue.catch(() => {});
+    if (session !== current || session.gen !== gen) return;
     const root = rootElement();
     if (!root || !isPaginated()) {
       post({ type: 'readAloud.sentences', gen, items: [], end: 'book' });

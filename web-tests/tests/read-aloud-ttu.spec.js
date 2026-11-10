@@ -254,7 +254,7 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
 }
 
 /** Reads the whole book aloud in paginated mode, advancing from chapter to chapter. */
-async function readThroughChapters(page, lateKeys = false) {
+async function readThroughChapters(page, { lateKeys = false, markBehind = false } = {}) {
   await openBook(page, BOOK, 'paginated', 'horizontal-tb');
   let reply = await ask(page, 'begin', { count: 10 });
   const all = [...reply.items];
@@ -263,6 +263,11 @@ async function readThroughChapters(page, lateKeys = false) {
   while (guard++ < 200) {
     if (reply.end === 'section') {
       if (lateKeys) await page.evaluate(() => (window.__lateKeys = true));
+      if (markBehind) {
+        // The voice reaches a sentence pages back (its mark turns back to it) just before the advance.
+        const index = all[all.length - 40].i;
+        await page.evaluate(([gen, index]) => window.__listener({ data: JSON.stringify({ type: 'readAloud.mark', gen, index, offset: 0 }) }), [gen, index]);
+      }
       reply = await ask(page, 'advance', { count: 10 });
       if (lateKeys) await page.evaluate(() => (window.__lateKeys = false));
       if (reply.end === 'book' && reply.items.length === 0) break;
@@ -307,7 +312,16 @@ test('a section that loads late after the last page turn is not taken for the en
       true,
     );
   });
-  await readThroughChapters(page, true);
+  await readThroughChapters(page, { lateKeys: true });
+});
+
+// The mark of the sentence before still turning pages to it when the advance came (the test's
+// speak() can return on the old mark): its page turns back undid the advance's turn past the
+// chapter's end, and the next section never coming was taken for the end of the book (300 of 450
+// in CI, the advance taking SECTION_LOAD_MS). The advance now lets the mark's turns finish first.
+test('a mark still turning pages when the advance comes does not end the book early', async ({ page }) => {
+  test.setTimeout(180_000);
+  await readThroughChapters(page, { markBehind: true });
 });
 
 test('continuous mode reads through every chapter to the end of the book', async ({ page }) => {
