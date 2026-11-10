@@ -28,13 +28,18 @@ data class Token(val start: Int, val length: Int, val rank: Int, val key: String
  * unknown token per character, or per run of katakana (a name such as メロス), and a run of
  * katakana is not split into one-character words.
  */
-class Segmenter(private val lexicon: Lexicon) {
+class Segmenter(private val lexicon: Lexicon, private val maxCached: Int = MAX_CACHED) {
     private class Hit(val key: String, val rank: Int, val inflections: Int) {
         val cost: Double = costOf(rank) + inflections * INFLECTION_COST
     }
 
-    /** Prefixes seen before, with what they matched (null: nothing). Short ones repeat a lot. */
+    /**
+     * Prefixes seen before, with what they matched (null: nothing). Short ones repeat a lot. Cleared
+     * when full: one segmenter outlives many books, and new prefixes would otherwise keep coming.
+     */
     private val cache = HashMap<String, Hit?>()
+
+    internal val cachedPrefixes: Int get() = cache.size
 
     fun segment(text: String, onToken: (Token) -> Unit) {
         var i = 0
@@ -107,7 +112,10 @@ class Segmenter(private val lexicon: Lexicon) {
                 if (best == null || hit.cost < best.cost) best = hit
             }
         }
-        if (source.length <= CACHED_LENGTH) cache[source] = best
+        if (source.length <= CACHED_LENGTH) {
+            if (cache.size >= maxCached) cache.clear()
+            cache[source] = best
+        }
         return best
     }
 
@@ -122,6 +130,9 @@ class Segmenter(private val lexicon: Lexicon) {
         const val MAX_LENGTH = 20
 
         private const val CACHED_LENGTH = 6
+
+        /** About 30 MB of prefixes; a book uses far fewer. */
+        internal const val MAX_CACHED = 200_000
 
         /** Rank assumed for words in a dictionary but in no frequency list. */
         internal const val RARE_RANK = 500_000

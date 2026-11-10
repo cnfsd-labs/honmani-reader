@@ -2,6 +2,7 @@ package app.honmani.reader.data.difficulty
 
 import app.honmani.reader.lookup.WordClass
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SegmenterTest {
@@ -85,5 +86,20 @@ class SegmenterTest {
     @Test
     fun punctuationAndLatinAreSkipped() {
         assertEquals(listOf("猫", "である"), split("「猫」である。ABC 123"))
+    }
+
+    @Test
+    fun theCacheStaysBoundedAcrossManyBooks() {
+        val segmenter = Segmenter(lexicon, maxCached = 500)
+        val random = kotlin.random.Random(7)
+        val kana = ('ぁ'..'ゖ').toList()
+        val reference = "吾輩は猫である。名前はまだ無い。"
+        val before = buildList { segmenter.segment(reference) { add(it.key) } }
+        repeat(5) {
+            val book = String(CharArray(1_000) { kana[random.nextInt(kana.size)] })
+            segmenter.segment(book) { }
+            assertTrue(segmenter.cachedPrefixes <= 500)
+        }
+        assertEquals(before, buildList { segmenter.segment(reference) { add(it.key) } })
     }
 }
