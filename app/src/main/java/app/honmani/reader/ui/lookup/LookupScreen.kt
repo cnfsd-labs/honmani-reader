@@ -200,13 +200,14 @@ private fun TextCharacters(text: String, selected: Int, onTap: (Int) -> Unit) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(CHARACTER_SIZE)
+                    .size(CHARACTER_TOUCH_SIZE)
+                    .clickable(role = Role.Button) { onTap(at) }
+                    .semantics { contentDescription = "$character, $description" }
+                    .padding((CHARACTER_TOUCH_SIZE - CHARACTER_SIZE) / 2)
                     .background(
                         if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                         RoundedCornerShape(8.dp),
-                    )
-                    .clickable(role = Role.Button) { onTap(at) }
-                    .semantics { contentDescription = "$character, $description" },
+                    ),
             ) {
                 Text(
                     character,
@@ -232,3 +233,6 @@ internal fun lookupAt(text: String, at: Int): TapLookup {
 private const val SCAN_LENGTH = 20
 private const val SCRIM_ALPHA = 0.32f
 private val CHARACTER_SIZE = 44.dp
+
+/** Each character takes touches over a full touch target; its mark stays [CHARACTER_SIZE]. */
+private val CHARACTER_TOUCH_SIZE = 48.dp

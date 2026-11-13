@@ -65,6 +65,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -97,6 +98,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -206,7 +208,7 @@ fun LookupPanel(
     val heights = PanelSizing.heights(
         available = with(density) { availableHeight.toPx() },
         minCollapsed = with(density) { MIN_COLLAPSED.toPx() },
-        roomAbove = with(density) { (BUBBLE_HEIGHT + BUBBLE_GAP).toPx() },
+        roomAbove = with(density) { (BUBBLE_TOUCH_HEIGHT - BUBBLE_INSET + BUBBLE_GAP).toPx() },
     )
     val maxExtra = rememberUpdatedState(heights.extra)
     // A new tap opens collapsed; navigation inside the panel keeps the tap and so the state.
@@ -331,7 +333,7 @@ fun LookupPanel(
             onShorter = onShorterMatch,
             onLonger = onLongerMatch,
             onCopy = { copy(bubble.text) },
-            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = BUBBLE_GAP),
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = BUBBLE_GAP - BUBBLE_INSET),
         )
     }
     Surface(
@@ -678,58 +680,62 @@ private fun SelectionBubbleRow(
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shadowElevation = 3.dp,
-    ) {
-        Row(
-            modifier = Modifier.height(BUBBLE_HEIGHT).padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (bubble.hasArrows) {
-                BubbleButton(
-                    label = stringResource(R.string.lookup_match_shorter),
-                    enabled = bubble.canShorten,
-                    onClick = onShorter,
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null) }
-            }
-            Text(
-                text = bubble.text,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .widthIn(min = 32.dp)
-                    .padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
-            )
-            if (bubble.hasArrows) {
-                BubbleButton(
-                    label = stringResource(R.string.lookup_match_longer),
-                    enabled = bubble.canLengthen,
-                    onClick = onLonger,
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
-            }
-            if (bubble.canCopy) {
-                BubbleButton(label = stringResource(R.string.lookup_copy_word), onClick = onCopy) {
-                    Icon(painterResource(R.drawable.ic_copy), contentDescription = null, modifier = Modifier.size(18.dp))
+    // The pill is BUBBLE_HEIGHT tall; its buttons take touches over the full BUBBLE_TOUCH_HEIGHT.
+    Box(modifier = modifier.height(BUBBLE_TOUCH_HEIGHT)) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .padding(vertical = BUBBLE_INSET)
+                .shadow(3.dp, CircleShape)
+                .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape),
+        )
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSecondaryContainer) {
+            Row(
+                modifier = Modifier.height(BUBBLE_TOUCH_HEIGHT).padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (bubble.hasArrows) {
+                    BubbleButton(
+                        label = stringResource(R.string.lookup_match_shorter),
+                        enabled = bubble.canShorten,
+                        onClick = onShorter,
+                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null) }
+                }
+                Text(
+                    text = bubble.text,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .widthIn(min = 32.dp)
+                        .padding(horizontal = if (bubble.hasArrows) 0.dp else 8.dp),
+                )
+                if (bubble.hasArrows) {
+                    BubbleButton(
+                        label = stringResource(R.string.lookup_match_longer),
+                        enabled = bubble.canLengthen,
+                        onClick = onLonger,
+                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
+                }
+                if (bubble.canCopy) {
+                    BubbleButton(label = stringResource(R.string.lookup_copy_word), onClick = onCopy) {
+                        Icon(painterResource(R.drawable.ic_copy), contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         }
     }
 }
 
-/** A button of the bubble: as wide as any touch target, as tall as the bubble. */
+/** A button of the bubble: a full touch target, over the bubble's height and a little beyond. */
 @Composable
 private fun BubbleButton(label: String, onClick: () -> Unit, enabled: Boolean = true, icon: @Composable () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(width = 48.dp, height = BUBBLE_HEIGHT)
+            .size(width = 48.dp, height = BUBBLE_TOUCH_HEIGHT)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label }
             .alpha(if (enabled) 1f else 0.3f),
@@ -779,6 +785,8 @@ private fun PanelMenu(
 /** The header row: the height of its buttons, for the thumb at the bottom of a tall phone. */
 private val HEADER_HEIGHT = 48.dp
 private val BUBBLE_HEIGHT = 40.dp
+private val BUBBLE_TOUCH_HEIGHT = 48.dp
+private val BUBBLE_INSET = (BUBBLE_TOUCH_HEIGHT - BUBBLE_HEIGHT) / 2
 private val BUBBLE_GAP = 6.dp
 
 /** In a short (landscape) area the collapsed panel is at least this tall, up to 60% of the area. */
