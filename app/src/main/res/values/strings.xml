@@ -1117,6 +1117,14 @@
         <item quantity="one">%1$d day of reading in the last year</item>
         <item quantity="other">%1$d days of reading in the last year</item>
     </plurals>
+    <plurals name="progress_calendar_summary">
+        <item quantity="one">Read on %1$d of %2$d day, %3$s in all</item>
+        <item quantity="other">Read on %1$d of %2$d days, %3$s in all</item>
+    </plurals>
+    <plurals name="progress_calendar_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
     <string name="progress_calendar_older">Older weeks</string>
     <string name="progress_calendar_newer">Newer weeks</string>
     <string name="progress_calendar_range">%1$s – %2$s</string>

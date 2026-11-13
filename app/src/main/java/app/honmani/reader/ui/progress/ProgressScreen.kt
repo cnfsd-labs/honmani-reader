@@ -69,6 +69,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -533,7 +534,14 @@ private fun ReadingCalendar(calendar: Map<LocalDate, Long>, today: LocalDate) {
                             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.progress_calendar_newer))
                         }
                     }
-                    Canvas(modifier = Modifier.fillMaxWidth().height((cellDp + GAP) * 7 - GAP)) {
+                    // The cells say it only by colour: one sentence for the shown weeks instead.
+                    val shownLast = minOf(lastMonday.plusDays(6), today)
+                    val shownDays = generateSequence(shownFirst) { it.plusDays(1) }.takeWhile { it <= shownLast }.toList()
+                    val readDays = shownDays.count { (calendar[it] ?: 0L) >= 60 }
+                    val shownMinutes = shownDays.sumOf { calendar[it] ?: 0L } / 60
+                    val minutesText = pluralStringResource(R.plurals.progress_calendar_minutes, shownMinutes.toInt(), shownMinutes)
+                    val summary = pluralStringResource(R.plurals.progress_calendar_summary, shownDays.size, readDays, shownDays.size, minutesText)
+                    Canvas(modifier = Modifier.fillMaxWidth().height((cellDp + GAP) * 7 - GAP).semantics { contentDescription = summary }) {
                         val cell = cellDp.toPx()
                         val step = (cellDp + GAP).toPx()
                         for (week in 0 until weeks) {
