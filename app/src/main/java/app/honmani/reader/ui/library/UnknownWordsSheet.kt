@@ -1,7 +1,6 @@
 package app.honmani.reader.ui.library
 
 import android.widget.Toast
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -138,7 +139,9 @@ fun UnknownWordsSheet(contentHash: String, viewModel: StatisticsViewModel, onDis
                                         Color.Transparent
                                     },
                                 ),
-                                modifier = Modifier.clickable { if (selected) chosen -= word.key else chosen += word.key },
+                                modifier = Modifier.toggleable(value = selected, role = Role.Checkbox) { checked ->
+                                    if (checked) chosen += word.key else chosen -= word.key
+                                },
                             )
                             HorizontalDivider()
                         }
