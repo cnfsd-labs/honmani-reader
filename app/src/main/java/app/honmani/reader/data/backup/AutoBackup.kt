@@ -4,6 +4,7 @@ import app.honmani.reader.diagnostics.logWarning
 import android.content.SharedPreferences
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,10 @@ import kotlinx.coroutines.withContext
  * After a new install with such a file from the old phone, the reader is asked once whether to
  * restore it ([offer]); until they answer it is not overwritten, so starting the app doesn't
  * replace the old phone's backup with an empty one.
+ *
+ * It is written whenever the app asks ([save]: on leaving a book, on going to the background) and
+ * its content changed since the last one ([fingerprint], kept in [device]): nothing is rewritten
+ * while nothing changed, whatever the time.
  *
  * A backup over [MAX_BYTES] would make Android skip all of the app's backup, so it never goes into
  * [dir]: the last smaller one stays there, and the big one is kept in [largeDir] (outside the backup
@@ -49,7 +54,7 @@ class AutoBackup(
 
     /** What [save] did. */
     enum class Outcome {
-        /** Nothing was written (not due, an offer waits, the backup couldn't be made or written). */
+        /** Nothing was written (nothing changed, an offer waits, the backup couldn't be made or written). */
         Skipped,
 
         /** [file] is the new backup. */
@@ -90,22 +95,17 @@ class AutoBackup(
     suspend fun read(): BackupFile = withContext(Dispatchers.IO) { file.inputStream().buffered().use(BackupCodec::read) }
 
     /** [save] as a yes or no: whether a new backup went into [file]. */
-    suspend fun saveIfDue(force: Boolean = false, make: suspend () -> BackupFile): Boolean =
+    suspend fun saveIfChanged(force: Boolean = false, make: suspend () -> BackupFile): Boolean =
         save(force, make) == Outcome.Saved
 
     /**
-     * Writes a new backup with [make] if the last one is older than [MIN_INTERVAL_MS] (or [force]),
+     * Writes a new backup with [make] if its content differs from the last one's (or [force]),
      * unless an offer waits for an answer. A backup over [MAX_BYTES], which Android's limit for all
      * of an app's backup would reject, does not replace [file]: it goes to [largeFile] and counts as
-     * the last backup for the interval.
+     * the last backup.
      */
     suspend fun save(force: Boolean = false, make: suspend () -> BackupFile): Outcome = mutex.withLock {
         if (!device.getBoolean(KEY_ANSWERED, false)) return Outcome.Skipped
-        val last = withContext(Dispatchers.IO) {
-            listOf(file, largeFile).filter { it.isFile }.maxOfOrNull { it.lastModified() }
-        }
-        // A backup dated in the future (the clock was set back) is not recent: it would block saving.
-        if (!force && last != null && now() - last in 0 until MIN_INTERVAL_MS) return Outcome.Skipped
         val made = try {
             make()
         } catch (e: CancellationException) {
@@ -128,7 +128,10 @@ class AutoBackup(
             }
             if (earlier != null) made.copy(readerSettings = earlier) else made
         }
-        withContext(Dispatchers.IO) {
+        val content = fingerprint(backup)
+        val stored = withContext(Dispatchers.IO) { (if (tooLarge.value) largeFile else file).isFile }
+        if (!force && stored && device.getString(KEY_FINGERPRINT, null) == content) return Outcome.Skipped
+        val outcome = withContext(Dispatchers.IO) {
             // A full storage must not take the app down as it goes to the background: the last
             // backup stays, and the next one is tried next time.
             val partial = File(dir, "$FILE_NAME.part")
@@ -163,6 +166,8 @@ class AutoBackup(
                 Outcome.Skipped
             }
         }
+        if (outcome != Outcome.Skipped) device.edit().putString(KEY_FINGERPRINT, content).apply()
+        outcome
     }
 
     companion object {
@@ -172,11 +177,20 @@ class AutoBackup(
         /** Beside [DIRECTORY] (`DIRECTORY-large`), not in it: the backup rules include only [DIRECTORY]. */
         const val LARGE_DIRECTORY = "auto-backup-large"
         const val FILE_NAME = "honmani-backup.zip"
-        const val MIN_INTERVAL_MS = 6 * 60 * 60 * 1000L
 
         /** Android backs up at most 25 MB per app; the settings and some room stay free. */
         const val MAX_BYTES = 10L * 1024 * 1024
 
         private const val KEY_ANSWERED = "auto_backup_offer_answered"
+
+        /** [fingerprint] of the last backup written; on this phone only, like [KEY_ANSWERED]. */
+        private const val KEY_FINGERPRINT = "auto_backup_fingerprint"
+
+        /** What the backup holds, without when it was made: the same data gives the same value. */
+        private fun fingerprint(backup: BackupFile): String {
+            val json = BackupCodec.toJson(backup.copy(exportedAt = 0))
+            return MessageDigest.getInstance("SHA-256").digest(json.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        }
     }
 }

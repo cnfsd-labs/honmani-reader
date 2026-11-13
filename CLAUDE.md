@@ -39,8 +39,8 @@ public: never copy those notes, personal details or discussions into it.
   data). Day columns: `reading_day.day` is `yyyy-MM-dd` text, `read_day.day` an epoch-day number (both local dates; permanent once frozen). Once frozen: a change needs a new version, a migration in `HonmaniDatabase.MIGRATIONS`, a test
   in `DatabaseMigrationTest` and the exported JSON committed. No destructive fallback.
 - **Android backup** keeps the `settings` preferences and `files/auto-backup/` (`AutoBackup`: the
-  Settings backup zip, rewritten at most every 6 h when the app goes to the background, dropped over
-  10 MB, offered once on a new install). Everything tied to this phone (first start, encrypted keys,
+  Settings backup zip, rewritten when the reader leaves a book or the app goes to the background, only
+  if its content changed (never on start), dropped over 10 MB, offered once on a new install). Everything tied to this phone (first start, encrypted keys,
   AnkiDroid ids, sync account) is in `device` preferences, never backed up (`BackupRulesTest`). Backed-up setting names and types, the backup file name and the Anki note type ids are permanent (`BackupSettingKeysTest`).
 - **Application ID** `app.honmani.reader` is permanent. Play bundles come from the "Release bundle"
   workflow (tag `release/<version>`: version name from the tag, version code = run number × 10 + attempt); other builds stay unsigned or debug-signed.

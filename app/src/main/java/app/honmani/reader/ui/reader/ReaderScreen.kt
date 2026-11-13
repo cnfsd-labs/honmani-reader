@@ -285,7 +285,6 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             if (event == Lifecycle.Event.ON_STOP) {
                 container.ttuLibrary.requestProgress()
                 container.progressSync.flush()
-                container.saveAutoBackup()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -638,6 +637,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 closeRequests = viewModel.closeRequests,
                 onAtLibraryChanged = {
+                    // Back from a book (or ttu's settings): what was read goes into the backup.
+                    if (it && !atLibrary) container.saveAutoBackup()
                     atLibrary = it
                     if (it) {
                         viewModel.dismiss()

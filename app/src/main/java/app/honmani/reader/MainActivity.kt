@@ -71,8 +71,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        // Whatever screen was open, the sync file (if the reader turned it on) is brought up to date.
-        (application as HonmaniApplication).container.saveSyncFile()
+        // Whatever screen was open, the automatic backup (if anything changed) and the sync file
+        // (if the reader turned it on) are brought up to date.
+        val container = (application as HonmaniApplication).container
+        if (!isChangingConfigurations) container.saveAutoBackup()
+        container.saveSyncFile()
     }
 
     /**

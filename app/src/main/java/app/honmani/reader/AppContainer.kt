@@ -868,8 +868,9 @@ class AppContainer(context: Context) {
     }
 
     /**
-     * Brings [autoBackup] up to date when it is due, as the app goes to the background. ttu's
-     * reader settings come from the reader page, so this starts on the main thread.
+     * Brings [autoBackup] (and the backup folder's copy) up to date if anything changed since the
+     * last one, as the reader leaves a book and as the app goes to the background; never on app
+     * start. ttu's reader settings come from the reader page, so this starts on the main thread.
      */
     fun saveAutoBackup(force: Boolean = false) {
         applicationScope.launch(Dispatchers.Main) { autoBackupNow(force) }

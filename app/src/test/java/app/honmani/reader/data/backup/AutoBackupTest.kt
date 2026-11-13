@@ -30,49 +30,66 @@ class AutoBackupTest {
         auto.checkOffer()
         assertNull(auto.offer.first())
 
-        assertTrue(auto.saveIfDue { backup() })
+        assertTrue(auto.saveIfChanged { backup() })
+        assertEquals(clock, auto.read().exportedAt)
+    }
+
+    private fun changed(at: Long = clock, what: String = "22") =
+        BackupFile(exportedAt = at, readerSettings = mapOf("fontSize" to what))
+
+    @Test
+    fun aBackupIsWrittenAgainAtOnceWhenSomethingChanged() = runBlocking {
+        auto.checkOffer()
+        assertTrue(auto.saveIfChanged { changed(what = "22") })
+
+        clock += 60_000
+        assertTrue(auto.saveIfChanged { changed(what = "30") })
+        assertEquals(clock, auto.read().exportedAt)
+        assertEquals("30", auto.read().readerSettings?.get("fontSize"))
+    }
+
+    @Test
+    fun anUnchangedBackupIsNotRewritten() = runBlocking {
+        auto.checkOffer()
+        assertTrue(auto.saveIfChanged { changed() })
+        val made = clock
+        val stamp = auto.file.lastModified()
+
+        // Only the export's own date differs.
+        clock += 24 * 60 * 60 * 1000L
+        assertEquals(AutoBackup.Outcome.Skipped, auto.save { changed() })
+        assertEquals(made, auto.read().exportedAt)
+        assertEquals(stamp, auto.file.lastModified())
+
+        // Back up now still writes it.
+        assertTrue(auto.saveIfChanged(force = true) { changed() })
         assertEquals(clock, auto.read().exportedAt)
     }
 
     @Test
-    fun aBackupIsWrittenAgainOnlyAfterSomeHours() = runBlocking {
+    fun aMissingBackupIsWrittenAgainEvenWhenUnchanged() = runBlocking {
         auto.checkOffer()
-        assertTrue(auto.saveIfDue { backup() })
+        assertTrue(auto.saveIfChanged { changed() })
+        auto.file.delete()
 
-        clock += AutoBackup.MIN_INTERVAL_MS / 2
-        assertFalse(auto.saveIfDue { backup() })
-        assertTrue(auto.saveIfDue(force = true) { backup() })
-
-        clock += AutoBackup.MIN_INTERVAL_MS
-        assertTrue(auto.saveIfDue { backup() })
-        assertEquals(clock, auto.read().exportedAt)
-    }
-
-    @Test
-    fun aBackupDatedInTheFutureDoesNotBlockSaving() = runBlocking {
-        auto.checkOffer()
-        assertTrue(auto.saveIfDue { backup() })
-        // The clock was set back: the file now looks newer than the present.
-        assertTrue(auto.file.setLastModified(clock + 10 * AutoBackup.MIN_INTERVAL_MS))
-
-        assertTrue(auto.saveIfDue { backup() })
-        assertEquals(clock, auto.read().exportedAt)
+        assertTrue(auto.saveIfChanged { changed() })
+        assertTrue(auto.file.isFile)
     }
 
     @Test
     fun readerSettingsOfTheLastBackupSurviveAnotherWithoutThePage() = runBlocking {
         auto.checkOffer()
         val settings = mapOf("fontSize" to "22", "theme" to null)
-        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = settings) })
+        assertTrue(auto.saveIfChanged { BackupFile(exportedAt = clock, readerSettings = settings) })
 
-        clock += AutoBackup.MIN_INTERVAL_MS
-        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = null) })
+        clock += 60_000
+        assertTrue(auto.saveIfChanged(force = true) { BackupFile(exportedAt = clock, readerSettings = null) })
         assertEquals(clock, auto.read().exportedAt)
         assertEquals(settings, auto.read().readerSettings)
 
-        clock += AutoBackup.MIN_INTERVAL_MS
+        clock += 60_000
         val newer = mapOf("fontSize" to "30")
-        assertTrue(auto.saveIfDue { BackupFile(exportedAt = clock, readerSettings = newer) })
+        assertTrue(auto.saveIfChanged { BackupFile(exportedAt = clock, readerSettings = newer) })
         assertEquals(newer, auto.read().readerSettings)
     }
 
@@ -84,12 +101,12 @@ class AutoBackupTest {
 
         auto.checkOffer()
         assertTrue(auto.offer.first() != null)
-        assertFalse(auto.saveIfDue(force = true) { backup() })
+        assertFalse(auto.saveIfChanged(force = true) { backup() })
         assertEquals(42L, auto.read().exportedAt)
 
         auto.answered()
         assertNull(auto.offer.first())
-        assertTrue(auto.saveIfDue(force = true) { backup() })
+        assertTrue(auto.saveIfChanged(force = true) { backup() })
         assertEquals(clock, auto.read().exportedAt)
 
         // Asked once: the next start offers nothing.
@@ -111,10 +128,10 @@ class AutoBackupTest {
     @Test
     fun aBackupThatCouldNotBeMadeLeavesTheLastOne() = runBlocking {
         auto.checkOffer()
-        assertTrue(auto.saveIfDue { backup() })
-        clock += AutoBackup.MIN_INTERVAL_MS
+        assertTrue(auto.saveIfChanged { backup() })
+        clock += 60_000
 
-        assertFalse(auto.saveIfDue { throw IllegalStateException("reader busy") })
+        assertFalse(auto.saveIfChanged { throw IllegalStateException("reader busy") })
         assertTrue(auto.file.isFile)
     }
 
@@ -124,21 +141,21 @@ class AutoBackupTest {
         val auto = AutoBackup(blocked, device, now = { clock })
         auto.checkOffer()
 
-        assertFalse(auto.saveIfDue { backup() })
+        assertFalse(auto.saveIfChanged { backup() })
         assertFalse(File(blocked, "${AutoBackup.FILE_NAME}.part").exists())
     }
 
     @Test
     fun aFailedWriteKeepsTheLastBackupAndLeavesNoPartFile() = runBlocking {
         auto.checkOffer()
-        assertTrue(auto.saveIfDue { backup() })
+        assertTrue(auto.saveIfChanged { backup() })
         val before = auto.file.readBytes()
         val stamp = auto.file.lastModified()
 
         // The temporary file can't be opened: its name is taken by a directory.
         val partial = File(dir, "${AutoBackup.FILE_NAME}.part").apply { mkdirs() }
-        clock += AutoBackup.MIN_INTERVAL_MS
-        assertFalse(auto.saveIfDue { backup() })
+        clock += 60_000
+        assertFalse(auto.saveIfChanged { changed() })
 
         assertFalse(partial.exists())
         assertTrue(before.contentEquals(auto.file.readBytes()))
@@ -147,7 +164,7 @@ class AutoBackupTest {
         assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
 
         // The next attempt works again.
-        assertTrue(auto.saveIfDue(force = true) { backup() })
+        assertTrue(auto.saveIfChanged(force = true) { backup() })
         assertEquals(clock, auto.read().exportedAt)
     }
 
@@ -157,7 +174,7 @@ class AutoBackupTest {
         // The rename fails: the backup's name is taken by a directory that isn't empty.
         File(auto.file, "in-the-way").apply { parentFile?.mkdirs() }.writeText("x")
 
-        assertFalse(auto.saveIfDue { backup() })
+        assertFalse(auto.saveIfChanged { backup() })
 
         assertFalse(File(dir, "${AutoBackup.FILE_NAME}.part").exists())
         assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
@@ -182,22 +199,23 @@ class AutoBackupTest {
         val before = auto.file.readBytes()
         assertFalse(auto.tooLarge.value)
 
-        clock += AutoBackup.MIN_INTERVAL_MS
+        val savedAt = clock
+        clock += 60_000
         assertEquals(AutoBackup.Outcome.Large, auto.save { hugeBackup() })
 
         assertTrue(auto.tooLarge.value)
         assertTrue(before.contentEquals(auto.file.readBytes()))
         assertTrue(auto.largeFile.length() > AutoBackup.MAX_BYTES)
-        assertEquals(clock - AutoBackup.MIN_INTERVAL_MS, auto.read().exportedAt)
+        assertEquals(savedAt, auto.read().exportedAt)
         assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
-        assertFalse(auto.saveIfDue { hugeBackup() })
+        assertFalse(auto.saveIfChanged { hugeBackup() })
 
-        // The large file counts as the last backup: no new export until the interval has passed.
-        clock += AutoBackup.MIN_INTERVAL_MS / 2
-        assertEquals(AutoBackup.Outcome.Skipped, auto.save { throw AssertionError("exported too early") })
+        // The large file counts as the last backup: the same content again isn't rewritten.
+        clock += 60_000
+        assertEquals(AutoBackup.Outcome.Skipped, auto.save { hugeBackup() })
 
         // Back to a normal size: the large file goes and the note with it.
-        clock += AutoBackup.MIN_INTERVAL_MS
+        clock += 60_000
         assertEquals(AutoBackup.Outcome.Saved, auto.save { backup() })
         assertFalse(auto.largeFile.exists())
         assertFalse(auto.tooLarge.value)

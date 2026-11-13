@@ -334,13 +334,15 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
   Progress -> Overview shows the review tiles.
 - Progress sync signed in: read on in KOReader after the backup, restore, add the book -> opens at
   KOReader's page ("Continued at ..."), not the backup's.
-- Without a file: Honmani's own backup (rewritten on going to the background, at most every 6 h) rides
+- Without a file: Honmani's own backup (rewritten on leaving a book and on going to the background, only
+  when something changed; the backup folder's copy with it) rides
   Android's Google backup or phone transfer. New phone's first start: "Restore from your previous
   phone?" (with date); Restore = from file; settings already restored by Android.
 - Back up to a folder: pick a folder holding another install's `honmani-backup.zip` -> it is renamed
   `honmani-backup-<date>.zip`, "Restore the backup in this folder?" lists its contents, a new
   `honmani-backup.zip` is written. Off and on again with the same folder: no offer. "Back up now"
-  updates "Last folder backup".
+  updates "Last folder backup". Turn pages, back to the library -> `files/auto-backup/honmani-backup.zip`
+  and the folder copy are newer; Home without a change -> neither is rewritten.
 - Sync folder (Settings -> Backup): pick a folder, press Home: `honmani-sync-<id>.zip` is
   there (no `.part` file); its JSON has `syncFormat`, `deviceId`, no `settings`/`catalogs`. Remove the
   folder in the file app: "Folder unavailable: choose it again". Default off. Two phones, one folder
