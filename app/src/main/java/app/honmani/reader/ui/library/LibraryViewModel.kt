@@ -861,10 +861,10 @@ class LibraryViewModel(
         forgetBookmarks(book.contentHash)
         forgetHighlights(book.contentHash)
         forgetPronunciations(book.contentHash)
-        // A book from the watched folder stays removed, by its content hash.
-        if (book.source == BookSource.FOLDER) {
-            dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, book.contentHash, now()))
-        }
+        // A removed book stays away from the watched folder, by its content hash, wherever it
+        // was first added from (the folder may hold a copy, or be chosen later). Only the
+        // scan reads this: adding it again by hand still works.
+        dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, book.contentHash, now()))
         // A book from a catalogue stays removed: automatic imports skip it from now on.
         book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
             dao.insertRemoved(RemovedBookEntity(book.source, it, now()))

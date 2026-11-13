@@ -339,6 +339,25 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun aBookAddedByHandAndRemovedStaysAwayFromTheWatchedFolder() = runBlocking {
+        val bytes = TestBooks.epub(title = "A")
+        val book = addAndWait("a.epub", bytes)
+        viewModel.remove(book.id)
+        eventually { dao.books.value.takeIf { it.isEmpty() } }
+
+        files["root/a.epub"] = bytes
+        val tree = FakeDocumentTree(mapOf("root" to listOf(file("root/a.epub").copy(size = 1, modified = 1))))
+        viewModel = viewModelOn(tree, watched = watchedFolder())
+        viewModel.scanWatchedFolder()
+        delay(300)
+        assertTrue(dao.books.value.isEmpty())
+
+        // Adding it again by hand still works.
+        addAndWait("a.epub", bytes)
+        assertEquals(listOf("A"), dao.books.value.map { it.title })
+    }
+
+    @Test
     fun aBookRemovedWhileTheScanHashesIsNotAddedAgain() = runBlocking {
         val bytes = TestBooks.epub(title = "A")
         files["root/a.epub"] = bytes
