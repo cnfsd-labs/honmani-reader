@@ -85,9 +85,11 @@
    * ttu turns a book's font-family naming "sans-serif" into its second font group and "serif" into
    * the first; Honmani's font setting is the first group. The second follows it (so a paragraph
    * the book styles as sans uses the reader's font too) until the user picks another one in ttu's
-   * settings: this key holds the value last copied.
+   * settings: this key holds the value last copied. With BOOK_GOTHIC "1" (the reader's "Keep the
+   * book's gothic text") the second group goes back to ttu's sans-serif instead.
    */
   const FONT_TWO_COPY = 'honmaniFontGroupTwoCopy';
+  const BOOK_GOTHIC = 'honmaniBookGothic';
 
   /** Honmani's earlier default, replaced by saving on every page turn. */
   const OLD_BOOKMARK_TIME = '1';
@@ -103,7 +105,11 @@
     }
     const fontOne = window.localStorage.getItem('fontFamilyGroupOne');
     const fontTwo = window.localStorage.getItem('fontFamilyGroupTwo');
-    if (fontTwo === DEFAULTS.fontFamilyGroupTwo || fontTwo === window.localStorage.getItem(FONT_TWO_COPY)) {
+    const copied = fontTwo === window.localStorage.getItem(FONT_TWO_COPY);
+    if (window.localStorage.getItem(BOOK_GOTHIC) === '1') {
+      if (copied) window.localStorage.setItem('fontFamilyGroupTwo', DEFAULTS.fontFamilyGroupTwo);
+      window.localStorage.removeItem(FONT_TWO_COPY);
+    } else if (fontTwo === DEFAULTS.fontFamilyGroupTwo || copied) {
       window.localStorage.setItem('fontFamilyGroupTwo', fontOne);
       window.localStorage.setItem(FONT_TWO_COPY, fontOne);
     }

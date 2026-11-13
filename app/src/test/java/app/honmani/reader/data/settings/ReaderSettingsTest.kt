@@ -86,6 +86,10 @@ class ReaderSettingsTest {
         assertFalse(ReaderSettings.fromStorage(emptyMap()).immersive)
         assertEquals("0", stored["honmaniEInk"])
         assertFalse(ReaderSettings.fromStorage(emptyMap()).eInk)
+        // The book's gothic text uses the reader's font unless the reader keeps it.
+        assertEquals("0", stored["honmaniBookGothic"])
+        assertFalse(ReaderSettings.fromStorage(emptyMap()).bookGothic)
+        assertTrue(ReaderSettings.fromStorage(mapOf("honmaniBookGothic" to "1")).bookGothic)
         val immersive = ReaderSettings(immersive = true)
         assertTrue(immersive.hidesBars(atLibrary = false, settingsOpen = false))
         assertFalse(immersive.hidesBars(atLibrary = true, settingsOpen = false))

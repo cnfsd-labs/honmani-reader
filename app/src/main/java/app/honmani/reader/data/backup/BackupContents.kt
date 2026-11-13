@@ -40,7 +40,7 @@ private fun hostOf(url: String): String =
  */
 object ReaderSettingsCheck {
     private val themes = setOf("auto", "light-theme", "dark-theme", "ecru-theme", "water-theme", "gray-theme", "black-theme")
-    private val flags = setOf("hideFurigana", "showCharacterCounter", "showPercentage", "enableReaderWakeLock", "honmaniProgressBar", "honmaniVolumeKeys", "honmaniEdgeTaps", "honmaniEdgeForward", "honmaniSelectionLookup", "honmaniHideKnownFurigana", "honmaniTintOneUnknown", "honmaniMarkDue", "honmaniImmersive", "honmaniEInk")
+    private val flags = setOf("hideFurigana", "showCharacterCounter", "showPercentage", "enableReaderWakeLock", "honmaniProgressBar", "honmaniVolumeKeys", "honmaniEdgeTaps", "honmaniEdgeForward", "honmaniSelectionLookup", "honmaniHideKnownFurigana", "honmaniTintOneUnknown", "honmaniMarkDue", "honmaniImmersive", "honmaniEInk", "honmaniBookGothic")
     private val badFontChars = Regex("""[\"'\\;{}<>()\u0000-\u001f]""")
 
     fun valid(values: Map<String, String?>): Map<String, String> = buildMap {

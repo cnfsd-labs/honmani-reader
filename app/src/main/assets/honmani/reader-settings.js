@@ -55,6 +55,7 @@
     'honmaniMarkDue',
     'honmaniImmersive',
     'honmaniEInk',
+    'honmaniBookGothic',
     'honmaniCustomCss',
   ];
   const USER_FONTS = 'userfonts';

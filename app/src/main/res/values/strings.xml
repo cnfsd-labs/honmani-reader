@@ -1425,6 +1425,8 @@
     <string name="reader_settings_edge_zone_wide">Wide</string>
     <string name="reader_settings_edge_forward">Both edges turn forward</string>
     <string name="reader_settings_edge_forward_details">For reading with one hand: a tap at either edge goes to the next page</string>
+    <string name="reader_settings_book_gothic">Keep the book\'s gothic text</string>
+    <string name="reader_settings_book_gothic_details">Text the book sets in a gothic (sans-serif) font keeps it. Off: the whole book uses the font above.</string>
     <string name="reader_settings_hide_known_furigana">Hide furigana over words you know</string>
     <string name="reader_settings_hide_known_furigana_details">Words looked up and learned, or read many times. The page keeps its layout; looking a word up brings its furigana back. Takes effect when the book is opened again.</string>
     <string name="reader_settings_tint_one_unknown">Tint sentences with one new word</string>

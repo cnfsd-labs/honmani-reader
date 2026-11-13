@@ -145,6 +145,9 @@ private fun ReaderSettingsContent(
         }
         Section(stringResource(R.string.reader_settings_font)) {
             FontList(settings.font, fonts) { onChange(settings.copy(font = it)) }
+            SwitchRow(R.string.reader_settings_book_gothic, R.string.reader_settings_book_gothic_details, settings.bookGothic) {
+                onChange(settings.copy(bookGothic = it))
+            }
         }
         Section(stringResource(R.string.reader_settings_text_size, settings.fontSize)) {
             Slider(

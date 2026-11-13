@@ -151,6 +151,27 @@ test("a paragraph the book styles as sans-serif uses the reader's font like the 
   expect(await paragraphFont(page, '名前は')).toBe('cursive');
 });
 
+test("with \"Keep the book's gothic text\" a sans-serif paragraph keeps a sans face", async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  await page.evaluate(() => localStorage.setItem('fontFamilyGroupOne', 'monospace'));
+  await importAndOpen(page, sansParagraphEpub, 'ゴシックの段落');
+  expect(await paragraphFont(page, '名前は')).toBe('monospace');
+
+  // Switched on in the app's settings, which reload the page.
+  await page.evaluate(() => localStorage.setItem('honmaniBookGothic', '1'));
+  await page.reload();
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 3_000 });
+  expect(await paragraphFont(page, '名前は')).toBe('sans-serif');
+  expect(await paragraphFont(page, '吾輩は')).toBe('monospace');
+
+  // And off again: the reader's font everywhere.
+  await page.evaluate(() => localStorage.setItem('honmaniBookGothic', '0'));
+  await page.reload();
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 3_000 });
+  expect(await paragraphFont(page, '名前は')).toBe('monospace');
+});
+
 test('a second font group the user picked in ttu is kept', async ({ page }) => {
   await setUp(page, { fontFamilyGroupOne: 'monospace', fontFamilyGroupTwo: 'fantasy' });
   await importAndOpen(page, sansParagraphEpub, 'ゴシックの段落');

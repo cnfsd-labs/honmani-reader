@@ -77,6 +77,8 @@ data class ReaderSettings(
     val immersive: Boolean = false,
     /** E-ink mode: black on white, no motion, no shadows and grey marks in the book (`reader-style.js`); off by default. */
     val eInk: Boolean = false,
+    /** Book text styled as sans-serif keeps a gothic face instead of the reader's font (`ttu-defaults.js`); off by default. */
+    val bookGothic: Boolean = false,
     /** The reader's own CSS for the book text, empty by default (`reader-style.js`, at most [CustomCss.MAX_BYTES] bytes). */
     val customCss: String = "",
 ) {
@@ -107,6 +109,7 @@ data class ReaderSettings(
         put(MARK_DUE, flag(markDue))
         put(IMMERSIVE, flag(immersive))
         put(EINK, flag(eInk))
+        put(BOOK_GOTHIC, flag(bookGothic))
         put(CUSTOM_CSS, customCss)
     }
 
@@ -139,6 +142,7 @@ data class ReaderSettings(
         private const val MARK_DUE = "honmaniMarkDue"
         private const val IMMERSIVE = "honmaniImmersive"
         private const val EINK = "honmaniEInk"
+        private const val BOOK_GOTHIC = "honmaniBookGothic"
         private const val CUSTOM_CSS = "honmaniCustomCss"
         private const val VERTICAL = "vertical-rl"
         private const val HORIZONTAL = "horizontal-tb"
@@ -178,6 +182,7 @@ data class ReaderSettings(
                 markDue = flag(MARK_DUE, defaults.markDue),
                 immersive = flag(IMMERSIVE, defaults.immersive),
                 eInk = flag(EINK, defaults.eInk),
+                bookGothic = flag(BOOK_GOTHIC, defaults.bookGothic),
                 customCss = values[CUSTOM_CSS]?.takeIf { CustomCss.fits(it) } ?: defaults.customCss,
             )
         }
