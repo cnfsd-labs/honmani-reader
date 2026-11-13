@@ -513,9 +513,17 @@ class LibraryViewModel(
             var failed = 0
             try {
                 for (file in scan.files) {
+                    var removedMeanwhile = false
                     val result = addMutex.withLock {
+                        // Removed while this scan was hashing: it stays away.
+                        removedMeanwhile = scan.hashes[file.id] in dao.removedSourceIds(BookSource.FOLDER)
+                        if (removedMeanwhile) return@withLock null
                         val picked = withContext(Dispatchers.IO) { openFile(documents.uriOf(file.id)) }
                         picked?.let { addQuietly(it, BookSource.FOLDER) }
+                    }
+                    if (removedMeanwhile) {
+                        watched.seen.mark(file)
+                        continue
                     }
                     when (result) {
                         is BookAdder.Result.Added -> imported++
@@ -830,37 +838,40 @@ class LibraryViewModel(
      * unless [deleteStatistics]: then its reading days and finished record go too.
      */
     fun remove(id: Long, deleteStatistics: Boolean = false) {
-        viewModelScope.launch {
-            val book = dao.find(id) ?: return@launch
-            book.ttuId?.let { ttuId ->
-                try {
-                    ttu.remove(ttuId)
-                } catch (_: TtuLibraryException) {
-                    // The reader keeps an orphaned copy; harmless, and gone if it is reset.
-                }
+        // Under addMutex: a watched-folder scan must not add the book again while it is removed.
+        viewModelScope.launch { addMutex.withLock { removeNow(id, deleteStatistics) } }
+    }
+
+    private suspend fun removeNow(id: Long, deleteStatistics: Boolean) {
+        val book = dao.find(id) ?: return
+        book.ttuId?.let { ttuId ->
+            try {
+                ttu.remove(ttuId)
+            } catch (_: TtuLibraryException) {
+                // The reader keeps an orphaned copy; harmless, and gone if it is reset.
             }
-            if (deleteStatistics) {
-                forgetStatistics(book.id, book.contentHash)
-            } else {
-                keepStatistics(book.id, book.contentHash)
-                if (FinishedBooks.isFinished(book)) recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
-            }
-            dao.delete(book.id)
-            forgetBookmarks(book.contentHash)
-            forgetHighlights(book.contentHash)
-            forgetPronunciations(book.contentHash)
-            // A book from the watched folder stays removed, by its content hash.
-            if (book.source == BookSource.FOLDER) {
-                dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, book.contentHash, now()))
-            }
-            // A book from a catalogue stays removed: automatic imports skip it from now on.
-            book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
-                dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
-            }
-            withContext(Dispatchers.IO) {
-                importer.deleteFiles(book)
-                forgetDerivedData(book.contentHash)
-            }
+        }
+        if (deleteStatistics) {
+            forgetStatistics(book.id, book.contentHash)
+        } else {
+            keepStatistics(book.id, book.contentHash)
+            if (FinishedBooks.isFinished(book)) recordFinished(FinishedBookEntity(book.contentHash, book.title, book.finishedAt))
+        }
+        dao.delete(book.id)
+        forgetBookmarks(book.contentHash)
+        forgetHighlights(book.contentHash)
+        forgetPronunciations(book.contentHash)
+        // A book from the watched folder stays removed, by its content hash.
+        if (book.source == BookSource.FOLDER) {
+            dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, book.contentHash, now()))
+        }
+        // A book from a catalogue stays removed: automatic imports skip it from now on.
+        book.sourceId?.takeIf { book.source == BookSource.OPDS }?.let {
+            dao.insertRemoved(RemovedBookEntity(book.source, it, now()))
+        }
+        withContext(Dispatchers.IO) {
+            importer.deleteFiles(book)
+            forgetDerivedData(book.contentHash)
         }
     }
 

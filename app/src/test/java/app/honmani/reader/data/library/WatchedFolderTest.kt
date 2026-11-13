@@ -97,6 +97,7 @@ class WatchedFolderTest {
         }
 
         assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
+        assertEquals(mapOf("root/s/b.epub" to "hash-of-root/s/b.epub"), result.hashes)
         assertEquals(listOf("root/s/b.epub"), hashed)
         assertTrue("a file still being copied must not count as seen", !seen.isUnchanged(copying))
     }

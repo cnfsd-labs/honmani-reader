@@ -9,6 +9,7 @@ import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.FakeDocumentTree
 import app.honmani.reader.data.library.FakeFolderTarget
 import app.honmani.reader.data.library.WatchedFolder
+import app.honmani.reader.data.library.WatchedFolderScan
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.file
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
 import app.honmani.reader.data.stats.FinishedBookEntity
@@ -335,6 +336,29 @@ class LibraryViewModelTest {
 
         assertEquals(LibraryNotice.WatchedFolderAdded(1, 0), withTimeout(5_000) { viewModel.notices.first() })
         assertEquals(listOf("A", "B"), dao.books.value.map { it.title })
+    }
+
+    @Test
+    fun aBookRemovedWhileTheScanHashesIsNotAddedAgain() = runBlocking {
+        val bytes = TestBooks.epub(title = "A")
+        files["root/a.epub"] = bytes
+        val entry = file("root/a.epub").copy(size = 1, modified = 1)
+        val tree = FakeDocumentTree(mapOf("root" to listOf(entry)))
+        val hash = WatchedFolderScan.sha256(bytes.inputStream())
+        val watched = watchedFolder()
+        var opened = 0
+        // The removal lands after the scan read the removed list, while it hashes the file.
+        viewModel = viewModelOn(
+            tree,
+            onOpen = { if (opened++ == 0) runBlocking { dao.insertRemoved(RemovedBookEntity(BookSource.FOLDER, hash, 1L)) } },
+            watched = watched,
+        )
+        viewModel.scanWatchedFolder()
+        eventually { watched.seen.isUnchanged(entry).takeIf { it } }
+        delay(100)
+
+        assertTrue(dao.books.value.isEmpty())
+        assertEquals(1, opened)
     }
 
     @Test

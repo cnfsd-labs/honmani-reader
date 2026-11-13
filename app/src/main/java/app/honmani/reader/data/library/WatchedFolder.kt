@@ -139,6 +139,8 @@ class SeenFiles(private val file: File) {
 /** What a scan of the watched folder found to add. */
 data class WatchedScan(
     val files: List<TreeEntry>,
+    /** The content hash of each of [files], by document id. */
+    val hashes: Map<String, String> = emptyMap(),
     /** New files whose content the reader had removed from the library before. */
     val removed: Int,
     val unreadableFolders: Int,
@@ -165,6 +167,7 @@ object WatchedFolderScan {
     ): WatchedScan {
         val scan = TreeWalker.findBooks(tree)
         val files = mutableListOf<TreeEntry>()
+        val hashes = HashMap<String, String>()
         var removed = 0
         for (entry in scan.files) {
             coroutineContext.ensureActive()
@@ -176,9 +179,10 @@ object WatchedFolderScan {
                 removed++
             } else {
                 files += entry
+                hashes[entry.id] = hash
             }
         }
-        return WatchedScan(files, removed, scan.unreadableFolders, scan.incomplete)
+        return WatchedScan(files, hashes, removed, scan.unreadableFolders, scan.incomplete)
     }
 
     /** SHA-256 of [input] as lowercase hex, the same as a book's content hash. */
