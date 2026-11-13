@@ -62,6 +62,9 @@ class ReadAloudController(
 
     private var gen = 0
     private var connected = false
+
+    /** A [ReadAloudVoice.connect] is out: another would start a second engine. */
+    private var connecting = false
     private var onConnected: (() -> Unit)? = null
 
     /** The sentence being spoken, or -1 before the first one starts. */
@@ -176,6 +179,7 @@ class ReadAloudController(
         awaiting = false
         resumeAfterPanel = false
         connected = false
+        connecting = false
         voice.stop()
         voice.shutdown()
         if (phase != ReadAloudPhase.OFF) toPage("""{"type":"readAloud.stop"}""")
@@ -331,7 +335,8 @@ class ReadAloudController(
         if (problem == VoiceProblem.NO_ENGINE || problem == VoiceProblem.NO_JAPANESE) {
             voice.shutdown()
             connected = false
-            }
+            connecting = false
+        }
         log("problem $problem")
         _state.value = _state.value.copy(phase = ReadAloudPhase.PROBLEM, problem = problem)
     }
@@ -390,8 +395,11 @@ class ReadAloudController(
             return
         }
         onConnected = action
+        if (connecting) return
+        connecting = true
         voice.connect { problem ->
-                val wanted = onConnected
+            connecting = false
+            val wanted = onConnected
             onConnected = null
             if (problem == null) {
                 connected = true

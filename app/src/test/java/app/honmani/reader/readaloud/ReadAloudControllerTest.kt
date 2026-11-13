@@ -272,6 +272,26 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun playingAgainWhileConnectingWaitsForTheSameEngine() {
+        voice.autoConnect = false
+        controller.start()
+        controller.pause()
+        controller.start()
+        assertEquals(1, voice.connects)
+        voice.pendingConnect!!(null)
+        assertEquals(listOf("readAloud.begin"), types())
+    }
+
+    @Test
+    fun closingWhileConnectingLetsTheNextPlayConnectAgain() {
+        voice.autoConnect = false
+        controller.start()
+        controller.close()
+        controller.start()
+        assertEquals(2, voice.connects)
+    }
+
+    @Test
     fun changingTheSpeedIsSavedAndRestartsTheSentence() {
         startAndReceive()
         controller.onStart(id(1))
