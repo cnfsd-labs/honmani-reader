@@ -30,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +63,9 @@ fun BookmarksSheet(
 ) {
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var renaming by remember { mutableStateOf<BookmarkEntity?>(null) }
+    // By id, so a rename in progress survives the app being stopped in the background.
+    var renamingId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val renaming = renamingId?.let { id -> bookmarks.find { it.id == id } }
     val deleted = stringResource(R.string.bookmark_deleted)
     val undo = stringResource(R.string.action_undo)
     PullDownSheet(onDismiss = onDismiss, properties = menuReturnSheetProperties(onBack)) {
@@ -82,7 +86,7 @@ fun BookmarksSheet(
                             supportingContent = { Text(stringResource(R.string.book_search_position, bookmark.percent)) },
                             trailingContent = {
                                 Row {
-                                    IconButton(onClick = { renaming = bookmark }) {
+                                    IconButton(onClick = { renamingId = bookmark.id }) {
                                         Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.bookmark_rename))
                                     }
                                     IconButton(onClick = {
@@ -112,9 +116,9 @@ fun BookmarksSheet(
             initial = bookmark.name,
             onSave = {
                 onRename(bookmark, it)
-                renaming = null
+                renamingId = null
             },
-            onDismiss = { renaming = null },
+            onDismiss = { renamingId = null },
         )
     }
 }
@@ -122,7 +126,7 @@ fun BookmarksSheet(
 /** A dialog asking for a bookmark's name, [initial] filled in; Save is off for a blank name. */
 @Composable
 fun BookmarkNameDialog(title: String, initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf(initial) }
+    var name by rememberSaveable { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -142,4 +146,12 @@ fun BookmarkNameDialog(title: String, initial: String, onSave: (String) -> Unit,
 }
 
 /** A bookmark being named before it is saved: the place and the name suggested from the text there. */
-data class BookmarkDraft(val characters: Long, val total: Long, val name: String)
+data class BookmarkDraft(val characters: Long, val total: Long, val name: String) {
+    companion object {
+        /** Keeps a draft being named across the app being stopped in the background. */
+        val Saver = listSaver<BookmarkDraft?, Any>(
+            save = { draft -> draft?.let { listOf(it.characters, it.total, it.name) }.orEmpty() },
+            restore = { if (it.size == 3) BookmarkDraft(it[0] as Long, it[1] as Long, it[2] as String) else null },
+        )
+    }
+}

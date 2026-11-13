@@ -343,7 +343,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var openTtuId by rememberSaveable { mutableStateOf<Long?>(null) }
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
     var bookmarksShown by rememberSaveable { mutableStateOf(false) }
-    var bookmarkDraft by remember { mutableStateOf<BookmarkDraft?>(null) }
+    var bookmarkDraft by rememberSaveable(stateSaver = BookmarkDraft.Saver) { mutableStateOf<BookmarkDraft?>(null) }
     val jumpSnackbar = remember { SnackbarHostState() }
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
     val bookHash by produceState<String?>(null, openTtuId) {
