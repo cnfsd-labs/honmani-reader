@@ -3,8 +3,9 @@ name: Release bundle
 # The app bundle (.aab) for Google Play, signed with the upload key, for a commit whose Android
 # workflow is green. Started by pushing a tag `release/<anything>` on that commit (for example
 # `git tag release/0.1.0-1 && git push origin release/0.1.0-1`), or by hand (Actions → Release
-# bundle → Run workflow; GitHub offers that only once this file is on main). The run number is
-# the version code, so every bundle can be uploaded.
+# bundle → Run workflow; GitHub offers that only once this file is on main). The version code is
+# run number × 10 + attempt (a re-run gets a new one), so every bundle can be uploaded; the
+# version name is the tag's <version> (app/build.gradle.kts).
 #
 # Repository secrets (Settings → Secrets and variables → Actions):
 #   HONMANI_UPLOAD_KEYSTORE_BASE64    the upload keystore (PKCS12), base64-encoded
@@ -74,8 +75,10 @@ jobs:
           HONMANI_UPLOAD_KEYSTORE: ${{ runner.temp }}/upload.p12
           HONMANI_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.HONMANI_UPLOAD_KEYSTORE_PASSWORD }}
           HONMANI_UPLOAD_KEY_ALIAS: ${{ secrets.HONMANI_UPLOAD_KEY_ALIAS }}
-          HONMANI_VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew --stacktrace bundleRelease
+        run: |
+          export HONMANI_VERSION_CODE=$((GITHUB_RUN_NUMBER * 10 + GITHUB_RUN_ATTEMPT))
+          echo "HONMANI_VERSION_CODE=$HONMANI_VERSION_CODE" >> "$GITHUB_ENV"
+          ./gradlew --stacktrace bundleRelease
 
       - name: Bundle checks (signed, bundled reader, licences, no source maps)
         run: |
@@ -88,10 +91,10 @@ jobs:
           grep -q '^base/assets/ttu/_app/' <<<"$entries" || { echo "::error::ttu's _app/ is missing"; exit 1; }
           # R8's mapping in BUNDLE-METADATA stays: Play uses it to deobfuscate crash reports.
           if grep -q '^base/assets/.*\.map$' <<<"$entries"; then echo "::error::source maps in the bundle"; exit 1; fi
-          echo "Version code ${{ github.run_number }}"
+          echo "Version code $HONMANI_VERSION_CODE"
 
       - name: Upload bundle
         uses: actions/upload-artifact@v7
         with:
-          name: honmani-play-bundle-${{ github.run_number }}
+          name: honmani-play-bundle-${{ github.run_number }}-${{ github.run_attempt }}
           path: app/build/outputs/bundle/release/app-release.aab

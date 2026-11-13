@@ -43,7 +43,7 @@ public: never copy those notes, personal details or discussions into it.
   10 MB, offered once on a new install). Everything tied to this phone (first start, encrypted keys,
   AnkiDroid ids, sync account) is in `device` preferences, never backed up (`BackupRulesTest`). Backed-up setting names and types, the backup file name and the Anki note type ids are permanent (`BackupSettingKeysTest`).
 - **Application ID** `app.honmani.reader` is permanent. Play bundles come from the "Release bundle"
-  workflow (tag `release/*`; run number = version code); other builds stay unsigned or debug-signed.
+  workflow (tag `release/<version>`: version name from the tag, version code = run number × 10 + attempt); other builds stay unsigned or debug-signed.
 - **Versions:** AGP 9.5 with built-in Kotlin (no `org.jetbrains.kotlin.android`), Gradle 9.8, Kotlin
   2.4.21, KSP 2.3 (move together), compileSdk 37, targetSdk 36 (raise deliberately).
 - **Reader settings:** ttu's localStorage is the only store (Honmani's own as `honmani*` keys); theme

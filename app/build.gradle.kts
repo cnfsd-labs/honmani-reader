@@ -20,9 +20,17 @@ android {
         minSdk = 26
         targetSdk = 36
         // Play needs a higher version code for every upload: the release workflow's run number
-        // (.github/workflows/release.yml); 1 for every other build.
+        // times 10 plus its attempt (.github/workflows/release.yml); 1 for every other build.
         versionCode = System.getenv("HONMANI_VERSION_CODE")?.toInt() ?: 1
-        versionName = "0.1.0"
+        // From a tag `release/<version>`: <version> when it starts like one ("0.2.0"), else the
+        // default with the tag's name appended ("release/test-1" -> "0.1.0-test-1").
+        val defaultVersionName = "0.1.0"
+        val releaseTag = System.getenv("GITHUB_REF_NAME")?.takeIf { it.startsWith("release/") }?.removePrefix("release/")
+        versionName = when {
+            releaseTag.isNullOrBlank() -> defaultVersionName
+            Regex("\\d+\\.\\d+.*").matches(releaseTag) -> releaseTag
+            else -> "$defaultVersionName-$releaseTag"
+        }
     }
 
     signingConfigs {
