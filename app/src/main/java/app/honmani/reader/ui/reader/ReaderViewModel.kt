@@ -175,21 +175,31 @@ class ReaderViewModel(
     private var counted: Pair<TapLookup, List<LookupUndo>>? = null
     private val _countedTap = MutableStateFlow<TapLookup?>(null)
 
-    /** The tap whose lookups changed something that "Don't count" ([dontCount]) can take back; null if none. */
+    /** A tap the reader chose not to count: a lookup of it still being saved is taken back when it is. */
+    private var discarded: TapLookup? = null
+
+    /**
+     * The tap in the book whose panel offers "Don't count" ([dontCount]); null if none. Every tap
+     * that counts offers it, also one that changed nothing (a repeat): it then only closes the panel.
+     */
     val countedTap: StateFlow<TapLookup?> = _countedTap.asStateFlow()
 
     private fun addCounted(tap: TapLookup, undo: LookupUndo) {
+        if (tap == discarded) {
+            // "Don't count" came before the lookup was saved.
+            viewModelScope.launch { takeBack(listOf(undo)) }
+            return
+        }
+        // A late lookup of an earlier tap stays counted; only the current tap can be taken back.
+        if (tap != _countedTap.value) return
         val earlier = counted?.takeIf { it.first == tap }?.second.orEmpty()
         counted = tap to earlier + undo
-        _countedTap.value = tap
     }
 
     /** The reader meant to save the word [key] (star, Anki card, "+ Learn"): "Don't count" leaves it alone. */
     private fun keep(key: String) {
         val (tap, items) = counted ?: return
-        val rest = items.filter { it.key != key }
-        counted = if (rest.isEmpty()) null else tap to rest
-        _countedTap.value = if (rest.isEmpty()) null else tap
+        counted = tap to items.filter { it.key != key }
     }
 
     /**
@@ -197,19 +207,23 @@ class ReaderViewModel(
      * word progress, a lapsed card) and closes the panel. Earlier lookups of the word stay counted.
      */
     fun dontCount() {
-        val items = counted?.second ?: return
+        val tap = _countedTap.value ?: return
+        val items = counted?.takeIf { it.first == tap }?.second.orEmpty()
         counted = null
+        discarded = tap
         _countedTap.value = null
         dismiss()
-        viewModelScope.launch {
-            for (undo in items.asReversed()) {
-                try {
-                    undoLookup(undo)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    log("Taking back a lookup failed: $e")
-                }
+        if (items.isNotEmpty()) viewModelScope.launch { takeBack(items) }
+    }
+
+    private suspend fun takeBack(items: List<LookupUndo>) {
+        for (undo in items.asReversed()) {
+            try {
+                undoLookup(undo)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Taking back a lookup failed: $e")
             }
         }
     }
@@ -258,7 +272,8 @@ class ReaderViewModel(
     fun onTap(tap: TapLookup) {
         lookupJob?.cancel()
         counted = null
-        _countedTap.value = null
+        discarded = null
+        _countedTap.value = tap.takeIf { recordsOnOpen(it) }
         val lookupId = ++lookupCount
         lookupJob = viewModelScope.launch {
             val start = TimeSource.Monotonic.markNow()

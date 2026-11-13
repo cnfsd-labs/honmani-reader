@@ -324,7 +324,37 @@ class ReaderViewModelTest {
         model.onTap(tap("食べました。"))
         val group = (model.panel.value as LookupPanelState.Results).groups.single()
         model.setStarred(group, true)
-        assertNull(model.countedTap.value)
+        model.dontCount()
+        assertNull(model.panel.value)
+        assertEquals("the starred word stays", 1, undone.size)
+    }
+
+    @Test
+    fun dontCountIsOfferedForATapThatChangedNothing_andTakesBackALookupSavedAfterIt() {
+        val undone = mutableListOf<LookupUndo>()
+        val saving = CompletableDeferred<LookupUndo?>()
+        var repeat = true
+        val model = ReaderViewModel(
+            lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { if (repeat) null else saving.await() },
+            undoLookup = { undone += it },
+            findBook = { null },
+        )
+        // A repeat tap (same word and sentence soon after) saves nothing, but the panel still offers it.
+        model.onTap(tap("食べました。"))
+        pending.getValue("食べました。").complete(LookupResult(listOf(entry("食べる", "食べました"))))
+        assertEquals(model.panel.value?.tap, model.countedTap.value)
+        model.dontCount()
+        assertNull(model.panel.value)
+        assertEquals(0, undone.size)
+
+        // "Don't count" before the lookup is saved takes it back once it is.
+        repeat = false
+        model.onTap(tap("食べました。"))
+        model.dontCount()
+        saving.complete(LookupUndo(WordUndo(1, WordRepository.key("食べる", "食べる"), null, 1, 1, emptyList()), null, null))
+        assertEquals(1, undone.size)
     }
 
     @Test
