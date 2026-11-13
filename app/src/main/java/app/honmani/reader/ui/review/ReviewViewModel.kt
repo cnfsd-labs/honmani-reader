@@ -166,6 +166,8 @@ class ReviewViewModel(
 
     fun remove() = act(R.string.word_deleted) { it.removeWord() }
 
+    fun ignore() = act(R.string.word_ignored) { it.ignoreWord() }
+
     fun editMeaning(gloss: String) = act(keepRevealed = true) { it.editMeaning(gloss) }
 
     fun editNote(note: String) = act(keepRevealed = true) { it.editNote(note) }

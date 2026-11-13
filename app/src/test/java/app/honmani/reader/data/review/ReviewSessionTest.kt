@@ -332,6 +332,21 @@ class ReviewSessionTest {
     }
 
     @Test
+    fun notAWordIgnoresTheWordAndUndoTakesItBack() = runTest {
+        dueWord("猫")
+        val session = session()
+        val id = session.current!!.word.id
+        val card = reviews.card(id)!!
+        session.ignoreWord()
+        assertNull(session.current)
+        assertTrue(words.find(id)!!.ignored)
+        assertEquals(card, reviews.card(id))
+        session.undo()
+        assertFalse(words.find(id)!!.ignored)
+        assertEquals(id, session.current!!.word.id)
+    }
+
+    @Test
     fun editingTheMeaningChangesTheCardOnScreen() = runTest {
         dueWord("猫")
         val session = session()

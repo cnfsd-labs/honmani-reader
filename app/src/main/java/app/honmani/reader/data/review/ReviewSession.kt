@@ -31,6 +31,8 @@ class ReviewSession(
         val grade: Grade? = null,
         /** The word was removed with its lookups; undo puts it back. */
         val deleted: DeletedWord? = null,
+        /** The word was ignored; undo takes that back. */
+        val ignored: Boolean = false,
     )
 
     private val queue = ArrayDeque<CardWithWord>()
@@ -121,6 +123,18 @@ class ReviewSession(
         return true
     }
 
+    /**
+     * "Not a word": ignores the current word (no marks, out of counts and review), keeping it and
+     * its card; [undo] takes it back.
+     */
+    suspend fun ignoreWord() {
+        val item = current ?: return
+        queue.removeFirst()
+        val before = reviews.card(item.word.id) ?: item.card
+        words.setIgnored(item.word.id, true)
+        actions.addLast(Action(item, before, ignored = true))
+    }
+
     /** Replaces the meaning of the current word. */
     suspend fun editMeaning(gloss: String) {
         val item = current ?: return
@@ -150,6 +164,7 @@ class ReviewSession(
         val action = actions.removeLastOrNull() ?: return false
         if (action.requeued && queue.isNotEmpty() && queue.last().word.id == action.item.word.id) queue.removeLast()
         action.deleted?.let { words.restore(it) }
+        if (action.ignored) words.setIgnored(action.item.word.id, false)
         if (action.review != null) reviews.undo(action.review) else reviews.restore(action.before)
         if (action.wasLearning) words.markLearning(action.item.word.id)
         queue.addFirst(action.item.copy(card = action.before))

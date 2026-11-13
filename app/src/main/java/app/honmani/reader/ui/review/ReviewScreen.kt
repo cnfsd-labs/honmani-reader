@@ -384,7 +384,7 @@ private fun ReviewTopBar(
                         MenuItem(R.string.action_lookup_word, close) { onLookUp(card) }
                         val bookId = card.sentence?.bookId
                         if (bookId != null) MenuItem(R.string.review_open_in_book, close) { onOpenBook(bookId) }
-                        MenuItem(R.string.review_not_a_word, close, viewModel::remove)
+                        MenuItem(R.string.review_not_a_word, close, viewModel::ignore)
                         MenuItem(R.string.review_remove, close, viewModel::remove)
                     }
                 }
