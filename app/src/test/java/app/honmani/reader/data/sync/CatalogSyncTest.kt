@@ -76,4 +76,13 @@ class CatalogSyncTest {
         assertEquals("http://nas:8083", CatalogSync.origin("http://NAS:8083/opds"))
         assertEquals("https://books.example", CatalogSync.origin(" https://books.example/opds/ "))
     }
+
+    @Test
+    fun aDefaultPortSpelledOutIsTheSameServer() {
+        settings.signIn(KoSyncAccount("http://nas/kosync", "reader", "key"))
+        assertTrue(sync.isOn("http://nas:80/opds", "reader"))
+        settings.signIn(KoSyncAccount("https://nas:443/kosync", "reader", "key"))
+        assertTrue(sync.isOn("https://NAS/opds", "reader"))
+        assertFalse(sync.isOn("http://nas/opds", "reader"))
+    }
 }

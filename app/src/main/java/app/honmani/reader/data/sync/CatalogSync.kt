@@ -1,5 +1,6 @@
 package app.honmani.reader.data.sync
 
+import app.honmani.reader.data.net.originOf
 import java.net.URI
 import java.net.URISyntaxException
 
@@ -44,7 +45,8 @@ class CatalogSync(private val settings: KoSyncSettings, private val client: KoSy
 
         private fun sameServer(syncServer: String, catalogUrl: String): Boolean {
             val sync = KoSyncClient.endpoint(syncServer, "")
-            return origin(sync) == origin(catalogUrl)
+            // Default ports spelled out, so "http://nas" and "http://nas:80" are one server.
+            return (originOf(sync) ?: origin(sync)) == (originOf(catalogUrl) ?: origin(catalogUrl))
         }
     }
 }
