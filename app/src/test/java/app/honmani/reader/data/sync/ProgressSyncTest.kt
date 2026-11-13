@@ -17,6 +17,7 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -289,6 +290,7 @@ class ProgressSyncTest {
     @Test
     fun signingOutForgetsTheStatus() {
         status.succeeded()
+        assertNotNull(status.state.value.lastSuccessAt)
         // Let the sync start watching the account.
         Thread.sleep(300)
         settings.signOut()
