@@ -1516,7 +1516,11 @@
     <string name="auto_backup_restore">Restore</string>
     <string name="auto_backup_start_fresh">Start fresh</string>
     <string name="backup_folder_title">Back up to a folder</string>
-    <string name="backup_folder_details">Also copies the automatic backup into a folder you choose, such as one on an SD card or in a cloud app. One file, replaced each time</string>
+    <string name="backup_folder_details">Also copies the automatic backup into a folder you choose, such as one on an SD card or in a cloud app. One file, replaced each time. A backup already in the folder from another phone or an earlier install is kept under a dated name and offered for restoring.</string>
+    <string name="backup_folder_now">Back up now</string>
+    <string name="backup_folder_now_working">Backing up…</string>
+    <string name="backup_found_title">Restore the backup in this folder?</string>
+    <string name="backup_found_message">This folder already had a backup, from %1$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
     <string name="backup_folder_waiting">Folder chosen. The next automatic backup is copied there.</string>
     <string name="backup_too_large">Your backup is bigger than the 10 MB Android\'s cloud backup allows, so Google\'s copy stays at the last smaller one.</string>
     <string name="backup_too_large_folder">The copy in your folder is up to date.</string>

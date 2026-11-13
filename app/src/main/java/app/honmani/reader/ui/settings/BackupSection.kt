@@ -20,6 +20,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,6 +103,12 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
     )
     FolderBackupRow()
     SyncFolderRow()
+    // A backup that was already in a newly chosen backup folder: offered once, when nothing else shows.
+    val found by viewModel.foundBackup.collectAsStateWithLifecycle()
+    LaunchedEffect(found, state) {
+        val current = found
+        if (current != null && state == BackupState.Idle) viewModel.offerFound(current)
+    }
 }
 
 /** Settings → Back up and restore → Back up to a folder: a copy of the automatic backup in a folder the reader picks. */
@@ -111,6 +118,8 @@ private fun FolderBackupRow() {
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val folderBackup = container.folderBackup
     val state by folderBackup.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var backingUp by remember { mutableStateOf(false) }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         // Right away, so the folder has a copy before the next automatic backup is due.
         if (uri != null && folderBackup.choose(uri.toString())) container.saveAutoBackup(force = true)
@@ -143,6 +152,25 @@ private fun FolderBackupRow() {
             if (state is FolderBackupState.On) folderBackup.disable() else pick.launch(null)
         },
     )
+    if (state is FolderBackupState.On) {
+        ListItem(
+            headlineContent = {
+                TextButton(
+                    enabled = !backingUp,
+                    onClick = {
+                        backingUp = true
+                        scope.launch {
+                            try {
+                                container.backUpNow()
+                            } finally {
+                                backingUp = false
+                            }
+                        }
+                    },
+                ) { Text(stringResource(if (backingUp) R.string.backup_folder_now_working else R.string.backup_folder_now)) }
+            },
+        )
+    }
 }
 
 /**
@@ -311,12 +339,16 @@ private fun RestoreConfirmDialog(state: BackupState.Confirm, onConfirm: (BackupS
     var withCatalogs by rememberSaveable { mutableStateOf(true) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.backup_confirm_title)) },
+        title = { Text(stringResource(if (state.found != null) R.string.backup_found_title else R.string.backup_confirm_title)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
+                state.found?.let { found ->
+                    val date = remember(found) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(found.exportedAt)) }
+                    Text(stringResource(R.string.backup_found_message, date, found.name))
+                }
                 Text(stringResource(R.string.backup_confirm_intro))
                 Text(pluralStringResource(R.plurals.backup_confirm_books, contents.books, contents.books))
                 Text(pluralStringResource(R.plurals.backup_confirm_words, contents.words, contents.words))

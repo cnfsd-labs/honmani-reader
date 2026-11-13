@@ -16,6 +16,7 @@ import app.honmani.reader.data.backup.BackupFile
 import app.honmani.reader.data.backup.BackupFormatException
 import app.honmani.reader.data.backup.BackupContents
 import app.honmani.reader.data.backup.FolderBackupState
+import app.honmani.reader.data.backup.FoundBackup
 import app.honmani.reader.data.backup.ReaderSettingsCheck
 import app.honmani.reader.data.backup.RestoreSummary
 import app.honmani.reader.data.backup.contents
@@ -45,8 +46,11 @@ sealed interface BackupState {
 
     data object Saved : BackupState
 
-    /** A backup file was read; nothing is restored until the reader confirms. */
-    data class Confirm(val backup: BackupFile, val contents: BackupContents) : BackupState
+    /**
+     * A backup file was read; nothing is restored until the reader confirms. [found] is set when it
+     * is the backup found in a newly chosen backup folder ([FoundBackup]).
+     */
+    data class Confirm(val backup: BackupFile, val contents: BackupContents, val found: FoundBackup? = null) : BackupState
 
     data class Restored(val summary: RestoreSummary) : BackupState
 
@@ -73,6 +77,9 @@ class BackupViewModel(
 
     /** The folder backup, to tell whether it is on; its copy has no size limit. */
     val folderState: StateFlow<FolderBackupState> = container.folderBackup.state
+
+    /** A backup found in a newly chosen backup folder, to offer ([offerFound]). */
+    val foundBackup: StateFlow<FoundBackup?> = container.folderBackup.found
 
     /** The file name offered when saving. */
     fun fileName(today: LocalDate = LocalDate.now()) = "honmani-backup-$today.zip"
@@ -101,6 +108,14 @@ class BackupViewModel(
             input.use { BackupCodec.read(it.buffered()) }
         }
         BackupState.Confirm(backup, backup.contents())
+    }
+
+    /** Offers the backup found in a newly chosen backup folder, once: it is dismissed as it is read. */
+    fun offerFound(found: FoundBackup) = launchWork {
+        val folderBackup = container.folderBackup
+        folderBackup.dismissFound()
+        val backup = folderBackup.read(found)
+        BackupState.Confirm(backup, backup.contents(), found)
     }
 
     /** The reader confirmed the [BackupState.Confirm]; [withCatalogs] false leaves its book servers out. */
@@ -160,6 +175,8 @@ class BackupViewModel(
             }
         }
         if (summary.catalogsAdded > 0) container.opdsAutoImport.start(force = true)
+        // The automatic backup (and the folder's copy) should hold what was just restored.
+        container.saveAutoBackup(force = true)
         BackupState.Restored(summary)
     }
 

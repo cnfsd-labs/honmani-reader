@@ -337,6 +337,10 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
 - Without a file: Honmani's own backup (rewritten on going to the background, at most every 6 h) rides
   Android's Google backup or phone transfer. New phone's first start: "Restore from your previous
   phone?" (with date); Restore = from file; settings already restored by Android.
+- Back up to a folder: pick a folder holding another install's `honmani-backup.zip` -> it is renamed
+  `honmani-backup-<date>.zip`, "Restore the backup in this folder?" lists its contents, a new
+  `honmani-backup.zip` is written. Off and on again with the same folder: no offer. "Back up now"
+  updates "Last folder backup".
 - Sync folder (Settings -> Backup): pick a folder, press Home: `honmani-sync-<id>.zip` is
   there (no `.part` file); its JSON has `syncFormat`, `deviceId`, no `settings`/`catalogs`. Remove the
   folder in the file app: "Folder unavailable: choose it again". Default off. Two phones, one folder

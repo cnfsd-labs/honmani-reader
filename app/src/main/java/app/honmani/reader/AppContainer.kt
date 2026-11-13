@@ -872,27 +872,37 @@ class AppContainer(context: Context) {
      * reader settings come from the reader page, so this starts on the main thread.
      */
     fun saveAutoBackup(force: Boolean = false) {
-        applicationScope.launch(Dispatchers.Main) {
-            val outcome = autoBackup.save(force) {
-                val readerSettings = try {
-                    ttuLibrary.readSettings()
-                } catch (_: TtuLibraryException) {
-                    null
-                }
-                backup.export(readerSettings)
+        applicationScope.launch(Dispatchers.Main) { autoBackupNow(force) }
+    }
+
+    /**
+     * Settings → Back up now: a new automatic backup right away, also into the backup folder.
+     * Runs in [applicationScope], so leaving the screen doesn't stop it half way.
+     */
+    suspend fun backUpNow() {
+        applicationScope.launch(Dispatchers.Main) { autoBackupNow(force = true) }.join()
+    }
+
+    private suspend fun autoBackupNow(force: Boolean) {
+        val outcome = autoBackup.save(force) {
+            val readerSettings = try {
+                ttuLibrary.readSettings()
+            } catch (_: TtuLibraryException) {
+                null
             }
-            // The same file, also into the folder the reader chose (if any); not into the sync
-            // folder: that has the sync files, and one copy of the backup per phone isn't wanted there.
-            // A backup over Android's 10 MB limit isn't kept for Android, but the folder has no limit.
-            if (folderBackup.folder == null || folderBackup.folder != syncFolder.folder) {
-                when (outcome) {
-                    AutoBackup.Outcome.Saved -> folderBackup.copy(autoBackup.file)
-                    AutoBackup.Outcome.Large -> folderBackup.copy(autoBackup.largeFile)
-                    AutoBackup.Outcome.Skipped -> Unit
-                }
-            }
-            syncFolder.write()
+            backup.export(readerSettings)
         }
+        // The same file, also into the folder the reader chose (if any); not into the sync
+        // folder: that has the sync files, and one copy of the backup per phone isn't wanted there.
+        // A backup over Android's 10 MB limit isn't kept for Android, but the folder has no limit.
+        if (folderBackup.folder == null || folderBackup.folder != syncFolder.folder) {
+            when (outcome) {
+                AutoBackup.Outcome.Saved -> folderBackup.copy(autoBackup.file)
+                AutoBackup.Outcome.Large -> folderBackup.copy(autoBackup.largeFile)
+                AutoBackup.Outcome.Skipped -> Unit
+            }
+        }
+        syncFolder.write()
     }
 
     /** Once per app start: a backup another phone left is offered (see [AutoBackup.offer]). */

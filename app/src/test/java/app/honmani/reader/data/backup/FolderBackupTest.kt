@@ -9,9 +9,13 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -266,5 +270,109 @@ class FolderBackupTest {
 
         assertFalse(backup.choose("content://tree/a"))
         assertEquals(FolderBackupState.Off, backup.state.value)
+    }
+
+    private fun backupBytes(exportedAt: Long): ByteArray =
+        ByteArrayOutputStream().also { BackupCodec.write(BackupFile(exportedAt = exportedAt), it) }.toByteArray()
+
+    private fun stamp(at: Long) = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.ROOT).format(Date(at))
+
+    @Test
+    fun aBackupAnotherInstallLeftIsKeptUnderADatedNameAndOffered() = runBlocking {
+        val made = 1_794_580_735_235L
+        val earlier = backupBytes(made)
+        folder.files[file] = earlier
+        backup.choose("content://tree/a")
+
+        backup.copy(source)
+
+        val kept = "content://tree/a/honmani-backup-${stamp(made)}.zip"
+        assertTrue(earlier.contentEquals(folder.files[kept]))
+        assertEquals("zip one", String(folder.files[file]!!))
+        assertEquals(FoundBackup(kept, "honmani-backup-${stamp(made)}.zip", made), backup.found.value)
+        assertEquals(made, backup.read(backup.found.value!!).exportedAt)
+        // Only the first copy looks: later ones replace this install's own file as before.
+        source.writeText("zip two")
+        backup.copy(source)
+        assertEquals(setOf(file, kept), folder.files.keys)
+        assertEquals("zip two", String(folder.files[file]!!))
+    }
+
+    @Test
+    fun theOfferSurvivesARestartUntilDismissed() = runBlocking {
+        folder.files[file] = backupBytes(1_000L)
+        backup.choose("content://tree/a")
+        backup.copy(source)
+
+        val again = FolderBackup(device, folder)
+        assertEquals(backup.found.value, again.found.value)
+        again.dismissFound()
+        assertNull(again.found.value)
+        assertNull(FolderBackup(device, folder).found.value)
+    }
+
+    @Test
+    fun thisInstallsOwnCopyIsReplacedWhenTheFolderIsChosenAgain() = runBlocking {
+        backup.choose("content://tree/a")
+        backup.copy(source)
+        backup.disable()
+
+        backup.choose("content://tree/a")
+        source.writeText("zip two")
+        backup.copy(source)
+
+        assertEquals(mapOf(file to "zip two"), folder.files.mapValues { String(it.value) })
+        assertNull(backup.found.value)
+    }
+
+    @Test
+    fun aProviderThatCannotRenameKeepsACopy() = runBlocking {
+        folder.renamable = false
+        val earlier = backupBytes(1_000L)
+        folder.files[file] = earlier
+        backup.choose("content://tree/a")
+
+        backup.copy(source)
+
+        assertTrue(earlier.contentEquals(folder.files["content://tree/a/honmani-backup-${stamp(1_000L)}.zip"]))
+        assertEquals("zip one", String(folder.files[file]!!))
+    }
+
+    @Test
+    fun aFileThatIsNoBackupIsKeptButNotOffered() = runBlocking {
+        clock = 2_000L
+        folder.files[file] = "not a zip".toByteArray()
+        backup.choose("content://tree/a")
+
+        backup.copy(source)
+
+        assertEquals("not a zip", String(folder.files["content://tree/a/honmani-backup-${stamp(2_000L)}.zip"]!!))
+        assertNull(backup.found.value)
+    }
+
+    @Test
+    fun aDatedNameAlreadyTakenGetsANumber() = runBlocking {
+        folder.files["content://tree/a/honmani-backup-${stamp(1_000L)}.zip"] = "older".toByteArray()
+        folder.files[file] = backupBytes(1_000L)
+        backup.choose("content://tree/a")
+
+        backup.copy(source)
+
+        assertEquals("honmani-backup-${stamp(1_000L)}-2.zip", backup.found.value?.name)
+        assertEquals("older", String(folder.files["content://tree/a/honmani-backup-${stamp(1_000L)}.zip"]!!))
+    }
+
+    @Test
+    fun aBackupThatCannotBeKeptIsNotOverwritten() = runBlocking {
+        val earlier = backupBytes(1_000L)
+        folder.files[file] = earlier
+        backup.choose("content://tree/a")
+        folder.renamable = false
+        folder.denyWrite = true
+
+        backup.copy(source)
+
+        assertEquals(FolderBackupState.Unavailable, backup.state.value)
+        assertTrue(earlier.contentEquals(folder.files[file]))
     }
 }
