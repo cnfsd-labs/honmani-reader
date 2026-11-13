@@ -87,6 +87,21 @@ class WatchedFolderTest {
     }
 
     @Test
+    fun aFileModifiedJustNowIsLeftForALaterScan() {
+        val seen = SeenFiles(seenFile)
+        val copying = file("root/s/a.epub").copy(size = 10, modified = 1_000)
+        val settled = file("root/s/b.epub").copy(size = 10, modified = 999)
+
+        val result = runBlocking {
+            WatchedFolderScan.find(tree(copying, settled), seen, emptySet(), modifiedBefore = 1_000) { hash(it) }
+        }
+
+        assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
+        assertEquals(listOf("root/s/b.epub"), hashed)
+        assertTrue("a file still being copied must not count as seen", !seen.isUnchanged(copying))
+    }
+
+    @Test
     fun aFileThatCannotBeReadIsTriedAgainNextTime() {
         val seen = SeenFiles(seenFile)
         val tree = tree(file("root/s/a.epub"))

@@ -493,7 +493,8 @@ class LibraryViewModel(
             }
             val removedHashes = dao.removedSourceIds(BookSource.FOLDER).toSet()
             val scan = withContext(Dispatchers.IO) {
-                WatchedFolderScan.find(documents, watched.seen, removedHashes) { entry ->
+                val settledBefore = System.currentTimeMillis() - WatchedFolderScan.SETTLE_MILLIS
+                WatchedFolderScan.find(documents, watched.seen, removedHashes, settledBefore) { entry ->
                     try {
                         openFile(documents.uriOf(entry.id))?.input?.use(WatchedFolderScan::sha256)
                     } catch (e: CancellationException) {

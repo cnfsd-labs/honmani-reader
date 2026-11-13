@@ -146,16 +146,21 @@ data class WatchedScan(
 )
 
 object WatchedFolderScan {
+    /** How long a file must stay unmodified before a scan imports it (it may still be copied in). */
+    const val SETTLE_MILLIS = 15_000L
+
     /**
      * Walks [tree] (same limits as the folder import) and returns the book files that are new or
      * changed since [seen]. Those are hashed with [hashOf] (null: could not be read, tried again
      * next time); one whose hash is in [removedHashes] is marked seen and left out. Unchanged
-     * files are not read at all.
+     * files are not read at all. A file modified at or after [modifiedBefore] may still be being
+     * copied into the folder: it is left alone (not hashed, not marked) until a later scan.
      */
     suspend fun find(
         tree: DocumentTree,
         seen: SeenFiles,
         removedHashes: Set<String>,
+        modifiedBefore: Long = Long.MAX_VALUE,
         hashOf: suspend (TreeEntry) -> String?,
     ): WatchedScan {
         val scan = TreeWalker.findBooks(tree)
@@ -164,6 +169,7 @@ object WatchedFolderScan {
         for (entry in scan.files) {
             coroutineContext.ensureActive()
             if (seen.isUnchanged(entry)) continue
+            if (entry.modified >= modifiedBefore) continue
             val hash = hashOf(entry) ?: continue
             if (hash in removedHashes) {
                 seen.mark(entry)
