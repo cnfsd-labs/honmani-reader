@@ -59,7 +59,7 @@ async function openBook(page, epub, viewMode, writingMode) {
     },
     [viewMode, writingMode],
   );
-  for (const script of ['ttu-defaults.js', 'keep-position.js', 'library-bridge.js', 'reading-activity.js', 'sentence-follow.js', 'read-aloud.js']) {
+  for (const script of ['ttu-defaults.js', 'keep-position.js', 'library-bridge.js', 'reading-activity.js', 'book-end.js', 'sentence-follow.js', 'read-aloud.js']) {
     await page.addInitScript({ path: path.join(ASSETS, script) });
   }
   await page.route('**/honmani-books/*', (route) => route.fulfill({ status: 200, body: epub, contentType: 'application/octet-stream' }));
@@ -297,9 +297,8 @@ test('paginated mode goes on into the next chapter and says when the book ends',
 // A slow phone (or CI runner) can take longer than a couple of frames to load the next section
 // after the page turn past a chapter's end. The position not moving yet was taken for the end of
 // the book (a 300 of 450 sentence failure in CI). Here ttu hears the keys of an advance 500 ms late.
-test('a section that loads late after the last page turn is not taken for the end of the book', async ({ page }) => {
-  test.setTimeout(180_000);
-  await page.addInitScript(() => {
+async function delayAdvanceKeys(page, ms) {
+  await page.addInitScript((ms) => {
     window.addEventListener(
       'keydown',
       (event) => {
@@ -307,11 +306,24 @@ test('a section that loads late after the last page turn is not taken for the en
         event.stopImmediatePropagation();
         const late = new KeyboardEvent('keydown', { code: 'ArrowDown', key: 'ArrowDown', bubbles: true });
         late.__late = true;
-        setTimeout(() => window.dispatchEvent(late), 500);
+        setTimeout(() => window.dispatchEvent(late), ms);
       },
       true,
     );
-  });
+  }, ms);
+}
+
+test('a section that loads late after the last page turn is not taken for the end of the book', async ({ page }) => {
+  test.setTimeout(180_000);
+  await delayAdvanceKeys(page, 500);
+  await readThroughChapters(page, { lateKeys: true });
+});
+
+// Slower than one SECTION_LOAD_MS wait: ttu's counts say more chapters follow, so the advance
+// waits on instead of ending the book at the chapter's end.
+test('a section that loads after more than one wait is not taken for the end of the book', async ({ page }) => {
+  test.setTimeout(240_000);
+  await delayAdvanceKeys(page, 4000);
   await readThroughChapters(page, { lateKeys: true });
 });
 

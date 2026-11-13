@@ -48,6 +48,9 @@
   // How long after a page turn that moved nothing the next section may take to appear before the
   // book counts as ended (ttu loads it asynchronously; a slow phone needs more than a few frames).
   const SECTION_LOAD_MS = 2500;
+  // Such waits in a row before the book counts as ended: two when ttu's counts are unknown, up to
+  // MAX_SECTION_WAITS while they say more of the book follows, one when they say it is the end.
+  const MAX_SECTION_WAITS = 6;
   const LETTER = /[\p{L}\p{N}]/u;
   const BLANK = /^[\s￼]$/;
 
@@ -415,13 +418,19 @@
       let token = now && firstTokenOf(now);
       let here = now && startToken(now);
       const unmoved = () => !(token && token !== before) && (!here || (last && here.node === last.node && here.offset === last.offset));
-      // Nothing changed yet: the next section may still be loading, so look again for a while.
-      for (const deadline = performance.now() + SECTION_LOAD_MS; unmoved() && performance.now() < deadline; ) {
-        await nextFrame();
-        if (!session || session.gen !== gen) return;
-        now = rootElement();
-        token = now && firstTokenOf(now);
-        here = now && startToken(now);
+      // Nothing changed yet: the next section may still be loading, so look again for a while,
+      // longer while ttu's counts say this is not the last chapter (a slow phone).
+      for (let waits = 1; ; waits++) {
+        for (const deadline = performance.now() + SECTION_LOAD_MS; unmoved() && performance.now() < deadline; ) {
+          await nextFrame();
+          if (!session || session.gen !== gen) return;
+          now = rootElement();
+          token = now && firstTokenOf(now);
+          here = now && startToken(now);
+        }
+        if (!unmoved()) break;
+        const more = now && window.honmaniBookEnd ? window.honmaniBookEnd.moreAfter(now) : null;
+        if (more === false || waits >= (more ? MAX_SECTION_WAITS : 2)) break;
       }
       if (token && token !== before) {
         session.run = null;

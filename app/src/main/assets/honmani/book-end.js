@@ -136,6 +136,16 @@
     return false;
   }
 
+  /**
+   * Whether ttu's counts put more of the book after this page's chapter: true or false, or null
+   * while ttu has sent none (read-aloud.js asks before it takes a chapter end for the book's).
+   */
+  function moreAfter(root) {
+    if (explored === null || total === null || total <= 0 || countsFor !== bookId()) return null;
+    return total - explored - charsOnScreen(root) > END_SLACK_CHARS;
+  }
+  window.honmaniBookEnd = { moreAfter };
+
   function check() {
     const id = bookId();
     if (id === null || id === reported) return;
