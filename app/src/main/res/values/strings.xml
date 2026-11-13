@@ -466,6 +466,8 @@
     <string name="audiobook_play">Play</string>
     <string name="audiobook_change">Change files</string>
     <string name="audiobook_remove">Remove</string>
+    <string name="audiobook_remove_title">Remove the audiobook?</string>
+    <string name="audiobook_remove_text">Honmani forgets the audio and subtitles chosen for this book and the place reached in them. Your audio file itself stays on the phone.</string>
     <string name="audiobook_removed">Audiobook removed from this book</string>
     <string name="audiobook_export">Export audiobook</string>
     <string name="audiobook_export_saved">Saved %1$s\'s audiobook to the folder</string>

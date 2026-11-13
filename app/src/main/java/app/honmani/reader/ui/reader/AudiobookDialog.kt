@@ -72,6 +72,18 @@ fun AudiobookDialog(
         return
     }
     var keyHelp by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf(false) }
+    if (confirmRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text(stringResource(R.string.audiobook_remove_title)) },
+            text = { Text(stringResource(R.string.audiobook_remove_text)) },
+            confirmButton = {
+                TextButton(onClick = { confirmRemove = false; onRemove() }) { Text(stringResource(R.string.audiobook_remove)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text(stringResource(android.R.string.cancel)) } },
+        )
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = menuReturnDialogProperties(onBack),
@@ -112,7 +124,7 @@ fun AudiobookDialog(
         dismissButton = {
             if (step == AudiobookStep.MANAGE) {
                 TextButton(onClick = onChange) { Text(stringResource(R.string.audiobook_change)) }
-                TextButton(onClick = onRemove) { Text(stringResource(R.string.audiobook_remove)) }
+                TextButton(onClick = { confirmRemove = true }) { Text(stringResource(R.string.audiobook_remove)) }
             } else {
                 TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
             }
