@@ -81,6 +81,13 @@
   const BOOKMARK_BUTTON = '[role="button"][title="Create Bookmark"]';
   /** The theme Honmani last set; while ttu's theme still equals it, the user has not picked one. */
   const AUTO_THEME = 'honmaniAutoTheme';
+  /**
+   * ttu turns a book's font-family naming "sans-serif" into its second font group and "serif" into
+   * the first; Honmani's font setting is the first group. The second follows it (so a paragraph
+   * the book styles as sans uses the reader's font too) until the user picks another one in ttu's
+   * settings: this key holds the value last copied.
+   */
+  const FONT_TWO_COPY = 'honmaniFontGroupTwoCopy';
 
   /** Honmani's earlier default, replaced by saving on every page turn. */
   const OLD_BOOKMARK_TIME = '1';
@@ -93,6 +100,12 @@
       if (window.localStorage.getItem(key) === null) {
         window.localStorage.setItem(key, value);
       }
+    }
+    const fontOne = window.localStorage.getItem('fontFamilyGroupOne');
+    const fontTwo = window.localStorage.getItem('fontFamilyGroupTwo');
+    if (fontTwo === DEFAULTS.fontFamilyGroupTwo || fontTwo === window.localStorage.getItem(FONT_TWO_COPY)) {
+      window.localStorage.setItem('fontFamilyGroupTwo', fontOne);
+      window.localStorage.setItem(FONT_TWO_COPY, fontOne);
     }
 
     const systemTheme = prefersDark ? 'black-theme' : 'light-theme';

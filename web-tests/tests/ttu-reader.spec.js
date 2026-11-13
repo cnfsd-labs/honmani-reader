@@ -111,7 +111,52 @@ test('defaults to system fonts so the book shows without waiting for web fonts',
   await importAndOpen(page);
 
   expect(await page.evaluate(() => localStorage.getItem('fontFamilyGroupOne'))).toBe('serif');
-  expect(await page.evaluate(() => localStorage.getItem('fontFamilyGroupTwo'))).toBe('sans-serif');
+  // ttu's second group (book text styled "sans-serif") follows the reader's font.
+  expect(await page.evaluate(() => localStorage.getItem('fontFamilyGroupTwo'))).toBe('serif');
+});
+
+const sansParagraphEpub = {
+  name: 'sans.epub',
+  mimeType: 'application/epub+zip',
+  buffer: buildEpub({
+    title: 'ゴシックの段落',
+    raw: true,
+    css: 'p.sans { font-family: "Hiragino Kaku Gothic ProN", sans-serif; }',
+    paragraphs: ['<p>吾輩は猫である。</p>', '<p class="sans">名前はまだ無い。</p>', '<p>どこで生れたかとんと見当がつかぬ。</p>'],
+  }),
+};
+
+/** The computed font family of the book's paragraph containing `text`. */
+const paragraphFont = (page, text) =>
+  page.evaluate((text) => {
+    const p = Array.from(document.querySelectorAll('.book-content p')).find((el) => el.textContent.includes(text));
+    return getComputedStyle(p).fontFamily;
+  }, text);
+
+test("a paragraph the book styles as sans-serif uses the reader's font like the rest", async ({ page }) => {
+  await setUp(page);
+  // Picked after ttu-defaults.js wrote its defaults, as the app's settings screen does.
+  await page.goto(`${server.url}/manage`);
+  await page.evaluate(() => localStorage.setItem('fontFamilyGroupOne', 'monospace'));
+  await importAndOpen(page, sansParagraphEpub, 'ゴシックの段落');
+
+  const plain = await paragraphFont(page, '吾輩は');
+  expect(plain).toBe('monospace');
+  expect(await paragraphFont(page, '名前は')).toBe(plain);
+
+  // A font picked later keeps the second group following.
+  await page.evaluate(() => localStorage.setItem('fontFamilyGroupOne', 'cursive'));
+  await page.reload();
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 3_000 });
+  expect(await paragraphFont(page, '名前は')).toBe('cursive');
+});
+
+test('a second font group the user picked in ttu is kept', async ({ page }) => {
+  await setUp(page, { fontFamilyGroupOne: 'monospace', fontFamilyGroupTwo: 'fantasy' });
+  await importAndOpen(page, sansParagraphEpub, 'ゴシックの段落');
+
+  expect(await paragraphFont(page, '名前は')).toBe('fantasy');
+  expect(await paragraphFont(page, '吾輩は')).toBe('monospace');
 });
 
 test('defaults to larger text and an instant auto bookmark, and keeps what the user set', async ({ page }) => {
