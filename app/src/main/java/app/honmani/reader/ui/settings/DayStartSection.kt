@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.settings
 
+import android.content.Context
+import android.text.format.DateFormat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -19,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.settings.DaySettings
+import java.util.Calendar
 
 /** Settings → Reading: the hour after midnight when a reading and review day starts (midnight by default). */
 @OptIn(ExperimentalLayoutApi::class)
@@ -39,11 +42,20 @@ fun DayStartSection() {
                     onClick = { settings.setStartHour(hour) },
                     label = {
                         Text(
-                            if (hour == 0) stringResource(R.string.settings_day_start_midnight) else stringResource(R.string.settings_day_start_hour, hour),
+                            if (hour == 0) stringResource(R.string.settings_day_start_midnight) else hourText(context, hour),
                         )
                     },
                 )
             }
         }
     }
+}
+
+/** [hour] o'clock in the phone's time format: "4:00 AM" or "04:00" as the 12/24-hour setting has it. */
+private fun hourText(context: Context, hour: Int): String {
+    val time = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, 0)
+    }
+    return DateFormat.getTimeFormat(context).format(time.time)
 }
