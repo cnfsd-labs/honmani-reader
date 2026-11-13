@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -93,14 +94,17 @@ fun SearchField(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 48.dp).padding(start = 16.dp)) {
             Icon(Icons.Filled.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            val hint = stringResource(R.string.search_hint)
             Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
                 if (field.text.isEmpty()) {
+                    // The field below carries the hint as its label: not read twice.
                     Text(
-                        stringResource(R.string.search_hint),
+                        hint,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clearAndSetSemantics {},
                     )
                 }
                 BasicTextField(
@@ -113,7 +117,8 @@ fun SearchField(
                     keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequester),
+                        .focusRequester(focusRequester)
+                        .semantics { contentDescription = hint },
                 )
             }
             if (field.text.isNotEmpty()) {
