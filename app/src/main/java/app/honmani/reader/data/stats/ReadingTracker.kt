@@ -154,10 +154,10 @@ class ReadingTracker(
                 // ttu saves the same position again when a page turn stays in one paragraph:
                 // the time keeps adding up until the position moves.
                 if (characters == before) {
-                    synchronized(lock) { carried[ttuId] = carried[ttuId].orEmpty() + onThisPage }
+                    synchronized(lock) { carried[ttuId] = carried[ttuId].orEmpty().sumWith(onThisPage) }
                     return@withLock
                 }
-                val byDay = onThisPage + synchronized(lock) { carried.remove(ttuId).orEmpty() }
+                val byDay = onThisPage.sumWith(synchronized(lock) { carried.remove(ttuId).orEmpty() })
                 val seconds = byDay.values.sum() / 1_000
                 val read = if (seconds >= MIN_PAGE_SECONDS) {
                     (characters - before).coerceIn(0L, seconds * MAX_CHARACTERS_PER_SECOND)
@@ -185,7 +185,7 @@ class ReadingTracker(
                 for ((ttuId, characters) in positions) {
                     val before = store.position(ttuId) ?: 0L
                     if (characters == before) continue
-                    val byDay = synchronized(lock) { sinceReport.remove(ttuId).orEmpty() + carried.remove(ttuId).orEmpty() }
+                    val byDay = synchronized(lock) { sinceReport.remove(ttuId).orEmpty().sumWith(carried.remove(ttuId).orEmpty()) }
                     val seconds = byDay.values.sum() / 1_000
                     val allowed = seconds * MAX_CHARACTERS_PER_SECOND + SLACK_CHARACTERS
                     val read = (characters - before).coerceIn(0L, allowed)
@@ -325,3 +325,7 @@ class ReadingTracker(
         const val SLACK_CHARACTERS = 500L
     }
 }
+
+/** Both maps' times together: a day in both gets the sum (`Map.plus` would keep only one). */
+private fun Map<String, Long>.sumWith(other: Map<String, Long>): Map<String, Long> =
+    other.entries.fold(this) { sum, (day, millis) -> sum + (day to (sum[day] ?: 0L) + millis) }

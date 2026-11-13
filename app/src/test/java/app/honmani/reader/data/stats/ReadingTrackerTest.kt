@@ -320,6 +320,26 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun shortPageTurnsInOneParagraphAddUpOnTheSameDay() = runTest {
+        val tracker = tracker()
+        store.positions[7] = 1_000
+        tracker.setForeground(true)
+        tracker.setVisible(true)
+        tracker.setBook(7)
+        // Three turns of three seconds each inside one paragraph, then the position moves:
+        // nine seconds together, past the minimum, though each turn alone is under it.
+        repeat(3) {
+            seconds(3)
+            tracker.onPage(7, 1_000)
+            advanceUntilIdle()
+        }
+        seconds(3)
+        tracker.onPage(7, 1_200)
+        advanceUntilIdle()
+        assertEquals(200L, store.characters[7L to DAY])
+    }
+
+    @Test
     fun aPageTurnWithoutAStoredPositionCountsNothingAndStoresIt() = runTest {
         val tracker = tracker()
         tracker.setForeground(true)
