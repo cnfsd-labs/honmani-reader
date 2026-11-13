@@ -2,8 +2,10 @@ package app.honmani.reader.data.dictionary
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.zip.DataFormatException
 
 class GlossaryPackerTest {
     private fun entry(i: Int) =
@@ -36,5 +38,20 @@ class GlossaryPackerTest {
         assertFalse(plain.isPacked)
         assertEquals("[\"to eat\"]", GlossaryPacker.unpack(plain, null))
         assertEquals(plain, Glossary(plain.bytes.copyOf()))
+    }
+
+    @Test
+    fun aGlossaryThatInflatesBeyondTheCap_failsCleanly() {
+        val samples = (1..300).map(::entry)
+        GlossaryPacker(GlossaryPacker.preset(samples)).use { packer ->
+            // Some 6 KB of JSON that packs to a few hundred bytes, like a deflate bomb in small.
+            val json = entry(7).repeat(20)
+            val packed = packer.pack(json)
+            assertTrue(packed.isPacked)
+            assertThrows(DataFormatException::class.java) {
+                GlossaryPacker.unpack(packed, packer.preset, maxBytes = json.length / 2)
+            }
+            assertEquals(json, GlossaryPacker.unpack(packed, packer.preset, maxBytes = json.toByteArray().size))
+        }
     }
 }

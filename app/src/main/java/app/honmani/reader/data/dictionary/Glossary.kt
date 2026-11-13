@@ -113,8 +113,12 @@ class GlossaryPacker(val preset: ByteArray) : AutoCloseable {
             return if (bytes.size > PRESET_SIZE) bytes.copyOfRange(bytes.size - PRESET_SIZE, bytes.size) else bytes
         }
 
-        /** The JSON of [glossary]; [preset] is its dictionary's, needed for packed glossaries. */
-        fun unpack(glossary: Glossary, preset: ByteArray?): String {
+        /**
+         * The JSON of [glossary]; [preset] is its dictionary's, needed for packed glossaries. A
+         * packed glossary that inflates to more than [maxBytes] throws [DataFormatException], so a
+         * corrupt or hostile database row cannot fill the memory.
+         */
+        fun unpack(glossary: Glossary, preset: ByteArray?, maxBytes: Int = MAX_UNPACKED_BYTES): String {
             if (!glossary.isPacked) return glossary.json
             requireNotNull(preset) { "Packed glossary without a preset" }
             val inflater = Inflater(true)
@@ -122,13 +126,14 @@ class GlossaryPacker(val preset: ByteArray) : AutoCloseable {
                 val bytes = glossary.bytes
                 inflater.setInput(bytes, 1, bytes.size - 1)
                 inflater.setDictionary(preset)
-                val output = ByteArrayOutputStream(bytes.size * 4)
+                val output = ByteArrayOutputStream(minOf(bytes.size * 4, maxBytes))
                 val buffer = ByteArray(BUFFER_SIZE)
                 while (!inflater.finished()) {
                     val count = inflater.inflate(buffer)
                     if (count == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
                         throw DataFormatException("Truncated glossary")
                     }
+                    if (output.size() + count > maxBytes) throw DataFormatException("Glossary larger than $maxBytes bytes")
                     output.write(buffer, 0, count)
                 }
                 return output.toString(Charsets.UTF_8.name())
@@ -138,5 +143,8 @@ class GlossaryPacker(val preset: ByteArray) : AutoCloseable {
         }
 
         private const val SEED = 7L
+
+        /** Far more than any real glossary (the largest structured ones are some 100 KB). */
+        const val MAX_UNPACKED_BYTES = 8 * 1024 * 1024
     }
 }

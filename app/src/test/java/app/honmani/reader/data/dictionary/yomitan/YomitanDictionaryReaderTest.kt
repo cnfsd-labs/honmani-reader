@@ -77,6 +77,17 @@ class YomitanDictionaryReaderTest {
     }
 
     @Test
+    fun entriesWithoutADeclaredSizeShareTheTotalUnpackedCap() {
+        val budget = UnpackBudget(150)
+        assertEquals(100, LimitedInputStream(ByteArray(100).inputStream(), "a", Long.MAX_VALUE, budget).readBytes().size)
+
+        val e = assertThrows(InvalidDictionaryException::class.java) {
+            LimitedInputStream(ByteArray(100).inputStream(), "b", Long.MAX_VALUE, budget).readBytes()
+        }
+        assertEquals("The file is too large when unpacked to be a dictionary", e.message)
+    }
+
+    @Test
     fun legacyVersionKeyIsAcceptedAsFormat() {
         val files = mapOf("index.json" to """{"title":"Old","revision":"1","version":3}""")
         open(files).use { assertEquals(3, it.index.format) }
