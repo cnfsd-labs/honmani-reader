@@ -78,6 +78,9 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - **Ignore word**: panel ⋮ -> "Ignore word" (shows "Stop ignoring"); Words row -> "Ignore word" (Undo).
   Ignored: no tint, out of Learning/Learned/All, card out of the queue, not in book-sheet N%/M/"Words to
   learn". Words ⋮ -> "Ignored words"; "Stop ignoring" restores state. Lookup works; backup keeps it.
+- **Mark as learned**: panel ⋮ of a result that is not the tapped word -> "Mark as learned": toast
+  "<word> moved to Known", word in Words -> Known, the entry gone from that ⋮. The tapped word (just moved
+  back to Learning by the lookup) offers it too; tapping that word again later moves it back to Learning.
 
 - **Show pitch accent** (Settings -> Reading, on by default; needs a pitch dictionary, e.g. Kanjium):
   off -> no pitch line over the reading in the reader's panel, Words, Review and search panels; the headword,

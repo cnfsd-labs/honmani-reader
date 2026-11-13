@@ -337,6 +337,11 @@ fun WordsScreen(
     LaunchedEffect(searchPanel) {
         searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
+    LaunchedEffect(searchPanel) {
+        searchPanel.learnedWords.collect {
+            Toast.makeText(context, context.getString(R.string.word_moved_to_learned, it), Toast.LENGTH_SHORT).show()
+        }
+    }
     // Back from Words or Dictionary goes to Review, the page the tab opens on, as Progress's sections go to the first.
     BackHandler(enabled = panel == null && pager.currentPage != WordsPage.REVIEW.ordinal) {
         scope.launch { pager.animateScrollToPage(WordsPage.REVIEW.ordinal) }
@@ -471,6 +476,7 @@ fun WordsScreen(
                 showAnki = ankiEnabled,
                 onSetStarred = searchPanel::setStarred,
                 onSetIgnored = searchPanel::setIgnored,
+                onMarkLearned = searchPanel::markLearned,
                 onSetFurigana = searchPanel::setFurigana,
                 onListen = searchPanel::listen,
                 onLookupWord = searchPanel::lookupWord,

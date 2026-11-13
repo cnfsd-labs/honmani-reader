@@ -322,6 +322,17 @@ class WordRepository(
 
     suspend fun markLearned(id: Long) = dao.markLearned(id)
 
+    /** Moves a saved word to Known by its written form and reading; nothing if it isn't saved. */
+    suspend fun markLearned(expression: String, reading: String) {
+        dao.find(expression, reading)?.let { dao.markLearned(it.id) }
+    }
+
+    /** Which of these words (expression, reading) are known, as [key]s. */
+    suspend fun learnedAmong(words: Collection<Pair<String, String>>): Set<String> =
+        words.filter { (expression, reading) -> dao.find(expression, reading)?.status == WordStatus.LEARNED }
+            .map { (expression, reading) -> key(expression, reading) }
+            .toSet()
+
     suspend fun markLearning(id: Long) = dao.markLearning(id)
 
     /** Deletes a word with its lookups and returns them, for [restore]; null if it is gone. */

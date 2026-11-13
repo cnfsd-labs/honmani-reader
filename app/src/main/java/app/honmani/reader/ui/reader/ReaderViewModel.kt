@@ -58,6 +58,8 @@ sealed interface LookupPanelState {
         val starred: Set<String> = emptySet(),
         /** Words ignored ("Ignore word"), as [WordRepository.key]s. */
         val ignored: Set<String> = emptySet(),
+        /** Saved words that are known (status learned), as [WordRepository.key]s. */
+        val learned: Set<String> = emptySet(),
         /** The furigana corrections of saved words ([app.honmani.reader.lookup.FuriganaOverride]), by [WordRepository.key]. */
         val furigana: Map<String, String> = emptyMap(),
         /** Words in the word list, as [WordRepository.key]s; only a search ([LookupOrigin.SEARCH]) asks. */
@@ -124,6 +126,10 @@ class ReaderViewModel(
     private val ignoredAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
     /** Ignores or un-ignores the saved word (expression, reading). */
     private val saveIgnored: suspend (expression: String, reading: String, ignored: Boolean) -> Unit = { _, _, _ -> },
+    /** Which of these words (expression, reading) are known, as [WordRepository.key]s. */
+    private val learnedAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
+    /** Moves the saved word (expression, reading) to Known, as "Mark as learned" in Words does. */
+    private val saveLearned: suspend (expression: String, reading: String) -> Unit = { _, _ -> },
     /** The furigana corrections of these words (expression, reading) that have one, by [WordRepository.key]. */
     private val furiganaAmong: suspend (Collection<Pair<String, String>>) -> Map<String, String> = { emptyMap() },
     /** Saves the furigana correction of the saved word (expression, reading); blank removes it. */
@@ -332,9 +338,10 @@ class ReaderViewModel(
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
             val ignored = ignoredWords(groups)
+            val learned = learnedWords(groups, recorded = recordsOnOpen(tap))
             val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, furigana = furigana, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, furigana = furigana, kanji = kanji) }
         }
     }
 
@@ -388,14 +395,15 @@ class ReaderViewModel(
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
-            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), furigana = emptyMap(), kanji = emptyMap()) }
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), learned = emptySet(), furigana = emptyMap(), kanji = emptyMap()) }
             _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
             val ignored = ignoredWords(groups)
+            val learned = learnedWords(groups, recorded = recordsOnOpen(tap))
             val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
-            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, furigana = furigana, kanji = kanji) }
+            updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, furigana = furigana, kanji = kanji) }
         }
     }
 
@@ -459,10 +467,11 @@ class ReaderViewModel(
         val inAnki = wordsInAnki(groups)
         val starred = starredWords(groups)
         val ignored = ignoredWords(groups)
+        val learned = learnedWords(groups, recorded = false)
         val saved = savedWords(groups)
         val furigana = furiganaOf(groups)
         val kanji = kanjiOf(groups)
-        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, saved = saved, furigana = furigana, kanji = kanji) }
+        updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, saved = saved, furigana = furigana, kanji = kanji) }
     }
 
     /** "+ Learn" in a search: saves [group] to the word list (origin [LookupOrigin.SEARCH]). */
@@ -692,6 +701,53 @@ class ReaderViewModel(
         }
     }
 
+    /**
+     * The known words among [groups]. A tap's lookup of its best match ([recorded]) moves that word
+     * back to Learning, so it never counts here, whether or not the recording has been written yet.
+     */
+    private suspend fun learnedWords(groups: List<LookupGroup>, recorded: Boolean): Set<String> = try {
+        val learned = learnedAmong(groups.map { it.expression to it.reading })
+        if (recorded) learned - WordRepository.key(groups.first().expression, groups.first().reading) else learned
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log("Checking known words failed: $e")
+        emptySet()
+    }
+
+    private val _learnedWords = Channel<String>(Channel.BUFFERED)
+
+    /** Words moved to Known from the panel (their written form), to tell the reader. */
+    val learnedWords: Flow<String> = _learnedWords.receiveAsFlow()
+
+    /**
+     * "Mark as learned" for [group] of the tapped text: saves the word first if this lookup hasn't
+     * (only the best match of a tap is), then moves it to Known, as the word list's action does.
+     * A later lookup moves it back to Learning, as for any known word.
+     */
+    fun markLearned(group: LookupGroup) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        if (state.previous != null) return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        if (key in state.learned) return
+        updateResults(tap) { it.copy(learned = it.learned + key) }
+        keep(key)
+        viewModelScope.launch {
+            try {
+                record(tap, group).join()
+                saveLearned(group.expression, group.reading)
+                if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
+                _learnedWords.send(group.expression)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Marking a word as learned failed: $e")
+                updateResults(tap) { it.copy(learned = it.learned - key) }
+            }
+        }
+    }
+
     /** Adds [group] from the panel to Anki, with the tapped sentence, and saves the word. */
     fun addToAnki(group: LookupGroup) {
         val state = _panel.value as? LookupPanelState.Results ?: return
@@ -889,6 +945,8 @@ class ReaderViewModel(
                     saveIgnored = { expression, reading, ignored ->
                         container.wordRepository.setIgnored(expression, reading, ignored)
                     },
+                    learnedAmong = { container.wordRepository.learnedAmong(it) },
+                    saveLearned = { expression, reading -> container.wordRepository.markLearned(expression, reading) },
                     furiganaAmong = { container.wordRepository.furiganaAmong(it) },
                     saveFurigana = { expression, reading, furigana ->
                         container.wordRepository.setFurigana(expression, reading, furigana)

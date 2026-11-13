@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.delay
 import android.content.ContextWrapper
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -554,6 +555,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     LaunchedEffect(viewModel) {
         viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
+    LaunchedEffect(viewModel) {
+        viewModel.learnedWords.collect {
+            Toast.makeText(context, context.getString(R.string.word_moved_to_learned, it), Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // The words with a review card due today, for their tint in the book (word-marks.js).
     val dueWords = remember(dueToday) { dueToday.mapTo(HashSet()) { it.expression } as Set<String> }
@@ -829,6 +835,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     showAnki = ankiEnabled,
                     onSetStarred = viewModel::setStarred,
                     onSetIgnored = viewModel::setIgnored,
+                    onMarkLearned = viewModel::markLearned,
                     onSetFurigana = viewModel::setFurigana,
                     onEditLookup = { openInDictionary(context, it) },
                     onListen = { group ->

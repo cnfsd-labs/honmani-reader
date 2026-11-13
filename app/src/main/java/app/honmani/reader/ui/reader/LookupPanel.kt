@@ -167,6 +167,8 @@ fun LookupPanel(
     onSetFurigana: ((LookupGroup, String) -> Unit)? = null,
     /** "Ignore word" in a word's overflow menu: ignore it (true) or stop ignoring it. */
     onSetIgnored: (LookupGroup, Boolean) -> Unit = { _, _ -> },
+    /** "Mark as learned" in a word's overflow menu: move it to Known; null shows no such entry. */
+    onMarkLearned: ((LookupGroup) -> Unit)? = null,
     /** Opens the search screen with a text filled in, when nothing was found; null shows no such button. */
     onEditLookup: ((String) -> Unit)? = null,
     /** The listen button of a word: say it. */
@@ -469,6 +471,12 @@ fun LookupPanel(
                                     ignored = WordRepository.key(group.expression, group.reading) in state.ignored,
                                     onSetIgnored = if (state.previous == null) {
                                         { onSetIgnored(group, it) }
+                                    } else {
+                                        null
+                                    },
+                                    learned = WordRepository.key(group.expression, group.reading) in state.learned,
+                                    onMarkLearned = if (onMarkLearned != null && state.previous == null) {
+                                        { onMarkLearned(group) }
                                     } else {
                                         null
                                     },
@@ -838,6 +846,9 @@ private fun LookupGroupItem(
     showAnki: Boolean = true,
     ignored: Boolean = false,
     onSetIgnored: ((Boolean) -> Unit)? = null,
+    /** Whether the word is known already: then it offers no "Mark as learned". */
+    learned: Boolean = false,
+    onMarkLearned: (() -> Unit)? = null,
     onListen: () -> Unit = {},
     onLearn: (() -> Unit)? = null,
     saved: Boolean = false,
@@ -900,7 +911,8 @@ private fun LookupGroupItem(
                         }
                     }
                 }
-                if (onSetStarred != null || onSetIgnored != null || onCorrectFurigana != null) {
+                val markLearned = onMarkLearned?.takeUnless { learned }
+                if (onSetStarred != null || onSetIgnored != null || onCorrectFurigana != null || markLearned != null) {
                     // Used now and then, so out of the way: the star shows beside the word once set.
                     var menu by remember { mutableStateOf(false) }
                     Box {
@@ -918,6 +930,15 @@ private fun LookupGroupItem(
                                     onClick = {
                                         menu = false
                                         onSetStarred(!starred)
+                                    },
+                                )
+                            }
+                            if (markLearned != null) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_mark_learned)) },
+                                    onClick = {
+                                        menu = false
+                                        markLearned()
                                     },
                                 )
                             }

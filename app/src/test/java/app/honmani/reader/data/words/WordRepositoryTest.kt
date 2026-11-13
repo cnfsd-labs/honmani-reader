@@ -338,6 +338,23 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun aWordMarkedLearnedByItsText_isKnownUntilItIsLookedUpAgain() = runTest {
+        repository.record(lookup("猫"))
+        repository.record(lookup("犬"))
+
+        repository.markLearned("猫", "よみ")
+        // Only a saved word can be marked by its text.
+        repository.markLearned("鼬", "よみ")
+
+        assertEquals(WordStatus.LEARNED, repository.find("猫", "よみ")!!.status)
+        assertEquals(null, repository.find("鼬", "よみ"))
+        assertEquals(setOf(WordRepository.key("猫", "よみ")), repository.learnedAmong(listOf("猫" to "よみ", "犬" to "よみ", "鼬" to "よみ")))
+        // A lookup in another sentence (the same one soon after doesn't count) takes it back to Learning.
+        repository.record(lookup("猫", sentence = "猫がいる。"))
+        assertEquals(WordStatus.LEARNING, repository.find("猫", "よみ")!!.status)
+    }
+
+    @Test
     fun aFuriganaOverrideSurvivesLookingUpAgainAndDeletingAndRestoring_andKeepsTheReading() = runTest {
         repository.record(lookup("飛び散る", sentence = "飛び散る。"))
         val id = learning().single().id

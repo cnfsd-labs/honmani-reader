@@ -19,6 +19,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -726,5 +727,56 @@ class ReaderViewModelTest {
         model.setIgnored(group, false)
 
         assertTrue(key in (model.panel.value as LookupPanelState.Results).ignored)
+    }
+
+    @Test
+    fun markLearned_savesTheWordFirst_thenMovesItToKnown_andTellsTheReader() = runTest {
+        val steps = mutableListOf<String>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べる"), entry("食べ物", "食べ"))) },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { steps += "record ${it.expression}"; null },
+            saveLearned = { expression, _ -> steps += "learned $expression" },
+        )
+        model.onTap(tap("食べる"))
+        steps.clear()
+        val other = (model.panel.value as LookupPanelState.Results).groups[1]
+
+        model.markLearned(other)
+
+        assertEquals(listOf("record 食べ物", "learned 食べ物"), steps)
+        assertTrue(WordRepository.key("食べ物", "食べ物") in (model.panel.value as LookupPanelState.Results).learned)
+        assertEquals("食べ物", model.learnedWords.first())
+        // Once known, the menu offers it no more: a second tap on it changes nothing.
+        model.markLearned(other)
+        assertEquals(2, steps.size)
+    }
+
+    @Test
+    fun theTappedWordIsNotKnown_sinceItsLookupMovesItBackToLearning() {
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べる"), entry("食べ物", "食べ"))) },
+            compute = Dispatchers.Unconfined,
+            learnedAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.toSet() },
+        )
+
+        model.onTap(tap("食べる"))
+
+        assertEquals(setOf(WordRepository.key("食べ物", "食べ物")), (model.panel.value as LookupPanelState.Results).learned)
+    }
+
+    @Test
+    fun aFailingMarkLearnedIsTakenBack() {
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            saveLearned = { _, _ -> error("disk full") },
+        )
+        model.onTap(tap("食べました。"))
+        val group = (model.panel.value as LookupPanelState.Results).groups.single()
+
+        model.markLearned(group)
+
+        assertTrue((model.panel.value as LookupPanelState.Results).learned.isEmpty())
     }
 }
