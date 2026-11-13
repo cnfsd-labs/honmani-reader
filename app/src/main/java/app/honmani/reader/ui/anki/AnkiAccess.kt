@@ -132,6 +132,11 @@ fun showVoiceProblem(context: Context, problem: VoiceProblem) {
     toast(context, context.getString(R.string.listen_failed, context.getString(problem.label())))
 }
 
+/** Confirms that "Mark as learned" moved [word] to Known. */
+fun showMovedToKnown(context: Context, word: String) {
+    toast(context, context.getString(R.string.word_moved_to_learned, word))
+}
+
 fun VoiceProblem.label(): Int = when (this) {
     VoiceProblem.NO_ENGINE -> R.string.voice_problem_no_engine
     VoiceProblem.NO_JAPANESE -> R.string.voice_problem_no_japanese

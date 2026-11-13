@@ -135,6 +135,7 @@ import app.honmani.reader.ui.known.KnownWordsCard
 import app.honmani.reader.ui.known.KnownWordsSheet
 import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.FrequencyBadge
 import app.honmani.reader.ui.reader.GlossLines
@@ -339,7 +340,7 @@ fun WordsScreen(
     }
     LaunchedEffect(searchPanel) {
         searchPanel.learnedWords.collect {
-            Toast.makeText(context, context.getString(R.string.word_moved_to_learned, it), Toast.LENGTH_SHORT).show()
+            showMovedToKnown(context, it)
         }
     }
     // Back from Words or Dictionary goes to Review, the page the tab opens on, as Progress's sections go to the first.

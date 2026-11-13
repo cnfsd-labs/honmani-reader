@@ -1,6 +1,5 @@
 package app.honmani.reader.ui.lookup
 
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,6 +56,7 @@ import app.honmani.reader.R
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.ReaderViewModel
@@ -109,7 +109,7 @@ fun LookupScreen(
     }
     LaunchedEffect(viewModel) {
         viewModel.learnedWords.collect {
-            Toast.makeText(context, context.getString(R.string.word_moved_to_learned, it), Toast.LENGTH_SHORT).show()
+            showMovedToKnown(context, it)
         }
     }
     BackHandler { if (!viewModel.back()) onDone() }

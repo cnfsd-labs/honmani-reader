@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.delay
 import android.content.ContextWrapper
 import android.content.Intent
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -123,6 +122,7 @@ import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
+import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.library.AddBookStart
 import app.honmani.reader.ui.library.LibraryScreen
@@ -557,7 +557,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     }
     LaunchedEffect(viewModel) {
         viewModel.learnedWords.collect {
-            Toast.makeText(context, context.getString(R.string.word_moved_to_learned, it), Toast.LENGTH_SHORT).show()
+            showMovedToKnown(context, it)
         }
     }
 
