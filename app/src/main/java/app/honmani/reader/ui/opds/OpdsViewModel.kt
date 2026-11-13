@@ -316,6 +316,7 @@ class OpdsViewModel(
                     OpdsException.Reason.UNAUTHORIZED -> DownloadFailure.UNAUTHORIZED
                     OpdsException.Reason.NETWORK, OpdsException.Reason.CERTIFICATE -> DownloadFailure.NETWORK
                     OpdsException.Reason.HOTSPOT -> DownloadFailure.HOTSPOT
+                    OpdsException.Reason.TOO_LARGE -> DownloadFailure.TOO_LARGE
                     else -> DownloadFailure.SERVER
                 }
                 setDownload(entry.id, DownloadState.Failed(failure))

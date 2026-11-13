@@ -1,5 +1,6 @@
 package app.honmani.reader.data.opds
 
+import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.net.LoginGate
 import java.io.File
 import java.io.OutputStream
@@ -161,6 +162,22 @@ class OpdsClientTest {
         assertEquals("猫.epub", name)
         assertEquals(book.size.toLong() to book.size.toLong(), last)
         assertEquals(book.toList(), target.readBytes().toList())
+    }
+
+    @Test
+    fun aBookLargerThanTheImportTakesIsNotDownloaded() = runTest {
+        val catalogue = server { _, out ->
+            out.head("200 OK", "Content-Length: ${BookImporter.MAX_BOOK_BYTES + 1}")
+            out.write(ByteArray(1000))
+        }
+        val target = File(folder.root, "big.part")
+        var received = 0L
+        assertFails(OpdsException.Reason.TOO_LARGE) {
+            client.download(OpdsServer("http://127.0.0.1:${catalogue.port}/"), "http://127.0.0.1:${catalogue.port}/b", target) { done, _ ->
+                received = done
+            }
+        }
+        assertEquals(0L, received)
     }
 
     @Test

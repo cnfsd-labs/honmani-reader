@@ -1,5 +1,6 @@
 package app.honmani.reader.data.opds
 
+import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.originOf
 import app.honmani.reader.diagnostics.NetworkLog
@@ -116,6 +117,8 @@ class OpdsClient(
         onProgress: (bytesDone: Long, bytesTotal: Long) -> Unit,
     ): String? = request(server, url) { connection, _ ->
         val total = connection.contentLengthLong
+        // The import refuses a larger book: don't download it first.
+        if (total > MAX_BOOK_BYTES) tooLarge(url)
         var done = 0L
         connection.inputStream.use { input ->
             destination.outputStream().use { output ->
@@ -246,7 +249,7 @@ class OpdsClient(
         private const val MAX_REDIRECTS = 5
         private const val MAX_FEED_BYTES = 8 shl 20
         const val MAX_THUMBNAIL_BYTES = 2 shl 20
-        private const val MAX_BOOK_BYTES = 500L shl 20
+        private const val MAX_BOOK_BYTES = BookImporter.MAX_BOOK_BYTES
         private const val BUFFER_SIZE = 64 * 1024
         private const val USER_AGENT = "Honmani (Android; OPDS)"
         private const val ACCEPT = "application/atom+xml, application/xml;q=0.9, */*;q=0.5"
