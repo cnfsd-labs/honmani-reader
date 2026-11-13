@@ -6,6 +6,7 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import java.io.File
 import java.io.IOException
+import kotlin.coroutines.CoroutineContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
@@ -64,13 +65,21 @@ class ProgressSync(
     private val now: () -> Long = System::currentTimeMillis,
     /** Records the last success and failure for Settings and the reader menu. */
     private val status: KoSyncStatus? = null,
+    /**
+     * Where book files are parsed: placing a position re-reads one chapter (up to 32 MB), which
+     * must not block the caller (the main thread, when a book opens) or [pull]'s timeout.
+     */
+    private val parsing: CoroutineContext = Dispatchers.Default,
 ) {
-    private class Document(val id: String, val positions: EpubPositions) {
+    private class Document(val id: String, val positions: EpubPositions, private val parsing: CoroutineContext) {
         val total get() = positions.total.coerceAtLeast(1)
 
-        fun characters(remote: RemoteProgress): Long =
+        suspend fun characters(remote: RemoteProgress): Long = withContext(parsing) {
             (positions.charactersAt(remote.progress)?.toLong() ?: (remote.percentage * total).roundToLong())
                 .coerceIn(0, total.toLong())
+        }
+
+        suspend fun xpointerAt(characters: Long): String? = withContext(parsing) { positions.xpointerAt(characters.toInt()) }
 
         fun percent(characters: Long) = (characters * 100.0 / total).roundToInt()
     }
@@ -154,8 +163,9 @@ class ProgressSync(
                     take(found.document, ttuId, found.characters, found.device, setBookmark)
                 } else {
                     // This phone's place stays, and goes to the server for the other device.
-                    found.document.positions.xpointerAt(found.local.toInt())?.let { xpointer ->
-                        unsent.put(
+                    found.document.xpointerAt(found.local)?.let { xpointer ->
+                        // A file write: off the caller's (main) thread, like the parse.
+                        withContext(Dispatchers.IO) { unsent.put(
                             UnsentPosition(
                                 ttuId = ttuId,
                                 document = found.document.id,
@@ -165,7 +175,7 @@ class ProgressSync(
                                 // The reader chose it over the other device's.
                                 readAt = maxOf(now(), found.at + 1),
                             ),
-                        )
+                        ) }
                     }
                     resend()
                     null
@@ -311,7 +321,7 @@ class ProgressSync(
             try {
                 val book = books.findByTtuId(ttuId)?.takeIf { it.format == BookFormat.EPUB }
                 val document = book?.let { document(it) }
-                val xpointer = document?.positions?.xpointerAt(characters.toInt())
+                val xpointer = document?.xpointerAt(characters)
                 if (document != null && xpointer != null) {
                     val percentage = characters.toDouble() / document.total
                     unsent.put(UnsentPosition(ttuId, document.id, xpointer, percentage.coerceIn(0.0, 1.0), characters, raw.readAt))
@@ -365,10 +375,10 @@ class ProgressSync(
 
     /** The book's sync id and positions, worked out once per book (it reads the whole file). */
     private suspend fun document(book: BookEntity): Document? = documentLock.withLock {
-        documents[book.id] ?: withContext(Dispatchers.Default) {
+        documents[book.id] ?: withContext(parsing) {
             val file = bookFile(book).takeIf { it.isFile } ?: return@withContext null
             val positions = EpubPositions.read(file) ?: return@withContext null
-            Document(PartialMd5.of(file), positions)
+            Document(PartialMd5.of(file), positions, parsing)
         }?.also { documents[book.id] = it }
     }
 

@@ -70,6 +70,7 @@ class ProgressSyncTest {
         books: File = File(folder.root, "books"),
         client: KoSyncClient = KoSyncClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000),
         pullTimeoutMs: Long = 4_000,
+        parsing: kotlin.coroutines.CoroutineContext = Dispatchers.Default,
     ) = ProgressSync(
         settings = settings,
         client = client,
@@ -82,6 +83,7 @@ class ProgressSyncTest {
         pushDelayMs = 50,
         now = { clock },
         status = status,
+        parsing = parsing,
     )
 
     @After
@@ -140,6 +142,27 @@ class ProgressSyncTest {
             assertTrue("Waited $tookMs ms", tookMs < 3_000)
             held.forEach { it.close() }
         }
+    }
+
+    @Test
+    fun aSlowChapterParseDoesNotHoldBackTheBook() {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+        // The book's first read is quick; placing the server's position in a chapter then takes 2 s.
+        val dispatches = java.util.concurrent.atomic.AtomicInteger()
+        val slow = object : kotlinx.coroutines.CoroutineDispatcher() {
+            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) {
+                val wait = dispatches.incrementAndGet() > 1
+                Thread { if (wait) Thread.sleep(2_000); block.run() }.start()
+            }
+        }
+        sync = newSync(pullTimeoutMs = 300, parsing = slow)
+
+        val started = System.nanoTime()
+        val pulled = runBlocking { pull(local = 7, savedAtMs = 1_000_000) }
+        val tookMs = (System.nanoTime() - started) / 1_000_000
+
+        assertNull(pulled)
+        assertTrue("Waited $tookMs ms", tookMs < 1_500)
     }
 
     @Test
