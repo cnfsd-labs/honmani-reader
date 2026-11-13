@@ -11,8 +11,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Timing: `adb logcat -s Honmani.lookup` prints each lookup's duration.
 - **Reader looks wrong** (blank page): open the book, wait 5 s, back to the library, Settings -> Help and about -> **Share
   diagnostics**, send to cnfsd.labs@gmail.com or an issue. Nothing is sent automatically.
-- Test files: `docs/samples/tebukuro.epub` (also on first start; Settings -> Reading -> Sample books has eight
-  more; no text = app bug), any DRM-free Japanese EPUB, an Aozora `.txt` (unzip the ルビあり zip).
+- Test files: `docs/samples/tebukuro.epub` (also on first start; Settings -> Help and about -> Sample books has
+  eight more; no text = app bug), any DRM-free Japanese EPUB, an Aozora `.txt` (unzip the ルビあり zip).
 
 ## Release pass (fresh install of the release build, ~10 min)
 
@@ -81,7 +81,6 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - **Mark as learned**: panel ⋮ of a result that is not the tapped word -> "Mark as learned": toast
   "<word> moved to Known", word in Words -> Known, the entry gone from that ⋮. The tapped word (just moved
   back to Learning by the lookup) offers it too; tapping that word again later moves it back to Learning.
-
 - **Show pitch accent** (Settings -> Reading, on by default; needs a pitch dictionary, e.g. Kanjium):
   off -> no pitch line over the reading in the reader's panel, Words, Review and search panels; the headword,
   other readings and everything else unchanged; dictionaries still listed. Kill and reopen: stays off.
@@ -154,8 +153,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Look up words in a book; next day the Review tab (first in Words; Words always opens on it) shows
   "Review · n" and an icon badge. Page: small stats on top, chips and a large Start low down. With no
   words yet: "No words yet", no Start button or chips; a Stats button opens Progress. Answers and the end
-  of a session give a soft haptic (system touch feedback) and, with Settings -> Appearance -> Sounds on, a sound (media volume; ringer silent or vibrate does not mute it). The end
-  screen shows the result and animates in. Front = sentence with
+  of a session give a soft haptic (system touch feedback) and, with Sounds on (see Appearance below), a
+  sound. The end screen shows the result and animates in. Front = sentence with
   the word marked; tap = answer; Forgot / Got it (or swipe); Undo; Back mid-session keeps answers.
 - ⋮: Bury until tomorrow, Mark known, Don't review, Review now, Edit meaning, Correct furigana (field per
   kanji part, kana only, Reset; also in the panel ⋮; changes only Honmani's built furigana, never the
@@ -235,14 +234,11 @@ aloud, on a page with furigana.
 Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent recording (media volume
 0). Reader menu -> Audiobook: pick audio, then subtitles.
 
-- Back while the bar is shown ends the audiobook (the book stays open); a second Back leaves the book.
-  Same for read aloud.
-
 - Bar, "Matching the subtitles to the book..." briefly, audio plays, the heard subtitle is marked; pages
   turn at page end (both directions, paged/continuous) and count as reading: with progress sync the
   position reaches the server (a far jump does not).
 - Subtitles not in the book change nothing (mark stays); under half found -> the bar says so.
-- Same bar order, volume buttons and swipe-away/Follow as read aloud.
+- Same bar order, volume buttons, swipe-away/Follow and Back as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
   0.5/0.75/1/1.25/1.5, kept.
 - Pause, close the app: audio paused, screen no longer kept on, Play continues. Another player pauses;
@@ -277,7 +273,7 @@ Needs your own Google Cloud API key (Settings -> Flashcards -> Voice) with billi
 - Finished: Play follows the audio with the marks like a paired recording; seek/next sentence land within
   ~50 ms. "Delete audio (N MB)" asks, then the pairing and `files/audiobook/generated/<hash>/` are gone
   (run-as ls). Removing the book from the library deletes them too.
-- The folder is not in a backup (`bmgr`, docs above) and the Network activity screen lists "Google audiobook voice".
+- The folder is not in a backup (`bmgr`, see Back up and restore) and the Network activity screen lists "Google audiobook voice".
 
 ## Bookmarks and the reading slider
 
@@ -321,10 +317,10 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
   reopening the book KOReader offers the last page. Conflict: read on offline in Honmani, open in
   KOReader at its older place and close, reconnect, open in Honmani -> "Where to continue?"; "Stay at
   ..." keeps Honmani's page (KOReader offers it next), "Go to ..." jumps back.
-- Komga (tried against Komga 1.30 on localhost with curl and `KoSyncClient`, not on the phone): user needs the
-  KOREADER_SYNC role and the library "KOReader hash"; sign in with its address, an API key as user name and any
-  password. Komga keeps the chapter only: KOReader/Honmani open at the chapter start from the other device
-  (Honmani then uses the percentage). Kavita (read from its source, untested): the API key is part of the address, `<address>/api/koreader/<API key>`, with any user name and password.
+- Komga: the user needs the KOREADER_SYNC role and the library "KOReader hash"; sign in with its address,
+  an API key as user name and any password. Komga keeps the chapter only: KOReader/Honmani open at the
+  chapter start from the other device (Honmani then uses the percentage). Kavita (untested): the API key
+  is part of the address, `<address>/api/koreader/<API key>`, with any user name and password.
 - Status: Settings -> Books and sync shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
   attempt failed ...: server unreachable" (or wrong login, HTTP status); that book's reader menu starts
   with "Progress sync failed: ..."; other books no hint. Server back -> next sync clears both.
@@ -415,12 +411,12 @@ adb shell bmgr enable false
   only when a daily goal is set and counts goal days ("goal streak"). A milestone or level-up shows a
   banner at the top of the Library once (swipe it away; not again on the next start; nothing on the first
   run after install). Words in Learning show one progress bar, also on collapsed rows.
-- Settings -> Appearance -> Sounds: off by default; on plays short tones for review answers, session end
-  and milestones, never while read aloud, an audiobook or other media plays. Animations
-  (next line) is on by default; off, or with E-ink mode, or animations turned off in Android, nothing
-  animates (the screens still change).
-- Settings -> Appearance -> Animations: off stops tab fades, panel slides, card moves and progress bars
-  growing; on brings them back at once.
+- Settings -> Appearance -> Sounds (off by default): short tones for review answers, session end and
+  milestones on the media stream (ringer silent or vibrate does not mute them), never while read aloud,
+  an audiobook or other media plays.
+- Settings -> Appearance -> Animations (on by default): off, E-ink mode or Android's animations off stop
+  tab fades, panel slides, card moves and growing progress bars (the screens still change); on brings
+  them back at once.
 - Progress -> Milestones: the calendar fits the width, arrows step through older weeks, a swipe on it
   turns the page. Level and milestones each have their own info text.
 - Settings -> Appearance -> random accent: Every launch changes on a cold start only, Every day with the

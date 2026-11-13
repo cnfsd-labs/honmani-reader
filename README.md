@@ -6,13 +6,11 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 
 - Dictionaries with one tap on the first start (English or Japanese definitions), or any
   Yomitan dictionary
-- EPUB and text files (Aozora Bunko too); an optional free-books catalogue of about 17,000
-  public-domain Aozora works to search and add (contacts its servers only after one tap); text shared from another app or pasted from the clipboard
-  becomes a book; vertical or horizontal text, furigana, reader fonts; pages
-  turn with a tap, a swipe or the volume buttons. Optional: immersive mode (hides the status and
-  navigation bars), e-ink mode (black on white, no animations, grey marks), your own CSS for the book
-  text. A tap on a picture (a cover too) opens it full screen with pinch zoom, double-tap zoom and
-  panning
+- EPUB and text files (Aozora Bunko too); text shared from another app or pasted becomes a book; an
+  optional catalogue of about 17,000 public-domain Aozora works to search and add (online only after a tap)
+- Vertical or horizontal text, furigana, reader fonts; pages turn with a tap, a swipe or the volume
+  buttons. Optional: immersive mode, e-ink mode (black on white, no animations, grey marks), your own
+  CSS. A tap on a picture opens it full screen with zoom
 - Search in the open book (reader menu): every match with its surroundings and place; a tap opens the
   book there and marks it
 - Read aloud (reader menu): the phone's Japanese voice (Settings, Text-to-speech) reads from the page on
@@ -143,4 +141,4 @@ KANJIDIC2 data (© Electronic Dictionary Research and Development Group,
 off until switched on) are from [Tatoeba](https://tatoeba.org) (Japanese sentences with English
 translations, [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/)), packed by
 `scripts/examples/build_examples.py` and downloaded from this repository's GitHub releases only when
-the reader turns them on: the app's only other download besides dictionaries and fonts.
+the reader turns them on. Every network use is listed in the [privacy policy](docs/privacy-policy.md).
