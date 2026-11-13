@@ -63,6 +63,7 @@ import app.honmani.reader.data.dictionary.ImportProgress
 import app.honmani.reader.data.dictionary.ImportStatus
 import app.honmani.reader.ui.HonmaniTopAppBar
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.onboarding.messageRes
 import app.honmani.reader.ui.rememberWithNotifications
 import app.honmani.reader.ui.theme.HonmaniTheme
 import java.text.NumberFormat
@@ -396,7 +397,8 @@ private fun importErrorMessage(failure: ImportStatus.Failed): String {
         ImportError.INVALID -> stringResource(R.string.import_failed_invalid, detail)
         ImportError.ALREADY_INSTALLED -> stringResource(R.string.import_failed_already_installed, detail)
         ImportError.NO_TERMS -> stringResource(R.string.import_failed_no_terms, detail)
-        ImportError.DOWNLOAD_FAILED -> stringResource(R.string.import_failed_download, detail)
+        // The exception's text is for the log, not a sentence for the reader.
+        ImportError.DOWNLOAD_FAILED -> stringResource(failure.reason.messageRes())
         ImportError.FAILED -> stringResource(R.string.import_failed)
     }
 }

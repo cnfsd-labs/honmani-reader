@@ -216,7 +216,7 @@ internal class KnownWordsFlow(
                 throw e
             } catch (e: Exception) {
                 logWarning("Honmani.known", "Preparing known words failed", e)
-                Step.Problem(context.getString(R.string.known_failed, e.message ?: e.javaClass.simpleName))
+                Step.Problem(context.getString(R.string.known_failed))
             }
         }
     }

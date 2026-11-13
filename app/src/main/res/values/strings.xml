@@ -686,7 +686,7 @@
     <string name="known_file_unreadable">That file could not be read.</string>
     <string name="known_file_too_large">That file is larger than 5 MB, which is too large for a word list.</string>
     <string name="known_list_empty">That list holds no words.</string>
-    <string name="known_failed">Could not mark the words: %1$s</string>
+    <string name="known_failed">Could not mark the words. Try again.</string>
     <string name="known_batch_top">The %1$s most common words</string>
     <string name="known_batch_anki">Anki deck %1$s</string>
     <string name="known_batch_list">Word list %1$s</string>
@@ -870,7 +870,6 @@
     <string name="import_failed_already_installed">“%1$s” is already installed.</string>
     <string name="import_failed_no_terms">“%1$s” has no terms, kanji, frequencies or pitch accents.</string>
     <string name="import_failed">The dictionary could not be imported.</string>
-    <string name="import_failed_download">The download failed: %1$s</string>
     <string name="download_running">Downloading %1$s…</string>
     <string name="download_progress">Downloading %1$s… %2$d of %3$d MB</string>
     <string name="catalog_title">Get dictionaries</string>
