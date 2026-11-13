@@ -8,6 +8,11 @@ data class CatalogDictionary(
     val titlePrefix: String,
     /** The `downloadUrl` from the dictionary's own index.json; it always points to the latest. */
     val url: String,
+    /**
+     * A pinned, known-good release on the same host, downloaded when the latest release at [url]
+     * turns out incomplete (the publisher sometimes ships one without its banks); null if none.
+     */
+    val fallbackUrl: String? = null,
     /** Approximate download size, for display. */
     val sizeMb: Int,
     val license: String,
@@ -33,11 +38,18 @@ data class CatalogDictionary(
 /**
  * Dictionaries offered for one-tap download. The URLs are GitHub "latest release" links, which
  * stay the same across releases. If one breaks, the download fails with a message; importing a
- * file still works.
+ * file still works. yomidevs' builds are sometimes incomplete: those entries fall back to the
+ * release of [YOMIDEVS_FALLBACK_TAG].
  */
 object DictionaryCatalog {
     /** Title prefix of JMnedict, whose entries rank below ordinary words of the same match. */
     const val NAMES_TITLE = "JMnedict"
+
+    /** The last yomidevs/jmdict-yomitan release known to be complete. */
+    private const val YOMIDEVS_FALLBACK_TAG = "2026-11-11"
+
+    private fun yomidevsFallback(file: String) =
+        "https://github.com/yomidevs/jmdict-yomitan/releases/download/$YOMIDEVS_FALLBACK_TAG/$file"
 
     /** Whether a dictionary of this title holds names (JMnedict). */
     fun isNames(title: String): Boolean =
@@ -59,6 +71,7 @@ object DictionaryCatalog {
             name = "JMdict (English)",
             titlePrefix = "JMdict",
             url = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMdict_english.zip",
+            fallbackUrl = yomidevsFallback("JMdict_english.zip"),
             sizeMb = 16,
             license = "CC BY-SA 4.0 (EDRDG)",
         ),
@@ -68,6 +81,7 @@ object DictionaryCatalog {
             titlePrefix = NAMES_TITLE,
             // Same publisher and release as JMdict; its index.json title is "JMnedict [date]".
             url = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/JMnedict.zip",
+            fallbackUrl = yomidevsFallback("JMnedict.zip"),
             sizeMb = 11,
             license = "CC BY-SA 4.0 (EDRDG)",
             kind = CatalogDictionary.Kind.NAMES,
@@ -87,6 +101,7 @@ object DictionaryCatalog {
             name = "KANJIDIC (English)",
             titlePrefix = "KANJIDIC",
             url = "https://github.com/yomidevs/jmdict-yomitan/releases/latest/download/KANJIDIC_english.zip",
+            fallbackUrl = yomidevsFallback("KANJIDIC_english.zip"),
             sizeMb = 1,
             license = "CC BY-SA 4.0 (EDRDG)",
             recommended = true,

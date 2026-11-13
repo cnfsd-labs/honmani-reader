@@ -44,29 +44,38 @@ class DictionaryImportWorker(
         var willRetry = false
         try {
             runInForeground(null)
+            val importer = container.dictionaryImporter
+            val format = inputData.getString(KEY_FORMAT)
+                ?.let { name -> DictionaryFileFormat.entries.firstOrNull { it.name == name } }
+                ?: DictionaryFileFormat.YOMITAN
+            val replaces = inputData.getLong(KEY_REPLACES, -1).takeIf { it >= 0 }
+            val importCopy: suspend () -> Unit = {
+                importer.import(copy, format, replaces) { progress ->
+                    setProgress(progress.toData())
+                    if (throttle.shouldPost(progress.title, progress.percent)) runInForeground(progress)
+                }
+            }
             if (url != null) {
                 val name = inputData.getString(KEY_NAME) ?: url.substringAfterLast('/')
-                container.dictionaryDownloader.download(url, copy) { done, total ->
-                    val download = DownloadProgress(name, done, total)
-                    setProgress(download.toData())
-                    val percent = if (total > 0) (done * 100 / total).toInt() else -1
-                    if (throttle.shouldPost(DOWNLOAD_STAGE, percent)) runInForeground(null, download)
+                // The publisher's latest release is sometimes incomplete: then the pinned one.
+                withReleaseFallback(name, url, inputData.getString(KEY_FALLBACK_URL)) { from ->
+                    container.dictionaryDownloader.download(from, copy) { done, total ->
+                        val download = DownloadProgress(name, done, total)
+                        setProgress(download.toData())
+                        val percent = if (total > 0) (done * 100 / total).toInt() else -1
+                        if (throttle.shouldPost(DOWNLOAD_STAGE, percent)) runInForeground(null, download)
+                    }
+                    if (format == DictionaryFileFormat.YOMITAN && !DownloadCheck.hasContentBank(copy)) {
+                        throw IncompleteReleaseException(name)
+                    }
+                    importCopy()
                 }
             } else {
                 // ZipFile needs random access, which a content URI does not offer.
                 resolver.openInputStream(uri!!)?.use { input ->
                     copy.outputStream().use { input.copyTo(it) }
                 } ?: return failure(ImportError.FAILED, null)
-            }
-
-            val importer = container.dictionaryImporter
-            val format = inputData.getString(KEY_FORMAT)
-                ?.let { name -> DictionaryFileFormat.entries.firstOrNull { it.name == name } }
-                ?: DictionaryFileFormat.YOMITAN
-            val replaces = inputData.getLong(KEY_REPLACES, -1).takeIf { it >= 0 }
-            importer.import(copy, format, replaces) { progress ->
-                setProgress(progress.toData())
-                if (throttle.shouldPost(progress.title, progress.percent)) runInForeground(progress)
+                importCopy()
             }
             return Result.success()
         } catch (e: CancellationException) {
@@ -82,6 +91,8 @@ class DictionaryImportWorker(
             return failure(ImportError.ALREADY_INSTALLED, e.title)
         } catch (e: NoTermsException) {
             return failure(ImportError.NO_TERMS, e.title)
+        } catch (e: IncompleteReleaseException) {
+            return failure(ImportError.INCOMPLETE_RELEASE, e.name)
         } catch (e: IOException) {
             return failure(ImportError.FAILED, e.message, FailureReason.ofStorage(e))
         } catch (e: SecurityException) {
@@ -155,6 +166,7 @@ class DictionaryImportWorker(
     companion object {
         private const val KEY_URI = "uri"
         private const val KEY_URL = "url"
+        private const val KEY_FALLBACK_URL = "fallbackUrl"
         private const val KEY_NAME = "name"
         private const val KEY_FORMAT = "format"
         private const val KEY_REPLACES = "replaces"
@@ -172,7 +184,12 @@ class DictionaryImportWorker(
         fun inputData(uri: String): Data = workDataOf(KEY_URI to uri)
 
         fun downloadInputData(dictionary: CatalogDictionary): Data =
-            workDataOf(KEY_URL to dictionary.url, KEY_NAME to dictionary.name, KEY_FORMAT to dictionary.format.name)
+            workDataOf(
+                KEY_URL to dictionary.url,
+                KEY_FALLBACK_URL to dictionary.fallbackUrl,
+                KEY_NAME to dictionary.name,
+                KEY_FORMAT to dictionary.format.name,
+            )
 
         fun updateInputData(update: DictionaryUpdate): Data = workDataOf(
             KEY_URL to update.downloadUrl,

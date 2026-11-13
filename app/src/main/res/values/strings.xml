@@ -868,6 +868,7 @@
     <string name="import_keep_open">Keep Honmani open until this is done: some phones pause apps in the background, and the import then waits until you come back.</string>
     <string name="import_failed_invalid">Not a Yomitan dictionary: %1$s</string>
     <string name="import_failed_already_installed">“%1$s” is already installed.</string>
+    <string name="import_failed_incomplete_release">The publisher\'s latest release of %1$s is incomplete. Try again later.</string>
     <string name="import_failed_no_terms">“%1$s” has no terms, kanji, frequencies or pitch accents.</string>
     <string name="import_failed">The dictionary could not be imported.</string>
     <string name="download_running">Downloading %1$s…</string>

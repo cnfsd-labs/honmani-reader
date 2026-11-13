@@ -13,6 +13,9 @@ enum class ImportError {
     /** Valid, but nothing Honmani can use; the detail is the title. */
     NO_TERMS,
 
+    /** A download from the publisher had no content, nor had its fallback; the detail is the name. */
+    INCOMPLETE_RELEASE,
+
     /** Downloading failed (no connection, server error); the detail says why. */
     DOWNLOAD_FAILED,
 
