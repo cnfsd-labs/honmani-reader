@@ -7,6 +7,7 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - Latest green **Android** workflow run -> Artifacts -> **honmani-test-apks**: `app-internal.apk`
   (release code; use for checks and timing) and `app-debug.apk` (WebView inspectable from
   `chrome://inspect`). Each run signs with a new key: uninstall the old build first (clears dictionaries).
+  The artifact is kept for 30 days.
 - Timing: `adb logcat -s Honmani.lookup` prints each lookup's duration.
 - **Reader looks wrong** (blank page): open the book, wait 5 s, back to the library, Settings -> Help and about -> **Share
   diagnostics**, send to cnfsd.labs@gmail.com or an issue. Nothing is sent automatically.

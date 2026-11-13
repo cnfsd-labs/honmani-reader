@@ -75,6 +75,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: honmani-test-apks
+          retention-days: 30
           path: |
             app/build/outputs/apk/internal/app-internal.apk
             app/build/outputs/apk/debug/app-debug.apk
