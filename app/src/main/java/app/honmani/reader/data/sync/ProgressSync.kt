@@ -352,8 +352,9 @@ class ProgressSync(
         val remote = client.progress(account, position.document)
         status?.succeeded()
         val remoteAt = remote?.timestamp?.let { it * 1000 }
-        if (remote != null && remote.deviceId != settings.deviceId && remoteAt != null && remoteAt > position.readAt) {
-            // Another device saved a position after this one was read.
+        // Another device saved a position after this one was read, or (an old server without
+        // times) at some point: only ever forwards there.
+        if (remote != null && remote.deviceId != settings.deviceId && (remoteAt == null || remoteAt > position.readAt)) {
             val theirs = books.findByTtuId(position.ttuId)
                 ?.takeIf { it.format == BookFormat.EPUB }
                 ?.let { document(it) }
@@ -364,8 +365,14 @@ class ProgressSync(
             } else {
                 remote.percentage > position.percentage - PERCENTAGE_SLACK
             }
-            if (further) unsent.remove(position) else unsent.hold(position)
-            return
+            if (further) {
+                unsent.remove(position)
+                return
+            }
+            if (remoteAt != null) {
+                unsent.hold(position)
+                return
+            }
         }
         client.update(account, position.document, position.progress, position.percentage, device, settings.deviceId)
         status?.succeeded()

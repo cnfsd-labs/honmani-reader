@@ -81,14 +81,15 @@ internal class FakeKoSyncServer(
         }
     }
 
-    fun save(document: String, xpointer: String, percentage: Double, device: String, deviceId: String, timestamp: Long) {
+    fun save(document: String, xpointer: String, percentage: Double, device: String, deviceId: String, timestamp: Long?) {
         progress[document] = buildJsonObject {
             put("document", document)
             put("progress", xpointer)
             put("percentage", percentage)
             put("device", device)
             put("device_id", deviceId)
-            put("timestamp", timestamp)
+            // An old server keeps no time.
+            if (timestamp != null) put("timestamp", timestamp)
         }
     }
 

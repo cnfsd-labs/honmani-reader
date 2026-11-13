@@ -324,6 +324,36 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun withoutServerTimes_anUnsentPositionIsNeverSentBackwards() = runBlocking {
+        server.down = true
+        sync.onPosition(5, 12)
+        sync.flush()
+        waitFor { unsentFile.isFile }
+        // An old server (no times): the Kindle is further on (character 18).
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = null)
+
+        server.down = false
+        sync.resend()
+        waitFor { !unsentFile.exists() }
+        assertEquals("K1", server.progress[document]!!["device_id"]!!.jsonPrimitive.content)
+        assertTrue(server.requests.none { it.method == "PUT" })
+    }
+
+    @Test
+    fun withoutServerTimes_anUnsentPositionFurtherOnIsSent() = runBlocking {
+        server.down = true
+        sync.onPosition(5, 12)
+        sync.flush()
+        waitFor { unsentFile.isFile }
+        server.save(document, "/body/DocFragment[9]/body/p/text().3", 0.0, "Kindle", "K1", timestamp = null)
+
+        server.down = false
+        sync.resend()
+        assertEquals(12.0 / 31, waitForProgress(device = settings.deviceId)["percentage"]!!.jsonPrimitive.double, 1e-9)
+        waitFor { !unsentFile.exists() }
+    }
+
+    @Test
     fun anEarlierPlaceSavedElsewhereLater_isLeftToTheReader_whoStays() = runBlocking {
         holdBehindKindle()
 
