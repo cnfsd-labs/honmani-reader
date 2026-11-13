@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
@@ -616,7 +617,7 @@ private fun PillButton(icon: Int, label: String, onClick: () -> Unit, modifier: 
     }
 }
 
-/** The book's actions as a row of tiles, removing last and in the error colour. */
+/** The book's actions as a row of tiles (two rows with large text), removing last and in the error colour. */
 @Composable
 private fun Actions(
     book: LibraryBook,
@@ -625,32 +626,44 @@ private fun Actions(
     onSetHidden: (Boolean) -> Unit,
     onRemove: () -> Unit,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .padding(horizontal = 24.dp)
-            .height(IntrinsicSize.Min),
-    ) {
-        val tile = Modifier.weight(1f).fillMaxHeight()
+    val tiles = buildList<@Composable (Modifier) -> Unit> {
         if (book.status != ReadingStatus.FINISHED) {
-            ActionTile(rememberVectorPainter(Icons.Filled.CheckCircle), stringResource(R.string.action_mark_finished), onMarkFinished, tile)
+            add { ActionTile(rememberVectorPainter(Icons.Filled.CheckCircle), stringResource(R.string.action_mark_finished), onMarkFinished, it) }
         }
         if (book.status != ReadingStatus.NOT_STARTED) {
-            ActionTile(rememberVectorPainter(Icons.Filled.Refresh), stringResource(R.string.action_reset_progress), onResetProgress, tile)
+            add { ActionTile(rememberVectorPainter(Icons.Filled.Refresh), stringResource(R.string.action_reset_progress), onResetProgress, it) }
         }
-        ActionTile(
-            icon = painterResource(if (book.hidden) R.drawable.ic_visible else R.drawable.ic_hidden),
-            label = stringResource(if (book.hidden) R.string.action_unhide_book else R.string.action_hide_book),
-            onClick = { onSetHidden(!book.hidden) },
-            modifier = tile,
-        )
-        ActionTile(
-            icon = rememberVectorPainter(Icons.Filled.Delete),
-            label = stringResource(R.string.action_remove),
-            onClick = onRemove,
-            modifier = tile,
-            color = MaterialTheme.colorScheme.error,
-        )
+        add {
+            ActionTile(
+                icon = painterResource(if (book.hidden) R.drawable.ic_visible else R.drawable.ic_hidden),
+                label = stringResource(if (book.hidden) R.string.action_unhide_book else R.string.action_hide_book),
+                onClick = { onSetHidden(!book.hidden) },
+                modifier = it,
+            )
+        }
+        add {
+            ActionTile(
+                icon = rememberVectorPainter(Icons.Filled.Delete),
+                label = stringResource(R.string.action_remove),
+                onClick = onRemove,
+                modifier = it,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+    // With large text four tiles in a row cut their labels short: two per row instead.
+    val perRow = if (LocalDensity.current.fontScale >= 1.3f) 2 else tiles.size
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(horizontal = 24.dp)) {
+        tiles.chunked(perRow).forEach { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.height(IntrinsicSize.Min),
+            ) {
+                row.forEach { it(Modifier.weight(1f).fillMaxHeight()) }
+                // A short last row keeps its tiles the width of the others.
+                repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
     }
 }
 

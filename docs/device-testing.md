@@ -119,6 +119,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - **Book sheet** of a graded book: "You know N% of its words; M are new to you": N counts only Known
   (new user 0 %), Learning is neither. Mark Known -> N rises; "Words to learn before reading" lists the
   M, most used first. Difficulty and cover badge unchanged.
+- Book sheet at the largest font: the action tiles (Mark as finished, Reset, Hide, Remove) wrap to two
+  per row, labels whole; TalkBack reads each tile once by its label.
 
 ## Anki
 
