@@ -24,6 +24,9 @@ class BookAdder(
 
         data object Unreadable : Result
 
+        /** Larger than [BookImporter.MAX_BOOK_BYTES]. */
+        data object TooLarge : Result
+
         /** ッツ Ebook Reader could not import the book; it was not kept. */
         data class ReaderFailed(val title: String) : Result
     }
@@ -38,6 +41,7 @@ class BookAdder(
         is BookImporter.Result.AlreadyInLibrary -> Result.AlreadyInLibrary(result.book)
         BookImporter.Result.Unsupported -> Result.Unsupported
         BookImporter.Result.Unreadable -> Result.Unreadable
+        BookImporter.Result.TooLarge -> Result.TooLarge
     }
 
     /** Imports a new book into the reader now, so problems show up at once and it opens fast. */

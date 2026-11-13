@@ -156,7 +156,8 @@ object WatchedFolderScan {
      * changed since [seen]. Those are hashed with [hashOf] (null: could not be read, tried again
      * next time); one whose hash is in [removedHashes] is marked seen and left out. Unchanged
      * files are not read at all. A file modified at or after [modifiedBefore] may still be being
-     * copied into the folder: it is left alone (not hashed, not marked) until a later scan.
+     * copied into the folder: it is left alone (not hashed, not marked) until a later scan. A file
+     * larger than [BookImporter.MAX_BOOK_BYTES] is marked seen without being read.
      */
     suspend fun find(
         tree: DocumentTree,
@@ -173,6 +174,11 @@ object WatchedFolderScan {
             coroutineContext.ensureActive()
             if (seen.isUnchanged(entry)) continue
             if (entry.modified >= modifiedBefore) continue
+            if (entry.size > BookImporter.MAX_BOOK_BYTES) {
+                // The import would refuse it: don't read it at every scan.
+                seen.mark(entry)
+                continue
+            }
             val hash = hashOf(entry) ?: continue
             if (hash in removedHashes) {
                 seen.mark(entry)

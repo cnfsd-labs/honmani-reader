@@ -130,6 +130,24 @@ class BookImporterTest {
     }
 
     @Test
+    fun aFileOverTheLimitIsRefusedAndNotKept() = runTest {
+        val epub = TestBooks.epub()
+        val small = BookImporter(dao, booksDir, coversDir, now = { 1_000L }, maxBytes = epub.size - 1L)
+        var read = 0L
+        val endless = object : java.io.InputStream() {
+            override fun read(): Int = if (read++ < epub.size * 100L) 0 else -1
+        }
+
+        assertEquals(BookImporter.Result.TooLarge, small.import(endless, "film.epub"))
+        assertTrue("it stopped reading at the limit", read < epub.size * 100L)
+        assertEquals(emptyList<String>(), booksDir.list()!!.toList())
+        assertTrue(dao.observeAll().first().isEmpty())
+        // Exactly at the limit is fine.
+        val fits = BookImporter(dao, booksDir, coversDir, now = { 1_000L }, maxBytes = epub.size.toLong())
+        assertTrue(fits.import(epub.inputStream(), "neko.epub") is BookImporter.Result.Added)
+    }
+
+    @Test
     fun aFailedInsertLeavesNoFilesBehind() = runTest {
         val failing = object : BookDao by dao {
             override suspend fun insert(book: BookEntity): Long = throw IllegalStateException("disk")

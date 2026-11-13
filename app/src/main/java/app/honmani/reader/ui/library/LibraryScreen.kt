@@ -140,6 +140,7 @@ import app.honmani.reader.R
 import app.honmani.reader.readaloud.AudiobookExportResult
 import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
+import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.ui.DifficultyBadge
@@ -495,6 +496,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.AlreadyInLibrary -> stringResource(R.string.library_already_added, notice.title)
     is LibraryNotice.Unsupported -> stringResource(R.string.library_unsupported, notice.fileName)
     is LibraryNotice.Unreadable -> stringResource(R.string.library_unreadable, notice.fileName)
+    is LibraryNotice.TooLarge -> stringResource(R.string.library_too_large, notice.fileName, BookImporter.MAX_BOOK_BYTES / (1024 * 1024))
     is LibraryNotice.ReaderFailed -> stringResource(R.string.library_reader_failed, notice.title)
     is LibraryNotice.ResetFailed -> stringResource(R.string.library_reset_failed, notice.title)
     is LibraryNotice.CopySaved -> stringResource(R.string.library_copy_saved, notice.title)

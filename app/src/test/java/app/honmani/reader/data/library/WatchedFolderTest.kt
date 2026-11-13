@@ -103,6 +103,19 @@ class WatchedFolderTest {
     }
 
     @Test
+    fun aFileTooLargeForABookIsNotRead() {
+        val seen = SeenFiles(seenFile)
+        val huge = file("root/s/film.epub").copy(size = BookImporter.MAX_BOOK_BYTES + 1, modified = 1)
+        val book = file("root/s/b.epub").copy(size = BookImporter.MAX_BOOK_BYTES, modified = 1)
+
+        val result = scan(tree(huge, book), seen)
+
+        assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
+        assertEquals(listOf("root/s/b.epub"), hashed)
+        assertTrue("an oversized file is not looked at again", seen.isUnchanged(huge))
+    }
+
+    @Test
     fun aFileThatCannotBeReadIsTriedAgainNextTime() {
         val seen = SeenFiles(seenFile)
         val tree = tree(file("root/s/a.epub"))

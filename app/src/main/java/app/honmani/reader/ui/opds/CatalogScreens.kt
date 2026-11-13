@@ -328,6 +328,7 @@ fun downloadFailureText(reason: DownloadFailure): Int = when (reason) {
     DownloadFailure.UNAUTHORIZED -> R.string.catalog_error_unauthorized
     DownloadFailure.SERVER -> R.string.catalog_download_failed_server
     DownloadFailure.UNREADABLE -> R.string.catalog_download_failed_unreadable
+    DownloadFailure.TOO_LARGE -> R.string.catalog_download_failed_too_large
     DownloadFailure.READER -> R.string.catalog_download_failed_reader
     DownloadFailure.HOTSPOT -> R.string.catalog_error_hotspot
 }

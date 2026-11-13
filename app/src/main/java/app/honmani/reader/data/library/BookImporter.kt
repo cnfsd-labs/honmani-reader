@@ -26,6 +26,8 @@ class BookImporter(
      * progress, see `Backup.onBookAdded`).
      */
     private val restore: suspend (BookEntity) -> BookEntity = { it },
+    /** Larger files are refused while they are copied ([MAX_BOOK_BYTES]). */
+    private val maxBytes: Long = MAX_BOOK_BYTES,
 ) {
     private val mutex = Mutex()
 
@@ -39,6 +41,9 @@ class BookImporter(
 
         /** An EPUB that cannot be read, or a file that could not be copied. */
         data object Unreadable : Result
+
+        /** Larger than [MAX_BOOK_BYTES]: a video or archive by mistake, or a book too big to keep. */
+        data object TooLarge : Result
     }
 
     /**
@@ -70,7 +75,9 @@ class BookImporter(
         }
         try {
             val (hash, head) = try {
-                copyAndHash(input, temp)
+                copyAndHash(input, temp, maxBytes)
+            } catch (_: TooLargeException) {
+                return Result.TooLarge
             } catch (_: Exception) {
                 // IOException, or whatever another app's content provider throws while reading.
                 return Result.Unreadable
@@ -191,18 +198,32 @@ class BookImporter(
 
     fun coverFile(book: BookEntity): File? = book.coverFileName?.let { File(coversDir, it) }
 
+    private class TooLargeException : IOException()
+
     companion object {
         private const val HEAD_SIZE = 4
 
-        /** Copies [input] to [target]; returns the SHA-256 (hex) and the first bytes. */
-        private fun copyAndHash(input: InputStream, target: File): Pair<String, ByteArray> {
+        /**
+         * The largest book file the library takes: generous for EPUBs full of images (manga, art
+         * books), small enough that a video picked by mistake doesn't fill the phone's storage.
+         */
+        const val MAX_BOOK_BYTES = 200L * 1024 * 1024
+
+        /**
+         * Copies [input] to [target]; returns the SHA-256 (hex) and the first bytes. Stops with a
+         * [TooLargeException] as soon as more than [maxBytes] came (the caller deletes [target]).
+         */
+        private fun copyAndHash(input: InputStream, target: File, maxBytes: Long): Pair<String, ByteArray> {
             val digest = MessageDigest.getInstance("SHA-256")
             var head = ByteArray(0)
+            var total = 0L
             target.outputStream().use { output ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 8)
                 while (true) {
                     val read = input.read(buffer)
                     if (read < 0) break
+                    total += read
+                    if (total > maxBytes) throw TooLargeException()
                     if (head.size < HEAD_SIZE) {
                         head += buffer.copyOf(minOf(read, HEAD_SIZE - head.size))
                     }
