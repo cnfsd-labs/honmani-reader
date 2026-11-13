@@ -173,11 +173,9 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
         if (focus != null) return true
         val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes)
-            // A request to duck pauses (pausesForFocusChange): Android must not lower the voice itself.
-            .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(
                 { change ->
-                    if (pausesForFocusChange(change)) {
+                    if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
                         listener?.onFocusLost()
                     }
                 },
