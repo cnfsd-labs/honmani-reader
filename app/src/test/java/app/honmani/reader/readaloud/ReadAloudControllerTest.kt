@@ -172,6 +172,29 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun nextWhilePausedOnTheLastSentenceOfASectionAdvancesAndSpeaks() {
+        startAndReceive(0, 1, end = "section")
+        controller.onStart(id(1))
+        controller.pause()
+        controller.next()
+        assertEquals("readAloud.advance", types().last())
+        assertEquals(ReadAloudPhase.STARTING, controller.state.value.phase)
+        controller.onSentences(gen, sentences(2, 3), null)
+        assertEquals(listOf("文2。", "文3。"), voice.spoken.map { it.second })
+    }
+
+    @Test
+    fun nextWhilePausedOnTheLastSentenceReceivedAsksForMore() {
+        startAndReceive(0, 1)
+        controller.onStart(id(1))
+        controller.pause()
+        controller.next()
+        assertEquals("readAloud.more", types().last())
+        controller.onSentences(gen, sentences(2), null)
+        assertEquals(listOf("文2。"), voice.spoken.map { it.second })
+    }
+
+    @Test
     fun theLookupPanelPausesAndClosingItResumes() {
         startAndReceive()
         controller.onStart(id(1))

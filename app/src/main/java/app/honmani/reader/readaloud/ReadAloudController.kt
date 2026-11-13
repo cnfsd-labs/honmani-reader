@@ -134,11 +134,13 @@ class ReadAloudController(
         when {
             current < 0 -> return
             target <= lastReceived -> restartAt(target)
-            state.value.running && pageEnd != null -> {
-                // The last sentence the page sent: skip what is left of it and go on.
+            phase == ReadAloudPhase.PAUSED || pageEnd != null -> {
+                // The last sentence the page sent: skip what is left of it and go on (and speak
+                // again when paused, as Next does on any other sentence).
                 gen++
                 voice.stop()
                 finishedThrough = lastReceived
+                if (phase == ReadAloudPhase.PAUSED) _state.value = _state.value.copy(phase = ReadAloudPhase.STARTING)
                 afterQueue()
             }
         }
@@ -329,7 +331,7 @@ class ReadAloudController(
         if (problem == VoiceProblem.NO_ENGINE || problem == VoiceProblem.NO_JAPANESE) {
             voice.shutdown()
             connected = false
-        }
+            }
         log("problem $problem")
         _state.value = _state.value.copy(phase = ReadAloudPhase.PROBLEM, problem = problem)
     }
@@ -389,7 +391,7 @@ class ReadAloudController(
         }
         onConnected = action
         voice.connect { problem ->
-            val wanted = onConnected
+                val wanted = onConnected
             onConnected = null
             if (problem == null) {
                 connected = true
