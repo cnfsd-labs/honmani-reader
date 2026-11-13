@@ -55,6 +55,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 - **Lookup panel height**: short/long word, kanji, non-word -> top edge stays ~50 %, content scrolls.
   Drag handle/header up -> ~88 %; tap handle toggles (TalkBack Expand/Collapse); drag down shrinks, then
   closes. New tap opens small; back/kanji keep size. Landscape usable.
+- **Folded results**: a tap anywhere on a folded result's row (also right of its text) opens it;
+  tapping an open result's word folds it. TalkBack reads one "Show this word" action per folded result.
 - **Reader menu hint**: the first book ever opened shows "Swipe up or tap the bottom edge for the reader menu" once (after the
   audiobook snackbar if both apply); a faint grab bar sits in the strip. Reset: `device.xml` key `reader_menu_hint_shown`.
 - **Reader bottom menu**: tap the strip under the text -> Contents, slider, Add bookmark, Bookmarks,

@@ -851,7 +851,13 @@ private fun LookupGroupItem(
     val folded = detail == Detail.FOLDED
     val expandLabel = stringResource(R.string.lookup_expand)
     Column(
-        modifier = if (folded) Modifier.clickable(onClickLabel = expandLabel) { onDetail(Detail.BRIEF) } else Modifier,
+        // A folded entry opens from a tap anywhere on its row, not only on its text. It has no
+        // other targets: its kanji, star and menu come when it is opened.
+        modifier = if (folded) {
+            Modifier.fillMaxWidth().clickable(onClickLabel = expandLabel) { onDetail(Detail.BRIEF) }
+        } else {
+            Modifier
+        },
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (folded) {
