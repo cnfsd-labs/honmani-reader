@@ -72,6 +72,20 @@ class KoSyncClientTest {
     }
 
     @Test
+    fun signsInToCalibreWebAutomated_whenItsPlainAddressRefusesTheLogin() = runTest {
+        val cwa = FakeKoSyncServer(cwa = true, guarded = true)
+        try {
+            val signedIn = client.signIn(cwa.url, "reader", "secret")
+            assertEquals(cwa.url + "/kosync", signedIn.server)
+            assertEquals("secret", signedIn.password)
+
+            assertFails(KoSyncException.Reason.UNAUTHORIZED) { client.signIn(cwa.url, "reader", "wrong") }
+        } finally {
+            cwa.stop()
+        }
+    }
+
+    @Test
     fun signsInToKomga_withItsApiKeyFromItsPlainAddress() = runTest {
         val komga = FakeKoSyncServer(user = "api-key", password = "dummy", komga = true)
         try {

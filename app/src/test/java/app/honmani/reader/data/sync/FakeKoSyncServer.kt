@@ -21,6 +21,8 @@ internal class FakeKoSyncServer(
     private val password: String = "secret",
     private val cwa: Boolean = false,
     private val komga: Boolean = false,
+    /** With [cwa]: a proxy in front asks for a login everywhere outside `/kosync`. */
+    private val guarded: Boolean = false,
 ) {
     private val key = KoSyncAccount.userKey(password)
     val users = ConcurrentHashMap(mapOf(user to key))
@@ -60,7 +62,10 @@ internal class FakeKoSyncServer(
             }
             when {
                 down -> out.respond("503 Service Unavailable", "")
+                cwa && guarded && !fullPath.startsWith("/kosync/") -> out.respond("401 Unauthorized", "")
                 cwa && !fullPath.startsWith("/kosync/") -> out.respond("308 Permanent Redirect", "")
+                // KOReader's server has no routes elsewhere, login or not.
+                !cwa && !komga && !path.startsWith("/users/") && !path.startsWith("/syncs/") -> out.respond("404 Not Found", "")
                 request.headers["accept"] != "application/vnd.koreader.v1+json" -> out.respond("412 Precondition Failed", "{}")
                 komga && !fullPath.startsWith("/koreader/") -> out.respond("200 OK", "<!doctype html><html></html>")
                 !authorized && komga -> out.respond("403 Forbidden", "")

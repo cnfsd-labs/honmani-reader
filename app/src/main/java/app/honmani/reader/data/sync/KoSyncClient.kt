@@ -103,22 +103,32 @@ class KoSyncClient(
             listOf(keyed.server, base + CWA_PATH, base + KOMGA_PATH)
         }
         var failure: KoSyncException? = null
+        // A refused login at one address (a proxy in front of CWA, say) still leaves the others.
+        var refused: KoSyncException? = null
         for (address in addresses) {
             val account = keyed.copy(server = address)
-            try {
+            var error = try {
                 authorize(account)
                 return account
             } catch (e: KoSyncException) {
-                if (e.reason == KoSyncException.Reason.UNAUTHORIZED && address.trimEnd('/').endsWith(CWA_PATH)) {
-                    val basic = account.copy(password = password)
+                e
+            }
+            if (error.reason == KoSyncException.Reason.UNAUTHORIZED && address.trimEnd('/').endsWith(CWA_PATH)) {
+                val basic = account.copy(password = password)
+                error = try {
                     authorize(basic)
                     return basic
+                } catch (e: KoSyncException) {
+                    e
                 }
-                if (e.reason != KoSyncException.Reason.NETWORK) throw e
-                if (failure == null) failure = e
+            }
+            when (error.reason) {
+                KoSyncException.Reason.NETWORK -> if (failure == null) failure = error
+                KoSyncException.Reason.UNAUTHORIZED -> if (refused == null) refused = error
+                else -> throw error
             }
         }
-        throw failure!!
+        throw refused ?: failure!!
     }
 
     /** Checks the login. */
