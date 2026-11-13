@@ -22,8 +22,8 @@ class BookImporter(
     private val coversDir: File,
     private val now: () -> Long = System::currentTimeMillis,
     /**
-     * Called with each new book; returns it with what a restored backup kept for it (its
-     * progress, see `Backup.onBookAdded`).
+     * Called by [restoreFor] with a new book; returns it with what a restored backup kept for it
+     * (its progress, see `Backup.onBookAdded`).
      */
     private val restore: suspend (BookEntity) -> BookEntity = { it },
     /** Larger files are refused while they are copied ([MAX_BOOK_BYTES]). */
@@ -145,20 +145,26 @@ class BookImporter(
                 coverFileName?.let { File(coversDir, it).delete() }
                 throw e
             }
-            return Result.Added(
-                try {
-                    restore(added)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    logWarning("Honmani.library", "Restoring a backup's data for an added book failed", e)
-                    // The book is in; only what a backup kept for it is missing.
-                    added
-                },
-            )
+            return Result.Added(added)
         } finally {
             temp.delete()
         }
+    }
+
+    /**
+     * Gives [book], just added and kept (handed to the reader), what a restored backup kept for it,
+     * and returns it as it is now. Not part of [import]: the restore moves statistics to the book
+     * for good, so a book the reader then rejects (and the library deletes) must not get them.
+     */
+    suspend fun restoreFor(book: BookEntity): BookEntity = try {
+        // Off the main thread, as in the import: the restore reads and writes a file.
+        withContext(Dispatchers.IO) { restore(book) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        logWarning("Honmani.library", "Restoring a backup's data for an added book failed", e)
+        // The book is in; only what a backup kept for it is missing.
+        book
     }
 
     /**

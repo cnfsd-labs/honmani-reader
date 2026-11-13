@@ -139,7 +139,11 @@ class OpdsAutoImport(
             val result = withContext(Dispatchers.IO) {
                 temp.inputStream().use { importer.import(it, name, BookSource.OPDS, entry.id) }
             }
-            if (result is BookImporter.Result.Added) return true
+            if (result is BookImporter.Result.Added) {
+                // Handed to the reader when first opened; nothing here can make the library drop it.
+                importer.restoreFor(result.book)
+                return true
+            }
             // A copy of a book already in the library, or a file the library can't read: don't
             // download it again on every start.
             bookDao.insertRemoved(RemovedBookEntity(BookSource.OPDS, entry.id, now()))

@@ -47,7 +47,8 @@ class BookAdder(
     /** Imports a new book into the reader now, so problems show up at once and it opens fast. */
     private suspend fun handToReader(book: BookEntity): Result = try {
         link(book, ensureInReader(book, null))
-        Result.Added(book)
+        // Only now that the book stays; from the row as linked, so the restore keeps the reader's id.
+        Result.Added(importer.restoreFor(dao.find(book.id) ?: book))
     } catch (_: TtuLibraryException) {
         // A book the reader cannot show is no use in the library.
         dao.delete(book.id)

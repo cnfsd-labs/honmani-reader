@@ -143,6 +143,31 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun aBackupIsRestoredForABookOnlyOnceTheReaderTookIt() = runBlocking {
+        val restored = mutableListOf<BookEntity>()
+        importer = BookImporter(dao, File(folder.root, "books"), File(folder.root, "covers"), restore = { book ->
+            restored += book
+            book
+        })
+        viewModel = LibraryViewModel(
+            dao = dao,
+            importer = importer,
+            ttu = ttu,
+            openFile = { uri -> files[uri.lastPathSegment]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) } },
+            now = { 42L },
+        )
+        page.failImports = true
+        viewModel.add(listOf(pick("neko.epub", TestBooks.epub())))
+        assertEquals(LibraryNotice.ReaderFailed("吾輩は猫である"), nextNotice())
+        assertTrue("a book the reader rejected must not take what a backup kept", restored.isEmpty())
+
+        page.failImports = false
+        val book = addAndWait("neko2.epub", TestBooks.epub())
+        val handed = eventually { restored.singleOrNull() }
+        assertEquals("restored with the reader's link in place", book.ttuId, handed.ttuId)
+    }
+
+    @Test
     fun addingTheSameBookAgainSaysSo() = runBlocking {
         addAndWait("neko.epub", TestBooks.epub())
         viewModel.add(listOf(pick("copy.epub", TestBooks.epub())))
