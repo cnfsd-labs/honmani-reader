@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
@@ -638,7 +639,8 @@ private fun HighlightBar(controls: HighlightControls) {
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .size(48.dp)
-                    .clickable(role = Role.Button, onClickLabel = names[index]) { controls.onPick(index, extent) }
+                    // A radio button each, so TalkBack also says which colour is the current one.
+                    .selectable(selected = controls.current == index, role = Role.RadioButton) { controls.onPick(index, extent) }
                     .semantics { contentDescription = names[index] },
             ) {
                 Box(

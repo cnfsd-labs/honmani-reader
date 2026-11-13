@@ -297,6 +297,7 @@ paged/continuous; with/without furigana:
 - Reopen, change font size, rotate -> same text highlighted.
 - Tap inside one: lookup opens with the colours (current ticked) and "Remove highlight"; another colour
   changes it; Remove deletes (Undo).
+- TalkBack on the colours: each is a radio button ("Yellow" ...), the current one read as selected.
 - Reader menu -> Highlights: passage, colour dot, place; tap jumps ("Back to where you were"), bin
   removes (Undo). Removing the book removes them. Backup/restore on a fresh install keeps them.
 - Selection lookup off: none can be made; existing ones drawn, listed, removable. TXT offers no Highlight.
