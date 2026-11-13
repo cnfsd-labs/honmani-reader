@@ -220,7 +220,10 @@ aloud, on a page with furigana.
 - Back ends read aloud, the book stays open; a second Back leaves the book.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
-- Call, other player, Home pauses it; the screen stays on only while reading.
+- Another player or Home pauses it for good; the screen stays on only while reading.
+- A notification sound while reading (phone muted): speech pauses and then goes on from the sentence
+  start by itself (logcat ReadAloud "audio focus lost for a moment", "audio focus back"); same after a
+  call. Pause by hand during the sound: it stays paused.
 - No Japanese voice: bar says so, offers "Voice settings". Book end: it stops and says so.
 - Rotate, change font, close the book while reading: no crash, no voice left.
 - Reader menu -> Pronunciations: add "text in the book" + "read as (kana)", Save; Read aloud speaks the
@@ -242,8 +245,9 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Same bar order, volume buttons and swipe-away/Follow as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
   0.5/0.75/1/1.25/1.5, kept.
-- Pause, close the app: audio paused, screen no longer kept on, Play continues. Call/other player
-  pauses; a word tap pauses while the panel is open.
+- Pause, close the app: audio paused, screen no longer kept on, Play continues. Another player pauses;
+  a notification sound or call pauses until it is over, then the audio goes on; a word tap pauses while
+  the panel is open.
 - Read aloud and the audiobook stop each other.
 - Export: the audiobook dialog (reader menu -> Audiobook) and the library book sheet show "Export audiobook"
   only with a paired or finished generated audiobook (not a partial one, not a book without one). Pick a

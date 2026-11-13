@@ -20,15 +20,12 @@ enum class AudiobookProblem {
  * decides what and when; it knows nothing of Android. All calls and callbacks are on the main thread.
  */
 interface AudiobookPlayer {
-    interface Listener {
+    interface Listener : FocusListener {
         /** The audio played to its end. */
         fun onCompleted()
 
         /** The player failed while playing. */
         fun onError()
-
-        /** Another app took the audio: pause. */
-        fun onFocusLost()
     }
 
     var listener: Listener?

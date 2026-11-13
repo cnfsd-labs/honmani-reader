@@ -80,6 +80,9 @@ class ReadAloudController(
     private var lastRange = -1
     private var resumeAfterPanel = false
 
+    /** Paused because another app needs the audio for a moment: the focus coming back continues. */
+    private var resumeAfterFocus = false
+
     /** Where in the sentence (as the book has it) the page was last told the voice is. */
     private var markOffset = 0
 
@@ -101,10 +104,12 @@ class ReadAloudController(
     fun start() {
         if (phase == ReadAloudPhase.STARTING || phase == ReadAloudPhase.SPEAKING) return
         resumeAfterPanel = false
+        resumeAfterFocus = false
         if (phase == ReadAloudPhase.PAUSED && current >= 0) restartAt(current) else begin()
     }
 
     fun pause() {
+        resumeAfterFocus = false
         if (!state.value.running) return
         pausedPageGen = gen
         gen++
@@ -178,6 +183,7 @@ class ReadAloudController(
         onConnected = null
         awaiting = false
         resumeAfterPanel = false
+        resumeAfterFocus = false
         connected = false
         connecting = false
         voice.stop()
@@ -192,6 +198,7 @@ class ReadAloudController(
     /** The lookup panel opened or closed: opening pauses, closing continues what it paused. */
     fun panelChanged(open: Boolean) {
         if (open) {
+            resumeAfterFocus = false
             if (state.value.running) {
                 resumeAfterPanel = true
                 pause()
@@ -292,6 +299,21 @@ class ReadAloudController(
         resumeAfterPanel = false
         log("audio focus lost")
         pause()
+    }
+
+    override fun onFocusPaused() {
+        if (!state.value.running) return
+        resumeAfterPanel = false
+        log("audio focus lost for a moment")
+        pause()
+        resumeAfterFocus = true
+    }
+
+    override fun onFocusResumed() {
+        if (!resumeAfterFocus) return
+        resumeAfterFocus = false
+        log("audio focus back")
+        if (phase == ReadAloudPhase.PAUSED) start()
     }
 
     // Inside.

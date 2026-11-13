@@ -238,6 +238,41 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun aPauseForAMomentContinuesFromTheSentenceStartWhenTheFocusComesBack() {
+        startAndReceive()
+        controller.onStart(id(1))
+        controller.onFocusPaused()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+        controller.onFocusResumed()
+        assertEquals(ReadAloudPhase.STARTING, controller.state.value.phase)
+        assertTrue(sent.last().contains(""""index":1"""))
+    }
+
+    @Test
+    fun theFocusComingBackDoesNotUndoAPauseByTheReader() {
+        startAndReceive()
+        controller.onStart(id(1))
+        controller.onFocusPaused()
+        controller.pause()
+        controller.onFocusResumed()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+        // Paused by the reader before the other sound: nothing to continue either.
+        controller.onFocusPaused()
+        controller.onFocusResumed()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+    }
+
+    @Test
+    fun afterAPermanentLossTheFocusComingBackDoesNotResume() {
+        startAndReceive()
+        controller.onStart(id(1))
+        controller.onFocusPaused()
+        controller.onFocusLost()
+        controller.onFocusResumed()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+    }
+
+    @Test
     fun threeErrorsInARowAreAProblem() {
         startAndReceive()
         controller.onError(id(0))

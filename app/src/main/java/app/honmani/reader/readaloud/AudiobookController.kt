@@ -68,6 +68,9 @@ class AudiobookController(
     private var openToken = 0
     private var resumeAfterPanel = false
 
+    /** Paused because another app needs the audio for a moment: the focus coming back continues. */
+    private var resumeAfterFocus = false
+
     /** The cue the page was last told about, and the generation of that message. */
     private var marked = -1
     private var markGen = -1
@@ -122,6 +125,7 @@ class AudiobookController(
     fun play() {
         if (phase != AudiobookPhase.PAUSED && phase != AudiobookPhase.ENDED) return
         resumeAfterPanel = false
+        resumeAfterFocus = false
         if (phase == AudiobookPhase.ENDED) player.seekTo(0)
         if (!player.play()) {
             _state.value = _state.value.copy(phase = AudiobookPhase.PAUSED)
@@ -135,6 +139,7 @@ class AudiobookController(
     }
 
     fun pause() {
+        resumeAfterFocus = false
         if (phase != AudiobookPhase.PLAYING) return
         player.pause()
         _state.value = _state.value.copy(phase = AudiobookPhase.PAUSED)
@@ -214,6 +219,7 @@ class AudiobookController(
     fun close() {
         openToken++
         resumeAfterPanel = false
+        resumeAfterFocus = false
         waitingForPage = false
         val had = phase
         if (had == AudiobookPhase.PLAYING || had == AudiobookPhase.PAUSED) savePosition(player.positionMs)
@@ -231,6 +237,7 @@ class AudiobookController(
     /** The lookup panel opened or closed: opening pauses, closing continues what it paused. */
     fun panelChanged(open: Boolean) {
         if (open) {
+            resumeAfterFocus = false
             if (phase == AudiobookPhase.PLAYING) {
                 resumeAfterPanel = true
                 pause()
@@ -322,6 +329,21 @@ class AudiobookController(
     override fun onFocusLost() {
         resumeAfterPanel = false
         pause()
+    }
+
+    override fun onFocusPaused() {
+        if (phase != AudiobookPhase.PLAYING) return
+        resumeAfterPanel = false
+        log("audio focus lost for a moment")
+        pause()
+        resumeAfterFocus = true
+    }
+
+    override fun onFocusResumed() {
+        if (!resumeAfterFocus) return
+        resumeAfterFocus = false
+        log("audio focus back")
+        if (phase == AudiobookPhase.PAUSED) play()
     }
 
     companion object {

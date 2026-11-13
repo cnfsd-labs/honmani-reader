@@ -8,7 +8,7 @@ import app.honmani.reader.anki.VoiceProblem
  * all [Listener] callbacks are on the main thread.
  */
 interface ReadAloudVoice {
-    interface Listener {
+    interface Listener : FocusListener {
         /** The engine began utterance [utteranceId]. */
         fun onStart(utteranceId: String)
 
@@ -18,9 +18,6 @@ interface ReadAloudVoice {
         fun onDone(utteranceId: String)
 
         fun onError(utteranceId: String)
-
-        /** Another app took the audio: stop speaking. */
-        fun onFocusLost()
     }
 
     var listener: Listener?

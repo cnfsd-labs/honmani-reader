@@ -13,7 +13,8 @@ import java.io.IOException
 
 /**
  * The audiobook's audio, played by Android's [MediaPlayer] as media (speech content) and with the
- * audio focus: another app taking the audio pauses it ([AudiobookPlayer.Listener.onFocusLost]).
+ * audio focus: another app taking the audio pauses it ([FocusListener]); after a pause for a moment
+ * ([FocusPause]) the focus is kept until it comes back.
  * The source is a content URI the reader chose; a file that is gone, or that the app may not read
  * any more, is [AudiobookProblem.AUDIO_GONE]. All calls and callbacks are on the main thread.
  */
@@ -29,6 +30,7 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
     private var media: MediaPlayer? = null
     private var prepared = false
     private var focus: AudioFocusRequest? = null
+    private val focusPause = FocusPause()
     private var rate = 1f
 
     /** Where a seek is going, until it lands: [MediaPlayer.getCurrentPosition] may still say the old place. */
@@ -127,7 +129,7 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
         } catch (_: IllegalStateException) {
             // The player is already gone.
         }
-        abandonFocus()
+        if (!focusPause.lostForAWhile) abandonFocus()
     }
 
     override fun setRate(rate: Float) {
@@ -169,26 +171,33 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
         }
     }
 
+    /** Asks for the focus, again with the request still held after a pause for a moment. */
     private fun requestFocus(): Boolean {
-        if (focus != null) return true
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        if (focus != null && !focusPause.lostForAWhile) return true
+        val request = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes)
+            // A request to duck pauses (FocusPause): Android must not lower the voice itself.
+            .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(
-                { change ->
-                    if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                        listener?.onFocusLost()
-                    }
-                },
+                { change -> if (focusPause.onChange(change, listener, ::isPlaying)) abandonFocus() },
                 main,
             )
             .build()
         if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return false
         focus = request
+        focusPause.reset()
         return true
+    }
+
+    private fun isPlaying(): Boolean = try {
+        media?.takeIf { prepared }?.isPlaying == true
+    } catch (_: IllegalStateException) {
+        false
     }
 
     private fun abandonFocus() {
         focus?.let { audio.abandonAudioFocusRequest(it) }
         focus = null
+        focusPause.reset()
     }
 }

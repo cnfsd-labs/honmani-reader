@@ -168,6 +168,34 @@ class AudiobookControllerTest {
     }
 
     @Test
+    fun aPauseForAMomentContinuesWhenTheFocusComesBack() {
+        start()
+        player.listener!!.onFocusPaused()
+        assertEquals(AudiobookPhase.PAUSED, controller.state.value.phase)
+        assertFalse(player.playing)
+        player.listener!!.onFocusResumed()
+        assertEquals(AudiobookPhase.PLAYING, controller.state.value.phase)
+        assertTrue(player.playing)
+    }
+
+    @Test
+    fun theFocusComingBackDoesNotUndoAPauseByTheReaderOrAPermanentLoss() {
+        start()
+        player.listener!!.onFocusPaused()
+        // Play and Pause by the reader while the other sound plays.
+        controller.togglePlay()
+        controller.togglePlay()
+        player.listener!!.onFocusResumed()
+        assertEquals(AudiobookPhase.PAUSED, controller.state.value.phase)
+        controller.play()
+        player.listener!!.onFocusPaused()
+        player.listener!!.onFocusLost()
+        player.listener!!.onFocusResumed()
+        assertEquals(AudiobookPhase.PAUSED, controller.state.value.phase)
+        assertFalse(player.playing)
+    }
+
+    @Test
     fun refusedFocusLeavesItPaused() {
         player.focusGranted = false
         start()

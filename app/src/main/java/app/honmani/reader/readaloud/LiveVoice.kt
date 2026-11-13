@@ -15,8 +15,9 @@ import java.util.Locale
 /**
  * The phone's own text-to-speech engine, speaking live (PhoneVoice writes files instead). Asks for
  * audio focus while something is queued and gives it back when the queue is empty or stopped, and
- * reports when another app takes the audio away. The engine's callbacks come on its own threads;
- * they are all moved to the main thread here.
+ * reports when another app takes the audio away; after a pause for a moment ([FocusPause]) it keeps
+ * the focus until it comes back. The engine's callbacks come on its own threads; they are all moved
+ * to the main thread here.
  */
 class LiveVoice(
     context: Context,
@@ -36,6 +37,7 @@ class LiveVoice(
     private var epoch = 0
     private var rate = 1f
     private var focus: AudioFocusRequest? = null
+    private val focusPause = FocusPause()
 
     /** The utterances queued and not yet finished; callbacks for any other id are stale. */
     private val live = HashSet<String>()
@@ -124,7 +126,7 @@ class LiveVoice(
     override fun stop() {
         engine?.stop()
         live.clear()
-        abandonFocus()
+        if (!focusPause.lostForAWhile) abandonFocus()
     }
 
     override fun shutdown() {
@@ -143,25 +145,27 @@ class LiveVoice(
         return id
     }
 
+    /** Asks for the focus, again with the request still held after a pause for a moment. */
     private fun requestFocus(): Boolean {
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+        val request = focus ?: AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes)
+            // A request to duck pauses (FocusPause): Android must not lower the voice itself.
+            .setWillPauseWhenDucked(true)
             .setOnAudioFocusChangeListener(
-                { change ->
-                    if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-                        listener?.onFocusLost()
-                    }
-                },
+                { change -> if (focusPause.onChange(change, listener) { live.isNotEmpty() }) abandonFocus() },
                 main,
             )
             .build()
         focus = request
-        return audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        val granted = audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) focusPause.reset()
+        return granted
     }
 
     private fun abandonFocus() {
         focus?.let { audio.abandonAudioFocusRequest(it) }
         focus = null
+        focusPause.reset()
     }
 
     private val progress = object : UtteranceProgressListener() {
