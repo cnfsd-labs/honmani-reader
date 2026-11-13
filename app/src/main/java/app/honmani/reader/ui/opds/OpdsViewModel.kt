@@ -1,7 +1,6 @@
 package app.honmani.reader.ui.opds
 
 import android.graphics.BitmapFactory
-import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
@@ -120,7 +119,7 @@ class OpdsViewModel(
 
     /** The last feed request, for retrying it. */
     private var lastRequest: (suspend () -> Unit)? = null
-    private val thumbnails = LruCache<String, ImageBitmap>(THUMBNAIL_CACHE_SIZE)
+    private val thumbnails = ThumbnailCache<ImageBitmap>(THUMBNAIL_CACHE_SIZE)
 
     val uiState: StateFlow<OpdsUiState> = combine(
         repository.catalogs,
@@ -270,13 +269,10 @@ class OpdsViewModel(
 
     /** A cover thumbnail of the open catalogue, loaded with its login; null if there is none. */
     suspend fun thumbnail(url: String): ImageBitmap? {
-        thumbnails.get(url)?.let { return it }
         val server = server ?: return null
-        return try {
+        return thumbnails.get(url) {
             val bytes = client.bytes(server, url, OpdsClient.MAX_THUMBNAIL_BYTES)
-            withContext(Dispatchers.Default) { decodeThumbnail(bytes) }?.also { thumbnails.put(url, it) }
-        } catch (_: OpdsException) {
-            null
+            withContext(Dispatchers.Default) { decodeThumbnail(bytes) }
         }
     }
 
