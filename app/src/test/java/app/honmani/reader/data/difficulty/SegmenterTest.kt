@@ -102,4 +102,24 @@ class SegmenterTest {
         }
         assertEquals(before, buildList { segmenter.segment(reference) { add(it.key) } })
     }
+
+    @Test
+    fun anAuxiliaryAfterAPastVerbStaysOneWord() {
+        // Ranks and classes as Jitendex and Jiten give them: しい is no stem of 知る (しる).
+        val words = Difficulty.addGrammar(
+            Lexicon.Builder()
+                .add("発見", 0, 1_146)
+                .add("する", WordClass.V5 or WordClass.VS, 10)
+                .add("らしい", WordClass.ADJ_I, 138)
+                .add("らし", 0, 28_679)
+                .add("ら", 0, 784)
+                .add("たら", 0, 2_909)
+                .add("しい", WordClass.ADJ_I, 14_011)
+                .add("しいる", WordClass.V1, 5_834)
+                .add("しる", WordClass.V5, 66),
+        ).build()
+        val text = "発見されたらしい"
+        val split = buildList { Segmenter(words).segment(text) { add(text.substring(it.start, it.start + it.length)) } }
+        assertEquals(listOf("発見", "された", "らしい"), split)
+    }
 }

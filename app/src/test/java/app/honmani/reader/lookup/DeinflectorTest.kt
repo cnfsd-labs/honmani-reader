@@ -39,6 +39,17 @@ class DeinflectorTest {
     }
 
     @Test
+    fun onlyHonorificVerbsHaveAnIStem() {
+        fun bases(text: String) = Deinflector.deinflect(text).map { it.text }
+        assertTrue("くださる" in bases("ください"))
+        assertTrue("いらっしゃる" in bases("いらっしゃいます"))
+        assertTrue("ござる" in bases("ございます"))
+        assertTrue("仰る" in bases("仰います"))
+        // Not 知る (しる): 発見されたら|しい instead of 発見された|らしい.
+        assertTrue("しる" !in bases("しい"))
+    }
+
+    @Test
     fun inflectionsAreListedFromTheDictionaryFormOutwards() {
         val result = Deinflector.deinflect("食べさせられなかった")
             .single { it.text == "食べる" && it.conditions and WordClass.V1 != 0 }

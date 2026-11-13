@@ -197,8 +197,11 @@ object Deinflector {
             rule(stem + "って", iku, TE, V5, Inflection.TE)
             rule(stem + "った", iku, PAST, V5, Inflection.PAST)
         }
-        // Honorific verbs (なさる, くださる, いらっしゃる, おっしゃる, ござる) have い-stems.
-        rule("い", "る", STEM, V5, Inflection.STEM)
+        // Honorific verbs (なさる, くださる, いらっしゃる, おっしゃる, ござる) have い-stems. Only
+        // theirs: any る verb would make しい the stem of 知る (発見されたら|しい).
+        for (ending in listOf("さる", "しゃる", "ざる", "仰る")) {
+            rule(ending.dropLast(1) + "い", ending, STEM, V5, Inflection.STEM)
+        }
 
         // 来る in kana.
         rule("こない", "くる", ADJ, VK, Inflection.NEGATIVE)
