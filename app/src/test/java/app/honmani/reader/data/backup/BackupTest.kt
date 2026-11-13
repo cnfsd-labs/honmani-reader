@@ -19,6 +19,7 @@ import app.honmani.reader.data.words.LookupEventEntity
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.WordLookupEntity
 import java.time.ZoneId
+import kotlinx.coroutines.async
 import app.honmani.reader.data.opds.OpdsCatalogEntity
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.MilestoneStore
@@ -226,6 +227,23 @@ class BackupTest {
         assertEquals(setOf("", "other"), new.days().map { it.deviceId }.toSet())
         assertEquals(35 * 60L, new.days().perBookAndDay().single().seconds)
         assertEquals(2, new.days().size)
+    }
+
+    @Test
+    fun twoRestoresAtOnceMergeLikeOneAfterTheOther() = runTest {
+        val old = oldPhone()
+        val backup = throughFile(old.backup.export(readerSettings = null))
+        val new = Phone("new")
+
+        val first = async { new.backup.restore(backup) }
+        val second = async { new.backup.restore(backup) }
+        first.await()
+        second.await()
+
+        val sequential = Phone("sequential")
+        sequential.backup.restore(backup)
+        sequential.backup.restore(backup)
+        assertEquals(sequential.snapshot(), new.snapshot())
     }
 
     @Test

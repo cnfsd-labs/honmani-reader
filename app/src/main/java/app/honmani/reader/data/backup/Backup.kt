@@ -59,6 +59,8 @@ import app.honmani.reader.lookup.FuriganaOverride
 import app.honmani.reader.diagnostics.logWarning
 import java.time.LocalDate
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -246,9 +248,13 @@ class Backup(
     /**
      * Merges [backup] into what this phone has; ttu's reader settings are the caller's. A restore
      * that has started finishes even if the caller is cancelled (the screen was left): the data
-     * and the files must not end up half merged.
+     * and the files must not end up half merged. A second restore meanwhile (Settings and the
+     * new-phone offer each have their own screen) waits for the first: both read the data before
+     * merging into it.
      */
-    suspend fun restore(backup: BackupFile): RestoreSummary = withContext(NonCancellable) { restoreNow(backup) }
+    suspend fun restore(backup: BackupFile): RestoreSummary = withContext(NonCancellable) { restoring.withLock { restoreNow(backup) } }
+
+    private val restoring = Mutex()
 
     private suspend fun restoreNow(backup: BackupFile): RestoreSummary {
         val newWaiting = ArrayList<WaitingBook>()
