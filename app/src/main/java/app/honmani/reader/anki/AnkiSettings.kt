@@ -3,6 +3,7 @@ package app.honmani.reader.anki
 import android.content.SharedPreferences
 import app.honmani.reader.data.words.Sentences
 import app.honmani.reader.data.opds.CredentialCipher
+import app.honmani.reader.data.opds.CredentialException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -194,14 +195,21 @@ class AnkiSettings(
     fun googleKey(): String? = devicePreferences.getString(KEY_GOOGLE_KEY, null)?.let(cipher::decrypt)
 
     /** Stores [key]; a blank key removes it. */
-    fun setGoogleKey(key: String) {
+    /** Saves (or with a blank [key] removes) the Google Cloud key; false if the phone could not encrypt it. */
+    fun setGoogleKey(key: String): Boolean {
         val trimmed = key.trim()
         if (trimmed.isEmpty()) {
             devicePreferences.edit().remove(KEY_GOOGLE_KEY).apply()
         } else {
-            devicePreferences.edit().putString(KEY_GOOGLE_KEY, cipher.encrypt(trimmed)).apply()
+            val encrypted = try {
+                cipher.encrypt(trimmed)
+            } catch (e: CredentialException) {
+                return false
+            }
+            devicePreferences.edit().putString(KEY_GOOGLE_KEY, encrypted).apply()
         }
         _hasGoogleKey.value = trimmed.isNotEmpty()
+        return true
     }
 
     /** The voice for new cards, or null for none. Google without a key falls back to the phone. */

@@ -1528,5 +1528,6 @@
     <string name="sync_error_network">No sync server answered at this address. Check the address and your connection.</string>
     <string name="sync_error_hotspot">This Wi-Fi is a hotspot with a login page, and this address is not encrypted (http), so Honmani does not send your password here. Use https, a VPN or another network.</string>
     <string name="sync_error_server">The server had a problem. Try again in a moment.</string>
+    <string name="error_key_storage">This phone could not store the key securely. Restart the phone and try again.</string>
     <string name="error_password_storage">This phone could not store the password securely. Restart the phone and try again.</string>
 </resources>

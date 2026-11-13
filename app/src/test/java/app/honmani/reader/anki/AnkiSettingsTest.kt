@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.opds.CredentialCipher
+import app.honmani.reader.data.opds.CredentialException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -72,6 +73,19 @@ class AnkiSettingsTest {
 
         settings.setSentenceEnds("  ")
         assertEquals("。！？!?…", settings.sentenceEnds.value)
+    }
+
+    @Test
+    fun aKeyThePhoneCannotEncryptIsNotSaved() {
+        val failing = object : CredentialCipher {
+            override fun encrypt(plain: String): String = throw CredentialException(java.security.GeneralSecurityException("no key"))
+
+            override fun decrypt(encrypted: String) = encrypted
+        }
+        val settings = AnkiSettings(choices, failing, device)
+
+        assertFalse(settings.setGoogleKey("key"))
+        assertFalse(settings.hasGoogleKey.value)
     }
 
     @Test

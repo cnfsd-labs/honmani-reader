@@ -187,9 +187,12 @@ private fun VoiceSettingsContent() {
                         TextButton(
                             enabled = keyInput.isNotBlank(),
                             onClick = {
-                                settings.setGoogleKey(keyInput)
-                                keyInput = ""
-                                checkKey()
+                                if (settings.setGoogleKey(keyInput)) {
+                                    keyInput = ""
+                                    checkKey()
+                                } else {
+                                    check = KeyCheck.Failed(R.string.error_key_storage)
+                                }
                             },
                         ) { Text(stringResource(R.string.action_save)) }
                     },
