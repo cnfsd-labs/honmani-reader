@@ -208,6 +208,7 @@ fun SearchContent(
         }
         when {
             !results.dictionariesAvailable -> item(key = "none") { Message(stringResource(R.string.lookup_no_dictionaries)) }
+            results.failed && results.query == query -> item(key = "failed") { Message(stringResource(R.string.search_failed)) }
             results.groups.isEmpty() && results.query == query ->
                 item(key = "empty") { Message(stringResource(R.string.search_nothing_found, query.trim())) }
         }

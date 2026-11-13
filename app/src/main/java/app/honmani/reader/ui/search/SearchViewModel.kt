@@ -1,12 +1,12 @@
 package app.honmani.reader.ui.search
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
+import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.lookup.LookupGroup
 import app.honmani.reader.lookup.LookupGroups
 import app.honmani.reader.lookup.LookupResult
@@ -30,6 +30,8 @@ data class SearchResults(
     val dictionariesAvailable: Boolean = true,
     /** True while English search is still being prepared (see [LookupResult.englishPending]). */
     val englishPending: Boolean = false,
+    /** True when the search threw: shown as an error, not as "nothing found". */
+    val failed: Boolean = false,
 )
 
 /**
@@ -67,8 +69,8 @@ class SearchViewModel(
         throw e
     } catch (e: Exception) {
         // A damaged dictionary row must not take the app down while typing.
-        Log.w("Honmani.search", "Search failed", e)
-        SearchResults(text)
+        logWarning("Honmani.search", "Search failed", e)
+        SearchResults(text, failed = true)
     }
 
     fun setQuery(text: String) {

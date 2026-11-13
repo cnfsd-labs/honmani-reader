@@ -14,6 +14,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -56,5 +58,27 @@ class SearchViewModelTest {
         advanceUntilIdle()
         // SearchContent lists the groups first to last from the top, the first one larger.
         assertEquals(listOf("best", "second", "third"), viewModel.results.value.groups.map { it.expression })
+    }
+
+    @Test
+    fun aThrowingSearchIsReportedAsFailed_notAsNothingFound() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val viewModel = SearchViewModel(search = { error("damaged row") }, compute = dispatcher)
+        viewModel.setQuery("b")
+        advanceUntilIdle()
+        assertTrue(viewModel.results.value.failed)
+        assertEquals("b", viewModel.results.value.query)
+    }
+
+    @Test
+    fun aSearchWithoutMatchesIsNotAFailure() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val viewModel = SearchViewModel(search = { LookupResult(emptyList()) }, compute = dispatcher)
+        viewModel.setQuery("b")
+        advanceUntilIdle()
+        assertFalse(viewModel.results.value.failed)
+        assertTrue(viewModel.results.value.groups.isEmpty())
     }
 }

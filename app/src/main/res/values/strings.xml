@@ -984,6 +984,7 @@
     <string name="search_history">Recent searches</string>
     <string name="search_history_clear">Clear</string>
     <string name="search_history_remove">Remove %1$s from recent searches</string>
+    <string name="search_failed">Search failed. Try again.</string>
     <string name="search_nothing_found">Nothing in the dictionaries for \"%1$s\".</string>
     <string name="search_in_your_words">In your words</string>
     <string name="search_english_pending">Getting English search ready: a minute after a dictionary is installed. Searching in Japanese and romaji works already.</string>
