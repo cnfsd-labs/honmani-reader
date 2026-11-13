@@ -145,6 +145,8 @@ data class WatchedScan(
     val removed: Int,
     val unreadableFolders: Int,
     val incomplete: Boolean,
+    /** New files larger than a book may be, skipped unread; the library counts them as failed once. */
+    val tooLarge: Int = 0,
 )
 
 object WatchedFolderScan {
@@ -170,6 +172,7 @@ object WatchedFolderScan {
         val files = mutableListOf<TreeEntry>()
         val hashes = HashMap<String, String>()
         var removed = 0
+        var tooLarge = 0
         for (entry in scan.files) {
             coroutineContext.ensureActive()
             if (seen.isUnchanged(entry)) continue
@@ -177,6 +180,7 @@ object WatchedFolderScan {
             if (entry.size > BookImporter.MAX_BOOK_BYTES) {
                 // The import would refuse it: don't read it at every scan.
                 seen.mark(entry)
+                tooLarge++
                 continue
             }
             val hash = hashOf(entry) ?: continue
@@ -188,7 +192,7 @@ object WatchedFolderScan {
                 hashes[entry.id] = hash
             }
         }
-        return WatchedScan(files, hashes, removed, scan.unreadableFolders, scan.incomplete)
+        return WatchedScan(files, hashes, removed, scan.unreadableFolders, scan.incomplete, tooLarge)
     }
 
     /** SHA-256 of [input] as lowercase hex, the same as a book's content hash. */

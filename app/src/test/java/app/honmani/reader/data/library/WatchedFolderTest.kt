@@ -113,6 +113,8 @@ class WatchedFolderTest {
         assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
         assertEquals(listOf("root/s/b.epub"), hashed)
         assertTrue("an oversized file is not looked at again", seen.isUnchanged(huge))
+        assertEquals("the library reports it once", 1, result.tooLarge)
+        assertEquals(0, scan(tree(huge, book), seen).tooLarge)
     }
 
     @Test

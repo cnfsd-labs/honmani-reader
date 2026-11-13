@@ -513,7 +513,8 @@ class LibraryViewModel(
             }
             watched.setProblem(false)
             var imported = 0
-            var failed = 0
+            // A file too large for a book is marked seen, so it is reported this once.
+            var failed = scan.tooLarge
             try {
                 for (file in scan.files) {
                     var removedMeanwhile = false
