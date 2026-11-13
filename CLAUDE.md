@@ -58,7 +58,7 @@ public: never copy those notes, personal details or discussions into it.
   stored deflated (`GlossaryPacker`).
 - **Saved words:** recorded on every tap lookup (a long press records nothing until a panel action saves
   the word), ranked by a decayed score (half-life 14 days), never
-  deleted for age. "Learned", not "Known". Anki cards are suggested, never pushed.
+  deleted for age. Finished words are "Known" (they include words marked from lists or Anki, never looked up); the tick action is "Mark as learned". Anki cards are suggested, never pushed.
 - **Spelling variants** (`SpellingVariants`): kanji forms of 2+ characters listed together by one
   dictionary entry count as one word for marks, coverage and progress; single kanji excluded; the
   vocabulary estimate and grading keep exact forms.
