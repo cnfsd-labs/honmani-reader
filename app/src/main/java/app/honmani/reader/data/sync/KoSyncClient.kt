@@ -71,6 +71,9 @@ class KoSyncException(
 
         /** The server asked for the login over http on a hotspot with a login page: not sent. */
         HOTSPOT,
+
+        /** The phone's Keystore could not encrypt the login: nothing was saved. */
+        PASSWORD_STORAGE,
     }
 }
 

@@ -12,8 +12,12 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/** The Keystore could not encrypt a secret, so it was not stored. */
+class CredentialException(cause: Throwable) : IOException("This phone could not store the password securely", cause)
+
 /** Encrypts secrets (catalogue passwords) for storage. */
 interface CredentialCipher {
+    /** Throws [CredentialException] if the Keystore fails. */
     fun encrypt(plain: String): String
 
     /** Null if the secret cannot be decrypted, for example after the key was lost. */
@@ -26,9 +30,18 @@ interface CredentialCipher {
  */
 class KeystoreCredentialCipher(private val alias: String = "honmani-credentials") : CredentialCipher {
     override fun encrypt(plain: String): String {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, key())
-        val sealed = cipher.iv + cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
+        val sealed = try {
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, key())
+            cipher.iv + cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
+        } catch (e: GeneralSecurityException) {
+            throw CredentialException(e)
+        } catch (e: ProviderException) {
+            // Some Keystore failures (a key the device can no longer use) come as this.
+            throw CredentialException(e)
+        } catch (e: IOException) {
+            throw CredentialException(e)
+        }
         return Base64.getEncoder().encodeToString(sealed)
     }
 

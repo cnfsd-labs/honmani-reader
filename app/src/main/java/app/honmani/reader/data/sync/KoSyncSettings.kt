@@ -2,6 +2,7 @@ package app.honmani.reader.data.sync
 
 import android.content.SharedPreferences
 import app.honmani.reader.data.opds.CredentialCipher
+import app.honmani.reader.data.opds.CredentialException
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +26,18 @@ class KoSyncSettings(
         get() = preferences.getString(KEY_DEVICE_ID, null) ?: UUID.randomUUID().toString().replace("-", "").uppercase()
             .also { preferences.edit().putString(KEY_DEVICE_ID, it).apply() }
 
+    /** Throws [KoSyncException] ([KoSyncException.Reason.PASSWORD_STORAGE]) if the login can't be encrypted. */
     fun signIn(account: KoSyncAccount) {
+        val (userKey, password) = try {
+            cipher.encrypt(account.userKey) to account.password?.let(cipher::encrypt)
+        } catch (e: CredentialException) {
+            throw KoSyncException(KoSyncException.Reason.PASSWORD_STORAGE, e.message!!, e)
+        }
         preferences.edit()
             .putString(KEY_SERVER, account.server)
             .putString(KEY_USERNAME, account.username)
-            .putString(KEY_USER_KEY, cipher.encrypt(account.userKey))
-            .putString(KEY_PASSWORD, account.password?.let(cipher::encrypt))
+            .putString(KEY_USER_KEY, userKey)
+            .putString(KEY_PASSWORD, password)
             .apply()
         _account.value = account
     }

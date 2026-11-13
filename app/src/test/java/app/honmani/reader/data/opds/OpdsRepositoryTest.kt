@@ -43,6 +43,20 @@ class OpdsRepositoryTest {
     }
 
     @Test
+    fun aKeystoreFailureIsAReadableError_andNothingIsSaved() = runTest {
+        // Unit tests have no Android Keystore: the real cipher fails as a broken one would.
+        val broken = OpdsRepository(dao, KeystoreCredentialCipher(), OpdsClient(), now = { 1L })
+        val error = try {
+            broken.save(null, "Calibre", "https://a.example/opds", "reader", "pw")
+            null
+        } catch (e: OpdsException) {
+            e
+        }
+        assertEquals(OpdsException.Reason.PASSWORD_STORAGE, error!!.reason)
+        assertTrue(repository.catalogs.first().isEmpty())
+    }
+
+    @Test
     fun noUserNameMeansNoPassword() = runTest {
         val id = repository.save(null, "Public", "https://a.example/opds", " ", "pw")
         assertNull(dao.find(id)!!.username)

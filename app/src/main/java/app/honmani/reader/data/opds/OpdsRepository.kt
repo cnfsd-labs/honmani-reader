@@ -82,7 +82,11 @@ class OpdsRepository(
             user == null -> null
             password == null -> existing?.passwordCipher
             password.isEmpty() -> null
-            else -> cipher.encrypt(password)
+            else -> try {
+                cipher.encrypt(password)
+            } catch (e: CredentialException) {
+                throw OpdsException(OpdsException.Reason.PASSWORD_STORAGE, e.message!!, e)
+            }
         }
         return if (existing == null) {
             dao.insert(

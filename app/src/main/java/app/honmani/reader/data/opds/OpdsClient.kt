@@ -50,6 +50,9 @@ class OpdsException(val reason: Reason, message: String, cause: Throwable? = nul
         HOTSPOT,
 
         TOO_LARGE,
+
+        /** The phone's Keystore could not encrypt the password: nothing was saved. */
+        PASSWORD_STORAGE,
     }
 }
 

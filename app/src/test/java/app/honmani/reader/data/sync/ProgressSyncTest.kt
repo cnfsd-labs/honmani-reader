@@ -424,6 +424,27 @@ class ProgressSyncTest {
         assertEquals(emptyMap<String, Any?>(), preferences.all.filterKeys { it != "kosync_device_id" })
     }
 
+    @Test
+    fun aKeystoreFailureAtSignInIsASyncError_andNothingIsKept() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val preferences = context.getSharedPreferences("sync-keystore-test", Context.MODE_PRIVATE)
+        val broken = object : CredentialCipher {
+            override fun encrypt(plain: String): String = throw app.honmani.reader.data.opds.CredentialException(java.security.KeyStoreException("Keystore gone"))
+
+            override fun decrypt(encrypted: String): String? = null
+        }
+        val brokenSettings = KoSyncSettings(preferences, broken)
+        val error = try {
+            brokenSettings.signIn(KoSyncAccount(server.url, "reader", KoSyncAccount.userKey("secret")))
+            null
+        } catch (e: KoSyncException) {
+            e
+        }
+        assertEquals(KoSyncException.Reason.PASSWORD_STORAGE, error!!.reason)
+        assertNull(brokenSettings.account.value)
+        assertEquals(emptyMap<String, Any?>(), preferences.all.filterKeys { it != "kosync_device_id" })
+    }
+
     private object PlainCipher : CredentialCipher {
         override fun encrypt(plain: String) = plain
 

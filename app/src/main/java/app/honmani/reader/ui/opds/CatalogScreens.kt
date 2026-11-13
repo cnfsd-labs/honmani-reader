@@ -243,6 +243,7 @@ fun catalogErrorText(reason: OpdsException.Reason): Int = when (reason) {
     OpdsException.Reason.CERTIFICATE -> R.string.catalog_error_certificate
     OpdsException.Reason.TOO_LARGE -> R.string.catalog_error_too_large
     OpdsException.Reason.HOTSPOT -> R.string.catalog_error_hotspot
+    OpdsException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
 }
 
 @Composable
@@ -352,6 +353,7 @@ private fun catalogSyncErrorText(reason: KoSyncException.Reason) = when (reason)
     KoSyncException.Reason.UNAUTHORIZED -> R.string.catalog_sync_error_unauthorized
     KoSyncException.Reason.SERVER -> R.string.sync_error_server
     KoSyncException.Reason.HOTSPOT -> R.string.sync_error_hotspot
+    KoSyncException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
     else -> R.string.catalog_sync_error_none
 }
 

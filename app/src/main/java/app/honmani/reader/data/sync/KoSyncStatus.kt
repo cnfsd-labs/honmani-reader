@@ -49,7 +49,7 @@ class KoSyncStatus(
             KoSyncException.Reason.NETWORK -> SyncFailure.Kind.NETWORK
             KoSyncException.Reason.SERVER -> SyncFailure.Kind.SERVER
             KoSyncException.Reason.HOTSPOT -> SyncFailure.Kind.HOTSPOT
-            null -> SyncFailure.Kind.OTHER
+            KoSyncException.Reason.PASSWORD_STORAGE, null -> SyncFailure.Kind.OTHER
         }
         val failure = SyncFailure(kind, kex?.status, ttuId, now())
         preferences.edit()
