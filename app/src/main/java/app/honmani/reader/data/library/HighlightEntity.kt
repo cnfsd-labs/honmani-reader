@@ -91,23 +91,26 @@ interface HighlightDao : TombstoneWriter {
     /** With the book, and without a marker: each phone keeps its own library, so the other phones keep theirs. */
     @Query("DELETE FROM highlight WHERE content_hash = :contentHash")
     suspend fun deleteForBook(contentHash: String)
+
+    /**
+     * Saves a new highlight. A highlight that overlaps older ones of the same book replaces them all,
+     * whatever their colour: the newest wins, and a reader never has to untangle layered marks.
+     * One transaction, so a crash never leaves the old ones gone without the new one.
+     */
+    @Transaction
+    suspend fun saveReplacingOverlaps(highlight: HighlightEntity): SavedHighlight {
+        val replaced = overlapping(highlight.contentHash, highlight.start, highlight.end)
+        for (old in replaced) delete(old.id)
+        return SavedHighlight(put(highlight), replaced)
+    }
+
+    /** Takes a saved highlight back and restores what it replaced, with their ids, in one transaction. */
+    @Transaction
+    suspend fun undoSave(saved: SavedHighlight) {
+        delete(saved.id)
+        for (old in saved.replaced) put(old)
+    }
 }
 
 /** A highlight just saved, with the ones it replaced (so Undo can bring them back). */
 data class SavedHighlight(val id: Long, val replaced: List<HighlightEntity>)
-
-/**
- * Saves a new highlight. A highlight that overlaps older ones of the same book replaces them all,
- * whatever their colour: the newest wins, and a reader never has to untangle layered marks.
- */
-suspend fun HighlightDao.saveReplacingOverlaps(highlight: HighlightEntity): SavedHighlight {
-    val replaced = overlapping(highlight.contentHash, highlight.start, highlight.end)
-    for (old in replaced) delete(old.id)
-    return SavedHighlight(put(highlight), replaced)
-}
-
-/** Takes a saved highlight back and restores what it replaced, with their ids. */
-suspend fun HighlightDao.undoSave(saved: SavedHighlight) {
-    delete(saved.id)
-    for (old in saved.replaced) put(old)
-}

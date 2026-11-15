@@ -632,6 +632,16 @@ class BackupTest {
     }
 
     @Test
+    fun onlyTheListedSettingsAreExported() = runTest {
+        val old = Phone("old")
+        old.settings.edit().putString("accent", "TEAL").putString("refold_last_export", "2026-11-01").putInt("something_else", 3).apply()
+
+        val backup = throughFile(old.backup.export(readerSettings = null))
+
+        assertEquals(setOf("accent"), backup.settings.keys)
+    }
+
+    @Test
     fun settingsOfAnotherTypeOrUnknownAreLeftOut() = runTest {
         val backup = throughFile(
             BackupFile(

@@ -221,7 +221,7 @@ class Backup(
         }
         return BackupFile(
             exportedAt = now(),
-            settings = if (sync != null) emptyMap() else settings.all.mapNotNull { (key, value) -> typed(value)?.let { key to it } }.toMap(),
+            settings = if (sync != null) emptyMap() else settings.all.filterKeys { it in SETTING_TYPES }.mapNotNull { (key, value) -> typed(value)?.let { key to it } }.toMap(),
             readerSettings = if (sync != null) null else readerSettings,
             milestones = milestones.seen.value.mapValues { (_, day) -> day.toString() },
             books = books,

@@ -88,8 +88,6 @@ import app.honmani.reader.data.library.BookmarkEntity
 import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.readaloud.PronunciationRules
-import app.honmani.reader.data.library.saveReplacingOverlaps
-import app.honmani.reader.data.library.undoSave
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
