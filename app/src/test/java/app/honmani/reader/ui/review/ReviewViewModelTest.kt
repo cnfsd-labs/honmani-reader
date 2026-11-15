@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.anki.VoiceProblem
@@ -17,6 +18,8 @@ import app.honmani.reader.data.words.WordRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -81,8 +84,14 @@ class ReviewViewModelTest {
         settings = ReviewSettings(context.getSharedPreferences("review-test", Context.MODE_PRIVATE))
     }
 
+    // A write still running would fail on the closed database and surface in a later test class
+    // as "uncaught exceptions before test": cancel the view models' work and wait for it first.
+    private val owned = mutableListOf<ReviewViewModel>()
+
     @After
     fun tearDown() {
+        owned.forEach { it.viewModelScope.cancel() }
+        runBlocking { withTimeout(5_000) { owned.forEach { it.viewModelScope.coroutineContext.job.join() } } }
         database.close()
         Dispatchers.resetMain()
     }
@@ -100,6 +109,7 @@ class ReviewViewModelTest {
     private fun model(): ReviewViewModel {
         val reviews = ReviewRepository(database)
         return ReviewViewModel(reviews, WordRepository(database), settings, audio = audio, ringerNormal = { ringerNormal })
+            .also { owned += it }
     }
 
     private fun started(): ReviewViewModel = runBlocking {
