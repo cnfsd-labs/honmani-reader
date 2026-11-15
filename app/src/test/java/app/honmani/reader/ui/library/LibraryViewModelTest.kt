@@ -20,7 +20,14 @@ import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuPage
 import app.honmani.reader.ui.reader.TtuProgress
 import java.io.File
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -140,6 +147,63 @@ class LibraryViewModelTest {
         assertEquals(LibraryNotice.ReaderFailed("吾輩は猫である"), nextNotice())
         assertTrue(dao.books.value.isEmpty())
         assertTrue(File(folder.root, "books").list()!!.isEmpty())
+    }
+
+    @Test
+    fun aStoppedAdd_keepsNoHalfAddedBook() = runBlocking {
+        page.holdNewImports = true
+        val adder = BookAdder(dao, importer, ttu)
+        val job = launch(Dispatchers.Main) { adder.add(TestBooks.epub().inputStream(), "neko.epub") }
+        eventually { page.held.firstOrNull() }
+
+        job.cancelAndJoin()
+
+        assertTrue(dao.books.value.isEmpty())
+        assertTrue(File(folder.root, "books").list()!!.isEmpty())
+    }
+
+    @Test
+    fun aBookOpenedFromAnotherAppWhileOneIsOpening_opensAfterIt() = runBlocking {
+        val first = addAndWait("a.epub", TestBooks.epub(author = "初版"))
+        val answer = CompletableDeferred<Unit>()
+        val asking = LibraryViewModel(
+            dao = dao,
+            importer = importer,
+            ttu = ttu,
+            openFile = { uri -> files[uri.lastPathSegment]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) } },
+            now = { 42L },
+            // "Where to continue?" stays up for the first book until answered.
+            syncPosition = { book, _, _ -> if (book.id == first.id) answer.await() },
+        )
+        asking.open(first.id)
+
+        asking.addOpened(listOf(pick("b.epub", TestBooks.epub(author = "改訂版"))))
+        val second = eventually { dao.books.value.getOrNull(1)?.takeIf { it.ttuId != null } }
+        assertTrue(page.loads.isEmpty())
+        answer.complete(Unit)
+
+        eventually { page.loads.getOrNull(1) }
+        assertEquals(listOf("/b?id=${first.ttuId}", "/b?id=${second.ttuId}"), page.loads)
+    }
+
+    @Test
+    fun leavingRightAfterRemove_stillRemovesTheBook() = runBlocking {
+        val book = addAndWait("neko.epub", TestBooks.epub())
+        page.holdRemoves = true
+        val store = ViewModelStore()
+        val leaving = ViewModelProvider(
+            store,
+            viewModelFactory { initializer { LibraryViewModel(dao = dao, importer = importer, ttu = ttu, openFile = { null }, now = { 42L }) } },
+        )[LibraryViewModel::class.java]
+        leaving.remove(book.id)
+        eventually { page.held.firstOrNull() }
+
+        store.clear()
+        page.release()
+
+        eventually { dao.books.value.takeIf { it.isEmpty() } }
+        eventually { File(folder.root, "books").list()!!.takeIf { it.isEmpty() } }
+        Unit
     }
 
     @Test
@@ -754,6 +818,17 @@ private class FakeReaderPage(private val ttu: TtuLibrary) : TtuPage {
     var failResets = false
     var lastTtuId = 0L
 
+    /** Held commands get no answer until [release]: a new book's import, a removal. */
+    var holdNewImports = false
+    var holdRemoves = false
+    val held = mutableListOf<Pair<String, JsonObject>>()
+
+    fun release() {
+        val commands = held.toList()
+        held.clear()
+        commands.forEach { (name, json) -> answer(name, json) }
+    }
+
     override fun evaluate(script: String) {
         val name = script.substringAfter("honmaniLibrary.").substringBefore("(")
         val arguments = script.substringAfter("(").substringBeforeLast(")")
@@ -765,6 +840,16 @@ private class FakeReaderPage(private val ttu: TtuLibrary) : TtuPage {
             loads += "/b?id=${json["ttuId"]!!.jsonPrimitive.long}"
             return
         }
+        val known = json["ttuId"]?.jsonPrimitive?.longOrNull
+        val hold = when (name) {
+            "ensure" -> known == null && holdNewImports
+            "remove" -> holdRemoves
+            else -> false
+        }
+        if (hold) held += name to json else answer(name, json)
+    }
+
+    private fun answer(name: String, json: JsonObject) {
         val requestId = json["requestId"]!!.jsonPrimitive.long
         when (name) {
             "ensure" -> {

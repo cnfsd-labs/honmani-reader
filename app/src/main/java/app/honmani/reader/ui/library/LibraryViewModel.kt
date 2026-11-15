@@ -389,7 +389,7 @@ class LibraryViewModel(
     fun addOpened(uris: List<Uri>) {
         viewModelScope.launch {
             val books = uris.map { uri -> addMutex.withLock { addOne(uri) } }
-            books.singleOrNull()?.let { open(it.id) }
+            books.singleOrNull()?.let { openWhenFree(it.id) }
         }
     }
 
@@ -417,7 +417,7 @@ class LibraryViewModel(
 
     private suspend fun addAndOpen(fileName: String, bytes: ByteArray) {
         val book = addMutex.withLock { add(PickedFile(fileName, ByteArrayInputStream(bytes))) }
-        book?.let { open(it.id) }
+        book?.let { openWhenFree(it.id) }
     }
 
     /** Adds a sample book and opens it (also if it is in the library already). */
@@ -427,7 +427,7 @@ class LibraryViewModel(
                 val picked = withContext(Dispatchers.IO) { openSample(sample) } ?: return@launch
                 add(picked)
             }
-            book?.let { open(it.id) }
+            book?.let { openWhenFree(it.id) }
         }
     }
 
@@ -659,6 +659,12 @@ class LibraryViewModel(
         batchJob?.cancel()
     }
 
+    /** Opens the book once the book being opened (perhaps asking "Where to continue?") is open. */
+    private suspend fun openWhenFree(id: Long) {
+        opening.first { it == null }
+        open(id)
+    }
+
     /** Opens the book; [listen]: its audiobook starts playing (only after the reader chose "Continue listening"). */
     fun open(id: Long, listen: Boolean = false) {
         if (opening.value != null) return
@@ -843,7 +849,8 @@ class LibraryViewModel(
      */
     fun remove(id: Long, deleteStatistics: Boolean = false) {
         // Under addMutex: a watched-folder scan must not add the book again while it is removed.
-        viewModelScope.launch { addMutex.withLock { removeNow(id, deleteStatistics) } }
+        // Not cancellable: leaving the library right after must not leave the file or the bookmarks behind.
+        viewModelScope.launch { withContext(NonCancellable) { addMutex.withLock { removeNow(id, deleteStatistics) } } }
     }
 
     private suspend fun removeNow(id: Long, deleteStatistics: Boolean) {

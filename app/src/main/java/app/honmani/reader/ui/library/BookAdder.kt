@@ -8,6 +8,10 @@ import app.honmani.reader.ui.reader.TtuBook
 import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuLibraryException
 import java.io.InputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /** Adds a book to the library and hands it to the reader: picked files and catalogue downloads. */
 class BookAdder(
@@ -45,15 +49,30 @@ class BookAdder(
     }
 
     /** Imports a new book into the reader now, so problems show up at once and it opens fast. */
-    private suspend fun handToReader(book: BookEntity): Result = try {
-        link(book, ensureInReader(book, null))
-        // Only now that the book stays; from the row as linked, so the restore keeps the reader's id.
-        Result.Added(importer.restoreFor(dao.find(book.id) ?: book))
-    } catch (_: TtuLibraryException) {
-        // A book the reader cannot show is no use in the library.
+    private suspend fun handToReader(book: BookEntity): Result {
+        val ttuBook = try {
+            ensureInReader(book, null)
+        } catch (_: TtuLibraryException) {
+            // A book the reader cannot show is no use in the library.
+            discard(book)
+            return Result.ReaderFailed(book.title)
+        } catch (e: CancellationException) {
+            // Stopped (e.g. a folder import): not kept half-added, so the next add does it all,
+            // including what a restored backup kept for it.
+            withContext(NonCancellable) { discard(book) }
+            throw e
+        }
+        // The reader holds it now: link it and restore its data even if the caller stops meanwhile.
+        return withContext(NonCancellable) {
+            link(book, ttuBook)
+            // Only now that the book stays; from the row as linked, so the restore keeps the reader's id.
+            Result.Added(importer.restoreFor(dao.find(book.id) ?: book))
+        }
+    }
+
+    private suspend fun discard(book: BookEntity) {
         dao.delete(book.id)
-        importer.deleteFiles(book)
-        Result.ReaderFailed(book.title)
+        withContext(Dispatchers.IO) { importer.deleteFiles(book) }
     }
 
     /** Has the reader hold [book], without replacing another library book that shares its title. */

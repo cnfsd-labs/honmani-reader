@@ -16,7 +16,14 @@ import app.honmani.reader.lookup.LookupEntry
 import app.honmani.reader.lookup.LookupResult
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -544,6 +551,38 @@ class ReaderViewModelTest {
 
         assertEquals(40L, recorded.single().bookId)
         assertEquals("Book 4", recorded.single().bookTitle)
+    }
+
+    @Test
+    fun aWordTappedJustBeforeTheReaderCloses_isStillSaved() {
+        val saving = CompletableDeferred<Unit>()
+        val app = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val store = ViewModelStore()
+        val closing = ViewModelProvider(
+            store,
+            viewModelFactory {
+                initializer {
+                    ReaderViewModel(
+                        lookup = { text, _ -> pending.getOrPut(text) { CompletableDeferred() }.await() },
+                        compute = Dispatchers.Unconfined,
+                        recordLookup = { saving.await(); recorded += it; null },
+                        findBook = { CompletableDeferred<ReadingBook?>().await() },
+                        recordScope = app,
+                    )
+                }
+            },
+        )[ReaderViewModel::class.java]
+        closing.onBookChanged(4)
+        closing.onTap(tap("猫"))
+        pending.getValue("猫").complete(LookupResult(listOf(entry("猫", "猫"))))
+
+        // Back: the reader's scope ends while the book is still being found and the word saved.
+        store.clear()
+        saving.complete(Unit)
+
+        assertEquals(listOf("猫"), recorded.map { it.expression })
+        assertNull(recorded.single().bookId)
+        app.cancel()
     }
 
     @Test

@@ -26,11 +26,13 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -151,6 +153,8 @@ class ReaderViewModel(
     private val origin: LookupOrigin = LookupOrigin.READER,
     /** Which of these words (expression, reading) are in the word list, as [WordRepository.key]s. */
     private val savedAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
+    /** Where a tap's word is saved: one that outlives the reader (null: [viewModelScope]), so Back right after a tap keeps it. */
+    private val recordScope: CoroutineScope? = null,
 ) : ViewModel() {
     private val recordsTaps = origin == LookupOrigin.READER
 
@@ -842,10 +846,16 @@ class ReaderViewModel(
             origin = origin,
         )
         val openBook = book
-        return viewModelScope.launch {
+        return (recordScope ?: viewModelScope).launch(Dispatchers.Main.immediate) {
             try {
                 // A tap right after the book opened comes before findBook has answered.
-                val found = awaitBook(openBook)
+                val found = try {
+                    awaitBook(openBook)
+                } catch (e: CancellationException) {
+                    // The reader closed before the book was found: saved without it.
+                    ensureActive()
+                    null
+                }
                 val undo = recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
                 // Only the lookups a tap made by itself can be taken back, not a word the reader chose to save.
                 if (taps && undo != null) addCounted(tap, undo)
@@ -956,6 +966,7 @@ class ReaderViewModel(
                     readAloud = { container.wordAudio.playSentence(it) },
                     stopSpeaking = { container.wordAudio.stop() },
                     origin = origin,
+                    recordScope = container.applicationScope,
                     savedAmong = { words ->
                         words.filter { (expression, reading) -> container.wordRepository.find(expression, reading) != null }
                             .mapTo(HashSet()) { (expression, reading) -> WordRepository.key(expression, reading) }
