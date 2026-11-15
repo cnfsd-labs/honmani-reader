@@ -15,6 +15,7 @@ class LibraryMessageTest {
             LibraryMessage.Failed(requestId = 4, message = "Error importing x"),
             LibraryMessage.parse("""{"type":"library.failed","requestId":4,"message":"Error importing x"}"""),
         )
+        assertEquals(LibraryMessage.ThemeChanged, LibraryMessage.parse("""{"type":"library.theme"}"""))
         assertEquals(
             LibraryMessage.Removed(requestId = 5),
             LibraryMessage.parse("""{"type":"library.removed","requestId":5}"""),

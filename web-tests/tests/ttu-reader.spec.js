@@ -493,6 +493,27 @@ test('the reader theme follows the system until the user picks one', async ({ br
   await context.close();
 });
 
+test('a system theme change while the page is open stores the new theme and asks for a reload', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'dark' });
+  const page = await context.newPage();
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const state = () => page.evaluate(() => [localStorage.getItem('theme'), localStorage.getItem('honmaniAutoTheme'),
+    window.__messages.filter((message) => message.type === 'library.theme').length]);
+  expect(await state()).toEqual(['black-theme', 'black-theme', 0]);
+
+  // No reload: ttu keeps the page, the app reloads it on the message.
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect.poll(state).toEqual(['light-theme', 'light-theme', 1]);
+
+  // A theme the user picked stays, and nothing needs reloading.
+  await page.evaluate(() => localStorage.setItem('theme', 'ecru-theme'));
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.waitForTimeout(200);
+  expect(await state()).toEqual(['ecru-theme', null, 1]);
+  await context.close();
+});
+
 test('a theme the user picked is kept', async ({ browser }) => {
   const context = await browser.newContext({ colorScheme: 'dark' });
   const page = await context.newPage();

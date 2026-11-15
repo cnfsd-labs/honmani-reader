@@ -51,6 +51,10 @@ class TtuLibrary(
     private val requestIds = AtomicLong()
     private val mutex = Mutex()
 
+    /** The page needs a reload for a new theme once the running command has its answer. */
+    @Volatile
+    private var themeReload = false
+
     private val _progress = MutableSharedFlow<List<TtuProgress>>(extraBufferCapacity = 4)
 
     /** Progress reports, after [requestProgress]. */
@@ -239,6 +243,12 @@ class TtuLibrary(
         }
     }
 
+    /** Reloads for a new system theme, never under a running command (an import would fail). */
+    private fun reloadForTheme() {
+        themeReload = false
+        reload()
+    }
+
     /** Asks for reading progress, answered on [progress]; does nothing without a page. */
     fun requestProgress() {
         page.value?.evaluate("window.honmaniLibrary && honmaniLibrary.progress();")
@@ -249,7 +259,11 @@ class TtuLibrary(
         when (message) {
             is LibraryMessage.Progress -> _progress.tryEmit(message.books)
             is LibraryMessage.Finished -> _finished.tryEmit(message.id)
-            is LibraryMessage.Reply -> pending.remove(message.requestId)?.complete(message)
+            is LibraryMessage.Reply -> {
+                pending.remove(message.requestId)?.complete(message)
+                if (themeReload && pending.isEmpty()) reloadForTheme()
+            }
+            LibraryMessage.ThemeChanged -> if (pending.isEmpty()) reloadForTheme() else themeReload = true
         }
     }
 

@@ -32,6 +32,9 @@ sealed interface LibraryMessage {
     /** The end of book [id] was on screen (`book-end.js`). */
     data class Finished(val id: Long) : LibraryMessage
 
+    /** The system's dark mode changed and the reader theme follows it: ttu needs a reload. */
+    data object ThemeChanged : LibraryMessage
+
     companion object {
         private const val MAX_MESSAGE_LENGTH = 1_000_000
         private const val MAX_TITLE_LENGTH = 1_000
@@ -78,6 +81,7 @@ sealed interface LibraryMessage {
                         key.length <= MAX_SETTING_LENGTH && (value == null || value.length <= MAX_SETTING_LENGTH)
                     },
                 )
+                "library.theme" -> ThemeChanged
                 "library.finished" -> Finished(envelope.id?.takeIf { it > 0 } ?: return null)
                 "library.progress" -> Progress(
                     envelope.books

@@ -265,4 +265,27 @@ class TtuLibraryTest {
         library.onMessage(LibraryMessage.Progress(listOf(TtuProgress(1, 0.5f))))
         assertEquals(listOf(TtuProgress(1, 0.5f)), reported.await())
     }
+
+    @Test
+    fun themeChange_reloadsThePageAfterTheRunningCommand() = runTest {
+        library.attach(page)
+        val result = async { library.ensure(TtuBook(3, "猫"), "/honmani-books/a.epub", "猫.epub") }
+        runCurrent()
+        val requestId = page.lastRequestId()
+
+        // An import is running: a reload now would lose it.
+        library.onMessage(LibraryMessage.ThemeChanged)
+        assertTrue(page.scripts.none { it.contains("reload()") })
+
+        library.onMessage(LibraryMessage.Ready(requestId, 9, "吾輩は猫である"))
+        assertEquals(TtuBook(9, "吾輩は猫である"), result.await())
+        assertTrue(page.scripts.last().contains("honmaniReaderSettings.reload()"))
+    }
+
+    @Test
+    fun themeChange_reloadsAnIdlePageAtOnce() {
+        library.attach(page)
+        library.onMessage(LibraryMessage.ThemeChanged)
+        assertTrue(page.scripts.last().contains("honmaniReaderSettings.reload()"))
+    }
 }

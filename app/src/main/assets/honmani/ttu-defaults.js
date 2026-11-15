@@ -5,7 +5,8 @@
  * "Noto Serif JP" / "Noto Sans JP", and the reader waits up to 10 s for its primary font to load
  * before showing a book. Defaulting to the generic families uses the system's Noto CJK fonts and
  * shows the book immediately. The reader theme follows the system's dark mode (black or light)
- * until the user picks a theme in ttu's settings. The text is larger than ttu's 20 px (easier to
+ * until the user picks a theme in ttu's settings, also when the system changes while the page is
+ * open (the app reloads the page on the `library.theme` message). The text is larger than ttu's 20 px (easier to
  * read kanji on a phone), the reading position is saved on every page turn instead of after 3 s
  * (so ttu's "Create Bookmark" button in the reader's header is hidden), and images are not
  * blurred. Settings the user changes are left alone.
@@ -114,16 +115,7 @@
       window.localStorage.setItem(FONT_TWO_COPY, fontOne);
     }
 
-    const systemTheme = prefersDark ? 'black-theme' : 'light-theme';
-    const theme = window.localStorage.getItem('theme');
-    const auto = window.localStorage.getItem(AUTO_THEME);
-    if (theme === null || theme === auto) {
-      window.localStorage.setItem('theme', systemTheme);
-      window.localStorage.setItem(AUTO_THEME, systemTheme);
-    } else if (auto !== null) {
-      // The user picked a theme in ttu's settings: theirs from now on.
-      window.localStorage.removeItem(AUTO_THEME);
-    }
+    followSystem(prefersDark);
 
     // ttu's stylesheet colours the page from these variables, light until its script sets
     // them on <body>; set on the root element, they apply from the first frame.
@@ -131,6 +123,40 @@
     if (colors && window.location.pathname.startsWith('/b')) whenRoot(paintRoot(colors));
   } catch (error) {
     // Storage can be unavailable; ttu then falls back to its own defaults.
+  }
+
+  // ttu opens books without reloading and the app keeps the page alive, so a system theme
+  // change arrives while the page is open. ttu reads its theme only when the page loads: while
+  // the theme follows the system, the new one is stored and the app reloads the page.
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {
+      let changed = false;
+      try {
+        changed = followSystem(event.matches);
+      } catch (error) {
+        // No storage: nothing to follow.
+      }
+      if (changed && window.honmani) window.honmani.postMessage(JSON.stringify({ type: 'library.theme' }));
+    });
+  }
+
+  /**
+   * Sets the theme for the system's dark mode unless the user picked one; true if it changed.
+   */
+  function followSystem(dark) {
+    const systemTheme = dark ? 'black-theme' : 'light-theme';
+    const theme = window.localStorage.getItem('theme');
+    const auto = window.localStorage.getItem(AUTO_THEME);
+    if (theme === null || theme === auto) {
+      window.localStorage.setItem('theme', systemTheme);
+      window.localStorage.setItem(AUTO_THEME, systemTheme);
+      return theme !== systemTheme;
+    }
+    if (auto !== null) {
+      // The user picked a theme in ttu's settings: theirs from now on.
+      window.localStorage.removeItem(AUTO_THEME);
+    }
+    return false;
   }
 
   whenRoot((root) => {
