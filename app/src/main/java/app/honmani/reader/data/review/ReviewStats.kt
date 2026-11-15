@@ -1,6 +1,7 @@
 package app.honmani.reader.data.review
 
 import java.time.ZoneId
+import kotlin.math.roundToLong
 
 /** What the Progress tab shows about reviews. */
 data class ReviewSummary(
@@ -46,17 +47,21 @@ object ReviewStats {
 
     /**
      * Passed reviews over all of those in [from]..now by cards that had been graded before: the
-     * first grading of a word is learning it, not remembering it. Null if there are none.
+     * first grading of a word is learning it, not remembering it, and so is a repeat on the same
+     * review day (a learning step). Null if there are none.
      */
-    fun retention(logs: List<ReviewLogEntity>, from: Long): Pair<Double, Int>? {
-        val reviews = logs.filter { it.at >= from && it.elapsedDays > 0.0 }
+    fun retention(logs: List<ReviewLogEntity>, from: Long, zone: ZoneId, startHour: Int = 0): Pair<Double, Int>? {
+        val reviews = logs.filter {
+            it.at >= from && it.elapsedDays > 0.0 &&
+                it.at - (it.elapsedDays * ReviewRules.DAY_MS).roundToLong() < ReviewRules.startOfDay(it.at, zone, startHour = startHour)
+        }
         if (reviews.isEmpty()) return null
         return reviews.count { it.grade != Grade.AGAIN.value }.toDouble() / reviews.size to reviews.size
     }
 
     fun summary(logs: List<ReviewLogEntity>, cardsInReview: Int, anyCard: Boolean, newToday: Int, now: Long, zone: ZoneId, startHour: Int = 0): ReviewSummary {
         val dayStart = ReviewRules.startOfDay(now, zone, startHour = startHour)
-        val retention = retention(logs, now - RETENTION_DAYS * ReviewRules.DAY_MS)
+        val retention = retention(logs, now - RETENTION_DAYS * ReviewRules.DAY_MS, zone, startHour)
         return ReviewSummary(
             today = logs.count { it.at >= dayStart },
             newToday = newToday,

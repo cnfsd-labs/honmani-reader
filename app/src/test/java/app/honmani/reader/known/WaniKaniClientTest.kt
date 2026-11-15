@@ -104,14 +104,17 @@ class WaniKaniClientTest {
 
         val items = client.knownItems(" $token ", includeKanji = false)
 
-        // Stage 4 and the kana vocabulary are left out, and so is the kanji that was not asked for.
-        assertEquals(listOf(WaniKaniItem("大人", "おとな", true), WaniKaniItem("一つ", "ひとつ", true)), items)
+        // Stage 4 is left out, and so is the kanji that was not asked for; kana-only words come without a reading.
+        assertEquals(
+            listOf(WaniKaniItem("大人", "おとな", true), WaniKaniItem("一つ", "ひとつ", true), WaniKaniItem("ありがとう", null, true)),
+            items,
+        )
         val first = server.requests.first()
         assertEquals("Bearer $token", first.headers["authorization"])
         assertEquals("20170710", first.headers["wanikani-revision"])
         // A fixed User-Agent, not the platform's default with the phone model and build.
         assertTrue(server.requests.all { it.headers["user-agent"] == "Honmani (Android)" })
-        assertTrue("subject_types=vocabulary&" in first.path)
+        assertTrue("subject_types=vocabulary,kana_vocabulary&" in first.path)
         assertTrue("srs_stages=5,6,7,8,9" in first.path)
         assertTrue(server.requests.none { token in it.path })
         assertTrue(server.requests.any { it.path.startsWith("/v2/subjects?ids=") })
@@ -123,9 +126,9 @@ class WaniKaniClientTest {
 
         val items = client.knownItems(token, includeKanji = true)
 
-        assertTrue("subject_types=vocabulary,kanji&" in server.requests.first().path)
+        assertTrue("subject_types=vocabulary,kana_vocabulary,kanji&" in server.requests.first().path)
         assertEquals(WaniKaniItem("人", null, false), items.single { !it.vocabulary })
-        assertEquals(3, items.size)
+        assertEquals(4, items.size)
     }
 
     @Test
@@ -158,7 +161,7 @@ class WaniKaniClientTest {
 
         val items = client.knownItems(token, false)
 
-        assertEquals(2, items.size)
+        assertEquals(3, items.size)
         assertEquals(listOf(7_000L), pauses)
     }
 

@@ -51,16 +51,30 @@ class ReviewStatsTest {
             log(now - 7 * day, Grade.HARD),
         )
 
-        val (retention, count) = ReviewStats.retention(logs, from)!!
+        val (retention, count) = ReviewStats.retention(logs, from, zone)!!
 
         assertEquals(0.75, retention, 1e-9)
         assertEquals(4, count)
     }
 
     @Test
+    fun retentionLeavesOutRepeatsOnTheSameDayButCountsTheNextDayUnder24Hours() {
+        val logs = listOf(
+            log(dayStart + 3_600_000, Grade.AGAIN, elapsed = 3.0), // a real review
+            log(dayStart + 3_600_000 + 600_000, Grade.GOOD, elapsed = 600_000.0 / day), // a learning step
+            log(dayStart + 2 * 3_600_000, Grade.GOOD, elapsed = 0.5), // last reviewed yesterday evening
+        )
+
+        val (retention, count) = ReviewStats.retention(logs, now - 30 * day, zone)!!
+
+        assertEquals(0.5, retention, 1e-9)
+        assertEquals(2, count)
+    }
+
+    @Test
     fun retentionIsNullWithoutReviewsOfKnownCards() {
-        assertNull(ReviewStats.retention(listOf(log(now - day, elapsed = 0.0)), now - 30 * day))
-        assertNull(ReviewStats.retention(emptyList(), 0))
+        assertNull(ReviewStats.retention(listOf(log(now - day, elapsed = 0.0)), now - 30 * day, zone))
+        assertNull(ReviewStats.retention(emptyList(), 0, zone))
     }
 
     @Test

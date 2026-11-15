@@ -183,6 +183,29 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun aPreparedLongSentenceIsNotCutInsideASurrogatePair() = runTest {
+        val id = repository.prepare(lookup("猫", sentence = "あ".repeat(399) + "𠮟" + "い"))
+
+        assertEquals("あ".repeat(399), repository.lookups(id).first().single().sentence)
+    }
+
+    @Test
+    fun undoingTheFirstLookupOfAKnownWordRestoresItsFirstLookupTime() = runTest {
+        val id = database.wordDao().insert(
+            WordEntity(
+                expression = "猫", reading = "よみ", gloss = "", status = WordStatus.LEARNED, lookupCount = 0,
+                firstLookedUpAt = 0, lastLookedUpAt = 0, rankKey = 0.0, lastSentence = "", lastSurfaceStart = 0, lastSurfaceEnd = 0,
+            ),
+        )
+        val undo = repository.record(lookup("猫"))!!
+        assertEquals(now, repository.find("猫", "よみ")!!.firstLookedUpAt)
+
+        repository.undo(undo)
+
+        assertEquals(0L, database.wordDao().find(id)!!.firstLookedUpAt)
+    }
+
+    @Test
     fun aSurfaceOutsideTheSentenceIsClamped() = runTest {
         repository.record(lookup("猫", sentence = "猫。", surface = "猫猫猫", surfaceStart = 1))
 

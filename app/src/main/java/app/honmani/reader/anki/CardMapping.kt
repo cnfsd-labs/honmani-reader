@@ -4,8 +4,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /** A note type of AnkiDroid as the settings and the exporter see it. */
 data class AnkiNoteTypeInfo(val id: Long, val name: String, val fields: List<String>)
@@ -107,21 +105,23 @@ data class FieldMapping(val sources: Map<String, CardSource>) {
             },
         ).toString()
 
-        /** Reads [toJson]'s text; anything unreadable gives nothing, unknown sources are dropped. */
+        /**
+         * Reads [toJson]'s text; unreadable text gives nothing, and a damaged note type or field is
+         * dropped on its own (the others stay), as are unknown sources.
+         */
         fun fromJson(text: String?): Map<String, FieldMapping> {
             if (text.isNullOrBlank()) return emptyMap()
-            return try {
-                Json.parseToJsonElement(text).jsonObject.mapValues { (_, fields) ->
-                    FieldMapping(
-                        fields.jsonObject.mapNotNull { (field, source) ->
-                            CardSource.fromName(source.jsonPrimitive.contentOrNull)?.let { field to it }
-                        }.toMap(),
-                    )
-                }
+            val root = try {
+                Json.parseToJsonElement(text) as? JsonObject
             } catch (_: IllegalArgumentException) {
-                // Not JSON or not the shape we wrote (a damaged backup): start with no mappings.
-                emptyMap()
-            }
+                null
+            } ?: return emptyMap() // Not JSON or not the shape we wrote (a damaged backup).
+            return root.mapNotNull { (noteType, fields) ->
+                val sources = (fields as? JsonObject)?.mapNotNull { (field, source) ->
+                    CardSource.fromName((source as? JsonPrimitive)?.contentOrNull)?.let { field to it }
+                } ?: return@mapNotNull null
+                noteType to FieldMapping(sources.toMap())
+            }.toMap()
         }
     }
 }

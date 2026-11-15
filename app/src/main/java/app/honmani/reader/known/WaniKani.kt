@@ -42,14 +42,14 @@ class WaniKaniClient(
     private val now: () -> Long = System::currentTimeMillis,
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
-    /** The vocabulary (and, if [includeKanji], kanji) at stage [MIN_STAGE] or above, in the API's order. */
+    /** The vocabulary, kana-only included (and, if [includeKanji], kanji), at stage [MIN_STAGE] or above, in the API's order. */
     suspend fun knownItems(token: String, includeKanji: Boolean, onProgress: (Int) -> Unit = {}): List<WaniKaniItem> {
         val key = token.trim()
         if (key.isEmpty()) throw WaniKaniException(WaniKaniProblem.NO_TOKEN)
         // A token is a UUID; anything else (a line break would split the header) is not one.
         if (!TOKEN.matches(key)) throw WaniKaniException(WaniKaniProblem.BAD_TOKEN)
         val session = Session(key)
-        val types = if (includeKanji) "vocabulary,kanji" else "vocabulary"
+        val types = if (includeKanji) "$VOCABULARY,$KANA_VOCABULARY,$KANJI" else "$VOCABULARY,$KANA_VOCABULARY"
         val assignments = ArrayList<Assignment>()
         var url: String? = "$baseUrl/v2/assignments?subject_types=$types&srs_stages=${(MIN_STAGE..MAX_STAGE).joinToString(",")}"
         var pages = 0
@@ -61,7 +61,7 @@ class WaniKaniClient(
             url = nextUrl(page)
             onProgress(assignments.size)
         }
-        val wanted = assignments.filter { it.stage >= MIN_STAGE && (it.type == VOCABULARY || includeKanji && it.type == KANJI) }
+        val wanted = assignments.filter { it.stage >= MIN_STAGE && (it.type == VOCABULARY || it.type == KANA_VOCABULARY || includeKanji && it.type == KANJI) }
         val subjects = HashMap<Long, Subject>()
         for (chunk in wanted.map { it.subjectId }.distinct().chunked(SUBJECTS_PER_REQUEST)) {
             var next: String? = "$baseUrl/v2/subjects?ids=${chunk.joinToString(",")}"
@@ -77,8 +77,9 @@ class WaniKaniClient(
         val items = LinkedHashMap<String, WaniKaniItem>()
         for (assignment in wanted) {
             val subject = subjects[assignment.subjectId] ?: continue
-            val vocabulary = assignment.type == VOCABULARY
-            val item = WaniKaniItem(subject.characters, if (vocabulary) subject.reading else null, vocabulary)
+            // A kana-only word (kana_vocabulary) has no readings: its characters are the reading.
+            val vocabulary = assignment.type != KANJI
+            val item = WaniKaniItem(subject.characters, if (assignment.type == VOCABULARY) subject.reading else null, vocabulary)
             items.putIfAbsent("${item.characters}\u0000${item.reading}", item)
         }
         return items.values.toList()
@@ -176,6 +177,7 @@ class WaniKaniClient(
         const val MIN_STAGE = 5
         private const val MAX_STAGE = 9
         private const val VOCABULARY = "vocabulary"
+        private const val KANA_VOCABULARY = "kana_vocabulary"
         private const val KANJI = "kanji"
         private const val REVISION = "20170710"
         private const val SUBJECTS_PER_REQUEST = 300

@@ -68,6 +68,13 @@ class FsrsTest {
     }
 
     @Test
+    fun sameDayHardMayLowerStabilityGoodNever() {
+        val memory = Memory(10.0, 5.0)
+        assertTrue(Fsrs.next(memory, Grade.HARD, 0.1).stability < 10.0)
+        assertTrue(Fsrs.next(memory, Grade.GOOD, 0.1).stability >= 10.0)
+    }
+
+    @Test
     fun forgettingLowersStabilityAndRaisesDifficulty() {
         val memory = Memory(30.0, 5.0)
         val after = Fsrs.next(memory, Grade.AGAIN, 30.0)

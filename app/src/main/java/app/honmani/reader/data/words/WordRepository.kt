@@ -124,10 +124,7 @@ class WordRepository(
      */
     suspend fun record(word: LookedUpWord): WordUndo? {
         val time = now()
-        val sentence = word.sentence.take(MAX_SENTENCE_LENGTH).let {
-            // Not half a surrogate pair at the cut.
-            if (it.length < word.sentence.length && it.isNotEmpty() && it.last().isHighSurrogate()) it.dropLast(1) else it
-        }
+        val sentence = cutSentence(word.sentence)
         val start = word.surfaceStart.coerceIn(0, sentence.length)
         val end = (start + word.surface.length).coerceAtMost(sentence.length)
         val gloss = word.gloss.take(MAX_GLOSS_LENGTH)
@@ -196,6 +193,11 @@ class WordRepository(
         }
     }
 
+    /** [sentence] cut to [MAX_SENTENCE_LENGTH], not inside a surrogate pair. */
+    private fun cutSentence(sentence: String): String = sentence.take(MAX_SENTENCE_LENGTH).let {
+        if (it.length < sentence.length && it.isNotEmpty() && it.last().isHighSurrogate()) it.dropLast(1) else it
+    }
+
     /**
      * Takes back what [undo] ([record]'s result) changed: a word the lookup created is deleted;
      * a word it only looked up again gets back the fields a lookup moves (status, count, rank,
@@ -217,6 +219,7 @@ class WordRepository(
                     status = before.status,
                     gloss = before.gloss,
                     lookupCount = before.lookupCount,
+                    firstLookedUpAt = before.firstLookedUpAt,
                     lastLookedUpAt = before.lastLookedUpAt,
                     rankKey = before.rankKey,
                     lastSentence = before.lastSentence,
@@ -235,7 +238,7 @@ class WordRepository(
      */
     suspend fun prepare(word: LookedUpWord): Long = database.withTransaction {
         val time = now()
-        val sentence = word.sentence.take(MAX_SENTENCE_LENGTH)
+        val sentence = cutSentence(word.sentence)
         val start = word.surfaceStart.coerceIn(0, sentence.length)
         val end = (start + word.surface.length).coerceAtMost(sentence.length)
         val existing = dao.find(word.expression, word.reading)

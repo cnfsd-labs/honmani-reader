@@ -164,6 +164,11 @@ class CardMappingTest {
         assertEquals(emptyMap<String, FieldMapping>(), FieldMapping.fromJson("{oops"))
         assertEquals(emptyMap<String, FieldMapping>(), FieldMapping.fromJson("[1,2]"))
         assertEquals(emptyMap<String, FieldMapping>(), FieldMapping.fromJson("{\"T\":5}"))
+        // One damaged note type or field loses only itself.
+        assertEquals(
+            mapOf("U" to FieldMapping(mapOf("A" to CardSource.WORD))),
+            FieldMapping.fromJson("{\"T\":5,\"U\":{\"A\":\"WORD\",\"B\":{}},\"V\":[1]}"),
+        )
 
         val read = FieldMapping.fromJson("{\"T\":{\"A\":\"WORD\",\"B\":\"FROM_THE_FUTURE\",\"C\":7}}")
         assertEquals(mapOf("A" to CardSource.WORD), read.getValue("T").sources)

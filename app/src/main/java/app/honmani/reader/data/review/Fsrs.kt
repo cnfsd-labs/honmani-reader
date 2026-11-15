@@ -103,7 +103,8 @@ object Fsrs {
 
     private fun shortTerm(s: Double, grade: Grade, w: DoubleArray): Double {
         val after = s * exp(w[17] * (grade.value - 3 + w[18])) * s.pow(-w[19])
-        return if (grade.passed) max(after, s) else after
+        // FSRS-6 keeps stability from falling only on Good and Easy; Hard may lower it.
+        return if (grade.value >= Grade.GOOD.value) max(after, s) else after
     }
 
     /** Natural log of 0.9, for tests that check the factor. */
