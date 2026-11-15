@@ -1,19 +1,25 @@
 package app.honmani.reader.data.fonts
 
+import app.honmani.reader.data.dictionary.DownloadException
 import app.honmani.reader.data.dictionary.FailureReason
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -57,33 +63,44 @@ class FontStore(
         val state = _states.value[font.id]
         if (state is FontState.Downloading || state == FontState.Installed) return
         set(font, FontState.Downloading(null))
-        jobs[font.id] = scope.launch {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             val part = File(dir, font.fileName + ".part")
             try {
                 withContext(io) { dir.mkdirs() }
+                val limit = font.sizeBytes + SIZE_MARGIN_BYTES
                 download(font.url, part) { done, total ->
+                    // A file far bigger than the catalog says is not this font: stop early.
+                    if (done > limit || total > limit) throw DownloadException("The download is larger than this font")
                     val size = if (total > 0) total else font.sizeBytes
                     set(font, FontState.Downloading((done.toFloat() / size).coerceIn(0f, 1f)))
                 }
                 withContext(io) {
+                    if (part.length() > limit) throw DownloadException("The download is larger than this font")
                     if (sha256(part) != font.sha256) throw IOException("The downloaded file is damaged")
                     if (!part.renameTo(file(font))) throw IOException("Could not save the font")
                 }
                 set(font, FontState.Installed)
-            } catch (e: IOException) {
-                part.delete()
+            } catch (e: CancellationException) {
                 // A cancelled download (the font was deleted meanwhile) is not a failure.
+                withContext(NonCancellable + io) { part.delete() }
+                throw e
+            } catch (e: Exception) {
+                withContext(NonCancellable + io) { part.delete() }
                 if (isActive) set(font, FontState.Failed(FailureReason.of(e)))
             } finally {
-                jobs.remove(font.id)
+                // Only this download's own entry: a newer download may have replaced it.
+                jobs.remove(font.id, coroutineContext.job)
             }
         }
+        jobs[font.id] = job
+        job.start()
     }
 
-    /** Removes [font] (or stops its download). */
+    /** Removes [font] (or stops its download, waiting for it to end before removing its files). */
     fun delete(font: CatalogFont) {
-        jobs.remove(font.id)?.cancel()
+        val running = jobs.remove(font.id)
         scope.launch {
+            running?.cancelAndJoin()
             withContext(io) {
                 file(font).delete()
                 File(dir, font.fileName + ".part").delete()
@@ -108,5 +125,10 @@ class FontStore(
             }
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private companion object {
+        /** How much bigger than the catalog's size a download may grow before it is stopped. */
+        const val SIZE_MARGIN_BYTES = 1L shl 20
     }
 }

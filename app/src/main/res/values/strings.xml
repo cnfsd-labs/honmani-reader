@@ -437,6 +437,7 @@
     <string name="network_purpose_wanikani">WaniKani</string>
     <string name="network_purpose_free_books_list">Free books list</string>
     <string name="network_purpose_free_books_book">Free book download</string>
+    <string name="network_purpose_font">Reader font download</string>
     <string name="reader_menu_contents">Contents</string>
     <string name="reader_menu_hint">Swipe up or tap the bottom edge for the reader menu</string>
     <string name="reader_menu_settings">Reader appearance and behaviour</string>

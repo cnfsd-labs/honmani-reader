@@ -14,6 +14,7 @@ enum class NetworkPurpose {
     WANIKANI,
     FREE_BOOKS_LIST,
     FREE_BOOKS_BOOK,
+    FONT,
 }
 
 /**

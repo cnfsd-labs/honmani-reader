@@ -8,6 +8,7 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.room.withTransaction
+import app.honmani.reader.diagnostics.NetworkPurpose
 import app.honmani.reader.anki.AnkiDroid
 import app.honmani.reader.anki.AnkiExporter
 import app.honmani.reader.anki.AnkiSettings
@@ -252,11 +253,16 @@ class AppContainer(context: Context) {
 
     val fontsDir = File(appContext.filesDir, "fonts")
 
-    val fontStore: FontStore by lazy { FontStore(fontsDir, applicationScope, dictionaryDownloader::download) }
+    val fontStore: FontStore by lazy { FontStore(fontsDir, applicationScope, { url, destination, onProgress ->
+            dictionaryDownloader.download(url, destination, NetworkPurpose.FONT, onProgress)
+        })
+    }
 
     /** The optional example sentences (Settings → Example sentences), in `files/examples/`. */
     val exampleStore: ExampleStore by lazy {
-        ExampleStore(File(appContext.filesDir, "examples"), applicationScope, dictionaryDownloader::download)
+        ExampleStore(File(appContext.filesDir, "examples"), applicationScope, download = { url, destination, onProgress ->
+            dictionaryDownloader.download(url, destination, onProgress = onProgress)
+        })
     }
 
     val exampleSentences: ExampleSentences by lazy { ExampleSentences(exampleStore, appearanceSettings.showExamples) }

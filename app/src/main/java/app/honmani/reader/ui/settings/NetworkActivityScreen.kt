@@ -36,6 +36,7 @@ private fun NetworkPurpose.title(): Int = when (this) {
     NetworkPurpose.WANIKANI -> R.string.network_purpose_wanikani
     NetworkPurpose.FREE_BOOKS_LIST -> R.string.network_purpose_free_books_list
     NetworkPurpose.FREE_BOOKS_BOOK -> R.string.network_purpose_free_books_book
+    NetworkPurpose.FONT -> R.string.network_purpose_font
 }
 
 /**

@@ -6,6 +6,8 @@ import java.io.IOException
 import java.security.MessageDigest
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,8 +36,11 @@ class FontStoreTest {
     )
 
     private var served = content
-    private var failure: IOException? = null
+    private var failure: Exception? = null
     private var gate: CompletableDeferred<Unit>? = null
+    /** Like a blocking read, the download does not notice it was cancelled while it waits at [gate]. */
+    private var stubborn = false
+    private var reportedTotal: Long? = null
     private val progress = mutableListOf<Float?>()
 
     private fun TestScope.store() = FontStore(
@@ -43,11 +48,12 @@ class FontStoreTest {
         scope = this,
         download = { url, destination, onProgress ->
             assertEquals(font.url, url)
-            gate?.await()
+            if (stubborn) withContext(NonCancellable) { gate?.await() } else gate?.await()
             failure?.let { throw it }
-            onProgress(served.size / 2L, served.size.toLong())
+            val total = reportedTotal ?: served.size.toLong()
+            onProgress(served.size / 2L, total)
             destination.writeBytes(served)
-            onProgress(served.size.toLong(), served.size.toLong())
+            onProgress(served.size.toLong(), total)
         },
         catalog = listOf(font),
         io = StandardTestDispatcher(testScheduler),
@@ -111,6 +117,61 @@ class FontStoreTest {
         store.download(font)
         advanceUntilIdle()
         store.delete(font)
+        advanceUntilIdle()
+        assertEquals(FontState.Available, store.states.value[font.id])
+        assertFalse(store.file(font).exists())
+    }
+
+    @Test
+    fun anUnexpectedErrorFailsTheDownload() = runTest(StandardTestDispatcher()) {
+        failure = IllegalStateException("bad response")
+        val store = store()
+        store.download(font)
+        advanceUntilIdle()
+        assertEquals(FontState.Failed(FailureReason.OTHER), store.states.value[font.id])
+        assertTrue(File(folder.root, "fonts").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun aDownloadFarLargerThanTheFontIsStopped() = runTest(StandardTestDispatcher()) {
+        // The server gives no size, and the file grows well past the catalog's.
+        served = ByteArray(3 shl 20)
+        reportedTotal = -1
+        val store = store()
+        store.download(font)
+        advanceUntilIdle()
+        assertTrue(store.states.value[font.id] is FontState.Failed)
+        assertTrue(File(folder.root, "fonts").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun deletingWaitsForADownloadThatIsSlowToStop() = runTest(StandardTestDispatcher()) {
+        stubborn = true
+        gate = CompletableDeferred()
+        val store = store()
+        store.download(font)
+        advanceUntilIdle()
+
+        store.delete(font)
+        advanceUntilIdle()
+        // Still ending: no new download can start over it.
+        assertTrue(store.states.value[font.id] is FontState.Downloading)
+        store.download(font)
+
+        gate?.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(FontState.Available, store.states.value[font.id])
+        assertFalse(store.file(font).exists())
+        assertTrue(File(folder.root, "fonts").listFiles().orEmpty().isEmpty())
+
+        // A later download is tracked again, so deleting stops it.
+        stubborn = false
+        gate = CompletableDeferred()
+        store.download(font)
+        advanceUntilIdle()
+        store.delete(font)
+        advanceUntilIdle()
+        gate?.complete(Unit)
         advanceUntilIdle()
         assertEquals(FontState.Available, store.states.value[font.id])
         assertFalse(store.file(font).exists())

@@ -43,9 +43,10 @@ class DictionaryDownloader(
     suspend fun download(
         url: String,
         destination: File,
+        purpose: NetworkPurpose = NetworkPurpose.DICTIONARY,
         onProgress: suspend (bytesDone: Long, bytesTotal: Long) -> Unit = { _, _ -> },
     ) = withContext(Dispatchers.IO) {
-        val connection = connect(url)
+        val connection = connect(url, purpose)
         try {
             val total = connection.contentLengthLong
             if (total > maxDownloadBytes) throw tooLarge()
@@ -124,7 +125,7 @@ class DictionaryDownloader(
      * Opens [url], following redirects by hand, and checks the answer is 200 OK; the caller
      * disconnects.
      */
-    private fun connect(url: String): HttpURLConnection {
+    private fun connect(url: String, purpose: NetworkPurpose = NetworkPurpose.DICTIONARY): HttpURLConnection {
         val first = parse(url)
         var current = first
         var redirects = 0
@@ -146,11 +147,11 @@ class DictionaryDownloader(
             val status = try {
                 connection.responseCode
             } catch (e: IOException) {
-                NetworkLog.shared.failed(NetworkPurpose.DICTIONARY, current.toString(), e)
+                NetworkLog.shared.failed(purpose, current.toString(), e)
                 connection.disconnect()
                 throw DownloadException("Could not connect: ${e.message}", e, FailureReason.OFFLINE)
             }
-            NetworkLog.shared.answered(NetworkPurpose.DICTIONARY, current.toString(), status, connection.contentLengthLong)
+            NetworkLog.shared.answered(purpose, current.toString(), status, connection.contentLengthLong)
             when {
                 status == HttpURLConnection.HTTP_OK -> return connection
                 status in REDIRECTS -> {
