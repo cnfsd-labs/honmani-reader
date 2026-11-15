@@ -223,6 +223,23 @@ class ReviewSessionTest {
     }
 
     @Test
+    fun anUndoForAnEarlierActionTakesNothingBack() = runTest {
+        dueWord("一")
+        dueWord("二")
+        val session = session()
+        session.bury()
+        val buried = session.lastAction!!
+        val graded = session.current!!.word.id
+        session.answer(Grade.GOOD)
+        // The snackbar of the bury is still up: its Undo must not take back the grade.
+        assertFalse(session.undo(buried))
+        assertEquals(1, session.remembered)
+        assertTrue(session.undo(session.lastAction))
+        assertEquals(graded, session.current!!.word.id)
+        assertTrue(session.undo(buried))
+    }
+
+    @Test
     fun buriedCardsLeaveTheQueueUntilTomorrow() = runTest {
         dueWord("猫")
         dueWord("犬")

@@ -381,6 +381,19 @@ class ReviewViewModelTest {
     }
 
     @Test
+    fun aDoubleTapGradesOnlyTheCardOnScreen() {
+        val model = started()
+        val first = model.state.value.card!!.wordId
+
+        model.gotIt()
+        model.gotIt()
+        model.undo()
+
+        // Had the second tap graded the next card, the undo would bring that one back.
+        waitFor(model) { it.card?.wordId == first && it.remembered == 0 && it.remaining == 2 }
+    }
+
+    @Test
     fun gradingTwiceStopsTheSoundOnlyOnce() {
         val model = started()
         model.speakWord()

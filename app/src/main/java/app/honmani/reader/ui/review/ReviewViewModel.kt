@@ -61,6 +61,8 @@ data class ReviewUiState(
     val revealed: Boolean = false,
     val remaining: Int = 0,
     val canUndo: Boolean = false,
+    /** The action Undo would take back ([ReviewSession.lastAction]). */
+    val lastAction: Long? = null,
     val forgotten: Int = 0,
     val remembered: Int = 0,
     /** Settings: the front shows the sentence (when the word has one) rather than the word alone. */
@@ -72,8 +74,10 @@ data class ReviewUiState(
 /** An answer the screen should let the reader feel (and, if switched on, hear); [finished] when it was the session's last card. */
 data class ReviewCue(val gotIt: Boolean, val finished: Boolean)
 
-/** A line for the snackbar; [undoable] adds the Undo button. */
-class ReviewNotice(@StringRes val message: Int, val word: String, val undoable: Boolean = true)
+/** A line for the snackbar; an [action] (the one it names) adds the Undo button, which takes back only that one. */
+class ReviewNotice(@StringRes val message: Int, val word: String, val action: Long? = null) {
+    val undoable: Boolean get() = action != null
+}
 
 /** No sound (the default where there is no player). */
 object NoReviewAudio : ReviewAudio {
@@ -117,6 +121,9 @@ class ReviewViewModel(
     // The session isn't thread safe: one action at a time.
     private val lock = Mutex()
     private var session: ReviewSession? = null
+
+    /** Counts the fronts shown; an action carries the count from when it was asked for. */
+    private var showing = 0L
 
     init {
         // The buttons follow the settings at once, so coming back from Settings agrees with the auto-play gate.
@@ -174,7 +181,8 @@ class ReviewViewModel(
 
     fun editFurigana(furigana: String) = act(keepRevealed = true) { it.editFurigana(furigana) }
 
-    fun undo() = act { it.undo() }
+    /** Takes back the last action; with an [action] (a snackbar's) only if that one is still the last. */
+    fun undo(action: Long? = null) = act(staleOk = true) { it.undo(action) }
 
     // One job at a time: a recording that is still being made never plays over the next card.
     private var audioJob: Job? = null
@@ -262,15 +270,24 @@ class ReviewViewModel(
     /** The book of the current card's sentence, if it has one. */
     val currentBookId: Long? get() = _state.value.card?.sentence?.bookId
 
-    private fun act(notice: Int? = null, keepRevealed: Boolean = false, answered: Boolean = false, gotIt: Boolean = true, action: suspend (ReviewSession) -> Any?) {
+    /**
+     * Runs [action] on the session. An action meant for the card on screen when it was asked for is
+     * dropped if another card (or the same one again) has been shown since: a quick double tap grades
+     * one card, not the next one unseen. [staleOk] for Undo, which never targets the card.
+     */
+    private fun act(notice: Int? = null, keepRevealed: Boolean = false, answered: Boolean = false, gotIt: Boolean = true, staleOk: Boolean = false, action: suspend (ReviewSession) -> Any?) {
+        val asked = showing
         viewModelScope.launch {
             lock.withLock {
                 val active = session ?: return@withLock
+                if (!staleOk && asked != showing) return@withLock
                 val word = active.current?.word?.expression.orEmpty()
+                val before = active.lastAction
                 action(active)
                 publish(active, keepRevealed)
                 if (answered) _cues.send(ReviewCue(gotIt, finished = active.current == null))
-                if (notice != null && word.isNotEmpty()) _notices.send(ReviewNotice(notice, word))
+                val done = active.lastAction.takeIf { it != before }
+                if (notice != null && word.isNotEmpty()) _notices.send(ReviewNotice(notice, word, done))
             }
         }
     }
@@ -296,6 +313,7 @@ class ReviewViewModel(
         }
         if (!sameCard) autoPlayed.clear()
         shownWordId = card?.wordId
+        if (!keepRevealed) showing++
         val shown = _state.value.let {
             it.copy(
                 loading = false,
@@ -304,6 +322,7 @@ class ReviewViewModel(
                 revealed = keepRevealed && it.revealed,
                 remaining = active.remaining,
                 canUndo = active.canUndo,
+                lastAction = active.lastAction,
                 forgotten = active.forgotten,
                 remembered = active.remembered,
             )

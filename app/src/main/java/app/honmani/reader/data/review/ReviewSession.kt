@@ -33,7 +33,9 @@ class ReviewSession(
         val deleted: DeletedWord? = null,
         /** The word was ignored; undo takes that back. */
         val ignored: Boolean = false,
-    )
+    ) {
+        val id: Long = ++lastId
+    }
 
     private val queue = ArrayDeque<CardWithWord>()
     private val actions = ArrayDeque<Action>()
@@ -45,6 +47,9 @@ class ReviewSession(
     val remaining: Int get() = queue.size
 
     val canUndo: Boolean get() = actions.isNotEmpty()
+
+    /** The action [undo] would take back, as an id that no other action in this process gets. */
+    val lastAction: Long? get() = actions.lastOrNull()?.id
 
     /** Gradings in this session that stand (not taken back). */
     val forgotten: Int get() = actions.count { it.grade == Grade.AGAIN }
@@ -159,8 +164,9 @@ class ReviewSession(
         queue[0] = item.copy(word = word)
     }
 
-    /** Takes back the last action; false if there is none. */
-    suspend fun undo(): Boolean {
+    /** Takes back the last action; false if there is none, or if [only] is given and the last action is another one. */
+    suspend fun undo(only: Long? = null): Boolean {
+        if (only != null && lastAction != only) return false
         val action = actions.removeLastOrNull() ?: return false
         if (action.requeued && queue.isNotEmpty() && queue.last().word.id == action.item.word.id) queue.removeLast()
         action.deleted?.let { words.restore(it) }
@@ -177,5 +183,9 @@ class ReviewSession(
         val before = reviews.card(item.word.id) ?: item.card
         change(item)
         actions.addLast(Action(item, before, wasLearning = wasLearning))
+    }
+
+    private companion object {
+        var lastId = 0L
     }
 }

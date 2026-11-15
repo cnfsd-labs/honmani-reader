@@ -153,15 +153,22 @@ fun ReviewScreen(
     val anki = rememberAnkiAccess()
     val ankiEnabled = rememberAnkiEnabled()
     LaunchedEffect(viewModel) { viewModel.start() }
+    // The action the snackbar on screen names; a newer action (or an undo) closes it.
+    var noticeAction by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(viewModel) {
         viewModel.notices.collect { notice ->
+            noticeAction = notice.action
             val result = snackbar.showSnackbar(
                 message = resources.getString(notice.message, notice.word),
                 actionLabel = if (notice.undoable) resources.getString(R.string.action_undo) else null,
                 duration = SnackbarDuration.Short,
             )
-            if (result == SnackbarResult.ActionPerformed) viewModel.undo()
+            noticeAction = null
+            if (result == SnackbarResult.ActionPerformed) viewModel.undo(notice.action)
         }
+    }
+    LaunchedEffect(state.lastAction, noticeAction) {
+        if (noticeAction != null && noticeAction != state.lastAction) snackbar.currentSnackbarData?.dismiss()
     }
     // Predefined haptic effects follow the system's touch-feedback setting; the sounds are off by default.
     val haptics = LocalHapticFeedback.current
