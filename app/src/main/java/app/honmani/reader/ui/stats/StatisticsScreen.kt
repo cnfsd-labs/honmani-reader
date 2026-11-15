@@ -56,6 +56,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -238,7 +239,9 @@ private fun PeriodPicker(period: StatsPeriod, onPick: (StatsPeriod) -> Unit) {
                 selected = entry == period,
                 onClick = { onPick(entry) },
                 shape = SegmentedButtonDefaults.itemShape(index, StatsPeriod.entries.size),
-                label = { Text(periodName(entry), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                // No check mark (the fill shows the choice) and two lines at a large font, not "Last 7 d…".
+                icon = {},
+                label = { Text(periodName(entry), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) },
             )
         }
     }
