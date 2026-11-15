@@ -616,14 +616,25 @@ class LibraryViewModel(
                     _notices.send(LibraryNotice.NothingToExport)
                     return@launch
                 }
-                val taken = withContext(Dispatchers.IO) { documents.children(documents.rootId) }
-                    ?.mapTo(mutableSetOf()) { it.name.lowercase() }
-                if (taken == null) {
+                val entries = withContext(Dispatchers.IO) { documents.children(documents.rootId) }
+                if (entries == null) {
                     _notices.send(LibraryNotice.FolderUnusable)
                     return@launch
                 }
+                val taken = entries.mapTo(mutableSetOf()) { it.name.lowercase() }
                 report = true
                 for ((index, book) in books.withIndex()) {
+                    // Exported before into this folder: keep that file rather than adding "Title (2)".
+                    val file = importer.bookFile(book)
+                    val already = withContext(Dispatchers.IO) {
+                        ExportNames.previousExport(book.title, book.format.extension, file.length(), entries)
+                            ?.let { entry -> documents.open(entry.id) }
+                            ?.let { input -> runCatching { ExportNames.sameBytes(file, input) }.getOrDefault(false) } == true
+                    }
+                    if (already) {
+                        exported++
+                        continue
+                    }
                     val name = ExportNames.unique(book.title, book.format.extension, taken)
                     batch.value = BatchProgress(exporting = true, done = index, total = books.size, current = name)
                     val mime = if (book.format == BookFormat.TXT) "text/plain" else "application/epub+zip"
@@ -633,7 +644,7 @@ class LibraryViewModel(
                         continue
                     }
                     try {
-                        writeDocument(importer.bookFile(book), target)
+                        writeDocument(file, target)
                         exported++
                     } catch (e: CancellationException) {
                         withContext(NonCancellable + Dispatchers.IO) { documents.delete(target) }

@@ -12,12 +12,17 @@ class FakeDocumentTree(
     val listed = mutableListOf<String>()
     var refuseCreate = false
 
+    /** The bytes of files that can be read, by id. */
+    val contents = mutableMapOf<String, ByteArray>()
+
     override fun children(folderId: String): List<TreeEntry>? {
         listed += folderId
         return folders[folderId]
     }
 
     override fun uriOf(id: String): Uri = Uri.parse("content://tree/$id")
+
+    override fun open(id: String): java.io.InputStream? = contents[id]?.inputStream()
 
     override fun createFile(folderId: String, mimeType: String, name: String): Uri? {
         if (refuseCreate) return null

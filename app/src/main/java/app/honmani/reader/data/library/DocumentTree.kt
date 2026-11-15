@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.DocumentsContract
 import app.honmani.reader.diagnostics.logWarning
+import java.io.InputStream
 
 /**
  * One entry of a folder in a [DocumentTree]: [id] is the document id inside the tree. [size] and
@@ -29,6 +30,9 @@ interface DocumentTree {
 
     /** The address to open [id] with. */
     fun uriOf(id: String): Uri
+
+    /** Opens file [id] for reading; null if it cannot be read. */
+    fun open(id: String): InputStream?
 
     /** Makes a new file in folder [folderId] (the provider may change the name); null if it cannot. */
     fun createFile(folderId: String, mimeType: String, name: String): Uri?
@@ -73,6 +77,13 @@ class ResolverDocumentTree(private val resolver: ContentResolver, private val tr
     }
 
     override fun uriOf(id: String): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+
+    override fun open(id: String): InputStream? = try {
+        resolver.openInputStream(uriOf(id))
+    } catch (e: Exception) {
+        logWarning("Honmani.library", "Could not read a file in the chosen folder", e)
+        null
+    }
 
     override fun createFile(folderId: String, mimeType: String, name: String): Uri? = try {
         DocumentsContract.createDocument(resolver, uriOf(folderId), mimeType, name)

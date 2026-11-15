@@ -15,6 +15,7 @@ import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.TestBooks
+import app.honmani.reader.data.library.TreeEntry
 import app.honmani.reader.ui.reader.LibraryMessage
 import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuPage
@@ -554,6 +555,32 @@ class LibraryViewModelTest {
             written.keys,
         )
         assertTrue(first.contentEquals(written.getValue("content://tree/root/Neko (2).epub")))
+    }
+
+    @Test
+    fun exportingAgainKeepsBooksAlreadyInTheFolder() = runBlocking {
+        val written = HashMap<String, ByteArray>()
+        val same = TestBooks.epub(title = "Neko")
+        val other = TestBooks.epub(title = "Inu")
+        val tree = FakeDocumentTree(
+            mapOf(
+                "root" to listOf(
+                    TreeEntry("root/Neko.epub", "Neko.epub", isFolder = false, size = same.size.toLong()),
+                    TreeEntry("root/Inu.epub", "Inu.epub", isFolder = false, size = other.size.toLong()),
+                ),
+            ),
+        )
+        tree.contents["root/Neko.epub"] = same
+        // Same name and size, different bytes: a different file.
+        tree.contents["root/Inu.epub"] = other.copyOf().also { it[it.size - 1] = (it.last() + 1).toByte() }
+        viewModel = viewModelOn(tree, written)
+        addAndWait("1.epub", same)
+        addAndWait("2.epub", other)
+
+        viewModel.exportLibrary(Uri.parse("content://tree/root"))
+
+        assertEquals(LibraryNotice.LibraryExported(2, 0, stopped = false), nextNotice())
+        assertEquals(setOf("content://tree/root/Inu (2).epub"), written.keys)
     }
 
     @Test
