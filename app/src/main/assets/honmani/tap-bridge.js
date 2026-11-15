@@ -159,7 +159,7 @@
     return document.createTreeWalker(block, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
       acceptNode: (node) => {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          return node.tagName === 'BR' || isGaiji(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+          return (node.tagName === 'BR' && !isSkipped(node)) || isGaiji(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
         }
         return isSkipped(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
       },

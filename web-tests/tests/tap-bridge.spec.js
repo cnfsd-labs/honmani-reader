@@ -250,6 +250,20 @@ test('a line break ends the scanned text and the sentence', async ({ page }) => 
   expect(next.ruby).toEqual([{ start: 0, end: 1, reading: 'ゆき' }]);
 });
 
+test('a <br> inside furigana is no line break in the text (as the word marks count it)', async ({ page }) => {
+  await page.evaluate(() => {
+    const p = document.createElement('p');
+    p.id = 'rtbr';
+    p.innerHTML = '前の<ruby>漢字<rt>かん<br>じ</rt></ruby>を読む。';
+    document.querySelector('#horizontal').prepend(p);
+  });
+  await tapChar(page, '#rtbr', '漢');
+  const [message] = await messages(page);
+  expect(message.text).toBe('漢字を読む。');
+  expect(message.sentence).toBe('前の漢字を読む。');
+  expect(message.sentenceOffset).toBe(2);
+});
+
 test('a line break in the source is a space, not the end of the text or the sentence', async ({ page }) => {
   await page.evaluate(() => {
     document.querySelector('#horizontal').insertAdjacentHTML(
