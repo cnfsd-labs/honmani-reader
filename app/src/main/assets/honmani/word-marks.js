@@ -437,22 +437,52 @@
     if (!timer) timer = setTimeout(send, BATCH_DELAY_MS);
   }
 
+  /**
+   * Where each of a block's nodes starts in its text, plus the text's length at the end; kept per
+   * node list (a scan makes a new one), so a mark finds its first node by binary search: a
+   * chapter in one block (converted Aozora text) has thousands of nodes and marks.
+   */
+  const startsOf = new WeakMap();
+
+  function nodeStarts(nodes) {
+    let starts = startsOf.get(nodes);
+    if (!starts) {
+      starts = [0];
+      for (const node of nodes) starts.push(starts[starts.length - 1] + dataOf(node).length);
+      startsOf.set(nodes, starts);
+    }
+    return starts;
+  }
+
   /** Ranges for text[start, start + length) of block `id`, one per text node (furigana between stays unmarked). */
   function rangesOf(id, start, length) {
     const ranges = [];
-    let offset = 0;
-    for (const node of blocks.get(id) || []) {
+    const nodes = blocks.get(id) || [];
+    const starts = nodeStarts(nodes);
+    // The last node starting at or before `start`.
+    let low = 0;
+    let high = nodes.length - 1;
+    let first = 0;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      if (starts[middle] <= start) {
+        first = middle;
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    for (let i = first; i < nodes.length && starts[i] < start + length; i++) {
+      const node = nodes[i];
+      const offset = starts[i];
       const from = Math.max(start, offset);
-      const size = dataOf(node).length;
-      const to = Math.min(start + length, offset + size);
+      const to = Math.min(start + length, starts[i + 1]);
       if (from < to && node.nodeType === Node.TEXT_NODE && node.isConnected) {
         const range = document.createRange();
         range.setStart(node, from - offset);
         range.setEnd(node, to - offset);
         ranges.push(range);
       }
-      offset += size;
-      if (offset >= start + length) break;
     }
     return ranges;
   }

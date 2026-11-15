@@ -44,6 +44,12 @@ const BOOKS = {
     title: '一段落の本',
     paragraphs: [Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('')],
   }),
+  // A converted Aozora text: the whole chapter (~33,000 characters) in one block of <br> lines.
+  'one-block.epub': buildEpub({
+    title: '一塊の本',
+    raw: true,
+    paragraphs: [`<div>${Array.from({ length: 1000 }, (_, i) => `これは第${i + 1}行目の文章で、吾輩は猫である。名前はまだ無い。`).join('<br/>')}</div>`],
+  }),
   // Lines split by <br> in one block, and words in their own elements with a space between.
   'lines.epub': buildEpub({
     title: '行の本',
@@ -620,7 +626,7 @@ async function withReplies(page) {
 }
 
 /** Opens `name` with word marks on, in `mode` (null: the default), and waits for the book. */
-async function openWithMarks(page, name, mode) {
+async function openWithMarks(page, name, mode, { timeout = 5_000 } = {}) {
   await setUp(page);
   await withReplies(page);
   if (mode) await page.addInitScript((mode) => window.localStorage.setItem('honmaniWordMarks', mode), mode);
@@ -628,7 +634,7 @@ async function openWithMarks(page, name, mode) {
   await page.goto(`${server.url}/manage`);
   const book = await ensure(page, name);
   await page.goto(`${server.url}/b?id=${book.id}`);
-  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout: 5_000 });
+  await expect(page.locator('div.fixed.inset-0.text-7xl')).toHaveCount(0, { timeout });
 }
 
 const markRequests = (page) => page.evaluate(() => window.__messages.filter((m) => m.type === 'marks.request'));
@@ -900,6 +906,41 @@ test('word marks ask about a paragraph longer than a request in pieces, and mark
     await page.evaluate(([requestId, blocks]) => window.__reply({ type: 'marks', requestId, blocks }), [requestId, blocks]);
   }
   await expect.poll(async () => (await marked(page))['honmani-learning'].sort()).toEqual(['1番目', '400番目']);
+});
+
+test('word marks on a chapter in one long block find each mark\'s text without walking the block', async ({ page }) => {
+  await openWithMarks(page, 'one-block.epub', null, { timeout: 30_000 });
+  const sent = async () => (await markRequests(page)).flatMap((m) => m.blocks.map((b) => ({ ...b, requestId: m.requestId }))).filter((b) => b.text.includes('行目の文章'));
+  // All of the block is asked about, piece by piece.
+  await expect.poll(async () => (await sent()).map((b) => b.text).join('').includes('第1000行目'), { timeout: 10_000 }).toBe(true);
+  const pieces = await sent();
+  // Every 吾輩 in the block: a thousand marks, most far into it.
+  const answers = new Map();
+  let count = 0;
+  for (const piece of pieces) {
+    const marks = [];
+    for (let at = piece.text.indexOf('吾輩'); at >= 0; at = piece.text.indexOf('吾輩', at + 1)) marks.push([at, 2, 0]);
+    count += marks.length;
+    if (!answers.has(piece.requestId)) answers.set(piece.requestId, []);
+    answers.get(piece.requestId).push({ id: piece.id, marks });
+  }
+  expect(count).toBe(1_000);
+  // Counts reads of text node data while the answers are drawn: each mark walking the block's
+  // nodes from its start made that grow with marks × nodes (a million here, seconds on a phone).
+  const reads = await page.evaluate((answers) => {
+    const own = Object.getOwnPropertyDescriptor(CharacterData.prototype, 'data');
+    let count = 0;
+    Object.defineProperty(CharacterData.prototype, 'data', { ...own, get() { count++; return own.get.call(this); } });
+    try {
+      for (const [requestId, blocks] of answers) window.__reply({ type: 'marks', requestId, blocks });
+    } finally {
+      Object.defineProperty(CharacterData.prototype, 'data', own);
+    }
+    return count;
+  }, [...answers]);
+  await expect.poll(async () => (await marked(page))['honmani-learning'].length).toBe(count);
+  expect(new Set((await marked(page))['honmani-learning'])).toEqual(new Set(['吾輩']));
+  expect(reads).toBeLessThan(50_000);
 });
 
 test('word marks read a block\'s text as the tap bridge does: a <br> ends a line, spaces stay', async ({ page }) => {
