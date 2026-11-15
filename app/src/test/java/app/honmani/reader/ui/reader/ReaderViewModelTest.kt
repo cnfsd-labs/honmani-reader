@@ -233,6 +233,23 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun aReferencedWordShowsItsOwnMarks() {
+        val model = ReaderViewModel(
+            lookup = { text, _ -> LookupResult(listOf(entry(text, text))) },
+            compute = Dispatchers.Unconfined,
+            starredAmong = { words -> words.filter { it.first == "犬" }.map { WordRepository.key(it.first, it.second) }.toSet() },
+            learnedAmong = { words -> words.filter { it.first == "猫" }.map { WordRepository.key(it.first, it.second) }.toSet() },
+        )
+        model.onTap(tap("猫"))
+        model.lookupWord("犬")
+
+        val panel = model.panel.value as LookupPanelState.Results
+        assertEquals("犬", panel.groups.single().expression)
+        assertEquals(setOf(WordRepository.key("犬", "犬")), panel.starred)
+        assertEquals(emptySet<String>(), panel.learned)
+    }
+
+    @Test
     fun theKanjiOfTheWordsOpenInThePanel_andBackReturns() {
         viewModel.onTap(tap("食べました。"))
         pending.getValue("食べました。").complete(LookupResult(listOf(entry("食べる", "食べました"))))

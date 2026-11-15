@@ -517,8 +517,12 @@ class ReaderViewModel(
                 current.copy(
                     groups = groups,
                     inAnki = wordsInAnki(groups),
-                    starred = emptySet(),
-                    ignored = emptySet(),
+                    // The marks of these words, not of the words the panel showed before.
+                    starred = starredWords(groups),
+                    ignored = ignoredWords(groups),
+                    learned = learnedWords(groups, recorded = false),
+                    saved = savedWords(groups),
+                    furigana = furiganaOf(groups),
                     addingToAnki = emptySet(),
                     previous = current,
                     kanji = kanjiOf(groups),
