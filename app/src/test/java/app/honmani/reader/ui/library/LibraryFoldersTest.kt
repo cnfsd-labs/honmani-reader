@@ -1,5 +1,9 @@
 package app.honmani.reader.ui.library
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
@@ -14,6 +18,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -41,6 +46,20 @@ class LibraryFoldersTest {
     private lateinit var folders: Folders
     private lateinit var viewModel: LibraryViewModel
 
+    // Every view model is cleared (and its work awaited) before the database closes, so no
+    // leftover query of one test fails in a later one.
+    private val store = ViewModelStore()
+    private val owned = mutableListOf<ViewModel>()
+
+    private fun <T : ViewModel> owned(model: T): T {
+        owned += model
+        @Suppress("UNCHECKED_CAST")
+        val factory = object : ViewModelProvider.Factory {
+            override fun <V : ViewModel> create(modelClass: Class<V>): V = model as V
+        }
+        return ViewModelProvider(store, factory)["model${owned.size}", model.javaClass]
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(Dispatchers.Unconfined)
@@ -49,13 +68,15 @@ class LibraryFoldersTest {
             HonmaniDatabase::class.java,
         ).allowMainThreadQueries().build()
         folders = Folders(database.folderDao())
-        viewModel = LibraryViewModel(
-            dao = database.bookDao(),
-            importer = BookImporter(database.bookDao(), File(files.root, "books"), File(files.root, "covers")),
-            ttu = TtuLibrary(pageTimeoutMs = 2_000, importTimeoutMs = 2_000),
-            openFile = { null },
-            now = { 42L },
-            folders = folders,
+        viewModel = owned(
+            LibraryViewModel(
+                dao = database.bookDao(),
+                importer = BookImporter(database.bookDao(), File(files.root, "books"), File(files.root, "covers")),
+                ttu = TtuLibrary(pageTimeoutMs = 2_000, importTimeoutMs = 2_000),
+                openFile = { null },
+                now = { 42L },
+                folders = folders,
+            ),
         )
     }
 
@@ -63,6 +84,8 @@ class LibraryFoldersTest {
     fun tearDown() {
         // setUp may have failed before the database existed; do not hide that error with a second one.
         try {
+            store.clear()
+            runBlocking { withTimeout(5_000) { owned.forEach { it.viewModelScope.coroutineContext.job.join() } } }
             if (::database.isInitialized) database.close()
         } finally {
             Dispatchers.resetMain()
@@ -154,6 +177,9 @@ class LibraryFoldersTest {
         val neko = addBook("neko")
         val novels = folder("Novels")
         folders.move(neko, novels)
+        // Choose the folder only once it is listed: the view model's first folder list may still be the
+        // empty one read before the folder existed, and a chosen folder missing from it counts as deleted.
+        state { it.folders.any { f -> f.id == novels } }
         viewModel.selectFolder(novels)
 
         viewModel.showHidden(true)
@@ -169,6 +195,7 @@ class LibraryFoldersTest {
         addBook("inu")
         val novels = folder("Novels")
         folders.move(neko, novels)
+        state { it.folders.any { f -> f.id == novels } }
         viewModel.selectFolder(novels)
         state { it.folderId == novels && it.books?.size == 1 }
 
@@ -212,14 +239,16 @@ class LibraryFoldersTest {
         assertNull(database.bookDao().find(neko)!!.folderId)
     }
 
-    private fun viewModelKeeping(view: LibraryFolderView) = LibraryViewModel(
-        dao = database.bookDao(),
-        importer = BookImporter(database.bookDao(), File(files.root, "books"), File(files.root, "covers")),
-        ttu = TtuLibrary(pageTimeoutMs = 2_000, importTimeoutMs = 2_000),
-        openFile = { null },
-        now = { 42L },
-        folders = folders,
-        folderView = view,
+    private fun viewModelKeeping(view: LibraryFolderView) = owned(
+        LibraryViewModel(
+            dao = database.bookDao(),
+            importer = BookImporter(database.bookDao(), File(files.root, "books"), File(files.root, "covers")),
+            ttu = TtuLibrary(pageTimeoutMs = 2_000, importTimeoutMs = 2_000),
+            openFile = { null },
+            now = { 42L },
+            folders = folders,
+            folderView = view,
+        ),
     )
 
     private fun folderView() = LibraryFolderView(

@@ -1,5 +1,9 @@
 package app.honmani.reader.ui.words
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
@@ -16,7 +20,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -41,6 +48,12 @@ class WordsViewModelTest {
     private lateinit var repository: WordRepository
     private val showFrequency = MutableStateFlow(true)
 
+    // The view models are cleared (and their work awaited) before the database closes: a list
+    // kept alive by its 5 s WhileSubscribed, or a write still running, would otherwise fail on the
+    // closed database and surface in a later test as "uncaught exceptions before test".
+    private val store = ViewModelStore()
+    private val owned = mutableListOf<WordsViewModel>()
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -53,6 +66,8 @@ class WordsViewModelTest {
 
     @After
     fun tearDown() {
+        store.clear()
+        runBlocking { withTimeout(5_000) { owned.forEach { it.viewModelScope.coroutineContext.job.join() } } }
         database.close()
         Dispatchers.resetMain()
     }
@@ -79,7 +94,7 @@ class WordsViewModelTest {
             database.termMetaDao(),
             database.kanjiDao(),
         )
-        return WordsViewModel(
+        val model = WordsViewModel(
             repository = repository,
             writeDocument = writeDocument,
             addCardDeferred = addCardDeferred,
@@ -88,6 +103,12 @@ class WordsViewModelTest {
             showFrequency = showFrequency,
             frequencyOf = { words -> lookup.frequencies(words) },
         )
+        owned += model
+        val factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = model as T
+        }
+        return ViewModelProvider(store, factory)["model${owned.size}", WordsViewModel::class.java]
     }
 
     @Test
