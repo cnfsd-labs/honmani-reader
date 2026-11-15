@@ -467,4 +467,29 @@ class AudiobookMakerTest {
         assertFalse(files.directory.exists())
         assertEquals(MakerStatus.None, maker.status("book"))
     }
+
+    @Test
+    fun requestsThatBlockTheirThreadStillGoOutTwoAtATime() {
+        val maker = maker("parallel")
+        maker.freeze(plan())
+        val arrived = CountDownLatch(AudiobookMaker.PARALLEL)
+        var together = false
+        val texts = Collections.synchronizedList(mutableListOf<String>())
+        // Blocks the calling thread, like the HTTP request of the real voice.
+        val blocking = object : SentenceVoice {
+            override suspend fun synthesize(text: String, sampleRateHertz: Int): ByteArray {
+                val call = synchronized(texts) { texts += text; texts.size }
+                if (call <= AudiobookMaker.PARALLEL) {
+                    arrived.countDown()
+                    if (arrived.await(5, TimeUnit.SECONDS)) together = true
+                }
+                return mp3(text)
+            }
+        }
+        val result = runBlocking { maker.run("book", blocking) }
+        finished(result)
+        assertTrue("the first two requests were out at the same time", together)
+        val lines = maker.files("book").journal.readLines().filter { it.isNotBlank() }.map { it.substringBefore('\t') }
+        assertEquals("appended in sentence order", List(12) { it.toString() }, lines)
+    }
 }

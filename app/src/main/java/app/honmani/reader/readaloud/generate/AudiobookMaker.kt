@@ -99,6 +99,11 @@ class AudiobookMaker(
     private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val pause: suspend (Long) -> Unit = { delay(it) },
     private val log: (String) -> Unit = { Log.w(TAG, it) },
+    /**
+     * Where a request waits for its answer. A dispatcher of its own: the voice's blocking call on
+     * the run's own dispatcher would run in place and hold the run, so only one request would be out.
+     */
+    private val requests: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(PARALLEL),
 ) {
     fun files(bookHash: String): GeneratedFiles = GeneratedFiles(File(root, store.fileName(bookHash)))
 
@@ -324,7 +329,7 @@ class AudiobookMaker(
         private suspend fun paid(text: String): ByteArray {
             var bytes: ByteArray? = null
             try {
-                withContext(NonCancellable) { bytes = voice.synthesize(text, plan.sampleRate) }
+                withContext(NonCancellable + requests) { bytes = voice.synthesize(text, plan.sampleRate) }
             } catch (e: CancellationException) {
                 return bytes ?: throw e
             }
