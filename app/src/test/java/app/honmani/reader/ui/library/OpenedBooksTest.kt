@@ -57,4 +57,14 @@ class OpenedBooksTest {
 
         assertEquals(listOf(book), opened.received.first())
     }
+
+    @Test
+    fun anOldShareReopenedFromRecentAppsIsNotTakenAgain() {
+        val opened = OpenedBooks()
+        val view = Intent(Intent.ACTION_VIEW).setData(book).addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
+        assertFalse(opened.receive(view))
+        val text = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "本文")
+            .addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY)
+        assertFalse(opened.receive(text))
+    }
 }

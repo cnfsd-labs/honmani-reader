@@ -47,7 +47,7 @@
              from another app goes to the running reader instead of a second one inside that app. -->
         <activity
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode|fontScale|locale|layoutDirection"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode|fontScale|fontWeightAdjustment|colorMode|touchscreen|locale|layoutDirection"
             android:launchMode="singleTask"
             android:exported="true">
             <intent-filter>

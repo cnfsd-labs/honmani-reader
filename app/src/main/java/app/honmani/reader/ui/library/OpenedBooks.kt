@@ -22,8 +22,13 @@ class OpenedBooks {
     /** Text shared with Honmani, to become a book. */
     val receivedText: Flow<SharedText.Shared> = texts.receiveAsFlow()
 
-    /** Takes the book files or the shared text of [intent], if it has any; true if it had. */
+    /**
+     * Takes the book files or the shared text of [intent], if it has any; true if it had. An intent
+     * Android hands again because Honmani was reopened from the recent apps was handled already:
+     * taking it again would import an old share a second time.
+     */
     fun receive(intent: Intent?): Boolean {
+        if (intent != null && intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return false
         SharedText.fromIntent(intent)?.let {
             texts.trySend(it)
             return true
