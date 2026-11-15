@@ -94,6 +94,19 @@ class GlossLayoutTest {
     }
 
     @Test
+    fun aVeryDeeplyNestedEntryGivesNothing_insteadOfOverflowingTheStack() {
+        // kotlinx-serialization refuses JSON nested deeper than 400 levels (maxNestingDepth), so
+        // the recursive walks below never see more: keep it that way when the library changes.
+        val levels = 20_000
+        val deep = """{"tag":"span","content":""".repeat(levels) + "\"deep\"" + "}".repeat(levels)
+        val glossary = """[{"type":"structured-content","content":[{"tag":"div","content":"shallow"},$deep]}]"""
+
+        assertEquals(emptyList<String>(), render(glossary))
+        assertEquals(emptyList<Sense>(), GlossaryFormatter.format(glossary))
+        assertNull(Redirect.target(-1, glossary))
+    }
+
+    @Test
     fun brokenGlossariesGiveNothing() {
         assertEquals(emptyList<String>(), render("not json"))
         assertEquals(emptyList<String>(), render("""[{"type":"image","path":"a.png"}]"""))

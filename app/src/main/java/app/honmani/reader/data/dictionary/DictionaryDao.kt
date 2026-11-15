@@ -78,6 +78,12 @@ data class TermKey(
     val score: Double,
 )
 
+/**
+ * Search rows of enabled dictionaries only, so a large disabled one can't use up the row limit.
+ * The `+` keeps SQLite on the expression and reading indexes.
+ */
+private const val ENABLED = "+dictionary_id IN (SELECT id FROM dictionary WHERE enabled = 1)"
+
 @Dao
 interface TermDao {
     @Insert
@@ -100,23 +106,23 @@ interface TermDao {
      */
     @Query(
         "SELECT id, dictionary_id, expression, reading, score FROM term " +
-            "WHERE expression >= :from AND expression < :to LIMIT :limit",
+            "WHERE expression >= :from AND expression < :to AND $ENABLED LIMIT :limit",
     )
     suspend fun keysByExpressionRange(from: String, to: String, limit: Int): List<TermKey>
 
     /** As [keysByExpressionRange], on the reading. */
     @Query(
         "SELECT id, dictionary_id, expression, reading, score FROM term " +
-            "WHERE reading >= :from AND reading < :to LIMIT :limit",
+            "WHERE reading >= :from AND reading < :to AND $ENABLED LIMIT :limit",
     )
     suspend fun keysByReadingRange(from: String, to: String, limit: Int): List<TermKey>
 
     /** Light rows of terms whose written form matches the GLOB [pattern]. */
-    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE expression GLOB :pattern LIMIT :limit")
+    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE expression GLOB :pattern AND $ENABLED LIMIT :limit")
     suspend fun keysByExpressionPattern(pattern: String, limit: Int): List<TermKey>
 
     /** Light rows of terms whose reading matches the GLOB [pattern]. */
-    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE reading GLOB :pattern LIMIT :limit")
+    @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE reading GLOB :pattern AND $ENABLED LIMIT :limit")
     suspend fun keysByReadingPattern(pattern: String, limit: Int): List<TermKey>
 
     /** The terms with [ids] (at most [MAX_LOOKUP_TEXTS]). */

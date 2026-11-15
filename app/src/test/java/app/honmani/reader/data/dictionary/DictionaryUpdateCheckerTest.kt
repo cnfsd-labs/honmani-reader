@@ -99,10 +99,8 @@ class DictionaryUpdateCheckerTest {
         val withoutStored = installed.copy(downloadUrl = null)
         assertNull(DictionaryUpdateChecker.updateFor(withoutStored, """{"revision":"2"}"""))
         assertNull(DictionaryUpdateChecker.updateFor(withoutStored, """{"revision":"2","downloadUrl":"https://a/a.zip"}"""))
-        assertEquals(
-            "https://a/old.zip",
-            DictionaryUpdateChecker.updateFor(installed, """{"revision":"2","downloadUrl":"http://a/a.zip"}""")?.downloadUrl,
-        )
+        // A new address the app won't use: the stored one would fetch the old file again.
+        assertNull(DictionaryUpdateChecker.updateFor(installed, """{"revision":"2","downloadUrl":"http://a/a.zip"}"""))
         assertEquals("https://a/old.zip", DictionaryUpdateChecker.updateFor(installed, """{"revision":"2"}""")?.downloadUrl)
     }
 
@@ -118,11 +116,14 @@ class DictionaryUpdateCheckerTest {
 
         assertEquals("https://GitHub.com/a/b.zip", offered("https://GitHub.com/a/b.zip"))
         assertEquals("https://github.com/b/new.zip", offered("https://github.com/b/new.zip"))
-        // Another host, a look-alike host, or credentials in front of the real one: the stored address stays.
-        assertEquals(installed.downloadUrl, offered("https://evil.example/a.zip"))
-        assertEquals(installed.downloadUrl, offered("https://github.com.evil.example/a.zip"))
-        assertEquals(installed.downloadUrl, offered("https://github.com@evil.example/a.zip"))
-        assertEquals(installed.downloadUrl, offered("https://objects.githubusercontent.com/a.zip"))
+        // Another host, a look-alike host, or credentials in front of the real one: no update
+        // (the stored address would fetch the old file, offered again after every try).
+        assertNull(offered("https://evil.example/a.zip"))
+        assertNull(offered("https://github.com.evil.example/a.zip"))
+        assertNull(offered("https://github.com@evil.example/a.zip"))
+        assertNull(offered("https://objects.githubusercontent.com/a.zip"))
+        // No address in the index: the stored one.
+        assertEquals(installed.downloadUrl, DictionaryUpdateChecker.updateFor(installed, """{"revision":"2"}""")?.downloadUrl)
     }
 
     @Test

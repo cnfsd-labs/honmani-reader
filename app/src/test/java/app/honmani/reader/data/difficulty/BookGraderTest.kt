@@ -41,11 +41,13 @@ class BookGraderTest {
         },
         texts = { book ->
             if (book.contentHash in broken) error("unreadable")
+            if (book.contentHash in huge) throw OutOfMemoryError("huge")
             texts[book.contentHash]?.let { sequenceOf(RubyText(it)) }
         },
     )
 
     private val broken = mutableSetOf<String>()
+    private val huge = mutableSetOf<String>()
 
     @Test
     fun gradesEachBookOnce_andKeepsTheGradesInFiles() = runBlocking {
@@ -79,6 +81,18 @@ class BookGraderTest {
         assertEquals(0, store.grades.value.getValue("bad").difficulty.score)
         assertEquals(true, store.grades.value.getValue("a").difficulty.score > 0)
         assertEquals(0, grader(store).gradeAll())
+    }
+
+    @Test
+    fun aBookTooLargeForMemoryIsKeptAsZeroAndTheOthersAreStillGraded() = runBlocking {
+        val store = DifficultyStore(folder.root)
+        library = listOf(book("huge"), book("a"))
+        huge += "huge"
+
+        assertEquals(2, grader(store).gradeAll())
+
+        assertEquals(0, store.grades.value.getValue("huge").difficulty.score)
+        assertEquals(true, store.grades.value.getValue("a").difficulty.score > 0)
     }
 
     @Test

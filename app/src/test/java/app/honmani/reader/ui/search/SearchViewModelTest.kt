@@ -7,6 +7,7 @@ import app.honmani.reader.lookup.LookupEntry
 import app.honmani.reader.lookup.LookupResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -58,6 +59,28 @@ class SearchViewModelTest {
         advanceUntilIdle()
         // SearchContent lists the groups first to last from the top, the first one larger.
         assertEquals(listOf("best", "second", "third"), viewModel.results.value.groups.map { it.expression })
+    }
+
+    @Test
+    fun englishResultsRefreshWhenTheGlossIndexIsBuilt() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val building = MutableStateFlow(true)
+        val viewModel = SearchViewModel(
+            search = {
+                if (building.value) LookupResult(emptyList(), englishPending = true) else LookupResult(listOf(entry(1, "猫")))
+            },
+            compute = dispatcher,
+            indexBuilding = building,
+        )
+        viewModel.setQuery("cat")
+        advanceUntilIdle()
+        assertTrue(viewModel.results.value.englishPending)
+
+        building.value = false
+        advanceUntilIdle()
+        assertFalse(viewModel.results.value.englishPending)
+        assertEquals(listOf("猫"), viewModel.results.value.groups.map { it.expression })
     }
 
     @Test

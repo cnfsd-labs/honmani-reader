@@ -71,6 +71,10 @@ class BookGrader(
             } catch (e: Exception) {
                 logWarning("Honmani.difficulty", "Grading \"${book.title}\" failed; kept as score 0", e)
                 null
+            } catch (e: OutOfMemoryError) {
+                // A huge book: its text is garbage now, and the books behind it still fit.
+                logWarning("Honmani.difficulty", "Grading \"${book.title}\" ran out of memory; kept as score 0", e)
+                null
             }
             val difficulty = measured?.difficulty
                 ?: BookDifficulty(Difficulty.VERSION, score = 0, r95 = 0, kanjiShare = 0f, sentenceLength = 0f, words = 0, distinctWords = 0, unknownShare = 0f)

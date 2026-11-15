@@ -680,6 +680,8 @@ class AppContainer(context: Context) {
         val installed = appContext.packageManager.getPackageInfo(appContext.packageName, 0).lastUpdateTime
         val signature = "${sources.signature}|$installed"
         sharedLexicon?.takeIf { it.first == signature }?.second ?: withContext(Dispatchers.IO) {
+            // Let the outdated lexicon go before the new one is read or built (tens of MB each).
+            sharedLexicon = null
             val started = System.nanoTime()
             val file = File(appContext.filesDir, "lexicon.bin")
             val read = Lexicon.read(file, signature)

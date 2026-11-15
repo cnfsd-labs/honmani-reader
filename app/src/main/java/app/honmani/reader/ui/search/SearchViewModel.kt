@@ -18,7 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -46,9 +49,13 @@ class SearchViewModel(
     private val removeFromHistory: (String) -> Unit = {},
     private val clearHistory: () -> Unit = {},
     private val compute: CoroutineDispatcher = Dispatchers.Default,
+    /** Whether the gloss index is being built: when it is done, English search finds more. */
+    indexBuilding: StateFlow<Boolean> = MutableStateFlow(false),
 ) : ViewModel() {
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
+
+    private val indexBuilt = MutableStateFlow(0)
 
     private val _results = MutableStateFlow(SearchResults())
     val results: StateFlow<SearchResults> = _results.asStateFlow()
@@ -56,9 +63,14 @@ class SearchViewModel(
     init {
         viewModelScope.launch {
             @OptIn(FlowPreview::class)
-            _query.debounce { if (it.isBlank()) 0L else DEBOUNCE_MS }.collectLatest { text ->
+            val debounced = _query.debounce { if (it.isBlank()) 0L else DEBOUNCE_MS }
+            combine(debounced, indexBuilt) { text, _ -> text }.collectLatest { text ->
                 _results.value = if (text.isBlank()) SearchResults() else run(text)
             }
+        }
+        viewModelScope.launch {
+            // Searches again once an index is built, so English results don't stay half found.
+            indexBuilding.drop(1).filter { !it }.collect { indexBuilt.value++ }
         }
     }
 
@@ -101,6 +113,7 @@ class SearchViewModel(
                     addToHistory = history::add,
                     removeFromHistory = history::remove,
                     clearHistory = history::clear,
+                    indexBuilding = container.glossIndex.building,
                 )
             }
         }

@@ -668,6 +668,19 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun aLargeDisabledDictionaryDoesNotCrowdOutWildcardResults() = runTest {
+        // More rows than a search reads per pattern (SEARCH_KEY_LIMIT, 200).
+        val big = install(
+            "Big",
+            *Array(201) { listOf("食x$it", "たx$it", "", 0, "filler") },
+        )
+        database.dictionaryDao().setEnabled(big, false)
+        jmdict()
+
+        assertEquals(setOf("食べる", "食べ物"), searched("食*").toSet())
+    }
+
+    @Test
     fun searchWithoutDictionariesSaysSo() = runTest {
         assertFalse(lookup.search("neko").dictionariesAvailable)
         jmdict()

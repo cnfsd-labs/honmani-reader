@@ -30,7 +30,7 @@ data class DictionaryUpdate(
  * does: dictionaries that declare `isUpdatable` name an `indexUrl` whose `index.json` carries
  * the latest revision and its `downloadUrl` (Jitendex, JMdict, KANJIDIC and Jiten do). Only the
  * two URLs from the dictionary itself are requested, over HTTPS, with nothing about the reader.
- * A new `downloadUrl` counts only on the host of the one stored with the dictionary.
+ * A new `downloadUrl` counts only on the host of the one stored with the dictionary (one elsewhere: no update).
  *
  * Updates are offered, not installed: Jitendex is a 40 MB download and a minute of import.
  * JMdict and KANJIDIC are rebuilt almost daily, so the automatic check leaves out dictionaries
@@ -107,9 +107,11 @@ class DictionaryUpdateChecker(
             if (revision == installed.revision) return null
             // The download address may change, but only within the host the dictionary was
             // installed from: a hijacked or hostile index.json must not send the app elsewhere.
-            val stored = installed.downloadUrl?.takeIf(::isHttps)
-            val offered = string("downloadUrl")?.takeIf { isHttps(it) && stored != null && sameHost(it, stored) }
-            val downloadUrl = offered ?: stored ?: return null
+            // A new address elsewhere offers no update: the stored one would fetch the old file
+            // (or nothing), and the same update would be offered again after every try.
+            val stored = installed.downloadUrl?.takeIf(::isHttps) ?: return null
+            val named = string("downloadUrl")
+            val downloadUrl = if (named == null) stored else named.takeIf { isHttps(it) && sameHost(it, stored) } ?: return null
             return DictionaryUpdate(installed.id, installed.title, revision, downloadUrl)
         }
 
