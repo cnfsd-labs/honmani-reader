@@ -13,10 +13,16 @@ import app.honmani.reader.readaloud.CueSpan
 import java.io.File
 import java.util.Base64
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -256,7 +262,7 @@ class AudiobookMakerTest {
         // The same status again comes from the cache and is unchanged.
         assertEquals(MakerStatus.Partial(0, 4, 0.0, 1.0), maker.status("book"))
 
-        maker.delete("book")
+        runBlocking { maker.delete("book") }
         assertEquals(MakerStatus.None, maker.status("book"))
         maker.freeze(plan(sentences = sentences(7), cap = 2.5))
         assertEquals(MakerStatus.Partial(0, 7, 0.0, 2.5), maker.status("book"))
@@ -372,7 +378,7 @@ class AudiobookMakerTest {
         maker.freeze(plan(sentences = sentences(2)))
         runBlocking { maker.run("book", voice) }
         assertTrue(maker.status("book") is MakerStatus.Finished)
-        maker.delete("book")
+        runBlocking { maker.delete("book") }
         assertEquals(MakerStatus.None, maker.status("book"))
         assertEquals(null, store.pairing("book"))
         assertFalse(maker.files("book").directory.exists())
@@ -396,5 +402,69 @@ class AudiobookMakerTest {
         }
         assertTrue(thrown)
         assertTrue((maker.status("book") as MakerStatus.Partial).done >= 2)
+    }
+
+    /** A voice whose first [held] requests wait for [gate]; [entered] counts down as they arrive. */
+    private inner class GatedVoice(val held: Int) : SentenceVoice {
+        val gate = CountDownLatch(1)
+        val entered = CountDownLatch(held)
+        val texts = Collections.synchronizedList(mutableListOf<String>())
+
+        // Its own threads: on the maker's dispatcher the request would block the run until it is answered.
+        private val threads = Executors.newCachedThreadPool().asCoroutineDispatcher()
+
+        override suspend fun synthesize(text: String, sampleRateHertz: Int): ByteArray = withContext(threads) {
+            val call = synchronized(texts) { texts += text; texts.size }
+            if (call <= held) {
+                entered.countDown()
+                // Like an HTTP request: cancelling does not interrupt it.
+                gate.await(10, TimeUnit.SECONDS)
+            }
+            mp3(text)
+        }
+    }
+
+    @Test
+    fun aSecondRunWaitsForACancelledOneAndNothingIsPaidTwice() {
+        val maker = maker("again")
+        maker.freeze(plan())
+        val voice = GatedVoice(held = AudiobookMaker.PARALLEL)
+        runBlocking(Dispatchers.IO) {
+            val first = launch { maker.run("book", voice) }
+            assertTrue(voice.entered.await(10, TimeUnit.SECONDS))
+            first.cancel()
+            val second = async { maker.run("book", voice) }
+            Thread.sleep(300)
+            assertEquals("the second run waits for the first to end", AudiobookMaker.PARALLEL, voice.texts.size)
+            voice.gate.countDown()
+            first.join()
+            finished(second.await())
+        }
+        val sentences = plan().sentences.map { it.spoken }
+        assertEquals("every sentence was sent once, those answered after the cancel too", sentences.sorted(), voice.texts.sorted())
+        val lines = maker.files("book").journal.readLines().filter { it.isNotBlank() }.map { it.substringBefore('\t') }
+        assertEquals(List(12) { it.toString() }, lines)
+    }
+
+    @Test
+    fun aDeleteWaitsForACancelledRunAndTheFolderStaysGone() {
+        val maker = maker("delete")
+        maker.freeze(plan())
+        val voice = GatedVoice(held = 1)
+        val files = maker.files("book")
+        runBlocking(Dispatchers.IO) {
+            val run = launch { maker.run("book", voice) }
+            assertTrue(voice.entered.await(10, TimeUnit.SECONDS))
+            run.cancel()
+            val delete = launch { maker.delete("book") }
+            Thread.sleep(300)
+            assertTrue("the delete waits for the run to end", files.plan.isFile)
+            voice.gate.countDown()
+            run.join()
+            delete.join()
+            maker.writeOutcome("book", MakerOutcome(MakerOutcome.Kind.STOPPED, "late"))
+        }
+        assertFalse(files.directory.exists())
+        assertEquals(MakerStatus.None, maker.status("book"))
     }
 }

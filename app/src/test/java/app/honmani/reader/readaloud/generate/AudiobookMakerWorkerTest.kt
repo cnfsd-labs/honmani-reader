@@ -197,10 +197,12 @@ class AudiobookMakerWorkerTest {
         maker.freeze(plan())
         useMaker(maker)
         val reached = CompletableDeferred<Unit>()
+        // A request can't be interrupted: the stuck one is answered only after the cancel.
+        val answer = CompletableDeferred<Unit>()
         behave = { call, text ->
             if (call == 4) {
                 reached.complete(Unit)
-                CompletableDeferred<Unit>().await()
+                answer.await()
             }
             mp3(text)
         }
@@ -208,6 +210,7 @@ class AudiobookMakerWorkerTest {
             val job = async(Dispatchers.IO) { worker().doWork() }
             withTimeout(30_000) { reached.await() }
             job.cancel()
+            answer.complete(Unit)
             job.join()
         }
         val files = maker.files("book")
@@ -215,7 +218,7 @@ class AudiobookMakerWorkerTest {
         assertTrue(files.part.isFile)
         assertNull("a cancelled job leaves no stop message", files.readOutcome())
         val done = (maker.status("book") as MakerStatus.Partial).done
-        assertTrue("sentences before the stuck one are kept: $done", done in 3..5)
+        assertTrue("sentences before the stuck one and those answered after the cancel are kept: $done", done in 5..6)
 
         behave = { _, text -> mp3(text) }
         calls.clear()

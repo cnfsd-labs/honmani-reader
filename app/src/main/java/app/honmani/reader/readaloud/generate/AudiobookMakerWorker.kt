@@ -71,11 +71,11 @@ class AudiobookMakerWorker(
         } catch (_: IllegalStateException) {
             // Android 12+ refuses to start a foreground service while the app is in the background,
             // and a job this long must not run unseen: wait, and go on when the reader opens Honmani.
-            return paused(files, applicationContext.getString(R.string.audiobook_open_honmani), MakerOutcome.Kind.BACKGROUND)
+            return paused(maker, applicationContext.getString(R.string.audiobook_open_honmani), MakerOutcome.Kind.BACKGROUND)
         }
         val plan = files.readPlan()
         val voice = env.voice(plan?.voice ?: inputData.getString(KEY_VOICE).orEmpty())
-            ?: return stopped(files, MakerOutcome(MakerOutcome.Kind.STOPPED, applicationContext.getString(R.string.audiobook_no_key)), title)
+            ?: return stopped(maker, MakerOutcome(MakerOutcome.Kind.STOPPED, applicationContext.getString(R.string.audiobook_no_key)), title)
         val cap = inputData.getDouble(KEY_CAP, -1.0).takeIf { it > 0 }
         var lastPosted = 0L
         val result = maker.run(bookHash, voice, cap) { p ->
@@ -93,12 +93,12 @@ class AudiobookMakerWorker(
                 Result.success()
             }
             is MakerResult.CapReached -> stopped(
-                files,
+                maker,
                 MakerOutcome(MakerOutcome.Kind.CAP, applicationContext.getString(R.string.audiobook_cap_reached, usd(result.spentUsd), usd(result.capUsd))),
                 title,
             )
-            is MakerResult.Stopped -> stopped(files, MakerOutcome(MakerOutcome.Kind.STOPPED, stoppedText(result.problem)), title)
-            is MakerResult.Paused -> paused(files, pausedText(result.problem))
+            is MakerResult.Stopped -> stopped(maker, MakerOutcome(MakerOutcome.Kind.STOPPED, stoppedText(result.problem)), title)
+            is MakerResult.Paused -> paused(maker, pausedText(result.problem))
         }
     }
 
@@ -112,13 +112,14 @@ class AudiobookMakerWorker(
         if (problem == VoiceProblem.NETWORK) R.string.audiobook_paused_network else R.string.audiobook_paused_busy,
     )
 
-    private fun paused(files: GeneratedFiles, message: String, kind: MakerOutcome.Kind = MakerOutcome.Kind.PAUSED): Result {
-        files.writeOutcome(MakerOutcome(kind, message))
+    // Through the maker: it waits for a delete of the book's audio and writes nothing after one.
+    private suspend fun paused(maker: AudiobookMaker, message: String, kind: MakerOutcome.Kind = MakerOutcome.Kind.PAUSED): Result {
+        maker.writeOutcome(inputData.getString(KEY_BOOK).orEmpty(), MakerOutcome(kind, message))
         return Result.retry()
     }
 
-    private fun stopped(files: GeneratedFiles, outcome: MakerOutcome, title: String): Result {
-        files.writeOutcome(outcome)
+    private suspend fun stopped(maker: AudiobookMaker, outcome: MakerOutcome, title: String): Result {
+        maker.writeOutcome(inputData.getString(KEY_BOOK).orEmpty(), outcome)
         postResult(title, outcome.message, inputData.getString(KEY_BOOK).orEmpty())
         return Result.failure(workDataOf(KEY_MESSAGE to outcome.message))
     }

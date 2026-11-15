@@ -13,13 +13,19 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** How far making an audiobook is: [done] of [total] sentences, [spentUsd] billed so far (every request sent counts). */
@@ -60,7 +66,8 @@ sealed interface MakerStatus {
 }
 
 private sealed interface Outcome {
-    class Done(val chunks: List<Mp3Chunk>) : Outcome
+    /** The audio is in the run's results, waiting for its turn. */
+    data object Done : Outcome
 
     class Halted(val result: MakerResult) : Outcome
 }
@@ -81,6 +88,10 @@ private fun usd(value: Double) = "$" + String.format(Locale.ROOT, "%.2f", value)
  *
  * [root] holds one folder per book (`files/audiobook/generated`). [pause] and [dispatcher] can be
  * replaced by tests.
+ *
+ * One run or delete at a time per book folder, across all makers of the process: a cancelled
+ * run can still be waiting for a request it can't interrupt, and a second run's recovery or a
+ * delete under it would cut its files (sentences paid again, or a folder written after removal).
  */
 class AudiobookMaker(
     private val root: File,
@@ -129,12 +140,23 @@ class AudiobookMaker(
         return MakerStatus.Partial(done, plan.sentences, files.billedMicros() / MICROS, plan.capUsd)
     }
 
-    /** Deletes the partial or finished audio of the book, and its pairing if that points to it. */
-    fun delete(bookHash: String) {
+    /**
+     * Deletes the partial or finished audio of the book, and its pairing if that points to it;
+     * waits for a run of the book that is still ending (cancel it first).
+     */
+    suspend fun delete(bookHash: String) {
         val files = files(bookHash)
-        val pairing = store.pairing(bookHash)
-        if (pairing != null && pairing.audio == uri(files.audio)) store.forget(bookHash)
-        files.directory.deleteRecursively()
+        locked(files) {
+            val pairing = store.pairing(bookHash)
+            if (pairing != null && pairing.audio == uri(files.audio)) store.forget(bookHash)
+            files.directory.deleteRecursively()
+        }
+    }
+
+    /** Keeps why the last run of [bookHash] ended, unless the book's audio was deleted meanwhile. */
+    suspend fun writeOutcome(bookHash: String, outcome: MakerOutcome) {
+        val files = files(bookHash)
+        locked(files) { if (files.plan.isFile) files.writeOutcome(outcome) }
     }
 
     /**
@@ -148,16 +170,20 @@ class AudiobookMaker(
         progress: (MakerProgress) -> Unit = {},
     ): MakerResult = withContext(dispatcher) {
         val files = files(bookHash)
-        var plan = files.readPlan() ?: return@withContext MakerResult.Stopped(null, "There is nothing to make: the plan is missing.")
+        locked(files) { runLocked(files, voice, capUsd, progress) }
+    }
+
+    private suspend fun runLocked(files: GeneratedFiles, voice: SentenceVoice, capUsd: Double?, progress: (MakerProgress) -> Unit): MakerResult {
+        var plan = files.readPlan() ?: return MakerResult.Stopped(null, "There is nothing to make: the plan is missing.")
         if (capUsd != null && capUsd > plan.capUsd) {
             plan = plan.copy(capUsd = capUsd)
             files.writePlan(plan)
             summaries.remove(files.plan.path)
         }
         if (plan.pricePerMillionUsd <= 0 || plan.sentences.isEmpty()) {
-            return@withContext MakerResult.Stopped(null, "There is nothing to make: no price or no text.")
+            return MakerResult.Stopped(null, "There is nothing to make: no price or no text.")
         }
-        Run(files, plan, voice, progress).run()
+        return Run(files, plan, voice, progress).run()
     }
 
     private inner class Run(
@@ -172,6 +198,9 @@ class AudiobookMaker(
         private var capHit = false
         private var format: Mp3Format? = null
         private lateinit var billing: FileOutputStream
+
+        /** The audio of finished sentences by index, kept even when the run is cancelled before it is their turn. */
+        private val results = ConcurrentHashMap<Int, List<Mp3Chunk>>()
 
         suspend fun run(): MakerResult {
             val total = plan.sentences.size
@@ -194,8 +223,18 @@ class AudiobookMaker(
             return result ?: finish(entries)
         }
 
-        /** Null when every sentence is done. */
-        private suspend fun loop(entries: MutableList<JournalEntry>, audioOut: FileOutputStream, journalOut: FileOutputStream): MakerResult? = coroutineScope {
+        /**
+         * Null when every sentence is done. However the loop ends, the requests still out are
+         * waited for and what came back is appended in order up to the first missing sentence:
+         * it is paid for already.
+         */
+        private suspend fun loop(entries: MutableList<JournalEntry>, audioOut: FileOutputStream, journalOut: FileOutputStream): MakerResult? = try {
+            requests(entries, audioOut, journalOut)
+        } finally {
+            append(entries, audioOut, journalOut, report = false)
+        }
+
+        private suspend fun requests(entries: MutableList<JournalEntry>, audioOut: FileOutputStream, journalOut: FileOutputStream): MakerResult? = coroutineScope {
             val total = plan.sentences.size
             val pending = ArrayDeque<Pair<Int, Deferred<Outcome>>>()
             var next = entries.size
@@ -204,37 +243,44 @@ class AudiobookMaker(
                 // UNDISPATCHED: a request is paid for (and the cap checked) in sentence order, before the next one starts.
                 while (pending.size < PARALLEL && next < total) {
                     val index = next++
-                    pending.addLast(index to async(start = CoroutineStart.UNDISPATCHED) { sentence(plan.sentences[index].spoken) })
+                    pending.addLast(index to async(start = CoroutineStart.UNDISPATCHED) { sentence(index) })
                 }
-                val (index, deferred) = pending.removeFirst()
-                when (val outcome = deferred.await()) {
+                when (val outcome = pending.removeFirst().second.await()) {
                     is Outcome.Halted -> stop = outcome.result
-                    is Outcome.Done -> {
-                        var bytes = 0L
-                        var frames = 0L
-                        for (chunk in outcome.chunks) {
-                            chunk.writeTo(audioOut)
-                            bytes += chunk.sizeBytes
-                            frames += chunk.frames
-                        }
-                        audioOut.flush()
-                        val entry = JournalEntry(index, bytes, frames, plan.sentences[index].billedChars)
-                        journalOut.write(GeneratedFiles.line(entry).toByteArray())
-                        journalOut.flush()
-                        entries += entry
-                        progress(snapshot(entries.size))
-                    }
+                    Outcome.Done -> append(entries, audioOut, journalOut, report = true)
                 }
             }
-            // What is still in flight was paid for already (it is in the billing file) but is not used.
+            // No new requests; those in flight end on their own and are appended by loop if they fit.
             pending.forEach { it.second.cancel() }
             stop
         }
 
+        /** Writes the finished sentences that come next, in order, to the audio and the journal. */
+        private fun append(entries: MutableList<JournalEntry>, audioOut: FileOutputStream, journalOut: FileOutputStream, report: Boolean) {
+            while (entries.size < plan.sentences.size) {
+                val index = entries.size
+                val chunks = results.remove(index) ?: return
+                var bytes = 0L
+                var frames = 0L
+                for (chunk in chunks) {
+                    chunk.writeTo(audioOut)
+                    bytes += chunk.sizeBytes
+                    frames += chunk.frames
+                }
+                audioOut.flush()
+                val entry = JournalEntry(index, bytes, frames, plan.sentences[index].billedChars)
+                journalOut.write(GeneratedFiles.line(entry).toByteArray())
+                journalOut.flush()
+                entries += entry
+                if (report) progress(snapshot(entries.size))
+            }
+        }
+
         private fun snapshot(done: Int) = MakerProgress(done, plan.sentences.size, synchronized(lock) { spent } / MICROS)
 
-        private suspend fun sentence(text: String): Outcome = try {
-            Outcome.Done(piece(text))
+        private suspend fun sentence(index: Int): Outcome = try {
+            results[index] = piece(plan.sentences[index].spoken)
+            Outcome.Done
         } catch (h: Halt) {
             Outcome.Halted(h.result)
         }
@@ -244,12 +290,13 @@ class AudiobookMaker(
             var attempt = 0
             while (true) {
                 attempt++
+                // A cancelled run sends nothing more, but keeps what an answered request brought.
+                currentCoroutineContext().ensureActive()
                 charge(text)
                 var problem: VoiceProblem
                 var retryAfter: Long? = null
                 try {
-                    val bytes = voice.synthesize(text, plan.sampleRate)
-                    return listOf(accept(bytes))
+                    return listOf(accept(paid(text)))
                 } catch (e: VoiceException) {
                     problem = e.problem
                     retryAfter = e.retryAfterSeconds
@@ -271,6 +318,17 @@ class AudiobookMaker(
                 val seconds = (retryAfter ?: (2L shl (attempt - 1))).coerceIn(MIN_BACKOFF_S, MAX_BACKOFF_S)
                 pause(seconds * 1000)
             }
+        }
+
+        /** The voice's answer for [text], also when the run is cancelled while it is out (it is billed either way). */
+        private suspend fun paid(text: String): ByteArray {
+            var bytes: ByteArray? = null
+            try {
+                withContext(NonCancellable) { bytes = voice.synthesize(text, plan.sampleRate) }
+            } catch (e: CancellationException) {
+                return bytes ?: throw e
+            }
+            return bytes!!
         }
 
         private suspend fun tooLong(text: String): List<Mp3Chunk> {
@@ -354,6 +412,12 @@ class AudiobookMaker(
         const val PAUSE_MS = 15 * 60 * 1000L
 
         private const val MICROS = 1_000_000.0
+
+        /** One per book folder, by path: held by a whole run and by a delete. */
+        private val folderLocks = ConcurrentHashMap<String, Mutex>()
+
+        private suspend fun <T> locked(files: GeneratedFiles, block: suspend () -> T): T =
+            folderLocks.computeIfAbsent(files.directory.absolutePath) { Mutex() }.withLock { block() }
         private val LINE_BREAKS = Regex("""\s*[\r\n]+\s*""")
 
         /** The file as the audiobook pairing keeps it. */

@@ -236,7 +236,7 @@ class LibraryViewModel(
      * Drops what was worked out for a removed book (grade, words, a restored position waiting for
      * it), by content hash; the statistics, lookups and saved words stay. Off the main thread.
      */
-    private val forgetDerivedData: (String) -> Unit = {},
+    private val forgetDerivedData: suspend (String) -> Unit = {},
     /** Keeps a finished book that is removed, so the "books finished" counts don't drop. */
     private val recordFinished: suspend (FinishedBookEntity) -> Unit = {},
     /** Deletes a book's reading statistics (its reading days, by book id) and its finished record (by content hash). */
