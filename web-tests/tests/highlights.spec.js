@@ -123,6 +123,12 @@ test('furigana: positions skip the readings, and a highlight over a ruby base ta
   expect(await measureText(page, '猫', 'で')).toEqual({ start: 3, end: 5, text: '猫で' });
 });
 
+test('the text of a highlight over a ruby leaves out the rp brackets', async ({ page }) => {
+  await openBook(page, '<div id="ttu-a"><p>吾輩は<ruby>猫<rp>(</rp><rt>ねこ</rt><rp>)</rp></ruby>である。</p></div>');
+  await send(page, [['ttu-a', 0]], []);
+  expect(await measureText(page, '猫', 'で')).toEqual({ start: 3, end: 5, text: '猫で' });
+});
+
 test('a highlight never colours furigana: one range per run of base text, none touching an rt or rp', async ({ page }) => {
   await openBook(
     page,

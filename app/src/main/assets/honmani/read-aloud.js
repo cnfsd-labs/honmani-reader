@@ -370,6 +370,14 @@
     session.pos = record.candIndex;
     session.after = record.run.after;
     session.nextIndex = record.i;
+    if (record.s !== record.cands[record.candIndex].s) {
+      // The rest of a sentence begun on an earlier page (see begin): again only the rest, so the
+      // mark does not turn back to where the sentence began.
+      session.pos++;
+      session.nextIndex++;
+      reply(message.count, [{ i: record.i, text: record.speech }]);
+      return;
+    }
     reply(message.count);
   }
 

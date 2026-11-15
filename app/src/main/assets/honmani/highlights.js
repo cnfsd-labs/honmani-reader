@@ -345,7 +345,8 @@
     const walker = document.createTreeWalker(roots[0], NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => {
         if (node.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
-        if (hidden(node)) return NodeFilter.FILTER_REJECT;
+        // ttu counts <rp> (indexOf keeps it), but its brackets are no part of the words.
+        if (hidden(node) || node.nodeName === 'RP') return NodeFilter.FILTER_REJECT;
         return isGaiji(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
       },
     });

@@ -158,3 +158,18 @@ test('with a long paragraph the first sentence is the one that begins on the pag
   }, first.text);
   expect(onScreen).toBe(true);
 });
+
+test('seek back to the rest of a sentence begun on an earlier page gives the rest again, not the whole sentence', async ({ page }) => {
+  // One sentence of several screens, scrolled into its middle; the next one starts below the screen.
+  const long = 'あいうえおかきくけこ'.repeat(300);
+  await openBook(page, `<p>${long}。終わり。</p>`, { storage: { viewMode: 'continuous' } });
+  await page.evaluate(() => window.scrollTo(0, 600));
+  const reply = await ask(page, 'begin', { count: 2 });
+  const [first, second] = reply.items;
+  expect(first.i).toBe(0);
+  expect(first.text.length).toBeLessThan(long.length);
+  expect(long + '。').toContain(first.text);
+  expect(second).toEqual({ i: 1, text: '終わり。' });
+  const back = await ask(page, 'seek', { index: 0, count: 2 });
+  expect(back.items).toEqual([first, second]);
+});

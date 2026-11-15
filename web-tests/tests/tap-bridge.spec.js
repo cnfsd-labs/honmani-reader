@@ -157,6 +157,17 @@ test('sends the sentence before the tapped one, within the paragraph', async ({ 
   expect(first).not.toHaveProperty('previousSentence');
 });
 
+test('a word after a quoted sentence starts its sentence after the closing quote', async ({ page }) => {
+  await page.evaluate(() => (document.querySelector('#h2').textContent = '「行く。」と言った。'));
+
+  await tapChar(page, '#h2', '言');
+
+  const [message] = await messages(page);
+  expect(message.sentence).toBe('と言った。');
+  expect(message.sentenceOffset).toBe(1);
+  expect(message.previousSentence).toBe('「行く。」');
+});
+
 test('the sentence before is cut to its last 200 characters', async ({ page }) => {
   await page.evaluate(() => {
     document.querySelector('#h2').textContent = `${'あ'.repeat(300)}。ここです。`;

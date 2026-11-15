@@ -229,6 +229,8 @@
   function sentenceBounds(text, position) {
     let start = position;
     while (start > 0 && !isSentenceEnd(text[start - 1])) start--;
+    // The previous sentence's closing quotes belong to it (as in sentenceSpans), not to this one.
+    if (start > 0) while (start < position && CLOSING_QUOTES.includes(text[start])) start++;
     let end = position;
     while (end < text.length && !isSentenceEnd(text[end])) end++;
     while (end < text.length && isSentenceEnd(text[end])) end++;
