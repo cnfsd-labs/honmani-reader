@@ -283,6 +283,8 @@ val buildTtu = tasks.register<BuildTtuTask>("buildTtu") {
 tasks.withType<Test>().configureEach {
     timeout.set(Duration.ofMinutes(6))
     testLogging { events("started", "failed") }
+    // Robolectric's Android 16 (SDK 36) sets up shared memory through a JDK-internal class.
+    jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
     // The one-off Aozora grading run (AozoraIndexGrader, scripts/aozora-index/README.md): hours
     // long, so no timeout, more heap, visible output, and never taken as up to date.
     if (System.getenv("HONMANI_GRADER_OUT") != null) {
