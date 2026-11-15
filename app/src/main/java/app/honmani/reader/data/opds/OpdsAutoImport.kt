@@ -91,8 +91,11 @@ class OpdsAutoImport(
         }
         if (!force && lastStart != 0L && now() - lastStart < MIN_INTERVAL_MS) return
         // Not counted as a run: the next start on Wi-Fi imports.
-        if (!force && !networkAllowed()) return
-        lastStart = now()
+        val allowed = networkAllowed()
+        if (!force && !allowed) return
+        // A forced run on mobile data imports only older books asked for: the next start on
+        // Wi-Fi still runs.
+        if (allowed) lastStart = now()
         job = scope.launch {
             do {
                 rerun = false

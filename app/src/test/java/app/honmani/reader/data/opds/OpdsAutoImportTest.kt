@@ -161,6 +161,9 @@ class OpdsAutoImportTest {
         assertEquals(0, autoImport.run())
         autoImport.start()
         autoImport.join()
+        // A forced start (a server just added) on mobile data imports nothing either.
+        autoImport.start(force = true)
+        autoImport.join()
 
         assertTrue(libraryIds().isEmpty())
         assertTrue(requests.isEmpty())
