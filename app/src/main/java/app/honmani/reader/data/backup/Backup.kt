@@ -90,7 +90,7 @@ data class SyncIdentity(val deviceId: String, val deviceName: String)
 
 /**
  * Makes and restores [BackupFile]s. A restore merges: whatever this phone already has stays, and
- * restoring the same backup twice changes nothing the second time. Per book and day the larger
+ * restoring the same backup twice changes nothing the second time. Per book, day and reading phone the larger
  * reading time and characters count, words are matched by written form and reading, books by
  * content hash. Books not in the library wait in [restored] until the same file is added again
  * ([onBookAdded]).
@@ -246,6 +246,7 @@ class Backup(
             knownBatches = knownBatches,
             catalogs = if (sync != null) emptyList() else tables.catalogs.map { BackupCatalog(it.title, it.url, it.username, it.autoImport) },
             syncFormat = sync?.let { SyncFolder.FORMAT },
+            installationId = installationId(),
             deviceId = sync?.deviceId,
             deviceName = sync?.deviceName,
             tombstones = tables.tombstones.map { BackupTombstone(it.kind, it.key, it.deletedAt) },
@@ -312,21 +313,28 @@ class Backup(
                 }
             }
 
-            val days = dao.readingDays().associateBy { Triple(it.bookId, it.day, it.deviceId) }
+            val days = dao.readingDays().associateByTo(HashMap()) { Triple(it.bookId, it.day, it.deviceId) }
+            // Rows are kept per reading phone, as a sync merge keeps them: the writer's own rows (empty
+            // device) under its installation id, and this phone's own rows (back from another phone)
+            // as its own, so the same reading meets itself again instead of adding up.
+            val own = installationId()
+            fun deviceOf(day: BackupReadingDay) = day.device.ifEmpty { backup.installationId.orEmpty() }.takeIf { it != own }.orEmpty()
             // A day that isn't a date would crash every screen that reads the days back.
             val changedDays = backup.readingDays.filter { runCatching { LocalDate.parse(it.day) }.isSuccess }.mapNotNull { day ->
                 val id = idOf(day.book)
-                val before = days[Triple(id, day.day, day.device)]
+                val device = deviceOf(day)
+                val before = days[Triple(id, day.day, device)]
                 val after = ReadingDayEntity(
                     bookId = id,
                     day = day.day,
-                    deviceId = day.device,
+                    deviceId = device,
                     seconds = maxOf(before?.seconds ?: 0, day.seconds),
                     characters = maxOf(before?.characters ?: 0, day.characters),
                     listenSeconds = maxOf(before?.listenSeconds ?: 0, day.listenSeconds),
                     refoldSeconds = maxOf(before?.refoldSeconds ?: 0, day.refoldSeconds),
                     refoldListenSeconds = maxOf(before?.refoldListenSeconds ?: 0, day.refoldListenSeconds),
                 )
+                days[Triple(id, day.day, device)] = after
                 after.takeIf { it != before }
             }
             if (changedDays.isNotEmpty()) dao.putReadingDays(changedDays)

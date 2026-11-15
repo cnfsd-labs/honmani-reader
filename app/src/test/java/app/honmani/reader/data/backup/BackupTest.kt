@@ -224,7 +224,8 @@ class BackupTest {
         new.backup.restore(backup)
         new.backup.restore(backup)
 
-        assertEquals(setOf("", "other"), new.days().map { it.deviceId }.toSet())
+        // The old phone's own reading stays its own, as a sync merge of its file keeps it.
+        assertEquals(setOf("old", "other"), new.days().map { it.deviceId }.toSet())
         assertEquals(35 * 60L, new.days().perBookAndDay().single().seconds)
         assertEquals(2, new.days().size)
     }
@@ -844,10 +845,11 @@ class BackupTest {
         assertEquals(0, summary.booksWaiting)
         assertEquals(listOf(book.id), summary.positions.map { it.id })
         assertEquals(5_000L, new.database.bookDao().find(book.id)?.characters)
-        val days = new.days().filter { it.bookId == book.id }.associateBy { it.day }
+        // Both phones' reading of a day adds up (400 s and 2,000 characters on the old one).
+        val days = new.days().filter { it.bookId == book.id }.perBookAndDay().associateBy { it.day }
         assertEquals(600L, days.getValue("2026-10-20").seconds)
-        assertEquals(900L, days.getValue("2026-10-21").seconds)
-        assertEquals(2_000L, days.getValue("2026-10-21").characters)
+        assertEquals(1_300L, days.getValue("2026-10-21").seconds)
+        assertEquals(2_500L, days.getValue("2026-10-21").characters)
         assertEquals(100L, days.getValue("2026-10-22").seconds)
         assertEquals(1, new.database.backupDao().words().count { it.expression == "猫" })
         assertEquals(RestoredPosition(5_000, 0.25f, savedAt = LAST_OPENED), new.restored.takePosition("hash-a"))

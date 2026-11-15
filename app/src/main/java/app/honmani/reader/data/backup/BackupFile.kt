@@ -63,6 +63,12 @@ data class BackupFile(
     val catalogs: List<BackupCatalog> = emptyList(),
     /** Sync files only (see [SyncFolder]): 1 for the first format; null in a backup. A newer number is skipped. */
     val syncFormat: Int? = null,
+    /**
+     * The installation id of the phone that wrote the file (null in files from older versions): a
+     * restore on another phone keeps that phone's own reading days (device empty) apart as its, so a
+     * later sync-folder merge of the same phone's reading doesn't count it twice.
+     */
+    val installationId: String? = null,
     /** Sync files only: the installation id of the phone that wrote the file. */
     val deviceId: String? = null,
     /** Sync files only: the phone's model, for the status line. */

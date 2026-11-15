@@ -563,6 +563,40 @@ class SyncMergeTest {
     }
 
     @Test
+    fun aBackupRestoredOnANewPhoneAndTheOldPhonesSyncFileCountTheReadingOnce() = runBlocking<Unit> {
+        val old = phone("a")
+        old.read(old.addBook(), 20 * 60)
+        old.sync()
+        val plain = old.backup.export(null)
+
+        val new = phone("b")
+        new.addBook()
+        new.backup.restore(plain)
+        new.read(new.theBook().id, 5 * 60)
+        new.sync()
+        assertEquals(25L * 60, new.secondsRead())
+
+        // And back: the old phone gets its own reading from the new phone's file and keeps it once.
+        old.sync()
+        assertEquals(25L * 60, old.secondsRead())
+        // Its backup restored again on the old phone counts it once too.
+        old.backup.restore(new.backup.export(null))
+        assertEquals(25L * 60, old.secondsRead())
+    }
+
+    @Test
+    fun aBackupFromAnOlderVersionStillRestoresItsReading() = runBlocking<Unit> {
+        val old = phone("a")
+        old.read(old.addBook(), 20 * 60)
+        val plain = old.backup.export(null).copy(installationId = null)
+
+        val new = phone("b")
+        new.addBook()
+        new.backup.restore(plain)
+        assertEquals(20L * 60, new.secondsRead())
+    }
+
+    @Test
     fun twoPhonesReadingAddUpAndStayAddedUp() = runBlocking<Unit> {
         val a = phone("a")
         val b = phone("b")
