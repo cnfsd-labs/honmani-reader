@@ -1,14 +1,19 @@
 # Privacy policy for Honmani
 
-*Last updated: 2026-11-09.*
+*Last updated: 2026-11-15.*
 
 Honmani is a free reader for Japanese books, published by CNFSD Labs. It has no account, no ads,
 no analytics and no tracking. CNFSD Labs does not receive any data from the app.
 
 ## What stays on your phone
 
-Your books, imported dictionaries, saved words, flashcard reviews, recent searches, reading statistics and settings are stored only
-on your phone, in Honmani's own app storage. Uninstalling the app deletes them.
+Your books, imported dictionaries, saved words, flashcard reviews, recent searches, reading statistics and settings are kept
+in Honmani's own app storage on your phone. Uninstalling the app deletes them. Android's backup can copy part of
+them to your Google account (see below); it is on by default on most phones.
+
+Text you select in another app and look up with Honmani (the "Honmani" entry in the selection or share menu) is looked
+up on your phone, and the word is saved with your other words. Text you share to Honmani as a book ("Add as a book")
+becomes a text book in your library. Neither is sent anywhere.
 
 If you pair an audiobook with a book (reader menu, Audiobook), Honmani plays the audio file you chose
 where it is (it keeps no copy), and keeps a copy of the subtitle file and where you stopped. These stay
@@ -16,7 +21,7 @@ on your phone, are not part of Android's backup, and are deleted when you remove
 export an audiobook, Honmani writes the audio and subtitles only into the folder you choose and sends
 them nowhere.
 
-If you have turned on Android's backup to your Google account (or move to a new phone with
+If Android's backup to your Google account is on (or you move to a new phone with
 Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki
 deck) and a copy Honmani keeps of its own backup file (see below: your saved words with their
 sentences, your flashcard reviews, reading progress, statistics, bookmarks and highlights, the titles of your books
@@ -38,7 +43,9 @@ Exporting your library writes copies of your book files only into the folder you
 
 ## When Honmani connects to the internet
 
-Honmani only connects to the internet for these things, and only to these places:
+Honmani only connects to the internet for these things, and only to these places. Every request names the app
+only as "Honmani (Android)" in its headers, not your phone model or Android version (progress sync sends the model
+name itself, see below).
 
 - **Dictionaries and reader fonts** you choose to download, and a check for dictionary
   updates when the app starts (for dictionaries you imported yourself that offer updates, the check goes to the
@@ -58,7 +65,8 @@ Honmani only connects to the internet for these things, and only to these places
   searches: the search runs on your phone). Neither host is contacted before you tap, and
   the list is kept on your phone until you refresh it. Their own privacy policies apply.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
-  to the addresses you enter, when the app starts if automatic import is on (it is by default for a new server) and when you open
+  to the addresses you enter, and to the addresses those servers' catalogues link to for covers, pages, search
+  and book files (without your login), when the app starts if automatic import is on (it is by default for a new server) and when you open
   the catalogue; a search you type in a server's catalogue is sent to that server. If you give a user name and password, the password is stored
   encrypted on your phone and sent only to that server.
   At an unencrypted address (`http://`) anyone on the same network can read a password that
@@ -88,6 +96,8 @@ Honmani only connects to the internet for these things, and only to these places
   with a Google voice (costs money)"; needs your own Google Cloud API key): Honmani sends the book's text,
   sentence by sentence (with the readings written out in place of furigana), and your key to Google
   (texttospeech.googleapis.com), over an encrypted connection, until the audiobook is done or you stop it.
+  Opening this dialog, or Settings → Flashcards → Voice, with a key sends your key to Google to list the available
+  voices (no text).
   The "Listen" button in the same dialog (and in Settings → Flashcards → Voice) sends one fixed short sample sentence, not
   your book's text, and your key to Google when you tap it.
   Google charges the account of your key per character sent; Honmani shows an estimate and keeps your
@@ -104,6 +114,17 @@ Settings → Help and about → Network activity lists the latest requests Honma
 name and how it went). The list is kept in memory on your phone only: it holds no addresses,
 logins or keys, is not sent anywhere unless you share the diagnostics yourself, and is gone when
 the app stops.
+
+## Deleting your data
+
+- **On your phone:** uninstall Honmani, or clear its storage (Android Settings → Apps → Honmani → Storage → Clear
+  storage). This deletes everything Honmani keeps there.
+- **Logins:** signing out of progress sync, or deleting a book server, removes its stored login from your phone.
+- **Android's backup:** Google keeps it in your Google account. You can turn backup off in Android's settings
+  (Google → Backup) and delete a phone's backup in the Google Drive app or on drive.google.com (Storage → Backups).
+- **Files you wrote yourself** (backup files, the sync folder, exports) stay where you put them until you delete them.
+- **Elsewhere:** what your own book or sync server keeps, what you added to AnkiDroid and your Google Cloud account
+  are yours; delete it there. CNFSD Labs holds no data about you, so there is nothing to ask us to delete.
 
 ## Other apps
 
