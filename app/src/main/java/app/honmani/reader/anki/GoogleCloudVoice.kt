@@ -1,5 +1,6 @@
 package app.honmani.reader.anki
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.data.TooLargeException
 import app.honmani.reader.data.readBytesAtMost
 import app.honmani.reader.diagnostics.NetworkLog
@@ -129,6 +130,7 @@ class GoogleCloudVoice(
                     connection.readTimeout = TIMEOUT_MS
                     connection.instanceFollowRedirects = false
                     connection.setRequestProperty("X-Goog-Api-Key", apiKey.trim())
+                    connection.setRequestProperty("User-Agent", USER_AGENT)
                     connection.setRequestProperty("Accept", "application/json")
                     if (body != null) {
                         connection.requestMethod = "POST"
@@ -141,7 +143,7 @@ class GoogleCloudVoice(
                     if (status !in 200..299) {
                         val error = connection.errorStream?.use { it.readBytesAtMost(MAX_ERROR_BYTES).toString(Charsets.UTF_8) }.orEmpty()
                         val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it >= 0 }
-                        throw VoiceException(problemFor(status, error), status = status, retryAfterSeconds = retryAfter)
+                        throw VoiceException(problemFor(status, error), status = status, retryAfterSeconds = retryAfter, detail = errorMessage(error))
                     }
                     val text = connection.inputStream.use { it.readBytesAtMost(MAX_RESPONSE_BYTES).toString(Charsets.UTF_8) }
                     Json.parseToJsonElement(text).jsonObject
@@ -173,6 +175,21 @@ class GoogleCloudVoice(
                 VoiceProblem.KEY_REJECTED
             else -> VoiceProblem.FAILED
         }
+
+        /** Google's `error.message` of an error answer, or empty if the body has none. */
+        internal fun errorMessage(error: String): String = try {
+            Json.parseToJsonElement(error).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull.orEmpty().take(MAX_DETAIL_CHARS)
+        } catch (e: IllegalArgumentException) {
+            ""
+        }
+
+        /**
+         * Whether a 400 answer means the text is too long for one request: Google says "... is longer
+         * than the limit of 5000 bytes" or "This request contains sentences that are too long".
+         */
+        fun isTooLong(detail: String): Boolean = detail.contains("too long", ignoreCase = true) || detail.contains("longer than", ignoreCase = true)
+
+        private const val MAX_DETAIL_CHARS = 300
 
         const val PREFERRED_VOICE = "ja-JP-Chirp3-HD-Aoede"
         private val MODELS = listOf("Chirp3-HD", "Chirp-HD", "Neural2", "Wavenet", "Standard")

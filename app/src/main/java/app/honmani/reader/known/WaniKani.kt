@@ -1,5 +1,6 @@
 package app.honmani.reader.known
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.data.TooLargeException
 import app.honmani.reader.data.net.originOf
 import app.honmani.reader.data.readBytesAtMost
@@ -137,6 +138,7 @@ class WaniKaniClient(
                 connection.instanceFollowRedirects = false
                 connection.setRequestProperty("Authorization", "Bearer $token")
                 connection.setRequestProperty("Wanikani-Revision", REVISION)
+                connection.setRequestProperty("User-Agent", USER_AGENT)
                 connection.setRequestProperty("Accept", "application/json")
                 val status = connection.responseCode
                 NetworkLog.shared.answered(NetworkPurpose.WANIKANI, url, status, connection.contentLengthLong)

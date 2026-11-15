@@ -49,6 +49,8 @@ class VoiceException(
     cause: Throwable? = null,
     val status: Int = 0,
     val retryAfterSeconds: Long? = null,
+    /** The service's own explanation of an error answer, such as Google's `error.message`; empty if none. */
+    val detail: String = "",
 ) : IOException(problem.name, cause)
 
 /** Turns Japanese text into an audio file for a card. */

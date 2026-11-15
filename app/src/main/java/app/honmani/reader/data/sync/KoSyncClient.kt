@@ -1,5 +1,6 @@
 package app.honmani.reader.data.sync
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.originOf
 import app.honmani.reader.diagnostics.NetworkLog
@@ -220,6 +221,7 @@ class KoSyncClient(
             connection.instanceFollowRedirects = false
             connection.requestMethod = method
             connection.setRequestProperty("Accept", ACCEPT)
+            connection.setRequestProperty("User-Agent", USER_AGENT)
             if (login && account.password != null) {
                 val token = "${account.username}:${account.password}".toByteArray(Charsets.UTF_8)
                 connection.setRequestProperty("Authorization", "Basic " + Base64.getEncoder().encodeToString(token))

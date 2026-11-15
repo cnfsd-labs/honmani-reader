@@ -1,5 +1,6 @@
 package app.honmani.reader.data.aozora
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.ByteArrayOutputStream
@@ -207,6 +208,5 @@ class AozoraClient(
         private const val MAX_REDIRECTS = 5
         private val REDIRECTS = setOf(301, 302, 303, 307, 308)
         private const val BUFFER = 64 * 1024
-        private const val USER_AGENT = "Honmani (Android; free books)"
     }
 }

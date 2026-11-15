@@ -1,6 +1,7 @@
 package app.honmani.reader.readaloud.generate
 
 import android.content.Context
+import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.opds.HeaderServer
@@ -295,6 +296,23 @@ class AudiobookMakerTest {
     }
 
     @Test
+    fun anotherRefusalStopsTheJobWithGooglesReasonWithoutSplittingOrPayingMore() {
+        val maker = maker("refused")
+        val all = listOf(PlannedSentence("あいうえお、かきくけこ、さしすせそ", "長い", CueSpan(0, 17))) + sentences(4)
+        behave = { _, _ -> "400 Bad Request|{\"error\":{\"code\":400,\"message\":\"Voice 'ja-JP-Nope' does not exist.\",\"status\":\"INVALID_ARGUMENT\"}}" }
+        maker.freeze(plan(sentences = all))
+        val result = runBlocking { maker.run("book", voice) }
+        assertEquals(VoiceProblem.FAILED, (result as MakerResult.Stopped).problem)
+        assertTrue(result.reason, result.reason.contains("Voice 'ja-JP-Nope' does not exist"))
+        // Only what was in flight went out: no halves of the first sentence, no retries.
+        assertTrue(calls.size <= AudiobookMaker.PARALLEL)
+        assertTrue(calls.none { it == "あいうえお、" })
+        assertTrue(pauses.isEmpty())
+        val billed = calls.sumOf { text -> all.first { it.spoken == text }.billedChars }
+        assertEquals(billed * 30L, maker.files("book").billedMicros())
+    }
+
+    @Test
     fun aSentenceThatIsTooLongIsSplitAtACommaOrSkipped() {
         val maker = maker("long")
         val long = "あいうえお、かきくけこ、さしすせそ"
@@ -305,7 +323,13 @@ class AudiobookMakerTest {
             PlannedSentence(noComma, "読点なし", CueSpan(20, 40)),
             PlannedSentence("いいえ", "いいえ", CueSpan(40, 43)),
         )
-        behave = { _, text -> if (text.length > 8) "400 Bad Request|{\"error\":{\"message\":\"Sentences that are too long\"}}" else null }
+        behave = { call, text ->
+            when {
+                text.length <= 8 -> null
+                call % 2 == 0 -> "400 Bad Request|{\"error\":{\"message\":\"This request contains sentences that are too long.\"}}"
+                else -> "400 Bad Request|{\"error\":{\"message\":\"Either `input.text` or `input.ssml` is longer than the limit of 5000 bytes.\"}}"
+            }
+        }
         maker.freeze(plan(sentences = all))
         val result = finished(runBlocking { maker.run("book", voice) })
         // The cue of the skipped sentence is left out; the others follow each other without a gap.
@@ -323,6 +347,9 @@ class AudiobookMakerTest {
         val request = server.requests.single()
         assertEquals("/v1/text:synthesize", request.path)
         assertEquals("key", request.headers["x-goog-api-key"])
+        val agent = request.headers["user-agent"].orEmpty()
+        assertEquals("Honmani (Android)", agent)
+        assertFalse(Build.MODEL in agent)
         val config = Json.parseToJsonElement(request.body).jsonObject["audioConfig"]!!.jsonObject
         assertEquals("MP3", config["audioEncoding"]!!.jsonPrimitive.content)
         assertEquals("24000", config["sampleRateHertz"]!!.jsonPrimitive.content)

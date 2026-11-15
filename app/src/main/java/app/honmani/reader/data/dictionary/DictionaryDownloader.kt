@@ -1,5 +1,6 @@
 package app.honmani.reader.data.dictionary
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.ByteArrayOutputStream
@@ -213,6 +214,5 @@ class DictionaryDownloader(
         private const val MB = 1024L * 1024
         private const val MAX_TEXT_BYTES = 256 * 1024
         private const val BUFFER_SIZE = 64 * 1024
-        private const val USER_AGENT = "Honmani (Android; dictionary download)"
     }
 }

@@ -109,6 +109,8 @@ class WaniKaniClientTest {
         val first = server.requests.first()
         assertEquals("Bearer $token", first.headers["authorization"])
         assertEquals("20170710", first.headers["wanikani-revision"])
+        // A fixed User-Agent, not the platform's default with the phone model and build.
+        assertTrue(server.requests.all { it.headers["user-agent"] == "Honmani (Android)" })
         assertTrue("subject_types=vocabulary&" in first.path)
         assertTrue("srs_stages=5,6,7,8,9" in first.path)
         assertTrue(server.requests.none { token in it.path })

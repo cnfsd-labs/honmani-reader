@@ -1,6 +1,7 @@
 package app.honmani.reader.readaloud.generate
 
 import android.util.Log
+import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.VoiceException
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.readaloud.AlignedCue
@@ -254,7 +255,9 @@ class AudiobookMaker(
                     retryAfter = e.retryAfterSeconds
                     when {
                         problem == VoiceProblem.QUOTA || problem == VoiceProblem.NETWORK -> Unit
-                        problem == VoiceProblem.FAILED && e.status == 400 -> return tooLong(text)
+                        problem == VoiceProblem.FAILED && e.status == 400 && GoogleCloudVoice.isTooLong(e.detail) -> return tooLong(text)
+                        // Any other refusal (a voice that doesn't exist, a bad setting) fails the same way for every sentence.
+                        problem == VoiceProblem.FAILED && e.status == 400 -> throw Halt(MakerResult.Stopped(problem, refusedReason(e.detail)))
                         problem == VoiceProblem.FAILED && (e.status == 0 || e.status >= 500) -> Unit
                         else -> throw Halt(MakerResult.Stopped(problem, stopReason(problem)))
                     }
@@ -370,6 +373,9 @@ class AudiobookMaker(
 
         private fun time(ms: Long): String =
             String.format(Locale.ROOT, "%02d:%02d:%02d,%03d", ms / 3_600_000, ms / 60_000 % 60, ms / 1000 % 60, ms % 1000)
+
+        private fun refusedReason(detail: String): String =
+            if (detail.isBlank()) "Google refused to make the audio." else "Google refused to make the audio: ${detail.trim().trimEnd('.')}."
 
         private fun stopReason(problem: VoiceProblem): String = when (problem) {
             VoiceProblem.KEY_REJECTED, VoiceProblem.NO_KEY -> "Google did not accept the API key. Check it in Settings and that the Cloud Text-to-Speech API is enabled for it."

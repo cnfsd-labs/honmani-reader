@@ -1,5 +1,6 @@
 package app.honmani.reader.data.opds
 
+import app.honmani.reader.data.net.USER_AGENT
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.net.LoginGate
 import app.honmani.reader.data.net.originOf
@@ -251,7 +252,6 @@ class OpdsClient(
         const val MAX_THUMBNAIL_BYTES = 2 shl 20
         private const val MAX_BOOK_BYTES = BookImporter.MAX_BOOK_BYTES
         private const val BUFFER_SIZE = 64 * 1024
-        private const val USER_AGENT = "Honmani (Android; OPDS)"
         private const val ACCEPT = "application/atom+xml, application/xml;q=0.9, */*;q=0.5"
 
         /** Basic auth for requests to the catalogue's own scheme, host and port only. */
