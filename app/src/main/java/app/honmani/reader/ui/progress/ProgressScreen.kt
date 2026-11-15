@@ -39,6 +39,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -131,8 +134,14 @@ fun ProgressTab(bottomBar: @Composable () -> Unit, onOpenBook: (Long) -> Unit = 
                         Tab(
                             selected = index == pager.currentPage,
                             onClick = { scope.launch { pager.animateScrollToPage(index) } },
-                            // Two lines at a large font rather than "Milesto…".
-                            text = { Text(stringResource(entry.label), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) },
+                            // One line that shrinks at a large font rather than "Milesto…" (two lines break the word).
+                            text = {
+                                Text(
+                                    stringResource(entry.label),
+                                    maxLines = 1,
+                                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = LocalTextStyle.current.fontSize),
+                                )
+                            },
                         )
                     }
                 }
