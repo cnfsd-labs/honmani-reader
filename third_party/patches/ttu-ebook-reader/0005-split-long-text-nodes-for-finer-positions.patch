@@ -9,7 +9,7 @@ split at sentence ends; the text looks the same.
 diff -ru a/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts b/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts
 --- a/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts	2026-10-18 18:26:04.130759989 +0000
 +++ b/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts	2026-10-18 18:26:04.149065408 +0000
-@@ -29,6 +29,50 @@
+@@ -29,6 +29,52 @@
    });
  }
  
@@ -41,7 +41,9 @@ diff -ru a/apps/web/src/lib/components/book-reader/get-paragraph-nodes.ts b/apps
 +  let start = 0;
 +  for (const cut of [...cuts, text.length]) {
 +    for (let next = start + MAX_TEXT_LENGTH; next < cut; next += MAX_TEXT_LENGTH) {
-+      pieces.push(next);
++      // Never between the halves of a surrogate pair (𠮟): each piece would count it apart.
++      const low = text.charCodeAt(next) >= 0xdc00 && text.charCodeAt(next) <= 0xdfff;
++      pieces.push(low ? next - 1 : next);
 +    }
 +    if (cut < text.length) pieces.push(cut);
 +    start = cut;

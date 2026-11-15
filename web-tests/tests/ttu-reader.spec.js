@@ -339,6 +339,25 @@ test('a page turn saves the reading position right away, without a bookmark butt
   expect(await page.locator('div.fixed.h-3.w-3.opacity-25').count()).toBe(0);
 });
 
+test('long text nodes are never split between the halves of a surrogate pair', async ({ page }) => {
+  await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
+  // No sentence end: patch 0005 cuts after 120 UTF-16 units, where 𠮟 (two units) starts at 119.
+  const paragraphs = ['あ'.repeat(119) + '𠮟' + 'い'.repeat(150)];
+  await importAndOpen(page, { ...nekoEpub, name: 'kanji.epub', buffer: buildEpub({ title: '叱る本', paragraphs }) }, '叱る本');
+  // Checked in the page: a lone surrogate would not survive the trip to the test as itself.
+  const pieces = () =>
+    page.evaluate(() => {
+      const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+      const found = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.data.includes('あ') || node.data.includes('い')) found.push(/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/.test(node.data));
+      }
+      return found;
+    });
+  await expect.poll(async () => (await pieces()).length).toBeGreaterThan(1);
+  expect(await pieces()).not.toContain(true);
+});
+
 test('the settings have no auto bookmark entries, and are dark with a dark reader theme', async ({ browser }) => {
   const context = await browser.newContext({ colorScheme: 'dark' });
   const page = await context.newPage();
