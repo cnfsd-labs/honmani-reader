@@ -239,6 +239,44 @@ class DictionaryImporterTest {
     }
 
     @Test
+    fun anUpdateKeepsASwitchOrMoveMadeWhileItRan() = runTest {
+        val dao = database.dictionaryDao()
+        val old = importer.import(writeZip(temp.root, sampleDictionary(), "old.zip"))
+        var changed = false
+
+        val updated = importer.import(writeZip(temp.root, sampleDictionary(), "new.zip"), replaces = old.id) {
+            if (!changed) dao.setEnabledAndPriority(old.id, enabled = false, priority = 5)
+            changed = true
+        }
+
+        val installed = dao.observeReady().first().single()
+        assertEquals(updated.id, installed.id)
+        assertEquals(false, installed.enabled)
+        assertEquals(5, installed.priority)
+        assertEquals(false, updated.enabled)
+        assertEquals(5, updated.priority)
+    }
+
+    @Test
+    fun anUpdateOfADictionaryDeletedWhileItRanIsDropped() = runTest {
+        val dao = database.dictionaryDao()
+        val old = importer.import(writeZip(temp.root, sampleDictionary(), "old.zip"))
+        var deleted = false
+
+        try {
+            importer.import(writeZip(temp.root, sampleDictionary(), "new.zip"), replaces = old.id) {
+                if (!deleted) dao.delete(old.id)
+                deleted = true
+            }
+            fail("expected ReplacedDictionaryGoneException")
+        } catch (_: ReplacedDictionaryGoneException) {
+        }
+
+        assertTrue(dao.observeReady().first().isEmpty())
+        assertNull(dao.findByTitle("Test Dictionary"))
+    }
+
+    @Test
     fun aFailedUpdateKeepsTheInstalledVersion() = runTest {
         val old = importer.import(writeZip(temp.root, sampleDictionary(), "old.zip"))
         val broken = sampleDictionary() + ("term_bank_2.json" to """[["壊","こわ","","",0,["broken"]]]""")

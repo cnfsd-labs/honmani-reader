@@ -57,7 +57,7 @@ class DictionariesViewModel(
     /** Catalog downloads requested in this session; they show as in progress until installed. */
     private val requested = MutableStateFlow<Set<String>>(emptySet())
 
-    /** Updates requested in this session, by installed dictionary id. */
+    /** Updates requested in this session, by installed dictionary id, until the import shows them. */
     private val requestedUpdates = MutableStateFlow<Set<Long>>(emptySet())
 
     private val updateCheck = combine(updateChecker.checking, updateChecker.checked) { checking, checked ->
@@ -92,15 +92,19 @@ class DictionariesViewModel(
                 }
                 CatalogItem(dictionary, state)
             }
-            val failed = imports.any { it is ImportStatus.Failed }
+            // An update is on its way while its import is queued or running, also after leaving the
+            // screen; one just requested counts until then unless its own import failed.
+            fun updating(id: Long) =
+                imports.any { it.replaces == id && it !is ImportStatus.Failed } ||
+                    (id in updateRequests && imports.none { it is ImportStatus.Failed && it.replaces == id })
             DictionariesUiState.Loaded(
                 dictionaries = dictionaries,
                 imports = imports,
                 deleting = deleting,
                 catalog = catalog,
                 updates = updates,
-                // Until the new version replaces the installed one (or the download fails).
-                updating = if (failed) emptySet() else updateRequests.filterTo(HashSet()) { it in updates },
+                // Until the new version replaces the installed one (or its download fails).
+                updating = updates.keys.filterTo(HashSet(), ::updating),
                 updateCheck = check,
             )
         }.stateIn(
@@ -122,7 +126,8 @@ class DictionariesViewModel(
 
     /** Downloads [update] and puts it in place of the installed version; repeated taps are ignored. */
     fun update(update: DictionaryUpdate) {
-        if (update.dictionaryId in requestedUpdates.value) return
+        val updating = (uiState.value as? DictionariesUiState.Loaded)?.updating.orEmpty()
+        if (update.dictionaryId in requestedUpdates.value || update.dictionaryId in updating) return
         requestedUpdates.update { it + update.dictionaryId }
         importScheduler.update(update)
     }

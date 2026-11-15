@@ -89,6 +89,9 @@ class DictionaryImportWorker(
             return failure(ImportError.INVALID, e.message)
         } catch (e: DictionaryAlreadyInstalledException) {
             return failure(ImportError.ALREADY_INSTALLED, e.title)
+        } catch (_: ReplacedDictionaryGoneException) {
+            // The reader deleted the dictionary meanwhile: nothing to update, nothing to report.
+            return Result.success()
         } catch (e: NoTermsException) {
             return failure(ImportError.NO_TERMS, e.title)
         } catch (e: IncompleteReleaseException) {
@@ -256,18 +259,20 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
         workManager.getWorkInfosByTagFlow(TAG).map { infos ->
             infos.mapNotNull { info ->
                 val id = info.id.toString()
+                val replaces = info.tags.firstOrNull { it.startsWith(UPDATE_TAG) }?.removePrefix(UPDATE_TAG)?.toLongOrNull()
                 when (info.state) {
-                    WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> ImportStatus.Queued(id)
+                    WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED -> ImportStatus.Queued(id, replaces)
                     WorkInfo.State.RUNNING -> ImportStatus.Running(
                         id = id,
                         progress = DictionaryImportWorker.progressOf(info.progress),
                         download = DictionaryImportWorker.downloadOf(info.progress),
+                        replaces = replaces,
                     )
                     WorkInfo.State.FAILED -> {
                         val (error, detail) = DictionaryImportWorker.errorOf(info.outputData)
                         val dictionaryId = info.tags.firstOrNull { it.startsWith(DICTIONARY_TAG) }
                             ?.removePrefix(DICTIONARY_TAG)
-                        ImportStatus.Failed(id, error, detail, dictionaryId, DictionaryImportWorker.reasonOf(info.outputData))
+                        ImportStatus.Failed(id, error, detail, dictionaryId, DictionaryImportWorker.reasonOf(info.outputData), replaces)
                     }
                     WorkInfo.State.SUCCEEDED, WorkInfo.State.CANCELLED -> null
                 }
@@ -287,6 +292,7 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
         val request = OneTimeWorkRequestBuilder<DictionaryImportWorker>()
             .setInputData(DictionaryImportWorker.updateInputData(update))
             .addTag(TAG)
+            .addTag(UPDATE_TAG + update.dictionaryId)
             .build()
         workManager.enqueue(request)
     }
@@ -300,5 +306,8 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
 
         /** Prefix of the tag that names the catalog dictionary a download is for. */
         const val DICTIONARY_TAG = "dictionary-import:"
+
+        /** Prefix of the tag that names the installed dictionary an update replaces. */
+        const val UPDATE_TAG = "dictionary-update:"
     }
 }

@@ -223,6 +223,35 @@ class DictionariesViewModelTest {
         assertTrue(state().updating.isEmpty())
     }
 
+    @Test
+    fun anUpdateStillRunningShowsAfterTheScreenIsOpenedAgain_andAnotherFailureLeavesItAlone() = runTest {
+        val id = dao.insert(
+            dictionary("JMdict [2026-10-01]").copy(
+                isUpdatable = true,
+                indexUrl = "https://example.org/JMdict.json",
+                downloadUrl = "https://example.org/JMdict-old.zip",
+            ),
+        )
+        remoteIndexes["https://example.org/JMdict.json"] =
+            """{"title":"JMdict [2026-10-16]","revision":"2","downloadUrl":"https://example.org/JMdict.zip"}"""
+        checker.start(all = true)
+        // Requested by an earlier screen: only the running import tells.
+        scheduler.imports.value = listOf(ImportStatus.Running("u", progress = null, replaces = id))
+        val reopened = DictionariesViewModel(DictionaryRepository(dao), scheduler, checker)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { reopened.uiState.collect {} }
+        fun state() = reopened.uiState.value as DictionariesUiState.Loaded
+
+        assertEquals(setOf(id), state().updating)
+        reopened.update(state().updates.getValue(id))
+        assertTrue(scheduler.updates.isEmpty())
+
+        scheduler.imports.value += ImportStatus.Failed("f", ImportError.FAILED, null)
+        assertEquals(setOf(id), state().updating)
+
+        scheduler.imports.value = listOf(ImportStatus.Failed("u", ImportError.FAILED, null, replaces = id))
+        assertTrue(state().updating.isEmpty())
+    }
+
     private fun dictionary(title: String) =
         DictionaryEntity(title = title, revision = "1", formatVersion = 3, importedAt = 0)
 }

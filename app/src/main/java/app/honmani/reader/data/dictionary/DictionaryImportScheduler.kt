@@ -89,13 +89,17 @@ sealed interface ImportStatus {
     /** Unique per import, so the UI can tell one failure from the next. */
     val id: String
 
-    data class Queued(override val id: String) : ImportStatus
+    /** The installed dictionary this import is an update of, if it is one. */
+    val replaces: Long?
+
+    data class Queued(override val id: String, override val replaces: Long? = null) : ImportStatus
 
     data class Running(
         override val id: String,
         val progress: ImportProgress?,
         /** Set while the dictionary file is being downloaded, before the import starts. */
         val download: DownloadProgress? = null,
+        override val replaces: Long? = null,
     ) : ImportStatus
 
     data class Failed(
@@ -105,6 +109,7 @@ sealed interface ImportStatus {
         /** The catalog dictionary whose download failed; null for imports of files and updates. */
         val dictionaryId: String? = null,
         val reason: FailureReason = FailureReason.OTHER,
+        override val replaces: Long? = null,
     ) : ImportStatus
 }
 

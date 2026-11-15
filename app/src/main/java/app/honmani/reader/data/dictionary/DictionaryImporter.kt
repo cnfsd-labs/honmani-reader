@@ -30,6 +30,9 @@ import kotlinx.serialization.json.JsonPrimitive
 class DictionaryAlreadyInstalledException(val title: String) :
     Exception("A dictionary titled \"$title\" is already installed")
 
+/** The dictionary an update was for was deleted while the update ran: the update is dropped. */
+class ReplacedDictionaryGoneException(val title: String) : Exception("\"$title\" was deleted during its update")
+
 /** The dictionary is valid but has nothing Honmani can use (e.g. only media files). */
 class NoTermsException(val title: String) : Exception("\"$title\" contains no terms")
 
@@ -104,11 +107,13 @@ class DictionaryImporter(
      *
      * With [replaces], the file is an update of that installed dictionary: it may carry the same
      * title, takes over its place (enabled, order) and the old version is deleted once the new
-     * one is ready. Until then lookups keep using the old one.
+     * one is ready. Until then lookups keep using the old one. Enabled and order are those the old
+     * one has when the new one is ready; if it was deleted meanwhile, the update is dropped.
      *
      * @throws InvalidDictionaryException the file is not a valid Yomitan dictionary
      * @throws DictionaryAlreadyInstalledException
      * @throws NoTermsException
+     * @throws ReplacedDictionaryGoneException
      */
     suspend fun import(
         file: File,
@@ -123,7 +128,7 @@ class DictionaryImporter(
             insertNanos = 0L
             waitNanos = 0L
             val started = System.nanoTime()
-            val replaced = replaces?.let { dictionaryDao.findById(it) }
+            val replaced = replaces?.let { dictionaryDao.findById(it) ?: throw ReplacedDictionaryGoneException("#$it") }
             val imported = when (format) {
                 DictionaryFileFormat.YOMITAN -> importYomitan(file, replaced, onProgress)
                 DictionaryFileFormat.KANJIUM_ACCENTS -> importKanjium(file, replaced, onProgress)
@@ -195,12 +200,16 @@ class DictionaryImporter(
             kanji(id) { kanjiCount += it }
             write(id) { metaCount += it }
             if (termCount == 0 && metaCount == 0 && kanjiCount == 0) throw NoTermsException(pending.title)
-            database.withTransaction {
+            // A switch, move or delete of the old version while the update ran wins over the copy taken at the start.
+            val final = database.withTransaction {
+                val old = replaced?.let { dictionaryDao.findById(it.id) ?: throw ReplacedDictionaryGoneException(it.title) }
+                if (old != null) dictionaryDao.setEnabledAndPriority(id, old.enabled, old.priority)
                 dictionaryDao.markReady(id, termCount, metaCount, kanjiCount)
-                if (replaced != null) dictionaryDao.delete(replaced.id)
+                if (old != null) dictionaryDao.delete(old.id)
+                if (old != null) placed.copy(enabled = old.enabled, priority = old.priority) else placed
             }
             meter.finish()
-            return placed.copy(
+            return final.copy(
                 id = id,
                 status = DictionaryEntity.Status.READY,
                 termCount = termCount,
