@@ -201,6 +201,24 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun anEntryWithoutWordClassesBorrowsThoseOfTheSameWordInAnotherDictionary() = runTest {
+        jmdict()
+        install("Plain", listOf("食べる", "たべる", "", 1, "eat (plain)"))
+
+        val full = lookup.lookup("食べた").entries.filter { it.source == "食べた" }
+
+        assertTrue(full.any { it.dictionary.title == "Plain" && it.term.expression == "食べる" })
+    }
+
+    @Test
+    fun anEntryWithoutWordClassesAloneMatchesOnlyUninflectedText() = runTest {
+        install("Plain", listOf("食べる", "たべる", "", 1, "eat (plain)"))
+
+        assertTrue(lookup.lookup("食べた").entries.none { it.term.expression == "食べる" })
+        assertEquals(listOf("食べる"), lookup.lookup("食べる").headwords())
+    }
+
+    @Test
     fun suruNounsAndKuru() = runTest {
         jmdict()
 

@@ -154,9 +154,17 @@ class DictionaryLookup(
             val terms = candidatesByText.keys.chunked(MAX_LOOKUP_TEXTS)
                 .flatMap { termDao.findByExpressionOrReading(it) }
                 .distinctBy { it.id }
+            // An entry without word classes borrows those another installed dictionary gives
+            // the same word (expression and reading); with none it matches uninflected text only.
+            val classesByWord = HashMap<Pair<String, String>, Int>()
+            for (term in terms) {
+                val classes = WordClass.fromRules(term.rules)
+                if (classes != 0) classesByWord.merge(term.expression to term.reading, classes, Int::or)
+            }
             return terms.mapNotNull { term ->
                 val dictionary = dictionaries[term.dictionaryId] ?: return@mapNotNull null
                 val termClasses = WordClass.fromRules(term.rules)
+                    .takeIf { it != 0 } ?: classesByWord[term.expression to term.reading] ?: 0
                 val matches = (candidatesByText[term.expression].orEmpty().map { it to true }) +
                     (candidatesByText[term.reading].orEmpty().map { it to false })
                 matches
