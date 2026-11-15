@@ -413,6 +413,9 @@ class AppContainer(context: Context) {
     /** Catalogue downloads wait here before they are added to the library. */
     val downloadsDir = File(appContext.cacheDir, "downloads")
 
+    /** When this process made the container: a download file older than that was left by a kill. */
+    private val createdAt = System.currentTimeMillis()
+
     val opdsAutoImport: OpdsAutoImport by lazy {
         OpdsAutoImport(
             repository = opdsRepository,
@@ -867,6 +870,11 @@ class AppContainer(context: Context) {
         applicationScope.launch { syncFolder.sync() }
     }
 
+    /** Starts again the audiobook jobs that wait for Honmani to open ([AudiobookScheduler.resumeWaitingForApp]). */
+    fun resumeAudiobooks() {
+        applicationScope.launch(Dispatchers.IO) { runCatching { audiobookScheduler.resumeWaitingForApp() } }
+    }
+
     /**
      * Brings [autoBackup] (and the backup folder's copy) up to date if anything changed since the
      * last one, as the reader leaves a book and as the app goes to the background; never on app
@@ -911,9 +919,12 @@ class AppContainer(context: Context) {
         applicationScope.launch { autoBackup.checkOffer() }
     }
 
-    /** Once per app start: removes import copies a kill left in the books directory. */
+    /** Once per app start: removes import copies and catalogue downloads a kill left behind. */
     fun sweepLeftovers() {
-        applicationScope.launch { bookImporter.sweepTemporaryFiles() }
+        applicationScope.launch {
+            bookImporter.sweepTemporaryFiles()
+            withContext(Dispatchers.IO) { OpdsAutoImport.sweepStaleDownloads(downloadsDir, createdAt) }
+        }
     }
 
     /**

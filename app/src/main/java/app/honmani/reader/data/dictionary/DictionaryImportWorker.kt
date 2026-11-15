@@ -22,6 +22,8 @@ import app.honmani.reader.R
 import app.honmani.reader.data.dictionary.yomitan.InvalidDictionaryException
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -73,7 +75,7 @@ class DictionaryImportWorker(
             } else {
                 // ZipFile needs random access, which a content URI does not offer.
                 resolver.openInputStream(uri!!)?.use { input ->
-                    copy.outputStream().use { input.copyTo(it) }
+                    copy.outputStream().use { copyAtMost(input, it) }
                 } ?: return failure(ImportError.FAILED, null)
                 importCopy()
             }
@@ -183,6 +185,24 @@ class DictionaryImportWorker(
 
         private const val CHANNEL_ID = "imports"
         private const val DOWNLOAD_STAGE = "download"
+
+        /**
+         * Copies a picked file, at most as much as a download may be
+         * ([DictionaryDownloader.MAX_DOWNLOAD_BYTES]): a bigger file is no dictionary and would only fill the cache.
+         */
+        internal fun copyAtMost(input: InputStream, output: OutputStream, maxBytes: Long = DictionaryDownloader.MAX_DOWNLOAD_BYTES) {
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var total = 0L
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) return
+                total += read
+                if (total > maxBytes) {
+                    throw InvalidDictionaryException("The file is larger than ${maxBytes / (1024 * 1024)} MB, more than any dictionary.")
+                }
+                output.write(buffer, 0, read)
+            }
+        }
 
         fun inputData(uri: String): Data = workDataOf(KEY_URI to uri)
 

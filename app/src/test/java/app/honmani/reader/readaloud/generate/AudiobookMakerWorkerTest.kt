@@ -179,7 +179,7 @@ class AudiobookMakerWorkerTest {
         val result = runBlocking { worker(foregroundRefused = true).doWork() }
         assertEquals(Result.retry(), result)
         val outcome = maker.files("book").readOutcome()!!
-        assertEquals(MakerOutcome.Kind.PAUSED, outcome.kind)
+        assertEquals(MakerOutcome.Kind.BACKGROUND, outcome.kind)
         assertEquals("Paused. Open Honmani to continue.", outcome.message)
         assertTrue(calls.isEmpty())
     }
@@ -242,6 +242,31 @@ class AudiobookMakerWorkerTest {
 
         scheduler.cancel("book")
         assertEquals(AudiobookJobState.Idle, runBlocking { scheduler.state("book").first() })
+    }
+
+    @Test
+    fun openingHonmaniStartsAgainAJobAndroidWouldNotStartInTheBackground() {
+        val maker = maker("resume")
+        val workManager = WorkManager.getInstance(context)
+        val scheduler = WorkManagerAudiobookScheduler(context, maker, workManager)
+        val name = WorkManagerAudiobookScheduler.workName("book")
+        fun live() = workManager.getWorkInfosForUniqueWork(name).get().single { it.state != WorkInfo.State.CANCELLED }
+
+        scheduler.start("book", "ja-JP-Chirp3-HD-Aoede", 2.0, allowMobileData = true)
+        val first = live().id
+        // A busy Google waits for its backoff.
+        maker.files("book").writeOutcome(MakerOutcome(MakerOutcome.Kind.PAUSED, "Google is busy."))
+        scheduler.resumeWaitingForApp()
+        assertEquals(first, live().id)
+
+        maker.files("book").writeOutcome(MakerOutcome(MakerOutcome.Kind.BACKGROUND, "Paused. Open Honmani to continue."))
+        assertEquals(AudiobookJobState.Paused("Paused. Open Honmani to continue."), runBlocking { scheduler.state("book").first() })
+        scheduler.resumeWaitingForApp()
+        val again = live()
+        assertTrue("a new run is queued at once", again.id != first)
+        assertEquals(NetworkType.CONNECTED, again.constraints.requiredNetworkType)
+        assertTrue(again.tags.contains("audiobook-cap:2.0"))
+        assertNull(maker.files("book").readOutcome())
     }
 
     @Test

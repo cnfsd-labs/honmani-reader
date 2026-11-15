@@ -29,4 +29,6 @@ class FakeAudiobookScheduler : AudiobookScheduler {
     }
 
     override fun state(bookHash: String): Flow<AudiobookJobState> = flow(bookHash)
+
+    override fun resumeWaitingForApp() = Unit
 }

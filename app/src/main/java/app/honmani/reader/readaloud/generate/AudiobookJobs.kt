@@ -5,8 +5,11 @@ import kotlinx.coroutines.flow.Flow
 /** Why a run of the audiobook worker ended without a finished book, kept in `outcome.txt` of the book's folder. */
 data class MakerOutcome(val kind: Kind, val message: String) {
     enum class Kind {
-        /** Google is busy or the phone could not start the work in the background: a retry is queued. */
+        /** Google is busy: a retry is queued. */
         PAUSED,
+
+        /** Android would not start the work in the background: a retry is queued, and opening Honmani starts it at once. */
+        BACKGROUND,
 
         /** The spending cap stopped it; raising the cap continues. */
         CAP,
@@ -67,4 +70,10 @@ interface AudiobookScheduler {
 
     /** The state of the job of [bookHash], following it as it changes. */
     fun state(bookHash: String): Flow<AudiobookJobState>
+
+    /**
+     * Starts again at once every job that waits because Android would not start it in the
+     * background; call it when Honmani comes to the foreground. Blocks: not on the main thread.
+     */
+    fun resumeWaitingForApp()
 }

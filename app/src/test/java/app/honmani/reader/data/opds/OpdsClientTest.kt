@@ -8,6 +8,7 @@ import java.net.ServerSocket
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -133,6 +134,24 @@ class OpdsClientTest {
         assertFails(OpdsException.Reason.NOT_A_CATALOGUE) { client.feed(opds, opds.url + "login") }
         val closedPort = ServerSocket(0).use { it.localPort }
         assertFails(OpdsException.Reason.NETWORK) { client.feed(opds, "http://127.0.0.1:$closedPort/opds") }
+    }
+
+    @Test
+    fun errorMessagesNameOnlyTheServer_neverAPathOrQuery() = runTest {
+        val catalogue = server { _, out -> out.respond("200 OK", "<!DOCTYPE html><html><body>Login</body></html>") }
+        val opds = OpdsServer("http://127.0.0.1:${catalogue.port}/")
+        try {
+            client.feed(opds, opds.url + "api/opds/secret-key?token=hidden")
+            fail("Expected a failure")
+        } catch (e: OpdsException) {
+            assertEquals("A page of http://127.0.0.1:${catalogue.port} is not an OPDS feed", e.message)
+        }
+        try {
+            client.feed(OpdsServer("ftp://a/"), "ftp://user:secret@a/x?token=hidden")
+            fail("Expected a failure")
+        } catch (e: OpdsException) {
+            assertFalse(e.message!!, "secret" in e.message!! || "hidden" in e.message!!)
+        }
     }
 
     @Test

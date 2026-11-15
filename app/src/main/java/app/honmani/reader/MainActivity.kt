@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
         container.appearanceSettings.refreshRandomAccent(container.dayClock.today().toEpochDay(), newLaunch = false)
         // Whatever the reader's other phones wrote into the sync folder (if turned on) comes in.
         (application as HonmaniApplication).container.syncWithFolder()
+        // An audiobook job Android would not start in the background goes on now, not after its backoff.
+        container.resumeAudiobooks()
     }
 
     override fun onStop() {

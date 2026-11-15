@@ -79,7 +79,7 @@ class OpdsClient(
             try {
                 OpdsParser.parseFeed(bytes, base)
             } catch (e: NotAFeedException) {
-                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "$url is not an OPDS feed", e)
+                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "A page of ${shown(url)} is not an OPDS feed", e)
             }
         }
     }
@@ -157,7 +157,7 @@ class OpdsClient(
         while (redirects <= MAX_REDIRECTS) {
             // Only web addresses: another scheme (ftp:, file:) gives no HTTP connection.
             if (!isWeb(current)) {
-                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "Not a web address: $current")
+                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "Not a web address")
             }
             val login = login(server, current)
             val connection = try {
@@ -171,8 +171,9 @@ class OpdsClient(
                 }
             } catch (e: IOException) {
                 throw networkError(e)
-            } catch (e: IllegalArgumentException) {
-                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "Bad address $current", e)
+            } catch (_: IllegalArgumentException) {
+                // Not the address or its cause's text: either may carry a login token.
+                throw OpdsException(OpdsException.Reason.NOT_A_CATALOGUE, "Bad address")
             }
             try {
                 val status = try {
@@ -244,9 +245,15 @@ class OpdsClient(
     }
 
     private fun tooLarge(url: String): Nothing =
-        throw OpdsException(OpdsException.Reason.TOO_LARGE, "$url is too large")
+        throw OpdsException(OpdsException.Reason.TOO_LARGE, "A file of ${shown(url)} is too large")
 
     companion object {
+        /**
+         * The server of [url] for an exception message, never its path or query: a crash record
+         * keeps the message, and some servers put an API key there (Kavita's `/api/opds/<key>`).
+         */
+        internal fun shown(url: String): String = originOf(url) ?: "the server"
+
         private const val MAX_REDIRECTS = 5
         private const val MAX_FEED_BYTES = 8 shl 20
         const val MAX_THUMBNAIL_BYTES = 2 shl 20

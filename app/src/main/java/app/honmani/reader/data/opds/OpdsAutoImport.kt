@@ -227,6 +227,15 @@ class OpdsAutoImport(
         const val MAX_PAGES = 100
 
         /**
+         * Deletes the `.part` files in [downloadsDir] last written before [before] (when this
+         * process started): a kill interrupted their download. A download running now is newer.
+         */
+        fun sweepStaleDownloads(downloadsDir: File, before: Long) {
+            downloadsDir.listFiles { file -> file.name.endsWith(".part") && file.lastModified() < before }
+                ?.forEach { it.delete() }
+        }
+
+        /**
          * The feed of a catalogue's newest books: the one the start feed links as "new", else
          * Calibre-Web's "Recently added" (`…/opds/new`), else the start feed itself if it lists
          * books.

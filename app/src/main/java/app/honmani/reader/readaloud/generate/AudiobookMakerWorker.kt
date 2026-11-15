@@ -45,7 +45,8 @@ class AudiobookEnvironment(
  * - Cap reached or stopped (key, billing, bad audio): failure, so nothing retries; the message is
  *   kept in `outcome.txt` for the dialog and shown in a notification.
  * - Paused (Google busy, or Android would not start the foreground service from the background):
- *   retry after 15 minutes; the outcome says why.
+ *   retry after 15 minutes; the outcome says why. The latter starts again when Honmani opens
+ *   ([WorkManagerAudiobookScheduler.resumeWaitingForApp]).
  * - Stopped by the system (network lost, Android 15's six hours for data sync) or cancelled:
  *   the coroutine is cancelled, WorkManager reschedules a system stop, and the journal makes the
  *   next run go on after the last whole sentence.
@@ -70,7 +71,7 @@ class AudiobookMakerWorker(
         } catch (_: IllegalStateException) {
             // Android 12+ refuses to start a foreground service while the app is in the background,
             // and a job this long must not run unseen: wait, and go on when the reader opens Honmani.
-            return paused(files, applicationContext.getString(R.string.audiobook_open_honmani))
+            return paused(files, applicationContext.getString(R.string.audiobook_open_honmani), MakerOutcome.Kind.BACKGROUND)
         }
         val plan = files.readPlan()
         val voice = env.voice(plan?.voice ?: inputData.getString(KEY_VOICE).orEmpty())
@@ -111,8 +112,8 @@ class AudiobookMakerWorker(
         if (problem == VoiceProblem.NETWORK) R.string.audiobook_paused_network else R.string.audiobook_paused_busy,
     )
 
-    private fun paused(files: GeneratedFiles, message: String): Result {
-        files.writeOutcome(MakerOutcome(MakerOutcome.Kind.PAUSED, message))
+    private fun paused(files: GeneratedFiles, message: String, kind: MakerOutcome.Kind = MakerOutcome.Kind.PAUSED): Result {
+        files.writeOutcome(MakerOutcome(kind, message))
         return Result.retry()
     }
 
@@ -236,6 +237,11 @@ class WorkManagerAudiobookScheduler(
                     .build(),
             )
             .setBackoffCriteria(BackoffPolicy.LINEAR, AudiobookMaker.PAUSE_MS, TimeUnit.MILLISECONDS)
+            // WorkInfo has no input data: the tags let resumeWaitingForApp queue the same job again.
+            .addTag(TAG)
+            .addTag(BOOK_TAG + bookHash)
+            .addTag(CAP_TAG + capUsd)
+            .addTag(VOICE_TAG + voice)
             .build()
         // Replace: a new cap or network choice applies; the journal makes the new run go on where the old one was.
         workManager.enqueueUniqueWork(workName(bookHash), ExistingWorkPolicy.REPLACE, request)
@@ -246,6 +252,18 @@ class WorkManagerAudiobookScheduler(
         maker.files(bookHash).clearOutcome()
     }
 
+    override fun resumeWaitingForApp() {
+        for (info in workManager.getWorkInfosByTag(TAG).get()) {
+            if (info.state != WorkInfo.State.ENQUEUED) continue
+            fun tagged(prefix: String) = info.tags.firstOrNull { it.startsWith(prefix) }?.removePrefix(prefix)
+            val bookHash = tagged(BOOK_TAG) ?: continue
+            if (maker.files(bookHash).readOutcome()?.kind != MakerOutcome.Kind.BACKGROUND) continue
+            val cap = tagged(CAP_TAG)?.toDoubleOrNull() ?: continue
+            val mobileData = info.constraints.requiredNetworkType != NetworkType.UNMETERED
+            start(bookHash, tagged(VOICE_TAG).orEmpty(), cap, mobileData)
+        }
+    }
+
     override fun state(bookHash: String): Flow<AudiobookJobState> =
         workManager.getWorkInfosForUniqueWorkFlow(workName(bookHash)).map { infos ->
             jobState(infos.firstOrNull(), maker.files(bookHash).readOutcome())
@@ -254,11 +272,20 @@ class WorkManagerAudiobookScheduler(
     companion object {
         fun workName(bookHash: String) = "audiobook-$bookHash"
 
+        private const val TAG = "audiobook"
+        private const val BOOK_TAG = "audiobook-book:"
+        private const val CAP_TAG = "audiobook-cap:"
+        private const val VOICE_TAG = "audiobook-voice:"
+
         /** The state for the work [info] (null: none) and the last [outcome] on disk. */
         fun jobState(info: WorkInfo?, outcome: MakerOutcome?): AudiobookJobState = when (info?.state) {
             WorkInfo.State.RUNNING -> AudiobookJobState.Running(AudiobookMakerWorker.progressOf(info.progress))
             WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED ->
-                if (outcome?.kind == MakerOutcome.Kind.PAUSED) AudiobookJobState.Paused(outcome.message) else AudiobookJobState.Waiting
+                if (outcome?.kind == MakerOutcome.Kind.PAUSED || outcome?.kind == MakerOutcome.Kind.BACKGROUND) {
+                    AudiobookJobState.Paused(outcome.message)
+                } else {
+                    AudiobookJobState.Waiting
+                }
             WorkInfo.State.SUCCEEDED -> AudiobookJobState.Finished
             WorkInfo.State.CANCELLED -> AudiobookJobState.Idle
             WorkInfo.State.FAILED, null -> when (outcome?.kind) {
