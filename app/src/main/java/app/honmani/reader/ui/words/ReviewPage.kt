@@ -183,6 +183,7 @@ fun ReviewPage(
                         } else {
                             null
                         },
+                        colors = selectedChipColors(),
                     )
                 }
                 chip(ReviewScope.Due, stringResource(R.string.review_chip_due))

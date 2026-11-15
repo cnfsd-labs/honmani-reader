@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.focus.focusRequester
@@ -587,6 +588,7 @@ private fun WordsContent(
                             } else {
                                 null
                             },
+                            colors = selectedChipColors(),
                         )
                     }
                 }
@@ -653,6 +655,17 @@ private fun WordsContent(
         )
     }
 }
+
+/**
+ * Filter chips whose selected one is filled with the theme's primary colour: the default pale
+ * container is hard to tell from an unselected chip, in light themes especially.
+ */
+@Composable
+internal fun selectedChipColors() = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = MaterialTheme.colorScheme.primary,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+)
 
 /** One of the two lists: [words] saved, then (known list) [knownByReading]. */
 @OptIn(ExperimentalLayoutApi::class)
