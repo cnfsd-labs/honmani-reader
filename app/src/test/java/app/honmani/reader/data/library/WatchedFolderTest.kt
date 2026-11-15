@@ -34,7 +34,7 @@ class WatchedFolderTest {
     }
 
     private fun scan(tree: FakeDocumentTree, seen: SeenFiles, removed: Set<String> = emptySet()) =
-        runBlocking { WatchedFolderScan.find(tree, seen, removed) { hash(it) } }
+        runBlocking { WatchedFolderScan.find(tree, seen, removed, recheckMillis = 0) { hash(it) } }
 
     private fun tree(vararg entries: TreeEntry) = FakeDocumentTree(
         mapOf("root" to listOf(folder("root/s")) , "root/s" to entries.toList()),
@@ -93,13 +93,32 @@ class WatchedFolderTest {
         val settled = file("root/s/b.epub").copy(size = 10, modified = 999)
 
         val result = runBlocking {
-            WatchedFolderScan.find(tree(copying, settled), seen, emptySet(), modifiedBefore = 1_000) { hash(it) }
+            WatchedFolderScan.find(tree(copying, settled), seen, emptySet(), modifiedBefore = 1_000, recheckMillis = 0) { hash(it) }
         }
 
         assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
         assertEquals(mapOf("root/s/b.epub" to "hash-of-root/s/b.epub"), result.hashes)
         assertEquals(listOf("root/s/b.epub"), hashed)
         assertTrue("a file still being copied must not count as seen", !seen.isUnchanged(copying))
+    }
+
+    @Test
+    fun aFileGrowingDuringTheScanIsLeftForALaterScan_evenWithAnOldModifiedTime() {
+        val seen = SeenFiles(seenFile)
+        val settled = file("root/s/b.epub").copy(size = 10, modified = 5)
+        var size = 10L
+        val fake = tree(file("root/s/a.epub").copy(size = 10, modified = 5), settled)
+        val growing = object : DocumentTree by fake {
+            override fun children(folderId: String) = fake.children(folderId)?.map {
+                if (it.id == "root/s/a.epub") it.copy(size = size).also { size += 10 } else it
+            }
+        }
+
+        val result = runBlocking { WatchedFolderScan.find(growing, seen, emptySet(), recheckMillis = 10) { hash(it) } }
+
+        assertEquals(listOf("root/s/b.epub"), result.files.map { it.id })
+        assertEquals(emptyMap<String, String>(), result.hashes - "root/s/b.epub")
+        assertTrue("a file still being copied must not count as seen", !seen.isUnchanged(file("root/s/a.epub").copy(size = 10, modified = 5)))
     }
 
     @Test
@@ -122,7 +141,7 @@ class WatchedFolderTest {
         val seen = SeenFiles(seenFile)
         val tree = tree(file("root/s/a.epub"))
 
-        val result = runBlocking { WatchedFolderScan.find(tree, seen, emptySet()) { null } }
+        val result = runBlocking { WatchedFolderScan.find(tree, seen, emptySet(), recheckMillis = 0) { null } }
 
         assertTrue(result.files.isEmpty())
         assertEquals(0, seen.size())

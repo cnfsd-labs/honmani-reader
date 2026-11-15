@@ -7,6 +7,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
 
@@ -154,21 +155,32 @@ object WatchedFolderScan {
     const val SETTLE_MILLIS = 15_000L
 
     /**
+     * A copy may keep the source's modified time, so new files are also listed again this long
+     * after the first look (and their hashing): one whose size changed meanwhile waits.
+     */
+    const val RECHECK_MILLIS = 1_500L
+
+    /**
      * Walks [tree] (same limits as the folder import) and returns the book files that are new or
      * changed since [seen]. Those are hashed with [hashOf] (null: could not be read, tried again
      * next time); one whose hash is in [removedHashes] is marked seen and left out. Unchanged
      * files are not read at all. A file modified at or after [modifiedBefore] may still be being
      * copied into the folder: it is left alone (not hashed, not marked) until a later scan. A file
-     * larger than [BookImporter.MAX_BOOK_BYTES] is marked seen without being read.
+     * larger than [BookImporter.MAX_BOOK_BYTES] is marked seen without being read. The folder is
+     * listed again [recheckMillis] after the first look; a file whose size or modified time
+     * changed meanwhile is still being copied and is left for a later scan too.
      */
     suspend fun find(
         tree: DocumentTree,
         seen: SeenFiles,
         removedHashes: Set<String>,
         modifiedBefore: Long = Long.MAX_VALUE,
+        recheckMillis: Long = RECHECK_MILLIS,
         hashOf: suspend (TreeEntry) -> String?,
     ): WatchedScan {
+        val listedAt = System.currentTimeMillis()
         val scan = TreeWalker.findBooks(tree)
+        val candidates = mutableListOf<Pair<TreeEntry, String>>()
         val files = mutableListOf<TreeEntry>()
         val hashes = HashMap<String, String>()
         var removed = 0
@@ -184,6 +196,14 @@ object WatchedFolderScan {
                 continue
             }
             val hash = hashOf(entry) ?: continue
+            candidates += entry to hash
+        }
+        if (candidates.isNotEmpty()) {
+            delay(recheckMillis - (System.currentTimeMillis() - listedAt))
+            val now = TreeWalker.findBooks(tree).files.associateBy { it.id }
+            candidates.retainAll { (entry, _) -> now[entry.id]?.let { it.size == entry.size && it.modified == entry.modified } == true }
+        }
+        for ((entry, hash) in candidates) {
             if (hash in removedHashes) {
                 seen.mark(entry)
                 removed++
