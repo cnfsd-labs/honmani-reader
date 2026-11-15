@@ -1,6 +1,7 @@
 package app.honmani.reader.data.sync
 
 import app.honmani.reader.data.net.LoginGate
+import app.honmani.reader.data.opds.head
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -125,6 +126,25 @@ class KoSyncClientTest {
         assertFails(KoSyncException.Reason.UNAUTHORIZED) { client.authorize(account.copy(userKey = "wrong")) }
         assertFails(KoSyncException.Reason.NETWORK) { client.authorize(account.copy(server = server.url + "/nothing-here")) }
         assertFails(KoSyncException.Reason.NETWORK) { client.authorize(account.copy(server = "ftp://example.com")) }
+    }
+
+    @Test
+    fun anHttpAddressRedirectedToHttps_asksForTheHttpsAddress_andSendsNoLogin() = runTest {
+        val moved = app.honmani.reader.data.opds.HeaderServer { path, out ->
+            out.head("301 Moved Permanently", "Location: https://127.0.0.1$path", "Content-Length: 0")
+        }
+        try {
+            assertFails(KoSyncException.Reason.USE_HTTPS) { client.signIn("http://127.0.0.1:${moved.port}", "reader", "secret") }
+            assertEquals(1, moved.requests.size)
+            assertTrue(moved.requests.all { it.headers["x-auth-key"] == null && it.headers["authorization"] == null })
+        } finally {
+            moved.stop()
+        }
+        val http = java.net.URL("http://nas.local:8081/users/auth")
+        assertTrue(KoSyncClient.upgradesToHttps(http, "https://NAS.local/users/auth"))
+        assertTrue(!KoSyncClient.upgradesToHttps(http, "https://elsewhere.example/users/auth"))
+        assertTrue(!KoSyncClient.upgradesToHttps(http, "/login"))
+        assertTrue(!KoSyncClient.upgradesToHttps(java.net.URL("https://nas.local/users/auth"), "https://nas.local/x"))
     }
 
     @Test

@@ -75,6 +75,12 @@ class KoSyncException(
 
         /** The phone's Keystore could not encrypt the login: nothing was saved. */
         PASSWORD_STORAGE,
+
+        /**
+         * An http address the server redirects to https on the same host: the reader should enter
+         * the https address. Not followed, so a login never goes to an origin it was not typed for.
+         */
+        USE_HTTPS,
     }
 }
 
@@ -236,6 +242,9 @@ class KoSyncClient(
             }
             val status = connection.responseCode
             NetworkLog.shared.answered(NetworkPurpose.PROGRESS_SYNC, url.toString(), status, connection.contentLengthLong)
+            if (status in 300..399 && upgradesToHttps(url, connection.getHeaderField("Location"))) {
+                throw KoSyncException(KoSyncException.Reason.USE_HTTPS, "The server answered $status: use its https address", status = status)
+            }
             // Komga answers 403, not 401, to a missing or wrong login.
             if (status == 401 || status == 403) throw KoSyncException(KoSyncException.Reason.UNAUTHORIZED, "Wrong login")
             val stream = if (status >= 400) connection.errorStream else connection.inputStream
@@ -283,6 +292,17 @@ class KoSyncClient(
         private const val CWA_PATH = "/kosync"
         private const val KOMGA_PATH = "/koreader"
         private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+
+        /** Whether [location] (a redirect's target) is the https version of the http address [url]. */
+        internal fun upgradesToHttps(url: URL, location: String?): Boolean {
+            if (url.protocol != "http" || location == null) return false
+            val target = try {
+                URL(url, location)
+            } catch (_: IOException) {
+                return false
+            }
+            return target.protocol == "https" && target.host.equals(url.host, ignoreCase = true)
+        }
 
         /** The server address as typed (with or without a trailing slash, https:// added if missing) plus [path]. */
         internal fun endpoint(server: String, path: String): String {

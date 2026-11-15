@@ -120,6 +120,7 @@ private fun SignInDialog(onDismiss: () -> Unit) {
                     KoSyncException.Reason.SERVER -> R.string.sync_error_server
                     KoSyncException.Reason.HOTSPOT -> R.string.sync_error_hotspot
                     KoSyncException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
+                    KoSyncException.Reason.USE_HTTPS -> R.string.sync_error_use_https
                 }
             } finally {
                 checking = false

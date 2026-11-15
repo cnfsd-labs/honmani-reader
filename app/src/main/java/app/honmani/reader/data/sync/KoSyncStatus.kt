@@ -46,7 +46,7 @@ class KoSyncStatus(
         val kex = error as? KoSyncException
         val kind = when (kex?.reason) {
             KoSyncException.Reason.UNAUTHORIZED -> SyncFailure.Kind.UNAUTHORIZED
-            KoSyncException.Reason.NETWORK -> SyncFailure.Kind.NETWORK
+            KoSyncException.Reason.NETWORK, KoSyncException.Reason.USE_HTTPS -> SyncFailure.Kind.NETWORK
             KoSyncException.Reason.SERVER -> SyncFailure.Kind.SERVER
             KoSyncException.Reason.HOTSPOT -> SyncFailure.Kind.HOTSPOT
             KoSyncException.Reason.PASSWORD_STORAGE, null -> SyncFailure.Kind.OTHER

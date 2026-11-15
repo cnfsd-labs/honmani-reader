@@ -355,6 +355,7 @@ private fun catalogSyncErrorText(reason: KoSyncException.Reason) = when (reason)
     KoSyncException.Reason.SERVER -> R.string.sync_error_server
     KoSyncException.Reason.HOTSPOT -> R.string.sync_error_hotspot
     KoSyncException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
+    KoSyncException.Reason.USE_HTTPS -> R.string.sync_error_use_https
     else -> R.string.catalog_sync_error_none
 }
 
