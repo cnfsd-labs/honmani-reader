@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -62,6 +63,17 @@ class AudiobookStoreTest {
         store.savePosition("abc", 5)
         assertEquals(0L, store.position("abc"))
         assertTrue(File(folder.root, "audiobook").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun anAudioFileStaysPairedWhileAnyBookUsesIt() {
+        val store = store()
+        store.pair("abc", "content://audio/1", "a".toByteArray())
+        store.pair("def", "content://audio/1", "b".toByteArray())
+        store.forget("abc")
+        assertTrue(store.isPaired("content://audio/1"))
+        store.forget("def")
+        assertFalse(store.isPaired("content://audio/1"))
     }
 
     @Test

@@ -123,6 +123,8 @@ class AudiobookSession(
     }
 
     private fun release(audio: String) {
+        // Another book may play the same file.
+        if (store.isPaired(audio)) return
         try {
             context.contentResolver.releasePersistableUriPermission(Uri.parse(audio), Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (_: Exception) {

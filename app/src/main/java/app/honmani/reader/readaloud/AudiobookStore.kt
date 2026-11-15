@@ -24,6 +24,10 @@ class AudiobookStore(
         return AudiobookPairing(audio, srt)
     }
 
+    /** Whether a book is still paired with [audio]: its permission must stay. */
+    fun isPaired(audio: String): Boolean =
+        preferences.all.any { (key, value) -> key.startsWith("audiobook.") && key.endsWith(".$AUDIO") && value == audio }
+
     /** Pairs the book with [audio] and the subtitles in [srtBytes]; the position starts over. */
     fun pair(bookHash: String, audio: String, srtBytes: ByteArray): AudiobookPairing {
         val hash = sha256(srtBytes)
