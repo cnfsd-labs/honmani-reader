@@ -24,7 +24,11 @@ import app.honmani.reader.data.words.WordLookupEntity
 import app.honmani.reader.data.words.WordProgressStore
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -62,8 +66,9 @@ class SyncMergeTest {
         private val stretches = ReadStretchStore(dir.resolve("stretches.txt"))
         private val progress = WordProgressStore(dir.resolve("progress.json"))
         val restored = RestoredBooks(dir.resolve("restored.json"))
-        val backup = Backup(db, settings, milestones, stretches, progress, restored, { emptyMap() }, { id }, { clock })
-        private val merger = SyncMerge(db, milestones, stretches, progress, restored, now = { clock }) { id }
+        val restoring = Mutex()
+        val backup = Backup(db, settings, milestones, stretches, progress, restored, { emptyMap() }, { id }, { clock }, restoring)
+        private val merger = SyncMerge(db, milestones, stretches, progress, restored, now = { clock }, restoring = restoring) { id }
         private val syncSettings = SyncSettings(settings, device) { clock }
         val address = "$folderName/${SyncFolder.fileName(id)}"
         var merges = 0
@@ -144,6 +149,24 @@ class SyncMergeTest {
     fun tearDown() {
         phones.forEach { it.close() }
         UpdateClock.source = System::currentTimeMillis
+    }
+
+    @Test
+    fun aMergeWaitsForARunningRestore() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        a.addWord()
+        a.sync()
+
+        b.restoring.lock()
+        val syncing = launch(Dispatchers.Default) { b.sync() }
+        withTimeoutOrNull(300) { syncing.join() }
+        assertTrue(syncing.isActive)
+        assertNull(b.findWord())
+
+        b.restoring.unlock()
+        syncing.join()
+        assertNotNull(b.findWord())
     }
 
     // Clocks that are wrong

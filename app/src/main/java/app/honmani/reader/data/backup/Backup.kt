@@ -107,6 +107,8 @@ class Backup(
     /** Names this installation in the keys of books known only by their statistics. */
     private val installationId: () -> String,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Held while a restore runs; [SyncMerge] waits for it too. */
+    private val restoring: Mutex = Mutex(),
 ) {
     private val dao = database.backupDao()
     private val wordDao = database.wordDao()
@@ -258,8 +260,6 @@ class Backup(
      * merging into it.
      */
     suspend fun restore(backup: BackupFile): RestoreSummary = withContext(NonCancellable) { restoring.withLock { restoreNow(backup) } }
-
-    private val restoring = Mutex()
 
     private suspend fun restoreNow(backup: BackupFile): RestoreSummary {
         val newWaiting = ArrayList<WaitingBook>()

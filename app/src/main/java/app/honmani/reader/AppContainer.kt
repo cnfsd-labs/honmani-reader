@@ -749,6 +749,9 @@ class AppContainer(context: Context) {
     /** What a restored backup keeps for books not back in the library yet. */
     val restoredBooks: RestoredBooks by lazy { RestoredBooks(File(appContext.filesDir, "restored-books.json")) }
 
+    /** Held while a restore runs: sync merges wait for it, as exports do. */
+    private val restoreLock = Mutex()
+
     /** Backups of everything but the books (Settings → Back up and restore). */
     val backup: Backup by lazy {
         Backup(
@@ -760,6 +763,7 @@ class AppContainer(context: Context) {
             restored = restoredBooks,
             grades = { difficultyStore.grades.value },
             installationId = ::installationId,
+            restoring = restoreLock,
         )
     }
 
@@ -857,7 +861,7 @@ class AppContainer(context: Context) {
     }
 
     private val syncMerge: SyncMerge by lazy {
-        SyncMerge(database, milestoneStore, readStretches, wordProgressStore, restoredBooks, installationId = ::installationId)
+        SyncMerge(database, milestoneStore, readStretches, wordProgressStore, restoredBooks, installationId = ::installationId, restoring = restoreLock)
     }
 
     private val syncSettings: SyncSettings by lazy { SyncSettings(settingsPreferences, devicePreferences) }

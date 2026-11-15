@@ -33,6 +33,8 @@ import app.honmani.reader.data.words.WordProgressStore
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.data.words.WordStep
 import java.time.LocalDate
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Takes another phone's sync file ([SyncFolder]) into this phone's data. Unlike [Backup.restore], which
@@ -48,6 +50,8 @@ class SyncMerge(
     private val wordProgress: WordProgressStore,
     private val restored: RestoredBooks,
     private val now: () -> Long = System::currentTimeMillis,
+    /** [Backup]'s restore lock: a merge waits for a running restore, as an export does. */
+    private val restoring: Mutex = Mutex(),
     private val installationId: () -> String,
 ) {
     private val dao = database.backupDao()
@@ -87,7 +91,9 @@ class SyncMerge(
         }
     }
 
-    suspend fun merge(incoming: BackupFile) {
+    suspend fun merge(incoming: BackupFile) = restoring.withLock { mergeNow(incoming) }
+
+    private suspend fun mergeNow(incoming: BackupFile) {
         // Another phone's clock may be wrong: no time of its file counts for more than a day from now.
         val file = SyncStamps.clamp(incoming, SyncStamps.ceiling(now()))
         val positions = ArrayList<Pair<BookEntity, Long>>()

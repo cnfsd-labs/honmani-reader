@@ -87,6 +87,11 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
             null,
             null,
         )?.use { cursor ->
+            // As in [find]: a list still loading would make files missing from it look gone (the
+            // held question dropped, seen files forgotten).
+            if (cursor.extras?.getBoolean(DocumentsContract.EXTRA_LOADING) == true) {
+                throw IOException("$folder is still loading")
+            }
             while (cursor.moveToNext()) {
                 val name = cursor.getString(1) ?: continue
                 files += FolderFile(
