@@ -30,6 +30,9 @@ internal class FakeFolder : FolderTarget {
     var denyWrite = false
     var folderGone = false
 
+    /** A cloud folder still fetching its listing: whether a file is there can't be told yet. */
+    var loading = false
+
     override fun grant(folder: String) {
         if (denyGrant) throw SecurityException("no")
         granted += folder
@@ -41,12 +44,16 @@ internal class FakeFolder : FolderTarget {
 
     override fun find(folder: String, name: String): String? {
         if (folderGone) throw FileNotFoundException(folder)
+        if (loading) throw IOException("still loading")
         return "$folder/$name".takeIf { it in files }
     }
 
     override fun create(folder: String, name: String): String {
         if (folderGone) throw FileNotFoundException(folder)
-        val address = "$folder/$name"
+        // As document providers do, a taken name gets a number.
+        val address = generateSequence(1) { it + 1 }
+            .map { if (it == 1) "$folder/$name" else "$folder/${name.removeSuffix(".zip")} ($it).zip" }
+            .first { it !in files }
         files[address] = ByteArray(0)
         return address
     }
@@ -291,7 +298,7 @@ class FolderBackupTest {
         assertEquals("zip one", String(folder.files[file]!!))
         assertEquals(FoundBackup(kept, "honmani-backup-${stamp(made)}.zip", made), backup.found.value)
         assertEquals(made, backup.read(backup.found.value!!).exportedAt)
-        // Only the first copy looks: later ones replace this install's own file as before.
+        // Later copies replace this install's own file.
         source.writeText("zip two")
         backup.copy(source)
         assertEquals(setOf(file, kept), folder.files.keys)
@@ -374,5 +381,63 @@ class FolderBackupTest {
 
         assertEquals(FolderBackupState.Unavailable, backup.state.value)
         assertTrue(earlier.contentEquals(folder.files[file]))
+    }
+
+    @Test
+    fun anotherPhonesBackupWrittenLaterIsKeptNotOverwritten() = runBlocking {
+        backup.choose("content://tree/a")
+        backup.copy(source)
+        // Another phone sharing the synced folder writes its own backup there.
+        val other = backupBytes(1_000L)
+        folder.files[file] = other
+
+        source.writeText("zip two")
+        backup.copy(source)
+
+        val kept = "content://tree/a/honmani-backup-${stamp(1_000L)}.zip"
+        assertTrue(other.contentEquals(folder.files[kept]))
+        assertEquals("zip two", String(folder.files[file]!!))
+        assertEquals(kept, backup.found.value?.file)
+    }
+
+    @Test
+    fun aFolderThatCannotBeListedForSureIsNotWrittenAndLookedAtAgain() = runBlocking {
+        val other = backupBytes(1_000L)
+        folder.files[file] = other
+        backup.choose("content://tree/a")
+        folder.loading = true
+
+        backup.copy(source)
+
+        assertEquals(FolderBackupState.Unavailable, backup.state.value)
+        assertEquals(setOf(file), folder.files.keys)
+        assertTrue(other.contentEquals(folder.files[file]))
+
+        folder.loading = false
+        backup.copy(source)
+
+        assertTrue(other.contentEquals(folder.files["content://tree/a/honmani-backup-${stamp(1_000L)}.zip"]))
+        assertEquals("zip one", String(folder.files[file]!!))
+        assertEquals(FolderBackupState.On(5_000L), backup.state.value)
+    }
+
+    @Test
+    fun aLeftoverTemporaryFileSurvivesAFailedWrite() = runBlocking {
+        backup.choose("content://tree/a")
+        backup.copy(source)
+        val leftover = "content://tree/a/tmp-${FolderBackup.FILE_NAME}"
+        folder.files[leftover] = "only finished copy".toByteArray()
+
+        source.writeText("zip two, longer")
+        folder.failAfter = 3
+        backup.copy(source)
+
+        assertEquals(FolderBackupState.Unavailable, backup.state.value)
+        assertEquals("only finished copy", String(folder.files[leftover]!!))
+
+        folder.failAfter = null
+        backup.copy(source)
+
+        assertEquals(mapOf(file to "zip two, longer"), folder.files.mapValues { String(it.value) })
     }
 }

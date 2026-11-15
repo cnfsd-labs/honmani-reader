@@ -29,7 +29,10 @@ interface FolderTarget {
     /** Gives that right up again; never throws. */
     fun release(folder: String)
 
-    /** The file called [name] in [folder] (its address), or null if there is none. */
+    /**
+     * The file called [name] in [folder] (its address), or null if there is none. Throws when the
+     * provider can't say for sure (it is gone or busy, or a cloud folder is still loading).
+     */
     fun find(folder: String, name: String): String?
 
     /** Makes a new, empty file called [name] in [folder]; the provider may alter the name. */
@@ -62,10 +65,12 @@ interface FolderTarget {
  * killed) leaves the earlier file untouched: [write] fills a finished temporary file called
  * [tempName] first (its name must end the way the provider expects for a zip), and only then is the
  * old file deleted and the new one renamed. A provider that can't rename gets the old file
- * overwritten in place instead, while the finished temporary file still exists.
+ * overwritten in place instead, while the finished temporary file still exists. A temporary file
+ * left by an earlier run (possibly the only finished copy) is deleted only once this one succeeded.
  */
 internal fun FolderTarget.replaceFile(folder: String, name: String, tempName: String, write: (OutputStream) -> Unit) {
-    find(folder, tempName)?.let { delete(it) }
+    val leftover = find(folder, tempName)
+    // The provider gives the new file a free name next to the leftover one.
     val temp = create(folder, tempName)
     var complete = false
     var overwriting = false
@@ -89,6 +94,7 @@ internal fun FolderTarget.replaceFile(folder: String, name: String, tempName: St
         }
         throw e
     }
+    if (leftover != null && leftover != temp) runCatching { delete(leftover) }
 }
 
 /** How the copy of the backup in the chosen folder stands. */
@@ -128,7 +134,7 @@ class FolderBackup(
 
     private val _found = MutableStateFlow(readFound())
 
-    /** A backup found in the folder when it was chosen, to offer for restoring; null when there is none. */
+    /** A backup another install left in the folder, to offer for restoring; null when there is none. */
     val found: StateFlow<FoundBackup?> = _found.asStateFlow()
 
     private fun readFound(): FoundBackup? {
@@ -171,8 +177,6 @@ class FolderBackup(
             .putString(KEY_FOLDER, folder)
             .remove(KEY_LAST)
             .putBoolean(KEY_FAILED, false)
-            // The first copy looks for a backup already there before it writes.
-            .putBoolean(KEY_CHECKED, false)
             .apply()
         _state.value = read()
         return true
@@ -211,17 +215,17 @@ class FolderBackup(
     }
 
     private fun write(folder: String, source: File) {
-        if (!device.getBoolean(KEY_CHECKED, true)) {
-            keepExisting(folder)
-            device.edit().putBoolean(KEY_CHECKED, true).apply()
-        }
+        // At every copy, not only the first: another phone may share the folder (a synced cloud
+        // folder), and a folder that couldn't be read for sure fails here instead of being taken
+        // as empty.
+        keepExisting(folder)
         target.replaceFile(folder, FILE_NAME, TEMP_NAME) { out -> source.inputStream().use { it.copyTo(out) } }
         device.edit().putString(KEY_WRITTEN, source.inputStream().use(::sha256)).apply()
     }
 
     /**
-     * A backup file already in a newly chosen [folder] that this install didn't write last (its
-     * content differs) is renamed to a dated name, or copied there if the provider can't rename,
+     * A backup file already in [folder] that this install didn't write last (its content differs
+     * from the last copy's, [KEY_WRITTEN]) is renamed to a dated name, or copied there if the provider can't rename,
      * before anything overwrites it. Throws if it can't be kept: then nothing is written.
      */
     private fun keepExisting(folder: String) {
@@ -276,10 +280,10 @@ class FolderBackup(
         private const val KEY_LAST = "folder_backup_last"
         private const val KEY_FAILED = "folder_backup_failed"
 
-        /** False until the first copy into a newly chosen folder has looked for a backup already there. */
-        private const val KEY_CHECKED = "folder_backup_checked"
-
-        /** SHA-256 of the last file this install copied into a folder; kept when switched off. */
+        /**
+         * SHA-256 of the last file this install copied into a folder; kept when switched off. A file
+         * there with other content is another install's and is kept, never overwritten.
+         */
         private const val KEY_WRITTEN = "folder_backup_written"
         private const val KEY_FOUND_FILE = "folder_backup_found_file"
         private const val KEY_FOUND_NAME = "folder_backup_found_name"

@@ -40,12 +40,17 @@ class ContentFolderTarget(private val resolver: ContentResolver) : FolderTarget 
             null,
             null,
         )?.use { cursor ->
+            // A cloud folder may answer with what it has so far and fetch the rest: a file not
+            // listed yet is not known to be absent.
+            if (cursor.extras?.getBoolean(DocumentsContract.EXTRA_LOADING) == true) {
+                throw IOException("$folder is still loading")
+            }
             while (cursor.moveToNext()) {
                 if (cursor.getString(1) == name) {
                     return DocumentsContract.buildDocumentUriUsingTree(tree, cursor.getString(0)).toString()
                 }
             }
-        }
+        } ?: throw IOException("Cannot list $folder")
         return null
     }
 
