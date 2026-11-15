@@ -95,19 +95,20 @@ class EpubPositions private constructor(
         var offset = 0
         var last: XNode? = null
         walk(body) { node ->
-            val count = count(node.text!!)
+            val count = if (node.isText) count(node.text!!) else 1
             if (count == 0) return@walk true
-            last = node
+            if (node.isText) last = node
             if (remaining < count) {
                 found = node
-                offset = offsetOf(node.text, remaining)
+                // At a gaiji picture: the element itself, which KOReader reads as the point before it.
+                offset = if (node.isText) offsetOf(node.text!!, remaining) else -1
                 return@walk false
             }
             remaining -= count
             true
         }
         val node = found ?: last?.also { offset = it.text!!.codePointCount(0, it.text.length) } ?: return null
-        return "/body/DocFragment[${index + 1}]" + path(body, node) + ".$offset"
+        return "/body/DocFragment[${index + 1}]" + path(body, node) + if (offset < 0) "" else ".$offset"
     }
 
     private fun sizeOf(index: Int): Int = (if (index + 1 < starts.size) starts[index + 1] else total) - starts[index]
@@ -161,10 +162,7 @@ class EpubPositions private constructor(
                         return null
                     }
                     val body = text?.let { bodyOf(Xhtml.parse(it)) } ?: continue
-                    walk(body) { node ->
-                        total += count(node.text!!)
-                        true
-                    }
+                    total += countWithGaiji(body)
                 }
                 EpubPositions(file, spine, starts, total)
             }
@@ -222,7 +220,6 @@ class EpubPositions private constructor(
                 spine.mapNotNull { name ->
                     val body = zip.text(name)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
                     val pieces = ArrayList<SpeechPiece>()
-                    fun isGaiji(node: XNode) = node.name == "img" && node.attributes["class"]?.contains("gaiji") == true
 
                     /** The text under [node] as the page shows it, without readings. */
                     fun collect(node: XNode, sink: StringBuilder) {
@@ -409,12 +406,12 @@ class EpubPositions private constructor(
         private fun bodyOf(document: XNode): XNode = document.find("body") ?: document
 
         /**
-         * Visits the text nodes ttu counts, in reading order, until [visit] returns false: not
-         * inside ruby readings (<rt>) or hidden elements.
+         * Visits the text nodes and gaiji pictures ttu counts, in reading order, until [visit]
+         * returns false: not inside ruby readings (<rt>) or hidden elements.
          */
         private fun walk(node: XNode, visit: (XNode) -> Boolean): Boolean {
             for (child in node.children) {
-                if (child.isText) {
+                if (child.isText || (isGaiji(child) && !skipped(child))) {
                     if (!visit(child)) return false
                 } else if (!skipped(child)) {
                     if (!walk(child, visit)) return false
@@ -422,6 +419,9 @@ class EpubPositions private constructor(
             }
             return true
         }
+
+        /** ttu's gaiji: an inline picture of a character, an <img> with a class containing "gaiji". */
+        private fun isGaiji(node: XNode) = node.name == "img" && node.attributes["class"]?.contains("gaiji") == true
 
         private fun skipped(element: XNode) =
             element.name == "rt" || "hidden" in element.attributes || "aria-hidden" in element.attributes
@@ -443,6 +443,10 @@ class EpubPositions private constructor(
                     if (counted) count += count(node.text!!)
                     return true
                 }
+                if (isGaiji(node)) {
+                    if (counted) count++
+                    return true
+                }
                 for (child in node.children) {
                     if (!visit(child, counted && !skippedNode(child))) return false
                 }
@@ -456,7 +460,7 @@ class EpubPositions private constructor(
 
         private fun add(node: XNode, counted: Boolean, sink: (Int) -> Unit) {
             if (!counted) return
-            if (node.isText) sink(count(node.text!!)) else node.children.forEach { add(it, !skippedNode(it), sink) }
+            if (node.isText) sink(count(node.text!!)) else if (isGaiji(node)) sink(1) else node.children.forEach { add(it, !skippedNode(it), sink) }
         }
 
         /** How many characters ttu counts in [text]. */

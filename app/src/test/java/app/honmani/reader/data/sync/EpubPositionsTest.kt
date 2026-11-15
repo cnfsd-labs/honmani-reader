@@ -124,6 +124,37 @@ class EpubPositionsTest {
     }
 
     @Test
+    fun gaijiPicturesCountAsOneCharacter_andSurviveTheRoundTrip() {
+        val file = folder.newFile("gaiji-positions.epub")
+        java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+            val entries = mapOf(
+                "META-INF/container.xml" to """<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>""",
+                "content.opf" to """<package><manifest><item id="a" href="a.xhtml"/><item id="b" href="b.xhtml"/></manifest><spine><itemref idref="a"/><itemref idref="b"/></spine></package>""",
+                "a.xhtml" to """<html><body><p>東<img class="gaiji" src="g.png"/>京<img class="x-gaiji-wide" src="h.png"/></p><p>都<img src="cover.png"/></p></body></html>""",
+                "b.xhtml" to """<html><body><p>本</p></body></html>""",
+            )
+            for ((name, text) in entries) {
+                zip.putNextEntry(java.util.zip.ZipEntry(name))
+                zip.write(text.toByteArray())
+                zip.closeEntry()
+            }
+        }
+
+        val gaiji = EpubPositions.read(file)!!
+
+        // 東 + gaiji + 京 + gaiji + 都 (a picture without the class counts nothing), then 本: as sectionStarts counts.
+        assertEquals(6, gaiji.total)
+        assertEquals(EpubPositions.sectionStarts(file)!!.total, gaiji.total)
+        assertEquals("/body/DocFragment[1]/body/p[1]/img[1]", gaiji.xpointerAt(1))
+        assertEquals("/body/DocFragment[1]/body/p[2]/text()[1].0", gaiji.xpointerAt(4))
+        assertEquals(4, gaiji.charactersAt("/body/DocFragment[1]/body/p[2]/text()[1].0"))
+        assertEquals(5, gaiji.charactersAt("/body/DocFragment[2]/body/p[1]/text()[1].0"))
+        for (n in 0..gaiji.total) {
+            assertEquals("position $n", n, gaiji.charactersAt(gaiji.xpointerAt(n)!!))
+        }
+    }
+
+    @Test
     fun notAnEpubGivesNull() {
         assertNull(EpubPositions.read(folder.newFile("empty.epub").apply { writeText("not a zip") }))
         assertNull(EpubPositions.texts(folder.root.resolve("empty.epub")))
