@@ -250,6 +250,33 @@ test('a failed write of the suffixed row is reported as failed at once, not afte
   expect(await storedTexts(page)).toHaveLength(1);
 });
 
+test('a book whose transaction aborts after the write is reported as failed at once', async ({ page }) => {
+  // Before the bridge wraps the store: the book's row is written, then its transaction aborts
+  // (as when storage runs out on commit); no request fails.
+  await page.addInitScript(() => {
+    for (const method of ['put', 'add']) {
+      const original = IDBObjectStore.prototype[method];
+      IDBObjectStore.prototype[method] = function (value, ...rest) {
+        const request = original.call(this, value, ...rest);
+        if (window.__abort && this.name === 'data') {
+          const transaction = this.transaction;
+          request.addEventListener('success', () => transaction.abort());
+        }
+        return request;
+      };
+    }
+  });
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  await page.evaluate(() => (window.__abort = true));
+
+  const started = Date.now();
+  const reply = await ensure(page, 'edition-a.epub');
+
+  expect(reply).toMatchObject({ type: 'library.failed' });
+  expect(Date.now() - started).toBeLessThan(15_000);
+});
+
 test('a book re-imported under its own id (not another library book\'s) is replaced, not duplicated', async ({ page }) => {
   await setUp(page);
   await page.goto(`${server.url}/manage`);

@@ -150,6 +150,12 @@
             const reason = request.error && request.error.name;
             pending.reject(new Error(`Error importing: ttu could not store the book (${reason || 'unknown error'})`));
           });
+          // The transaction can still fail after the write (e.g. storage full when it commits).
+          transaction.addEventListener('abort', () => {
+            if (pendingImport !== pending) return;
+            const reason = transaction.error && transaction.error.name;
+            pending.reject(new Error(`Error importing: ttu could not store the book (${reason || 'aborted'})`));
+          });
         }
         return request;
       };
