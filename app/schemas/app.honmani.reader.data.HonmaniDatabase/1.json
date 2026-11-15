@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "29c0742775a58b4f1adf03b393abbf99",
+    "identityHash": "e77d07671181ec9ea920deea18de87f0",
     "entities": [
       {
         "tableName": "dictionary",
@@ -1301,7 +1301,7 @@
       },
       {
         "tableName": "opds_catalog",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `url` TEXT NOT NULL, `username` TEXT, `password_cipher` TEXT, `added_at` INTEGER NOT NULL, `auto_import` INTEGER NOT NULL, `auto_import_complete` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `url` TEXT NOT NULL, `username` TEXT, `password_cipher` TEXT, `added_at` INTEGER NOT NULL, `auto_import` INTEGER NOT NULL, `auto_import_complete` INTEGER NOT NULL, `older_books_imported` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -1346,6 +1346,12 @@
           {
             "fieldPath": "autoImportComplete",
             "columnName": "auto_import_complete",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "olderBooksImported",
+            "columnName": "older_books_imported",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1792,7 +1798,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '29c0742775a58b4f1adf03b393abbf99')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e77d07671181ec9ea920deea18de87f0')"
     ]
   }
 }

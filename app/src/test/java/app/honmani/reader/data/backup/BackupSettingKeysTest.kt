@@ -39,6 +39,7 @@ class BackupSettingKeysTest {
                 "review_auto_play_content" to "string",
                 "review_known_after_days" to "int",
                 "day_start_hour" to "int",
+                "download_over_mobile_data" to "boolean",
                 "daily_goal_enabled" to "boolean",
                 "daily_goal_minutes" to "int",
                 "count_time_during_lookup" to "boolean",

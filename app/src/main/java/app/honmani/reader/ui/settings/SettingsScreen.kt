@@ -398,6 +398,7 @@ private fun SettingsContent(
                             modifier = Modifier.toggleable(catalog.autoImport, role = Role.Switch) { onAutoImportChange(catalog, it) },
                         )
                     }
+                    if (catalogs.isNotEmpty()) item { MobileDataSection() }
                     item { WatchedFolderSection() }
                     item { sync() }
                 }

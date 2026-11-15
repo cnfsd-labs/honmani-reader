@@ -49,6 +49,13 @@ class NetworkWatch(context: Context) {
         null
     }
 
+    /** Whether the current network costs by the byte (mobile data, a metered Wi-Fi). */
+    fun isMetered(): Boolean = try {
+        connectivity?.isActiveNetworkMetered ?: false
+    } catch (_: RuntimeException) {
+        false
+    }
+
     fun isHotspot(): Boolean {
         val network = current() ?: return false
         if (network in hotspots) return true

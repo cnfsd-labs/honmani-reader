@@ -109,6 +109,8 @@ class OpdsViewModel(
     private val startAutoImport: () -> Unit = {},
     /** Stops an automatic import from a catalogue (deleted, switched off, new address or login). */
     private val stopAutoImport: (Long) -> Unit = {},
+    /** Imports a catalogue's books older than the newest page ("Import older books"). */
+    private val importOlderBooks: (Long) -> Unit = {},
     /** Reading progress sync with a catalogue's login; null leaves sync out of the dialog. */
     private val catalogSync: CatalogSync? = null,
 ) : ViewModel() {
@@ -134,6 +136,11 @@ class OpdsViewModel(
     ) { catalogs, (browsing, editor), downloads, sourceIds, matched ->
         OpdsUiState(catalogs, browsing, editor, downloads, sourceIds.toSet() + matched)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OpdsUiState())
+
+    /** The reader tapped "Import older books" in the catalogue being browsed. */
+    fun importOlder() {
+        browsing.value?.catalog?.id?.let(importOlderBooks)
+    }
 
     fun openCatalog(catalog: OpdsCatalog) {
         loadJob?.cancel()
@@ -454,6 +461,7 @@ class OpdsViewModel(
                     downloadsDir = container.downloadsDir,
                     startAutoImport = { container.opdsAutoImport.start(force = true) },
                     stopAutoImport = container.opdsAutoImport::stop,
+                    importOlderBooks = container.opdsAutoImport::importOlder,
                     catalogSync = CatalogSync(container.koSyncSettings, container.koSyncClient),
                 )
             }

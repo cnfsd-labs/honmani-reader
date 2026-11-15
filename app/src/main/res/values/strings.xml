@@ -274,6 +274,11 @@
     </plurals>
     <string name="catalog_auto_import">Download Japanese books automatically</string>
     <string name="catalog_auto_import_details">When the app starts, new Japanese books on this server are added to the library. Books you remove stay removed.</string>
+    <string name="catalog_import_older">Import older books</string>
+    <string name="catalog_import_older_details">Only the newest Japanese books were added automatically. Tap to add the older ones too.</string>
+    <string name="catalog_import_older_started">Adding older books in the background.</string>
+    <string name="download_over_mobile_data">Download books over mobile data</string>
+    <string name="download_over_mobile_data_details">Off: new books from your servers are added only on Wi-Fi or another unmetered network.</string>
     <string name="catalog_sync">Sync reading progress here</string>
     <string name="catalog_sync_details">For Calibre-Web Automated: your position in EPUBs is kept on this server with this login, as in KOReader.</string>
     <string name="catalog_sync_replaces">For Calibre-Web Automated, with this login. Replaces the sync on %1$s.</string>

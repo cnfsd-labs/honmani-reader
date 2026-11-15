@@ -35,6 +35,9 @@ class OpdsAutoImportTest {
     private lateinit var autoImport: OpdsAutoImport
     private lateinit var server: HeaderServer
 
+    /** Whether the network allows a run nobody asked for (unmetered, or the setting on). */
+    private var networkAllowed = true
+
     /** Entries of the "Recently added" feed, newest first, per page. */
     private var pages = listOf<List<String>>()
     private val requests = mutableListOf<String>()
@@ -62,6 +65,7 @@ class OpdsAutoImportTest {
             bookDao = database.bookDao(),
             downloadsDir = File(folder.root, "downloads"),
             scope = CoroutineScope(Job()),
+            networkAllowed = { networkAllowed },
         )
         server = HeaderServer { path, out ->
             synchronized(requests) { requests += path }
@@ -105,18 +109,83 @@ class OpdsAutoImportTest {
     private suspend fun libraryIds() = database.bookDao().sourceIds(BookSource.OPDS).toSet()
 
     @Test
-    fun addsJapaneseEpubAndTextBooks_fromAllPages() = runBlocking {
+    fun aFirstRunAddsJapaneseEpubAndTextBooks_fromTheNewestPageOnly() = runBlocking {
         pages = listOf(
             listOf(book("a", "jpn"), book("b", "eng"), book("c", "jpn", format = "pdf"), book("d", "jpn", format = "txt")),
             listOf(book("e", "ja")),
         )
         val id = addCatalog()
 
-        assertEquals(3, autoImport.run())
+        assertEquals(2, autoImport.run())
 
-        assertEquals(setOf("urn:a", "urn:d", "urn:e"), libraryIds())
-        assertTrue(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+        assertEquals(setOf("urn:a", "urn:d"), libraryIds())
+        assertFalse(requests.any { it.startsWith("/opds/new?page=2") })
+        val catalog = database.opdsCatalogDao().find(id)!!
+        assertTrue(catalog.autoImportComplete)
+        assertTrue(OpdsRepository.offersOlderBooks(catalog))
+        assertTrue(repository.catalogs.first().single().offerOlderBooks)
         assertNull(autoImport.status.value)
+    }
+
+    @Test
+    fun importingOlderBooks_readsThePagesTheFirstRunLeft_andEndsTheOffer() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn")), listOf(book("b", "eng")), listOf(book("c", "jpn")))
+        val id = addCatalog()
+        autoImport.run()
+        // Also on mobile data: the reader asked for it.
+        networkAllowed = false
+
+        autoImport.importOlder(id)
+        autoImport.join()
+
+        assertEquals(setOf("urn:a", "urn:c"), libraryIds())
+        assertFalse(OpdsRepository.offersOlderBooks(database.opdsCatalogDao().find(id)!!))
+    }
+
+    @Test
+    fun aFirstRunThatSeesTheWholeCatalogue_offersNoOlderBooks() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn")))
+        val id = addCatalog()
+
+        autoImport.run()
+
+        assertFalse(OpdsRepository.offersOlderBooks(database.opdsCatalogDao().find(id)!!))
+    }
+
+    @Test
+    fun onAMeteredNetwork_runsWaitUnlessMobileDataIsAllowed() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn")))
+        addCatalog()
+        networkAllowed = false
+
+        assertEquals(0, autoImport.run())
+        autoImport.start()
+        autoImport.join()
+
+        assertTrue(libraryIds().isEmpty())
+        assertTrue(requests.isEmpty())
+
+        // On Wi-Fi (or with "Download books over mobile data" on) the next start imports: the
+        // skipped one did not count against the interval between runs.
+        networkAllowed = true
+        autoImport.start()
+        autoImport.join()
+
+        assertEquals(setOf("urn:a"), libraryIds())
+    }
+
+    @Test
+    fun aStartSoonAfterARun_doesNothing() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn")))
+        addCatalog()
+        autoImport.start()
+        autoImport.join()
+        synchronized(requests) { requests.clear() }
+
+        autoImport.start()
+        autoImport.join()
+
+        assertTrue(requests.isEmpty())
     }
 
     @Test
@@ -131,10 +200,11 @@ class OpdsAutoImportTest {
         pages = listOf(listOf(book("f", "jpn"), book("a", "jpn"), book("b", "jpn")), listOf(book("c", "jpn")))
         synchronized(requests) { requests.clear() }
 
-        assertEquals(1, autoImport.run())
+        // f, and c from the page the first run left.
+        assertEquals(2, autoImport.run())
 
         assertEquals(setOf("urn:a", "urn:c", "urn:f"), libraryIds())
-        // Page 1 brought f, so page 2 was read; it brought nothing, so the run stopped there.
+        // Page 1 brought f, so page 2 was read.
         assertEquals(1, requests.count { it.startsWith("/opds/new?page=2") })
     }
 
@@ -217,15 +287,22 @@ class OpdsAutoImportTest {
     }
 
     @Test
-    fun aFirstRunThatReachesThePageLimit_isComplete() = runBlocking {
+    fun importingOlderBooks_stopsAtThePageLimit() = runBlocking {
         // Nothing wanted on any page: only English books.
         pages = List(OpdsAutoImport.MAX_PAGES + 5) { listOf(book("e$it", "eng")) }
         val id = addCatalog()
 
         autoImport.run()
 
-        assertEquals(OpdsAutoImport.MAX_PAGES, requests.count { it.startsWith("/opds/new") })
+        assertEquals(OpdsAutoImport.FIRST_RUN_PAGES, requests.count { it.startsWith("/opds/new") })
         assertTrue(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+        synchronized(requests) { requests.clear() }
+
+        autoImport.importOlder(id)
+        autoImport.join()
+
+        assertEquals(OpdsAutoImport.MAX_PAGES, requests.count { it.startsWith("/opds/new") })
+        assertFalse(OpdsRepository.offersOlderBooks(database.opdsCatalogDao().find(id)!!))
         synchronized(requests) { requests.clear() }
 
         autoImport.run()

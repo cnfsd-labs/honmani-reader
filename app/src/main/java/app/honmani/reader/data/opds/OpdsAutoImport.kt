@@ -7,6 +7,7 @@ import app.honmani.reader.data.library.RemovedBookEntity
 import java.io.File
 import java.net.URI
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +37,12 @@ data class AutoImportStatus(
 /**
  * Downloads new Japanese books from the catalogues that have automatic import on. A run reads a
  * catalogue's newest books first, page by page, and adds every EPUB or text book marked Japanese
- * that is neither in the library nor was removed from it. Once a run has gone through a whole
- * catalogue, later runs stop at the first page that brings nothing new.
+ * that is neither in the library nor was removed from it. A catalogue's first run reads only the
+ * newest page ([FIRST_RUN_PAGES]); later runs stop at the first page that brings nothing new. The
+ * older books come on the reader's request ([importOlder]), up to [MAX_PAGES] pages.
+ *
+ * Runs on their own skip a metered network (mobile data) unless [networkAllowed] says otherwise
+ * (the "Download books over mobile data" setting); they happen on the next start on Wi-Fi.
  *
  * Books go into the library only; the reader imports one when it is first opened. A run that
  * fails (no connection, wrong login) is logged and tried again on a later start. A book the server
@@ -54,6 +59,8 @@ class OpdsAutoImport(
     private val downloadsDir: File,
     private val scope: CoroutineScope,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Whether a run that nobody asked for may download now (false on mobile data, by default). */
+    private val networkAllowed: () -> Boolean = { true },
     private val log: (String) -> Unit = {},
 ) {
     private val _status = MutableStateFlow<AutoImportStatus?>(null)
@@ -68,9 +75,13 @@ class OpdsAutoImport(
     /** The catalogue being imported from, and the job doing it. */
     @Volatile private var current: Pair<Long, Job>? = null
 
+    /** Catalogues whose older books the reader asked for. */
+    private val olderWanted = ConcurrentHashMap.newKeySet<Long>()
+
     /**
      * Starts a run, unless one is running or (without [force], as on app starts) the last one
-     * started less than [MIN_INTERVAL_MS] ago. A catalogue just added or switched on forces one.
+     * started less than [MIN_INTERVAL_MS] ago or the network is metered. A catalogue just added or
+     * switched on forces one.
      */
     fun start(force: Boolean = false) {
         if (job?.isActive == true) {
@@ -79,6 +90,8 @@ class OpdsAutoImport(
             return
         }
         if (!force && lastStart != 0L && now() - lastStart < MIN_INTERVAL_MS) return
+        // Not counted as a run: the next start on Wi-Fi imports.
+        if (!force && !networkAllowed()) return
         lastStart = now()
         job = scope.launch {
             do {
@@ -86,6 +99,11 @@ class OpdsAutoImport(
                 run()
             } while (rerun)
         }
+    }
+
+    /** Waits for the run [start] began, if any (tests). */
+    internal suspend fun join() {
+        job?.join()
     }
 
     /**
@@ -96,13 +114,29 @@ class OpdsAutoImport(
         current?.takeIf { it.first == catalogId }?.second?.cancel()
     }
 
-    /** Imports from every catalogue with automatic import on; returns how many books were added. */
+    /**
+     * Imports the books of catalogue [catalogId] older than its newest page (the reader tapped
+     * "Import older books"), on any network: the reader asked for it.
+     */
+    fun importOlder(catalogId: Long) {
+        olderWanted += catalogId
+        start(force = true)
+    }
+
+    /**
+     * Imports from every catalogue with automatic import on; returns how many books were added. On
+     * a metered network only the catalogues whose older books were asked for.
+     */
     suspend fun run(): Int {
         var added = 0
+        val allowed = networkAllowed()
+        if (!allowed) log("Automatic import: metered network, waiting for another one")
         try {
             for (catalog in repository.autoImportCatalogs()) {
+                val older = olderWanted.remove(catalog.id)
+                if (!allowed && !older) continue
                 added += try {
-                    importStoppable(catalog)
+                    importStoppable(catalog, older)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -117,8 +151,8 @@ class OpdsAutoImport(
     }
 
     /** [importFrom] in a child job that [stop] can cancel without ending the whole run. */
-    private suspend fun importStoppable(catalog: OpdsCatalogEntity): Int = coroutineScope {
-        val child = async { importFrom(catalog) }
+    private suspend fun importStoppable(catalog: OpdsCatalogEntity, older: Boolean): Int = coroutineScope {
+        val child = async { importFrom(catalog, older) }
         current = catalog.id to child
         try {
             child.await()
@@ -137,7 +171,8 @@ class OpdsAutoImport(
         return latest.autoImport && latest.url == catalog.url && latest.username == catalog.username
     }
 
-    private suspend fun importFrom(catalog: OpdsCatalogEntity): Int {
+    /** [older]: read up to [MAX_PAGES] pages, past pages without new books. */
+    private suspend fun importFrom(catalog: OpdsCatalogEntity, older: Boolean): Int {
         val server = repository.server(catalog)
         val root = client.feed(server, catalog.url)
         val newest = newestBooksUrl(root, catalog.url)
@@ -152,7 +187,8 @@ class OpdsAutoImport(
         var added = 0
         var url: String? = newest
         var pages = 0
-        while (url != null && pages < MAX_PAGES) {
+        val maxPages = if (older || catalog.autoImportComplete) MAX_PAGES else FIRST_RUN_PAGES
+        while (url != null && pages < maxPages) {
             if (!stillWanted(catalog)) return added
             val feed = if (url == catalog.url) root else client.feed(server, url)
             pages++
@@ -174,11 +210,12 @@ class OpdsAutoImport(
                 known += entry.id
             }
             // Newest first: after one complete run, a page without new books means the rest is known.
-            url = if (wanted.isEmpty() && catalog.autoImportComplete) null else feed.nextUrl
+            url = if (wanted.isEmpty() && catalog.autoImportComplete && !older) null else feed.nextUrl
         }
-        // The end of the catalogue, or as far as a first run reads: later runs stop at the first
-        // page without new books instead of reading all MAX_PAGES pages again on every start.
-        if (!catalog.autoImportComplete) repository.setAutoImportComplete(catalog)
+        // After a first run, later runs stop at the first page without new books instead of
+        // reading all pages again on every start. Older books are offered unless the first page
+        // was the whole catalogue.
+        if (!catalog.autoImportComplete || older) repository.setAutoImportComplete(catalog, olderToo = older || url == null)
         log("Automatic import from ${catalog.title}: $added added, $pages pages read")
         return added
     }
@@ -221,10 +258,16 @@ class OpdsAutoImport(
         const val MIN_INTERVAL_MS = 10 * 60 * 1000L
 
         /**
-         * A first run reads at most this many pages (Calibre-Web: 60 books each); older books are
-         * left for browsing.
+         * "Import older books" reads at most this many pages (Calibre-Web: 60 books each); still
+         * older books are left for browsing.
          */
         const val MAX_PAGES = 100
+
+        /**
+         * A catalogue's first run reads only this many pages (its newest books); "Import older
+         * books" reads the rest, up to [MAX_PAGES].
+         */
+        const val FIRST_RUN_PAGES = 1
 
         /**
          * Deletes the `.part` files in [downloadsDir] last written before [before] (when this

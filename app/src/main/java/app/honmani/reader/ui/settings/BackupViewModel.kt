@@ -174,7 +174,6 @@ class BackupViewModel(
                 }
             }
         }
-        if (summary.catalogsAdded > 0) container.opdsAutoImport.start(force = true)
         // The automatic backup (and the folder's copy) should hold what was just restored.
         container.saveAutoBackup(force = true)
         BackupState.Restored(summary)
@@ -189,6 +188,7 @@ class BackupViewModel(
         container.ankiSettings.reload()
         container.reviewSettings.reload()
         container.daySettings.reload()
+        container.downloadSettings.reload()
     }
 
     fun dismiss() {

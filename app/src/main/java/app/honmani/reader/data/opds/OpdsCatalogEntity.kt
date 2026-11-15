@@ -23,10 +23,15 @@ data class OpdsCatalogEntity(
     /** Download new Japanese books from this catalogue when the app starts. */
     @ColumnInfo(name = "auto_import") val autoImport: Boolean = true,
     /**
-     * Whether one automatic import went through the whole catalogue. Later ones stop at the
+     * Whether a first automatic import ran (it reads only the newest page). Later ones stop at the
      * first page of the newest books that brings nothing new.
      */
     @ColumnInfo(name = "auto_import_complete") val autoImportComplete: Boolean = false,
+    /**
+     * Whether older books need no offer: the reader's "Import older books" went through the
+     * catalogue (up to [OpdsAutoImport.MAX_PAGES] pages), or the first import reached its end.
+     */
+    @ColumnInfo(name = "older_books_imported") val olderBooksImported: Boolean = false,
 )
 
 @Dao

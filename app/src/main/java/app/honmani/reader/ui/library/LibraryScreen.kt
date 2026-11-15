@@ -370,6 +370,8 @@ fun LibraryScreen(
             onRetry = opds::retry,
             onChangeLogin = { opds.startEditing(browsing.catalog) },
             thumbnail = opds::thumbnail,
+            offerOlderBooks = opdsState.catalogs.any { it.id == browsing.catalog.id && it.offerOlderBooks },
+            onImportOlder = opds::importOlder,
         )
     } else {
         val container = (LocalContext.current.applicationContext as HonmaniApplication).container

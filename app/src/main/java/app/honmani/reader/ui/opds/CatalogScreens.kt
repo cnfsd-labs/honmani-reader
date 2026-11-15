@@ -87,8 +87,12 @@ fun CatalogBrowser(
     onRetry: () -> Unit,
     onChangeLogin: () -> Unit,
     thumbnail: suspend (String) -> ImageBitmap?,
+    /** The first automatic import took only the newest books: offer the older ones. */
+    offerOlderBooks: Boolean = false,
+    onImportOlder: () -> Unit = {},
 ) {
     var searching by rememberSaveable { mutableStateOf(false) }
+    var olderRequested by rememberSaveable { mutableStateOf(false) }
     BackHandler {
         if (searching) searching = false else onBack()
     }
@@ -149,6 +153,25 @@ fun CatalogBrowser(
                         .padding(32.dp),
                 )
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (state.pages.size == 1 && (offerOlderBooks || olderRequested)) {
+                        item(key = "older") {
+                            ListItem(
+                                headlineContent = { Text(stringResource(R.string.catalog_import_older)) },
+                                supportingContent = {
+                                    Text(
+                                        stringResource(
+                                            if (olderRequested) R.string.catalog_import_older_started else R.string.catalog_import_older_details,
+                                        ),
+                                    )
+                                },
+                                modifier = Modifier.clickable(enabled = !olderRequested) {
+                                    olderRequested = true
+                                    onImportOlder()
+                                },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
                     items(page.entries, key = { it.id }) { entry ->
                         val feedUrl = entry.feedUrl
                         if (feedUrl != null) {

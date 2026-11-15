@@ -66,7 +66,7 @@ name itself, see below).
   the list is kept on your phone until you refresh it. Their own privacy policies apply.
 - **Book servers you add yourself** (OPDS catalogues such as Calibre-Web). Honmani connects only
   to the addresses you enter, and to the addresses those servers' catalogues link to for covers, pages, search
-  and book files (without your login), when the app starts if automatic import is on (it is by default for a new server) and when you open
+  and book files (without your login), when the app starts if automatic import is on (it is by default for a new server; not over mobile data unless you allow it) and when you open
   the catalogue; a search you type in a server's catalogue is sent to that server. If you give a user name and password, the password is stored
   encrypted on your phone and sent only to that server.
   At an unencrypted address (`http://`) anyone on the same network can read a password that

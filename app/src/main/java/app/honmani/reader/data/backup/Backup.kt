@@ -23,6 +23,7 @@ import app.honmani.reader.data.settings.Accent
 import app.honmani.reader.data.settings.AccentRandom
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.DaySettings
+import app.honmani.reader.data.settings.DownloadSettings
 import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
 import app.honmani.reader.data.settings.ReadingGoalSettings
@@ -623,6 +624,7 @@ class Backup(
             ReviewSettings.KEY_AUTO_PLAY_CONTENT to BackupValue.STRING,
             ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
             DaySettings.KEY_START_HOUR to BackupValue.INT,
+            DownloadSettings.KEY_OVER_MOBILE_DATA to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_MINUTES to BackupValue.INT,
             ReadingTimeSettings.KEY_COUNT_DURING_LOOKUP to BackupValue.BOOLEAN,

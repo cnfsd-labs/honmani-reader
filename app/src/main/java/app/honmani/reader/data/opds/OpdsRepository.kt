@@ -13,6 +13,8 @@ data class OpdsCatalog(
     val hasPassword: Boolean,
     /** Whether new Japanese books are downloaded automatically when the app starts. */
     val autoImport: Boolean = true,
+    /** The first automatic import read only the newest books: offer "Import older books". */
+    val offerOlderBooks: Boolean = false,
 )
 
 /** The book catalogues the user added, with their logins. */
@@ -23,7 +25,7 @@ class OpdsRepository(
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     val catalogs: Flow<List<OpdsCatalog>> = dao.observeAll().map { list ->
-        list.map { OpdsCatalog(it.id, it.title, it.url, it.username, it.passwordCipher != null, it.autoImport) }
+        list.map { OpdsCatalog(it.id, it.title, it.url, it.username, it.passwordCipher != null, it.autoImport, offersOlderBooks(it)) }
     }
 
     /** Catalogues with automatic import on, with their state. */
@@ -34,13 +36,14 @@ class OpdsRepository(
     }
 
     /**
-     * Marks [catalog] as gone through once, unless its address or login changed since the import
-     * read it (a new server is looked through from the start).
+     * Marks [catalog] as imported from once ([olderToo]: its older books as well), unless its
+     * address or login changed since the import read it (a new server is looked through from the
+     * start).
      */
-    suspend fun setAutoImportComplete(catalog: OpdsCatalogEntity) {
+    suspend fun setAutoImportComplete(catalog: OpdsCatalogEntity, olderToo: Boolean = false) {
         dao.find(catalog.id)
             ?.takeIf { it.url == catalog.url && it.username == catalog.username }
-            ?.let { dao.update(it.copy(autoImportComplete = true)) }
+            ?.let { dao.update(it.copy(autoImportComplete = true, olderBooksImported = it.olderBooksImported || olderToo)) }
     }
 
     /** Catalogue [id] with its state, or null if it is gone. */
@@ -118,6 +121,7 @@ class OpdsRepository(
                     autoImport = autoImport ?: existing.autoImport,
                     // Another server or login: the next import looks through everything again.
                     autoImportComplete = existing.autoImportComplete && existing.url == url && existing.username == user,
+                    olderBooksImported = existing.olderBooksImported && existing.url == url && existing.username == user,
                 ),
             )
             existing.id
@@ -127,6 +131,10 @@ class OpdsRepository(
     suspend fun delete(id: Long) = dao.delete(id)
 
     companion object {
+        /** Whether "Import older books" is offered for [catalog]: its first import read only the newest page. */
+        fun offersOlderBooks(catalog: OpdsCatalogEntity) =
+            catalog.autoImport && catalog.autoImportComplete && !catalog.olderBooksImported
+
         /** The URLs to try for what the user typed, most likely first. */
         internal fun candidateUrls(address: String): List<String> {
             val trimmed = address.trim().trimEnd('/')

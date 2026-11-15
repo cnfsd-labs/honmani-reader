@@ -81,6 +81,7 @@ import app.honmani.reader.data.settings.ReadingGoalSettings
 import app.honmani.reader.data.settings.ReadingTimeSettings
 import app.honmani.reader.data.settings.RefoldExportSettings
 import app.honmani.reader.data.settings.DaySettings
+import app.honmani.reader.data.settings.DownloadSettings
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDao
@@ -223,6 +224,9 @@ class AppContainer(context: Context) {
 
     /** Settings → "Day starts at": when a reading and review day begins. */
     val daySettings: DaySettings by lazy { DaySettings(settingsPreferences) }
+
+    /** Settings → Books → "Download books over mobile data". */
+    val downloadSettings: DownloadSettings by lazy { DownloadSettings(settingsPreferences) }
 
     /** Which day a moment belongs to, by [daySettings]; every reading and review day comes from here. */
     val dayClock: DayClock by lazy { DayClock(startHour = { daySettings.startHour.value }) }
@@ -425,6 +429,7 @@ class AppContainer(context: Context) {
             downloadsDir = downloadsDir,
             scope = applicationScope,
             log = { Log.i("Honmani.opds", it) },
+            networkAllowed = { downloadSettings.overMobileData.value || !networkWatch.isMetered() },
         )
     }
 
