@@ -18,8 +18,17 @@ class KoSyncSettings(
 ) {
     private val _account = MutableStateFlow(load())
 
-    /** The signed-in account; null when sync is off. */
+    /** The signed-in account; null when sync is off or its login can no longer be read. */
     val account: StateFlow<KoSyncAccount?> = _account.asStateFlow()
+
+    private val _signedInAs = MutableStateFlow(storedLogin())
+
+    /**
+     * The server and user name signed in to, also when [account] is null because this phone can
+     * no longer decrypt the login (its Keystore key was lost): then the reader must enter the
+     * password again, and positions not yet sent are kept for it.
+     */
+    val signedInAs: StateFlow<Pair<String, String>?> = _signedInAs.asStateFlow()
 
     /** This phone's id towards the sync server, made once (KOReader keeps one per device too). */
     val deviceId: String
@@ -40,16 +49,23 @@ class KoSyncSettings(
             .putString(KEY_PASSWORD, password)
             .apply()
         _account.value = account
+        _signedInAs.value = account.server to account.username
     }
 
     fun signOut() {
         preferences.edit().remove(KEY_SERVER).remove(KEY_USERNAME).remove(KEY_USER_KEY).remove(KEY_PASSWORD).apply()
         _account.value = null
+        _signedInAs.value = null
+    }
+
+    private fun storedLogin(): Pair<String, String>? {
+        val server = preferences.getString(KEY_SERVER, null) ?: return null
+        val username = preferences.getString(KEY_USERNAME, null) ?: return null
+        return server to username
     }
 
     private fun load(): KoSyncAccount? {
-        val server = preferences.getString(KEY_SERVER, null) ?: return null
-        val username = preferences.getString(KEY_USERNAME, null) ?: return null
+        val (server, username) = storedLogin() ?: return null
         val key = preferences.getString(KEY_USER_KEY, null)?.let(cipher::decrypt) ?: return null
         val password = preferences.getString(KEY_PASSWORD, null)?.let { cipher.decrypt(it) ?: return null }
         return KoSyncAccount(server, username, key, password)

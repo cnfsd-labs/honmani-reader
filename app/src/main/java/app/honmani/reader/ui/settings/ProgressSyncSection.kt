@@ -42,6 +42,8 @@ fun ProgressSyncSection() {
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val settings = container.koSyncSettings
     val account by settings.account.collectAsStateWithLifecycle()
+    // Signed in, but this phone can no longer read the login: the password is needed again.
+    val locked = settings.signedInAs.collectAsStateWithLifecycle().value.takeIf { account == null }
     val status by container.koSyncStatus.state.collectAsStateWithLifecycle()
     var editing by rememberSaveable { mutableStateOf(false) }
 
@@ -51,7 +53,9 @@ fun ProgressSyncSection() {
             Column {
                 Text(
                     account?.let { stringResource(R.string.sync_signed_in, it.username, it.server) }
+                        ?: locked?.let { (server, username) -> stringResource(R.string.sync_needs_password, username, server) }
                         ?: stringResource(R.string.sync_off),
+                    color = if (locked != null) MaterialTheme.colorScheme.error else androidx.compose.ui.graphics.Color.Unspecified,
                 )
                 if (account != null) {
                     val failure = status.failure
@@ -89,17 +93,17 @@ fun ProgressSyncSection() {
             },
         )
     } else {
-        SignInDialog(onDismiss = { editing = false })
+        SignInDialog(onDismiss = { editing = false }, initialServer = locked?.first.orEmpty(), initialUsername = locked?.second.orEmpty())
     }
 }
 
 @Composable
-private fun SignInDialog(onDismiss: () -> Unit) {
+private fun SignInDialog(onDismiss: () -> Unit, initialServer: String = "", initialUsername: String = "") {
     val context = LocalContext.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val scope = rememberCoroutineScope()
-    var server by rememberSaveable { mutableStateOf("") }
-    var username by rememberSaveable { mutableStateOf("") }
+    var server by rememberSaveable { mutableStateOf(initialServer) }
+    var username by rememberSaveable { mutableStateOf(initialUsername) }
     // Not saveable: that would write it, readable, into the saved state.
     var password by remember { mutableStateOf("") }
     var checking by remember { mutableStateOf(false) }

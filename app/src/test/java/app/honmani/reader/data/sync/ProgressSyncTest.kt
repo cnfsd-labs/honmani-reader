@@ -427,6 +427,34 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun aLoginThePhoneCanNoLongerRead_keepsUnsentPositionsUntilSignedInAgain() = runBlocking {
+        server.down = true
+        sync.onPosition(5, 12)
+        sync.flush()
+        waitFor { unsentFile.isFile }
+
+        // The next start: the Keystore key is gone, so the login can't be decrypted.
+        val unreadable = object : CredentialCipher {
+            override fun encrypt(plain: String) = plain
+
+            override fun decrypt(encrypted: String): String? = null
+        }
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        settings = KoSyncSettings(context.getSharedPreferences("sync-test", Context.MODE_PRIVATE), unreadable)
+        assertNull(settings.account.value)
+        assertEquals(server.url to "reader", settings.signedInAs.value)
+        val restarted = newSync()
+        Thread.sleep(300)
+        assertTrue(unsentFile.isFile)
+
+        // The reader enters the password again: the kept position goes out.
+        server.down = false
+        settings.signIn(KoSyncAccount(server.url, "reader", KoSyncAccount.userKey("secret")))
+        restarted.resend()
+        assertEquals("/body/DocFragment[1]/body/div[1]/p[2]/text()[2].1", waitForProgress()["progress"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun aKeystoreFailureAtSignInIsASyncError_andNothingIsKept() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val preferences = context.getSharedPreferences("sync-keystore-test", Context.MODE_PRIVATE)

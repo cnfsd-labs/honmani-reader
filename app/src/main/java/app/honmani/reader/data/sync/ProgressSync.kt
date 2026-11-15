@@ -17,9 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -114,10 +112,11 @@ class ProgressSync(
 
     init {
         // Positions belong to the account they were read with: signing out or into another
-        // account drops them.
+        // account drops them. An account whose login can no longer be decrypted keeps them
+        // until the reader signs in to it again.
         scope.launch {
-            if (settings.account.value == null) unsent.clear() else unsent.all()
-            settings.account.map { it?.server to it?.username }.distinctUntilChanged().drop(1).collect {
+            if (settings.signedInAs.value == null) unsent.clear() else unsent.all()
+            settings.signedInAs.drop(1).collect {
                 unsent.clear()
                 status?.clear()
             }
