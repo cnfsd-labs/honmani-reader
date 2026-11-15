@@ -97,7 +97,6 @@ class AudiobookExporter(
             val info = if (isGenerated(bookHash, pairing)) AudioInfo("audio.mp3", "audio/mpeg") else audioInfo(pairing.audio)
             val extension = extension(info)
             val audioName = ExportNames.unique(title, extension, mutableSetOf())
-            val subtitleName = ExportNames.unique(title, "srt", mutableSetOf())
             val subtitles = store.subtitles(bookHash)
             val created = mutableListOf<Uri>()
             try {
@@ -106,6 +105,10 @@ class AudiobookExporter(
                 created += audio
                 val out = openOutput(audio) ?: throw IOException("Cannot write $audio")
                 out.use { copy(input, it) }
+                // The provider may have renamed a taken name ("Title (1).mp3"): the subtitles follow
+                // the audio's actual name, so players pair them.
+                val savedName = audioInfo(audio.toString()).displayName?.takeIf { it.isNotBlank() } ?: audioName
+                val subtitleName = savedName.substringBeforeLast('.') + ".srt"
                 if (subtitles != null) {
                     val srt = documents.createFile(documents.rootId, "application/x-subrip", subtitleName)
                         ?: throw IOException("Cannot create the subtitle file")
@@ -113,7 +116,7 @@ class AudiobookExporter(
                     val out2 = openOutput(srt) ?: throw IOException("Cannot write $srt")
                     out2.use { it.write(subtitles.toByteArray(Charsets.UTF_8)) }
                 }
-                if (subtitles != null) AudiobookExportResult.Saved(audioName) else AudiobookExportResult.SavedWithoutSubtitles(audioName)
+                if (subtitles != null) AudiobookExportResult.Saved(savedName) else AudiobookExportResult.SavedWithoutSubtitles(savedName)
             } catch (e: Throwable) {
                 withContext(NonCancellable) { created.forEach(documents::delete) }
                 if (e is CancellationException) throw e

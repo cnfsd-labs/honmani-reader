@@ -47,12 +47,14 @@ class AudiobookExporterTest {
     private var failWriteAfter: Int? = null
     private var failWith: IOException = IOException("disk broke")
     private var openedTree: DocumentTree? = documents
+    private val renamed = mutableMapOf<String, String>()
 
     private fun exporter() = AudiobookExporter(
         store = store,
         maker = maker,
         openAudio = { sources[it]?.invoke() ?: throw FileNotFoundException(it) },
-        audioInfo = { info },
+        // A created file's name is what the folder's provider gave it.
+        audioInfo = { if (it.startsWith("content://tree/")) AudioInfo(renamed[it] ?: it.substringAfterLast('/'), null) else info },
         openTree = { openedTree },
         openOutput = { uri ->
             val buffer = ByteArrayOutputStream().also { written[uri.toString()] = it }
@@ -187,5 +189,13 @@ class AudiobookExporterTest {
         openedTree = documents
         documents.refuseCreate = true
         assertEquals(AudiobookExportResult.FolderUnusable, export())
+    }
+
+    @Test
+    fun theSubtitlesFollowTheNameTheProviderGaveTheAudio() {
+        pairImported()
+        renamed["content://tree/root/My Book.m4a"] = "My Book (1).m4a"
+        assertEquals(AudiobookExportResult.Saved("My Book (1).m4a"), export())
+        assertEquals(setOf("content://tree/root/My Book.m4a", "content://tree/root/My Book (1).srt"), documents.created.keys)
     }
 }
