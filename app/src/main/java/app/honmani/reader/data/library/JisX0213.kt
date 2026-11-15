@@ -1,6 +1,6 @@
 package app.honmani.reader.data.library
 
-import java.io.DataInputStream
+import java.nio.ByteBuffer
 
 /**
  * JIS X 0213 kanji by plane, row and cell (Aozora's 第3水準1-15-62, 第4水準2-12-34), from the kJIS0213
@@ -34,14 +34,12 @@ object JisX0213 {
 
     private fun load(): Array<IntArray> {
         val stream = checkNotNull(JisX0213::class.java.getResourceAsStream("jisx0213.bin")) { "jisx0213.bin missing" }
-        DataInputStream(stream.buffered()).use { input ->
-            while (input.readUnsignedByte() != '\n'.code) Unit // the header line
-            val firstPlane = input.readUnsignedShort()
-            val records = generateSequence { if (input.available() > 0) input.readInt() else null }.toList()
-            return arrayOf(
-                records.subList(0, firstPlane).toIntArray(),
-                records.subList(firstPlane, records.size).toIntArray(),
-            )
-        }
+        // Read whole: available() may say 0 before the end of a stream from inside the APK.
+        val bytes = stream.use { it.readBytes() }
+        val buffer = ByteBuffer.wrap(bytes, bytes.indexOf('\n'.code.toByte()) + 1, 0)
+        buffer.limit(bytes.size)
+        val firstPlane = buffer.short.toInt() and 0xFFFF
+        val records = IntArray(buffer.remaining() / 4) { buffer.int }
+        return arrayOf(records.copyOfRange(0, firstPlane), records.copyOfRange(firstPlane, records.size))
     }
 }

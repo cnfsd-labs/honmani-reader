@@ -65,9 +65,9 @@ for script in 'assets/honmani/text.js' 'assets/honmani/tap-bridge.js' 'assets/ho
     fi
 done
 echo "ttu files: $(grep -c '^assets/ttu/' <<<"$entries")"
-# The licences screen shows these; source maps (used to list the libraries) must not ship.
+# The licences screen shows these (and the gaiji table must ship); source maps (used to list the libraries) must not ship.
 for notice in 'assets/licenses/gpl-3.0.txt' 'assets/licenses/apache-2.0.txt' 'assets/licenses/ttu.txt' \
-  'assets/licenses/ttu-libraries.txt' 'assets/licenses/unicode.txt'; do
+  'assets/licenses/ttu-libraries.txt' 'assets/licenses/unicode.txt' 'app/honmani/reader/data/library/jisx0213.bin'; do
     if ! grep -qxF "$notice" <<<"$entries"; then
         echo "FAIL: $notice is missing"
         failed=1
