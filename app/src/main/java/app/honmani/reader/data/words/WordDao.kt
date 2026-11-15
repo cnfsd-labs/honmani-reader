@@ -90,6 +90,17 @@ interface WordDao : TombstoneWriter {
     @Query("DELETE FROM lookup_event WHERE id = :id")
     suspend fun deleteLookupEvent(id: Long)
 
+    @Query("SELECT * FROM lookup_event WHERE id = :id")
+    suspend fun lookupEvent(id: Long): LookupEventEntity?
+
+    /** Takes back a counted lookup and leaves a marker for its moment, in one transaction. */
+    @Transaction
+    suspend fun uncountLookupEvent(id: Long) {
+        val event = lookupEvent(id) ?: return
+        putTombstone(SyncKeys.LOOKUP_EVENT, SyncKeys.lookupEvent(event.lookedUpAt))
+        deleteLookupEvent(id)
+    }
+
     @Query("DELETE FROM word_lookup WHERE id = :id")
     suspend fun deleteLookupRow(id: Long)
 

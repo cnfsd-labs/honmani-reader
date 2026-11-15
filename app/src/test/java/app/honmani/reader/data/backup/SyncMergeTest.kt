@@ -17,11 +17,13 @@ import app.honmani.reader.data.review.ReviewLogEntity
 import app.honmani.reader.data.settings.ReviewSettings
 import app.honmani.reader.data.stats.MilestoneStore
 import app.honmani.reader.data.stats.ReadingDayEntity
+import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.ReadStretchStore
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordLookupEntity
 import app.honmani.reader.data.words.WordProgressStore
+import app.honmani.reader.data.words.WordRepository
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
@@ -389,6 +391,36 @@ class SyncMergeTest {
 
         assertTrue(a.db.wordDao().allLookups(id).isEmpty())
         assertTrue(b.db.wordDao().allLookups(onB).isEmpty())
+    }
+
+    @Test
+    fun aLookupTakenBackWithDontCountStaysGoneOnBothPhones() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        val words = WordRepository(a.db) { clock }
+        clock = 1_500
+        words.record(LookedUpWord("犬", "いぬ", "dog", "犬", "犬だ", 0))
+        clock = 1_600
+        val fresh = words.record(LookedUpWord("猫", "ねこ", "cat", "猫", "猫だ", 0))!!
+        settle(a, b)
+        assertEquals(2, b.db.backupDao().lookupEvents().size)
+        assertNotNull(b.findWord())
+
+        // "Don't count" on a word the tap created, and on a second tap of a saved word.
+        clock = 1_700
+        val again = words.record(LookedUpWord("犬", "いぬ", "dog", "犬", "犬が", 0))!!
+        settle(a, b)
+        clock = 2_000
+        words.undo(fresh)
+        words.undo(again)
+        settle(b, a)
+
+        for (phone in listOf(a, b)) {
+            assertNull(phone.findWord())
+            assertEquals(listOf(1_500L), phone.db.backupDao().lookupEvents().map { it.lookedUpAt })
+            val dog = phone.db.wordDao().find("犬", "いぬ")!!
+            assertEquals(listOf(1_500L), phone.db.wordDao().allLookups(dog.id).map { it.lookedUpAt })
+        }
     }
 
     @Test

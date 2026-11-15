@@ -205,9 +205,11 @@ class WordRepository(
      */
     suspend fun undo(undo: WordUndo) {
         database.withTransaction {
-            dao.deleteLookupEvent(undo.eventId)
+            // Every delete leaves its marker, so a sync merge can't bring the lookup back.
+            dao.uncountLookupEvent(undo.eventId)
             val before = undo.before
             if (before == null) {
+                dao.deleteLookup(undo.lookupId)
                 dao.delete(undo.wordId)
                 return@withTransaction
             }

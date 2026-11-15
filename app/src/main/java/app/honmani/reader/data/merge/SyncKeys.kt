@@ -8,6 +8,7 @@ package app.honmani.reader.data.merge
 object SyncKeys {
     const val WORD = "word"
     const val WORD_LOOKUP = "word_lookup"
+    const val LOOKUP_EVENT = "lookup_event"
     const val REVIEW_CARD = "review_card"
     const val REVIEW_LOG = "review_log"
     const val BOOKMARK = "bookmark"
@@ -26,6 +27,9 @@ object SyncKeys {
     /** A lookup has no identity of its own: the word, the moment and the text as written. */
     fun wordLookup(expression: String, reading: String, lookedUpAt: Long, surface: String) =
         join(expression, reading, lookedUpAt, surface)
+
+    /** A counted lookup is merged by its moment alone (`SyncMerge.mergeLookupEvents`). */
+    fun lookupEvent(lookedUpAt: Long) = lookedUpAt.toString()
 
     /** The card belongs to its word. */
     fun reviewCard(expression: String, reading: String) = word(expression, reading)

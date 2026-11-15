@@ -106,7 +106,7 @@ class SyncMerge(
             val waiting = ArrayList<WaitingBook>()
             val idOf = mergeBooks(file, positions, waiting)
             mergeReadingDays(file, idOf)
-            mergeLookupEvents(file, idOf)
+            mergeLookupEvents(file, markers, idOf)
             mergeWords(file, markers, idOf, progressBefore, progress)
             mergeKnownBatches(file, markers)
             mergeFinished(file, markers)
@@ -142,6 +142,7 @@ class SyncMerge(
         val folders = folderDao.all().groupBy { SyncKeys.folder(it.name) }
         val batches = dao.knownBatches().groupBy { SyncKeys.knownBatch(it.source.name, it.detail, it.createdAt) }
         val finished = dao.finishedBooks().groupBy { SyncKeys.finishedBook(it.contentHash) }
+        val events = dao.lookupEvents().groupBy { SyncKeys.lookupEvent(it.lookedUpAt) }
 
         for (marker in file.tombstones) {
             val known = markers.time(marker.kind, marker.key)
@@ -169,6 +170,7 @@ class SyncMerge(
                 // Their keys hold a time, so doing it again makes a new key: the marker always wins.
                 SyncKeys.REVIEW_LOG -> settle(logs[marker.key], { Long.MIN_VALUE }) { reviewDao.deleteLogRow(it.id) }
                 SyncKeys.WORD_LOOKUP -> settle(lookups[marker.key], { Long.MIN_VALUE }) { wordDao.deleteLookupRow(it.id) }
+                SyncKeys.LOOKUP_EVENT -> settle(events[marker.key], { Long.MIN_VALUE }) { wordDao.deleteLookupEvent(it.id) }
                 SyncKeys.KNOWN_BATCH -> settle(batches[marker.key], { Long.MIN_VALUE }) { knownBatchDao.deleteBatchRow(it.id) }
                 SyncKeys.BOOKMARK -> settle(bookmarks[marker.key], { it.updatedAt }) { bookmarkDao.deleteRow(it.id) }
                 SyncKeys.HIGHLIGHT -> settle(highlights[marker.key], { it.updatedAt }) { highlightDao.deleteRow(it.id) }
@@ -275,10 +277,12 @@ class SyncMerge(
     }
 
     /** As many per moment as either side has; by moment alone, as the book's key may differ between phones. */
-    private suspend fun mergeLookupEvents(file: BackupFile, idOf: suspend (String) -> Long) {
+    private suspend fun mergeLookupEvents(file: BackupFile, markers: Markers, idOf: suspend (String) -> Long) {
         val here = dao.lookupEvents().groupingBy { it.lookedUpAt }.eachCount()
         val missing = ArrayList<LookupEventEntity>()
         for ((at, events) in file.lookupEvents.groupBy { it.lookedUpAt }) {
+            // A lookup taken back ("Don't count") at that moment stays uncounted.
+            if (markers.has(SyncKeys.LOOKUP_EVENT, SyncKeys.lookupEvent(at))) continue
             for (event in events.drop(here[at] ?: 0)) {
                 missing += LookupEventEntity(lookedUpAt = at, bookId = event.book?.let { idOf(it) })
             }
