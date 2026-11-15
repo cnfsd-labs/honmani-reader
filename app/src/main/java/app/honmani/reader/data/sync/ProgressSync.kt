@@ -18,6 +18,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -109,6 +110,12 @@ class ProgressSync(
     private val pulledTo = HashMap<Long, Long>()
     private var pending: Pair<Long, Long>? = null
     private var pushJob: Job? = null
+
+    /** When [flush] last ran ([System.nanoTime]): positions saved shortly after it go at once. */
+    private var flushedAt: Long? = null
+
+    /** Whether [pushJob] is still in its delay: only then may [flush] replace it. */
+    private var waiting = false
 
     init {
         // Positions belong to the account they were read with: signing out or into another
@@ -254,24 +261,37 @@ class ProgressSync(
         synchronized(this) {
             pending = ttuId to characters
             if (pushJob?.isActive == true) return
-            schedulePush(pushDelayMs)
+            // Just after [flush] (ttu answers its progress request later) a position goes at
+            // once: the reader left, and the process may be gone before a delay ends.
+            schedulePush(nextDelay())
         }
     }
+
+    private fun justFlushed() = flushedAt?.let { System.nanoTime() - it < FLUSH_GRACE_NS } == true
+
+    /** Under the lock. */
+    private fun nextDelay() = if (justFlushed()) 0 else pushDelayMs
 
     /** Sends [pending] after [wait]; under the lock. A position that arrived meanwhile follows. */
     private fun schedulePush(wait: Long) {
         val job = scope.launch(start = CoroutineStart.LAZY) {
             if (wait > 0) delay(wait)
+            synchronized(this@ProgressSync) {
+                // [flush] cancelled the wait just as it ended: its own job sends.
+                if (!isActive) return@launch
+                waiting = false
+            }
             push()
         }
         pushJob = job
+        waiting = wait > 0
         job.invokeOnCompletion { finished ->
             // A position turned in while this one was being sent had no job to wait for it.
             if (finished == null) {
                 synchronized(this) {
                     if (pushJob === job) {
                         pushJob = null
-                        if (pending != null) schedulePush(pushDelayMs)
+                        if (pending != null) schedulePush(nextDelay())
                     }
                 }
             }
@@ -282,7 +302,10 @@ class ProgressSync(
     /** Sends the latest position now: the reader left the book or the app. */
     fun flush() {
         synchronized(this) {
+            flushedAt = System.nanoTime()
             if (pending == null) return
+            // A job on its way to the server takes the position, or sends it after (no delay now).
+            if (pushJob?.isActive == true && !waiting) return
             pushJob?.cancel()
             schedulePush(0)
         }
@@ -392,6 +415,9 @@ class ProgressSync(
         const val TAG = "Honmani.sync"
         const val PULL_TIMEOUT_MS = 4_000L
         const val PUSH_DELAY_MS = 15_000L
+
+        /** How long after [flush] a saved position still counts as part of leaving. */
+        const val FLUSH_GRACE_NS = 10_000_000_000L
         const val MAX_DOCUMENTS = 3
 
         /** Positions closer than this count as the same (a few characters' rounding). */

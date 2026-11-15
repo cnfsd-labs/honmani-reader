@@ -72,6 +72,7 @@ class ProgressSyncTest {
         client: KoSyncClient = KoSyncClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000),
         pullTimeoutMs: Long = 4_000,
         parsing: kotlin.coroutines.CoroutineContext = Dispatchers.Default,
+        pushDelayMs: Long = 50,
     ) = ProgressSync(
         settings = settings,
         client = client,
@@ -81,7 +82,7 @@ class ProgressSyncTest {
         scope = scope,
         device = "Honmani (Test)",
         unsent = UnsentPositions(unsentFile),
-        pushDelayMs = 50,
+        pushDelayMs = pushDelayMs,
         now = { clock },
         status = status,
         parsing = parsing,
@@ -226,6 +227,16 @@ class ProgressSyncTest {
 
         sync.onPosition(5, 24)
         sync.flush()
+        assertEquals(24.0 / 31, waitForProgress(device = settings.deviceId)["percentage"]!!.jsonPrimitive.double, 1e-9)
+    }
+
+    @Test
+    fun aPositionSavedJustAfterLeavingIsSentAtOnce() = runBlocking {
+        sync = newSync(pushDelayMs = 60_000)
+        pull(local = 7, savedAtMs = 0)
+        // ttu answers the progress request of leaving after the flush.
+        sync.flush()
+        sync.onPosition(5, 24)
         assertEquals(24.0 / 31, waitForProgress(device = settings.deviceId)["percentage"]!!.jsonPrimitive.double, 1e-9)
     }
 
