@@ -1072,6 +1072,8 @@
     <string name="review_card_front">Card %1$s. Tap to show the answer.</string>
     <string name="review_card_back">Card %1$s, reading %2$s, meaning %3$s.</string>
     <string name="review_card_back_note">Card %1$s, reading %2$s, meaning %3$s, note %4$s.</string>
+    <string name="review_speaker_word">Word</string>
+    <string name="review_speaker_sentence">Sentence</string>
     <string name="review_speak_word">Say the word</string>
     <string name="review_speak_sentence">Read the sentence</string>
     <string name="review_swipe_hint">Swipe left: forgot. Swipe right: got it.</string>

@@ -46,6 +46,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
@@ -104,6 +106,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -682,23 +685,32 @@ private fun marked(sentence: ReviewSentence): AnnotatedString {
     }
 }
 
-/** The word's and the sentence's speaker buttons, above the answer buttons on the front and the back. */
+/**
+ * The word's and the sentence's speaker buttons, above the answer buttons on the front and the back. Short labels
+ * (TalkBack reads the longer description); at a large font the second button wraps to its own line.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Speakers(withSentence: Boolean, onWord: () -> Unit, onSentence: () -> Unit) {
-    Row(
+    FlowRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp),
     ) {
-        SpeakerButton(R.string.review_speak_word, onWord, Modifier.weight(1f, fill = false))
-        if (withSentence) SpeakerButton(R.string.review_speak_sentence, onSentence, Modifier.weight(1f, fill = false))
+        SpeakerButton(R.string.review_speaker_word, R.string.review_speak_word, onWord)
+        if (withSentence) SpeakerButton(R.string.review_speaker_sentence, R.string.review_speak_sentence, onSentence)
     }
 }
 
 @Composable
-private fun SpeakerButton(@androidx.annotation.StringRes label: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    TextButton(onClick = onClick, modifier = modifier) {
+private fun SpeakerButton(
+    @androidx.annotation.StringRes label: Int,
+    @androidx.annotation.StringRes description: Int,
+    onClick: () -> Unit,
+) {
+    val spoken = stringResource(description)
+    TextButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = spoken }) {
         Icon(painterResource(R.drawable.ic_listen), contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
         Text(stringResource(label), maxLines = 1)
