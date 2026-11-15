@@ -3,7 +3,7 @@ package app.honmani.reader.data.stats
 import java.time.LocalDate
 import kotlin.math.sqrt
 
-/** The reading level: earned with characters read, so it only goes up. */
+/** The reading level: earned with characters read, so it goes up with reading and down only when a book's statistics are deleted. */
 data class ReadingLevel(
     val level: Int,
     val characters: Long,

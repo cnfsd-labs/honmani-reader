@@ -56,12 +56,13 @@ class MilestoneStore(private val preferences: SharedPreferences) {
 
     /**
      * Adds milestones from a backup as seen on their days (the earlier day where both have one),
-     * without announcing them.
+     * without announcing them. A backup without any leaves a first run first: [record] then takes
+     * the milestones the restored statistics reach as known, not as news.
      */
     fun restore(seen: Map<String, LocalDate>) {
         val merged = _seen.value.toMutableMap()
         for ((id, day) in seen) merged[id] = merged[id]?.let { minOf(it, day) } ?: day
-        if (merged == _seen.value && preferences.contains(KEY_SEEN)) return
+        if (merged == _seen.value) return
         _seen.value = merged
         preferences.edit().putStringSet(KEY_SEEN, merged.map { (id, day) -> "$id$SEPARATOR$day" }.toSet()).apply()
     }

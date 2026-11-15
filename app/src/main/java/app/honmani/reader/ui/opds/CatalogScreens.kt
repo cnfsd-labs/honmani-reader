@@ -166,14 +166,21 @@ fun CatalogBrowser(
                     }
                     if (page.nextUrl != null) {
                         item(key = "more") {
-                            // Reaching the end of the list loads the next page.
-                            LaunchedEffect(page.entries.size) { onLoadMore() }
+                            // Reaching the end of the list loads the next page (keyed by its address: a page
+                            // of only known entries adds none but moves on); a failed one waits for a tap.
+                            if (!page.loadMoreFailed) LaunchedEffect(page.nextUrl) { onLoadMore() }
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(16.dp),
-                            ) { CircularProgressIndicator(modifier = Modifier.size(24.dp)) }
+                            ) {
+                                if (page.loadMoreFailed) {
+                                    TextButton(onClick = onLoadMore) { Text(stringResource(R.string.action_retry)) }
+                                } else {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                }
+                            }
                         }
                     }
                 }
@@ -369,7 +376,8 @@ fun CatalogDialog(
 ) {
     var address by rememberSaveable { mutableStateOf(editor.address) }
     var username by rememberSaveable { mutableStateOf(editor.username) }
-    var password by rememberSaveable { mutableStateOf("") }
+    // Not saveable: a typed password stays out of the saved instance state.
+    var password by remember { mutableStateOf("") }
     var autoImport by rememberSaveable { mutableStateOf(editor.autoImport) }
     var syncProgress by rememberSaveable { mutableStateOf(editor.syncProgress) }
     var confirmDelete by remember { mutableStateOf(false) }

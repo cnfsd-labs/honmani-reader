@@ -173,11 +173,14 @@ fun WordsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Each change gets a snackbar with an undo; the next waits until it is gone.
-    var change by remember { mutableStateOf<WordChange?>(null) }
+    // Each change gets a snackbar with an undo; the next waits until it is gone. One still showing when
+    // the tab was left comes back with it.
+    var change by remember { mutableStateOf(viewModel.shownChange) }
     LaunchedEffect(viewModel) {
+        snapshotFlow { change }.first { current -> current == null }
         viewModel.changes.collect {
             change = it
+            viewModel.shownChange = it
             snapshotFlow { change }.first { current -> current == null }
         }
     }
@@ -279,6 +282,7 @@ fun WordsScreen(
         if (current != null && message != null) {
             val result = snackbarHostState.showSnackbar(message, undoLabel, duration = SnackbarDuration.Short)
             if (result == SnackbarResult.ActionPerformed) viewModel.undo(current)
+            viewModel.shownChange = null
             change = null
         }
     }

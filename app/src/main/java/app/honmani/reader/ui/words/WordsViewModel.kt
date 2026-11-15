@@ -203,6 +203,9 @@ class WordsViewModel(
     /** Changes to offer an undo for. */
     val changes: Flow<WordChange> = _changes.receiveAsFlow()
 
+    /** The change whose undo is on screen, kept here so leaving the tab doesn't drop its undo. */
+    var shownChange: WordChange? = null
+
     private val lists: Flow<WordLists> = combine(repository.all, knowledge.onStart { emit(null) }) { words, knowledge ->
         WordLists.of(words, knowledge)
     }

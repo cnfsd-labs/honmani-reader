@@ -43,6 +43,8 @@ data class CatalogPage(
     val nextUrl: String?,
     val search: OpdsSearch?,
     val loadingMore: Boolean = false,
+    /** The last next page failed to load: the list offers a retry instead of loading it again by itself. */
+    val loadMoreFailed: Boolean = false,
 )
 
 data class BrowseState(
@@ -176,7 +178,7 @@ class OpdsViewModel(
         val next = page.nextUrl ?: return
         val server = server ?: return
         if (page.loadingMore || state.loading) return
-        replaceTop { it.copy(loadingMore = true) }
+        replaceTop { it.copy(loadingMore = true, loadMoreFailed = false) }
         viewModelScope.launch {
             try {
                 val feed = client.feed(server, next)
@@ -190,8 +192,7 @@ class OpdsViewModel(
                     )
                 }
             } catch (_: OpdsException) {
-                // Scrolling to the end again retries.
-                replacePage(page.url) { it.copy(loadingMore = false) }
+                replacePage(page.url) { it.copy(loadingMore = false, loadMoreFailed = true) }
             }
         }
     }

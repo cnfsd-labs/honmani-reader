@@ -54,4 +54,14 @@ class MilestoneStoreTest {
         assertEquals(mapOf("books_1" to today.minusDays(30), "streak_7" to today.minusDays(9)), reopened.seen.value)
         assertEquals(emptySet<String>(), reopened.pending.value)
     }
+
+    @Test
+    fun aRestoreWithoutMilestonesOnANewInstall_leavesTheFirstRecordQuiet() {
+        val store = MilestoneStore(preferences())
+
+        store.restore(emptyMap())
+        store.record(listOf("books_1", "characters_10000"), today)
+
+        assertEquals(emptySet<String>(), MilestoneStore(preferences()).pending.value)
+    }
 }
