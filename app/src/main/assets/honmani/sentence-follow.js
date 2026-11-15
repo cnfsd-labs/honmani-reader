@@ -7,7 +7,8 @@
  *   window.honmaniFollow.mark(range)         draws the "honmani-read-aloud" highlight over a Range
  *   window.honmaniFollow.clear()             removes it
  *   window.honmaniFollow.keepOnScreen(range) brings the start of the Range into view; resolves to
- *                                            true when it is on screen afterwards
+ *                                            true when it is on screen afterwards; a newer
+ *                                            call supersedes one still turning pages
  *
  * The mark is a CSS Custom Highlight: ttu's DOM, character counts and layout are never touched.
  * It draws below the word marks and the user's highlights (priority -4; theirs are -3 and up) with
@@ -74,6 +75,8 @@
   let detachedNow = false;
   let autoDepth = 0;
   let quietUntil = 0;
+  /** Counts keepOnScreen calls: an earlier call still turning pages stops when a newer one starts. */
+  let keeping = 0;
 
   function post(message) {
     const app = window.honmani;
@@ -175,11 +178,12 @@
     return range.comparePoint(first.node, first.offset) < 0 ? 1 : -1;
   }
 
-  async function keepPaginated(range) {
+  async function keepPaginated(range, token) {
     if (startOnScreen(range)) return true;
     return auto(async () => {
       for (let turns = 0; turns < MAX_TURNS && !startOnScreen(range); turns++) {
-        if (!range.startContainer.isConnected) return false;
+        // A newer call took over (the next passage, a new layout): the latest one turns the pages.
+        if (!range.startContainer.isConnected || token !== keeping) return false;
         const code = directionOf(range) > 0 ? 'ArrowDown' : 'ArrowUp';
         window.dispatchEvent(new KeyboardEvent('keydown', { code, key: code, bubbles: true }));
         await nextFrame();
@@ -218,8 +222,9 @@
 
   /** Brings the start of the range into view. */
   async function keepOnScreen(range) {
+    const token = ++keeping;
     if (detachedNow || !range || !range.startContainer.isConnected) return false;
-    return isPaginated() ? keepPaginated(range) : keepContinuous(range);
+    return isPaginated() ? keepPaginated(range, token) : keepContinuous(range);
   }
 
   window.honmaniFollow = Object.freeze({

@@ -34,6 +34,8 @@
   let restoring = false;
   let rememberTimer = 0;
   let settleTimer = 0;
+  /** Counts restores and resizes: a restore still turning pages stops on the next resize (another rotation). */
+  let restoreToken = 0;
 
   function isPaginated() {
     try {
@@ -126,6 +128,7 @@
   }
 
   async function bringAnchorBack() {
+    const token = ++restoreToken;
     if (!anchor || !anchor.node.isConnected || charOnScreen(anchor)) return;
     restoring = true;
     try {
@@ -137,6 +140,7 @@
       let lastDirection = 0;
       let reversals = 0;
       for (let turn = 0; turn < MAX_TURNS && !charOnScreen(anchor); turn++) {
+        if (token !== restoreToken) return;
         const first = firstCharOnScreen();
         if (!first) return;
         const direction = compare(first, anchor) < 0 ? 1 : -1;
@@ -153,13 +157,16 @@
         if (!now || (now.node === first.node && now.offset === first.offset)) return;
       }
     } finally {
-      restoring = false;
+      if (token === restoreToken) restoring = false;
     }
   }
 
   function onResize() {
     if (!document.querySelector(BOOK_ROOT_SELECTOR)) return;
     resizing = true;
+    // A restore still turning pages for the last layout stops: the next one starts once this settles.
+    restoreToken++;
+    restoring = false;
     clearTimeout(rememberTimer);
     clearTimeout(settleTimer);
     settleTimer = setTimeout(() => {

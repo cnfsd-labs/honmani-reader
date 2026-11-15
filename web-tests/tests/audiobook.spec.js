@@ -84,6 +84,31 @@ test('a newer mark replaces one still on its way', async ({ page }) => {
   await expect.poll(() => marked(page)).toEqual(['名前は']);
 });
 
+test('a newer mark stops the page turns of one still turning (paginated)', async ({ page }) => {
+  // A stand-in for ttu's paginated reader: one paragraph per screen, ArrowDown / ArrowUp turn.
+  const paragraphs = Array.from({ length: 30 }, (_, i) => `<p>${String(i).padStart(2, '0')}あいう</p>`).join('');
+  await openBook(page, `<div id="ttu-a">${paragraphs}</div>`, { css: 'margin: 0; } p { margin: 0; height: 100vh;' });
+  await page.evaluate(() => {
+    window.__turns = 0;
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'ArrowDown' && event.code !== 'ArrowUp') return;
+      window.__turns++;
+      window.scrollBy({ top: event.code === 'ArrowDown' ? innerHeight : -innerHeight, behavior: 'instant' });
+    });
+  });
+  await sections(page, [['ttu-a', 0]]);
+  // Each paragraph has 5 characters: paragraph 25 starts at 125, paragraph 1 at 5.
+  await send(page, { type: 'audiobook.mark', gen: 1, start: 125, end: 130 });
+  await expect.poll(() => page.evaluate(() => window.__turns)).toBeGreaterThanOrEqual(2);
+  await send(page, { type: 'audiobook.mark', gen: 2, start: 5, end: 10 });
+  await expect.poll(() => marked(page)).toEqual(['01あいう']);
+  await expect.poll(() => page.evaluate(() => Math.round(scrollY / innerHeight))).toBe(1);
+  await page.waitForTimeout(1_000);
+  // The earlier mark gave up at once instead of turning against the newer one up to its limit.
+  expect(await page.evaluate(() => Math.round(scrollY / innerHeight))).toBe(1);
+  expect(await page.evaluate(() => window.__turns)).toBeLessThan(15);
+});
+
 test('a section turned to by the keyboard is followed', async ({ page }) => {
   // A stand-in for ttu: ArrowDown swaps section a for b in the page.
   await openBook(page, '<div id="ttu-a"><p>吾輩は猫である。</p><p>名前はまだ無い。</p></div>');
