@@ -108,7 +108,7 @@ class AppearanceSettings(
     /** Whether the accent changes by itself, and how often. */
     val randomAccent: StateFlow<AccentRandom> = _randomAccent.asStateFlow()
 
-    private val _customHue = MutableStateFlow(preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE))
+    private val _customHue = MutableStateFlow(storedCustomHue())
 
     /** The hue (0–360°) of [Accent.CUSTOM]. */
     val customHue: StateFlow<Float> = _customHue.asStateFlow()
@@ -264,13 +264,17 @@ class AppearanceSettings(
             LOOKUP_TEXT_DEFAULT
         }
 
+    /** The stored hue within 0..360; a damaged value (NaN, out of range) falls back to the default. */
+    private fun storedCustomHue(): Float =
+        preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE).takeIf { it.isFinite() && it in 0f..360f } ?: DEFAULT_CUSTOM_HUE
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
         _lookupTextPercent.value = readLookupTextPercent()
         _showPitch.value = preferences.getBoolean(KEY_SHOW_PITCH, true)
         _accent.value = Accent.fromName(preferences.getString(KEY_ACCENT, null))
         _randomAccent.value = AccentRandom.fromName(preferences.getString(KEY_ACCENT_RANDOM, null))
-        _customHue.value = preferences.getFloat(KEY_CUSTOM_HUE, DEFAULT_CUSTOM_HUE)
+        _customHue.value = storedCustomHue()
         _showDifficulty.value = preferences.getBoolean(KEY_SHOW_DIFFICULTY, true)
         _librarySort.value = preferences.getString(KEY_LIBRARY_SORT, null)
         _showPreviousSentence.value = preferences.getBoolean(KEY_SHOW_PREVIOUS_SENTENCE, false)

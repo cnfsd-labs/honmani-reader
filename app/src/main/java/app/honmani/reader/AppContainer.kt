@@ -893,6 +893,8 @@ class AppContainer(context: Context) {
     }
 
     private suspend fun autoBackupNow(force: Boolean) {
+        // The reading time just counted (the book was left, the app stopped) goes in first.
+        readingTracker.settled()
         val outcome = autoBackup.save(force) {
             val readerSettings = try {
                 ttuLibrary.readSettings()

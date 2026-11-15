@@ -48,6 +48,20 @@ class ReadingTrackerTest {
     }
 
     @Test
+    fun settledWaitsForTheLastWrite() = runTest {
+        val tracker = tracker()
+        tracker.setForeground(true)
+        tracker.setBook(7)
+        tracker.setVisible(true)
+        minutes(2)
+        tracker.setVisible(false)
+
+        tracker.settled()
+
+        assertEquals(2 * 60L, store.seconds[7L to DAY])
+    }
+
+    @Test
     fun countsTimeOnlyWhileTheBookIsOnScreenAndTheAppInFront() = runTest {
         val tracker = tracker()
         tracker.setForeground(true)

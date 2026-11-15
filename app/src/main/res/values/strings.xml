@@ -385,7 +385,10 @@
     <string name="word_in_anki">In Anki</string>
     <string name="anki_adding">Adding to Anki…</string>
     <string name="action_add_all_to_anki">Add all %1$d to Anki</string>
-    <string name="anki_add_all_title" tools:ignore="PluralsCandidate">Add %1$d words to Anki?</string>
+    <plurals name="anki_add_all_title">
+        <item quantity="one">Add %1$d word to Anki?</item>
+        <item quantity="other">Add %1$d words to Anki?</item>
+    </plurals>
     <string name="anki_add_all_text">Each becomes a card in Anki. Particles and other grammar words (の, です) are left out; their own Anki button still adds them.</string>
     <string name="action_add">Add</string>
     <plurals name="anki_left_out">
@@ -433,7 +436,10 @@
     <string name="reader_menu_search">Search in book</string>
     <string name="reader_menu_read_aloud">Read aloud</string>
     <string name="reader_menu_pronunciations">Pronunciations</string>
-    <string name="reader_menu_pronunciations_count">%d replacements for Read aloud</string>
+    <plurals name="reader_menu_pronunciations_count">
+        <item quantity="one">%d replacement for Read aloud</item>
+        <item quantity="other">%d replacements for Read aloud</item>
+    </plurals>
     <string name="reader_menu_pronunciations_none">Fix a name the voice gets wrong</string>
     <string name="pronunciation_title">Pronunciations</string>
     <string name="pronunciation_explain">Read aloud speaks the kana instead of the text, in this book only.</string>
@@ -698,9 +704,15 @@
     <string name="known_review_top">The %1$s most common words by %2$s. Particles and grammar words are included, names are not.</string>
     <string name="known_review_anki">The words of the %1$s deck.</string>
     <string name="known_review_list">The words of %1$s.</string>
-    <string name="known_review_marks" tools:ignore="PluralsCandidate">Marks %1$d words as known: %2$d new to your list, %3$d moved from Learning.</string>
+    <plurals name="known_review_marks">
+        <item quantity="one">Marks %1$d word as known: %2$d new to your list, %3$d moved from Learning.</item>
+        <item quantity="other">Marks %1$d words as known: %2$d new to your list, %3$d moved from Learning.</item>
+    </plurals>
     <string name="known_review_already" tools:ignore="PluralsCandidate">%1$d were known already.</string>
-    <string name="known_review_names" tools:ignore="PluralsCandidate">%1$d names were left out.</string>
+    <plurals name="known_review_names">
+        <item quantity="one">%1$d name was left out.</item>
+        <item quantity="other">%1$d names were left out.</item>
+    </plurals>
     <string name="known_review_skipped" tools:ignore="PluralsCandidate">%1$d without a word were skipped.</string>
     <string name="known_review_unmatched" tools:ignore="PluralsCandidate">%1$d not found in your dictionaries: %2$s</string>
     <string name="known_review_undo">You can undo this.</string>
@@ -817,10 +829,8 @@
     <string name="audiobook_make_epub_only">EPUB only</string>
     <string name="audiobook_make_no_key">To make an audiobook with a Google voice, first enter your own Google Cloud API key in Settings, Flashcards, Voice.</string>
     <string name="audiobook_make_title">Make an audiobook</string>
-    <string name="audiobook_make_counting">Counting the characters of the book…</string>
     <string name="audiobook_make_checking">Checking your key and loading the voices…</string>
     <string name="audiobook_make_unreadable">This book could not be read to count its text.</string>
-    <string name="audiobook_make_no_text">This book has no text to speak.</string>
     <string name="audiobook_make_key_problem">Google said no, nothing was billed: %1$s</string>
     <string name="audiobook_make_chars">%1$s characters will be spoken in %2$s.</string>
     <string name="audiobook_make_voice">Voice</string>
@@ -857,7 +867,6 @@
     <string name="audiobook_generated_delete_text">Making it again costs money.</string>
     <string name="audiobook_generated_deleted">The audio was deleted.</string>
     <string name="audiobook_generated_finished">The audiobook is ready.</string>
-    <string name="audiobook_generated_close">Close</string>
     <string name="audiobook_make_hours">%1$d h %2$d min</string>
     <string name="audiobook_make_minutes">%1$d min</string>
 
@@ -1042,7 +1051,10 @@
     <string name="review_chip_starred">Starred</string>
     <string name="review_chip_all_learning">All learning</string>
     <string name="review_pick_book">Words of which book?</string>
-    <string name="review_nav_badge">%1$d words due for review</string>
+    <plurals name="review_nav_badge">
+        <item quantity="one">%1$d word due for review</item>
+        <item quantity="other">%1$d words due for review</item>
+    </plurals>
     <string name="review_close">Leave the review</string>
     <string name="review_left">%1$d left</string>
     <string name="review_show_answer">Show answer</string>

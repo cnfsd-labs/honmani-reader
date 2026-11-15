@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -69,7 +70,7 @@ private fun HomeTab.TabIcon() {
 @Composable
 private fun TabBadge(dot: Boolean, count: Int) {
     if (count > 0) {
-        val description = stringResource(R.string.review_nav_badge, count)
+        val description = pluralStringResource(R.plurals.review_nav_badge, count, count)
         Badge(modifier = Modifier.semantics { contentDescription = description })
     } else if (dot) {
         Badge()
@@ -83,7 +84,7 @@ private fun TabBadge(dot: Boolean, count: Int) {
 @Composable
 private fun TabLabel(tab: HomeTab, count: Int) {
     val label = stringResource(tab.label)
-    val description = if (count > 0) "$label, ${stringResource(R.string.review_nav_badge, count)}" else null
+    val description = if (count > 0) "$label, ${pluralStringResource(R.plurals.review_nav_badge, count, count)}" else null
     // Four labels share the bar's width: past 130% text size they broke mid-word ("Progre/ss"), so the
     // labels stop growing there (the icons and every other text keep following the system size).
     val density = LocalDensity.current

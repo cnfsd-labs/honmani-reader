@@ -487,9 +487,9 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                                 else -> stringResource(R.string.known_review_list, plan.detail)
                             },
                         )
-                        Text(stringResource(R.string.known_review_marks, change.changed, change.created, change.upgraded))
+                        Text(pluralStringResource(R.plurals.known_review_marks, change.changed, change.changed, change.created, change.upgraded))
                         if (change.unchanged > 0) Text(stringResource(R.string.known_review_already, change.unchanged))
-                        if (plan.resolved.names > 0) Text(stringResource(R.string.known_review_names, plan.resolved.names))
+                        if (plan.resolved.names > 0) Text(pluralStringResource(R.plurals.known_review_names, plan.resolved.names, plan.resolved.names))
                         if (plan.skipped > 0) Text(stringResource(R.string.known_review_skipped, plan.skipped))
                         if (plan.resolved.unmatched.isNotEmpty()) {
                             Text(

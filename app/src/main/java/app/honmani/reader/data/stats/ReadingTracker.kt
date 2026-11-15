@@ -5,6 +5,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -64,6 +66,9 @@ class ReadingTracker(
     private val dayClock = DayClock(zone, startHour, clock)
     private val lock = Any()
     private val writes = Mutex()
+
+    /** Writes launched and not finished yet; see [settled]. */
+    private val running = HashSet<Job>()
 
     private var book: Long? = null
     private var visible = false
@@ -140,7 +145,7 @@ class ReadingTracker(
         }
         // The time up to this page turn is taken now, before a later page adds to it.
         val onThisPage = synchronized(lock) { sinceReport.remove(ttuId).orEmpty() }
-        scope.launch {
+        track(scope.launch {
             writes.withLock {
                 val known = store.position(ttuId)
                 if (known == null) {
@@ -174,13 +179,13 @@ class ReadingTracker(
                 }
                 safely { store.setPosition(ttuId, characters) }
             }
-        }
+        })
     }
 
     /** ttu reported reading positions: characters read up to each book's position. */
     fun onPositions(positions: Map<Long, Long>) {
         if (positions.isEmpty()) return
-        scope.launch {
+        track(scope.launch {
             writes.withLock {
                 for ((ttuId, characters) in positions) {
                     val before = store.position(ttuId) ?: 0L
@@ -193,7 +198,7 @@ class ReadingTracker(
                     safely { store.setPosition(ttuId, characters) }
                 }
             }
-        }
+        })
     }
 
     /** Writes what was counted (when the app goes to the background, say). */
@@ -215,11 +220,11 @@ class ReadingTracker(
             due
         }
         if (due.isEmpty()) return
-        scope.launch {
+        track(scope.launch {
             writes.withLock {
                 for ((key, counted) in due) safely { store.add(key.first, key.second, counted.first, 0, counted.second) }
             }
-        }
+        })
     }
 
     private inline fun change(update: () -> Unit) {
@@ -286,6 +291,16 @@ class ReadingTracker(
             left -= share
             if (share > 0) safely { store.add(ttuId, day, 0, share) }
         }
+    }
+
+    private fun track(job: Job) {
+        synchronized(lock) { running += job }
+        job.invokeOnCompletion { synchronized(lock) { running -= job } }
+    }
+
+    /** Waits for the writes launched so far (the automatic backup must not miss the last ones). */
+    suspend fun settled() {
+        synchronized(lock) { running.toList() }.joinAll()
     }
 
     private fun flushIfDue() {

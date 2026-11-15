@@ -735,6 +735,24 @@ class BackupTest {
     }
 
     @Test
+    fun aNonFiniteNumberInADamagedBackupIsSkipped() = runTest {
+        val backup = throughFile(
+            BackupFile(
+                exportedAt = 1,
+                settings = mapOf(
+                    "accent_custom_hue" to BackupValue(BackupValue.FLOAT, JsonPrimitive("NaN")),
+                    "read_aloud_rate" to BackupValue(BackupValue.FLOAT, JsonPrimitive("Infinity")),
+                ),
+            ),
+        )
+        val new = Phone("new")
+
+        new.backup.restore(backup)
+
+        assertEquals(emptyMap<String, Any?>(), new.settings.all)
+    }
+
+    @Test
     fun theOwnNoteTypeAndItsMappingsComeBackWithTheSettings_butNotItsId() = runTest {
         val mappings = app.honmani.reader.anki.FieldMapping.toJson(
             mapOf(

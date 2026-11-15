@@ -96,6 +96,9 @@ sealed interface BridgeMessage {
          * Parses a bridge message, or returns null for anything unknown or malformed. The `type`
          * is read once and picks the parser; each kind has its own length cap.
          */
+        /** Whether [message] is a picture (the long one, worth parsing off the main thread). */
+        fun isPicture(message: String): Boolean = message.startsWith(IMAGE_PREFIX)
+
         fun parse(message: String?): BridgeMessage? {
             if (message == null) return null
             // Only a picture is longer than the usual cap, and the page writes its type first.

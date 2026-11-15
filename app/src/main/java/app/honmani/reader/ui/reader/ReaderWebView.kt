@@ -58,12 +58,15 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -344,6 +347,7 @@ fun ReaderWebView(
             factory = { context ->
                 createReaderWebView(
                     context = context,
+                    scope = scope,
                     onRenderProcessGone = { renderer++ },
                     // Only over a book: ttu's own pages keep their text fields' Paste and Select all.
                     hideSelectionToolbar = { currentHideToolbar && inBook },
@@ -526,6 +530,7 @@ private class WebViewRef {
 @SuppressLint("SetJavaScriptEnabled")
 private fun createReaderWebView(
     context: Context,
+    scope: CoroutineScope,
     onMessage: (BridgeMessage, JavaScriptReplyProxy) -> Unit,
     diagnostics: ReaderDiagnostics,
     ttuLibrary: TtuLibrary,
@@ -604,7 +609,16 @@ private fun createReaderWebView(
                 BRIDGE_OBJECT,
                 allowedOrigins,
             ) { _, message, _, isMainFrame, replyProxy ->
-                if (isMainFrame) BridgeMessage.parse(message.data)?.let { onMessage(it, replyProxy) }
+                val data = message.data
+                if (!isMainFrame) return@addWebMessageListener
+                if (data != null && BridgeMessage.isPicture(data)) {
+                    // A picture is up to 3 MB of text: parsed off the main thread, handed on back on it.
+                    scope.launch {
+                        withContext(Dispatchers.Default) { BridgeMessage.parse(data) }?.let { onMessage(it, replyProxy) }
+                    }
+                } else {
+                    BridgeMessage.parse(data)?.let { onMessage(it, replyProxy) }
+                }
             }
         }
 

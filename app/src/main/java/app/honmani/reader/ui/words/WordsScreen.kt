@@ -262,7 +262,7 @@ fun WordsScreen(
     if (confirmAddAll) {
         AlertDialog(
             onDismissRequest = { confirmAddAll = false },
-            title = { Text(stringResource(R.string.anki_add_all_title, uiState.notInAnki)) },
+            title = { Text(pluralStringResource(R.plurals.anki_add_all_title, uiState.notInAnki, uiState.notInAnki)) },
             text = { Text(stringResource(R.string.anki_add_all_text)) },
             confirmButton = {
                 TextButton(onClick = {

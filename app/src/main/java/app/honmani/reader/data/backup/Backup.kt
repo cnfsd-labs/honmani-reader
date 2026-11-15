@@ -116,9 +116,14 @@ class Backup(
      * Everything but the books; [readerSettings] are ttu's, read by the caller (null if it couldn't).
      * With [sync] the file is this phone's sync file instead (see [SyncFolder]): the edit times and
      * deletion markers are in, the reading days carry this phone's id, and nothing that stays on a
-     * phone (settings, ttu's settings, book servers, removed catalogue books) is.
+     * phone (settings, ttu's settings, book servers, removed catalogue books) is. Waits for a
+     * running restore: the waiting books and word progress it writes after the database must not
+     * be read half way.
      */
-    suspend fun export(readerSettings: Map<String, String?>?, sync: SyncIdentity? = null): BackupFile {
+    suspend fun export(readerSettings: Map<String, String?>?, sync: SyncIdentity? = null): BackupFile =
+        restoring.withLock { exportNow(readerSettings, sync) }
+
+    private suspend fun exportNow(readerSettings: Map<String, String?>?, sync: SyncIdentity?): BackupFile {
         class Tables(
             val books: List<BookEntity>,
             val folders: Map<Long, String>,
@@ -561,7 +566,7 @@ class Backup(
             when (typed.type) {
                 BackupValue.STRING -> value.contentOrNull?.takeIf { validString(key, it) }?.let { editor.putString(key, it) }
                 BackupValue.BOOLEAN -> value.booleanOrNull?.let { editor.putBoolean(key, it) }
-                BackupValue.FLOAT -> value.doubleOrNull?.let { editor.putFloat(key, it.toFloat()) }
+                BackupValue.FLOAT -> value.doubleOrNull?.toFloat()?.takeIf { it.isFinite() }?.let { editor.putFloat(key, it) }
                 BackupValue.INT -> value.intOrNull?.let { editor.putInt(key, it) }
             }
         }

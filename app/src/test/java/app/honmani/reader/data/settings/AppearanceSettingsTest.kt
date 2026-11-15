@@ -170,4 +170,12 @@ class AppearanceSettingsTest {
 
         assertEquals(true, AppearanceSettings(preferences(), device()).sounds.value)
     }
+
+    @Test
+    fun aDamagedHueFallsBackToTheDefault() {
+        preferences().edit().putFloat(AppearanceSettings.KEY_CUSTOM_HUE, Float.NaN).commit()
+        assertEquals(AppearanceSettings.DEFAULT_CUSTOM_HUE, AppearanceSettings(preferences(), device()).customHue.value)
+        preferences().edit().putFloat(AppearanceSettings.KEY_CUSTOM_HUE, 9000f).commit()
+        assertEquals(AppearanceSettings.DEFAULT_CUSTOM_HUE, AppearanceSettings(preferences(), device()).customHue.value)
+    }
 }

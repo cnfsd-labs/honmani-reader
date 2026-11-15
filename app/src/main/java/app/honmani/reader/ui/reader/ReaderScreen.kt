@@ -636,7 +636,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 closeRequests = viewModel.closeRequests,
                 onAtLibraryChanged = {
                     // Back from a book (or ttu's settings): what was read goes into the backup.
-                    if (it && !atLibrary) container.saveAutoBackup()
+                    if (it && !atLibrary) {
+                        // The book's time is counted first (the effect below repeats it harmlessly).
+                        tracker.setVisible(false)
+                        container.saveAutoBackup()
+                    }
                     atLibrary = it
                     if (it) {
                         viewModel.dismiss()
