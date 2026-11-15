@@ -322,7 +322,8 @@ class AudiobookController(
 
     override fun onError() {
         if (phase == AudiobookPhase.OFF || phase == AudiobookPhase.PROBLEM) return
-        savePosition(player.positionMs)
+        // A failed player may say 0: then the last saved position stands (a file gone mid-book).
+        player.positionMs.takeIf { it > 0 }?.let(savePosition)
         fail(AudiobookProblem.UNSUPPORTED)
     }
 

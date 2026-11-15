@@ -46,7 +46,16 @@ object Srt {
                     end = millis(g[5], g[6], g[7], g[8])
                     text = ArrayList()
                 }
-                marker -> text = null
+                // A time line that can't be read (after a blank line, or after the next cue's number)
+                // skips its block; in a cue's text "-->" is just text.
+                marker && text.let { it == null || it.size > 1 && NUMBER.matches(it.last()) } -> {
+                    val previous = text
+                    if (previous != null) {
+                        previous.removeAt(previous.lastIndex)
+                        close()
+                    }
+                    text = null
+                }
                 else -> text?.add(line)
             }
         }

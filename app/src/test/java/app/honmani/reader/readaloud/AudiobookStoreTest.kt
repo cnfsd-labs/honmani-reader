@@ -84,6 +84,14 @@ class AudiobookStoreTest {
     }
 
     @Test
+    fun shiftJisSubtitlesAreRead() {
+        val store = store()
+        val srt = "1\n00:00:01,000 --> 00:00:02,000\n吾輩は猫である。名前はまだ無い。\n"
+        store.pair("abc", "content://audio", srt.toByteArray(charset("windows-31j")))
+        assertEquals(srt, store.subtitles("abc"))
+    }
+
+    @Test
     fun theSpeedIsKeptAndOnlyKnownSpeedsComeBack() {
         val store = store()
         assertEquals(1f, store.rate(), 0f)

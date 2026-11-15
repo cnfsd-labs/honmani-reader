@@ -1,6 +1,7 @@
 package app.honmani.reader.readaloud
 
 import android.content.SharedPreferences
+import app.honmani.reader.data.library.TextEncoding
 import java.io.File
 import java.security.MessageDigest
 
@@ -43,15 +44,12 @@ class AudiobookStore(
         return AudiobookPairing(audio, hash)
     }
 
-    /** The subtitle copy as text (UTF-8, or UTF-16 with a byte order mark), or null if it is gone. */
+    /** The subtitle copy as text (UTF-8, Shift_JIS, EUC-JP or UTF-16: [TextEncoding]), or null if it is gone. */
     fun subtitles(bookHash: String): String? {
         val file = File(directory, "${name(bookHash)}.srt").takeIf { it.isFile } ?: return null
         val bytes = file.readBytes()
-        return when {
-            bytes.size >= 2 && bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte() -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16BE)
-            bytes.size >= 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte() -> String(bytes, 2, bytes.size - 2, Charsets.UTF_16LE)
-            else -> String(bytes, Charsets.UTF_8)
-        }
+        val start = TextEncoding.bomLength(bytes)
+        return String(bytes, start, bytes.size - start, TextEncoding.detect(bytes))
     }
 
     fun alignment(bookHash: String, srtHash: String): AudiobookAlignment? =

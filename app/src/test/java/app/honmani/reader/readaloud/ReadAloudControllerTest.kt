@@ -90,6 +90,18 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun aSentenceThePronunciationsEmptyIsSkippedAndReadingGoesOn() {
+        val rules = PronunciationRules(listOf("※" to ""))
+        val replacing = ReadAloudController(voice = voice, toPage = { sent.add(it) }, pronunciations = { rules })
+        replacing.start()
+        replacing.onSentences(gen, listOf(SpokenSentence(0, "文0。"), SpokenSentence(1, "※")), "book")
+        assertEquals(listOf("文0。"), voice.spoken.map { it.second })
+        replacing.onStart(id(0))
+        replacing.onDone(id(0))
+        assertEquals(ReadAloudPhase.ENDED, replacing.state.value.phase)
+    }
+
+    @Test
     fun asksForMoreAsTheQueueRunsLow() {
         startAndReceive()
         controller.onStart(id(0))

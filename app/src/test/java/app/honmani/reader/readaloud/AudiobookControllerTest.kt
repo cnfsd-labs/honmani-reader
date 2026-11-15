@@ -215,6 +215,15 @@ class AudiobookControllerTest {
     }
 
     @Test
+    fun aPlayerFailingWithoutAPositionKeepsTheLastSavedOne() {
+        start()
+        player.positionMs = 0 // a failed MediaPlayer can't say where it was
+        player.listener!!.onError()
+        assertEquals(AudiobookPhase.PROBLEM, controller.state.value.phase)
+        assertEquals(emptyList<Long>(), saved)
+    }
+
+    @Test
     fun previousAfterTheEndGoesToTheLastSubtitleReadyToPlay() {
         start()
         player.positionMs = 3_990

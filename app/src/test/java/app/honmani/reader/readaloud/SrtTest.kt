@@ -32,6 +32,12 @@ class SrtTest {
     }
 
     @Test
+    fun anArrowInTheTextKeepsTheCue() {
+        val cues = Srt.parse("1\n00:00:01,000 --> 00:00:02,000\nA --> B\nC\n\n2\n00:00:03,000 --> 00:00:04,000\nD\n3\n00:00:0x,000 --> 00:00:06,000\nlost\n")
+        assertEquals(listOf("A --> B\nC", "D"), cues.map { it.text })
+    }
+
+    @Test
     fun sortsCuesThatAreOutOfOrder() {
         val text = "1\n00:00:09,000 --> 00:00:10,000\nlate\n\n2\n00:00:01,000 --> 00:00:02,000\nearly\n"
         assertEquals(listOf("early", "late"), Srt.parse(text).map { it.text })

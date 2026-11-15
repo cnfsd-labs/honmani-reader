@@ -219,7 +219,7 @@ aloud, on a page with furigana.
 - Back ends read aloud, the book stays open; a second Back leaves the book.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
-- Another player or Home pauses it for good; the screen stays on only while reading.
+- Another player, Home or unplugging headphones pauses it for good; the screen stays on only while reading.
 - A notification sound while reading (phone muted): speech pauses and then goes on from the sentence
   start by itself (logcat ReadAloud "audio focus lost for a moment", "audio focus back"); same after a
   call. Pause by hand during the sound: it stays paused.
@@ -241,7 +241,8 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Same bar order, volume buttons, swipe-away/Follow and Back as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
   0.5/0.75/1/1.25/1.5, kept.
-- Pause, close the app: audio paused, screen no longer kept on, Play continues. Another player pauses;
+- Pause, close the app: audio paused, screen no longer kept on, Play continues. Another player or
+  unplugging headphones pauses;
   a notification sound or call pauses until it is over, then the audio goes on; a word tap pauses while
   the panel is open.
 - Read aloud and the audiobook stop each other.

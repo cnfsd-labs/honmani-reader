@@ -16,12 +16,14 @@ import java.util.Locale
  * The phone's own text-to-speech engine, speaking live (PhoneVoice writes files instead). Asks for
  * audio focus while something is queued and gives it back when the queue is empty or stopped, and
  * reports when another app takes the audio away; after a pause for a moment ([FocusPause]) it keeps
- * the focus until it comes back. The engine's callbacks come on its own threads; they are all moved
- * to the main thread here.
+ * the focus until it comes back; headphones unplugged count as the focus lost ([BecomingNoisy]). An
+ * engine that stops answering fails what is queued (see [stalled]). The engine's callbacks come on
+ * its own threads; they are all moved to the main thread here.
  */
 class LiveVoice(
     context: Context,
     private val connectTimeoutMs: Long = CONNECT_TIMEOUT_MS,
+    private val stallTimeoutMs: Long = STALL_TIMEOUT_MS,
 ) : ReadAloudVoice {
     private val context = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -38,9 +40,26 @@ class LiveVoice(
     private var rate = 1f
     private var focus: AudioFocusRequest? = null
     private val focusPause = FocusPause()
+    private val noisy = BecomingNoisy(context) { listener?.onFocusLost() }
 
-    /** The utterances queued and not yet finished; callbacks for any other id are stale. */
-    private val live = HashSet<String>()
+    /** The utterances queued and not yet finished, in order; callbacks for any other id are stale. */
+    private val live = LinkedHashSet<String>()
+
+    /** The longest text queued since the queue was last empty: how long the engine may be silent. */
+    private var longestQueued = 0
+
+    /**
+     * An engine whose process died (or hangs) reports nothing more: after too long without any
+     * callback the queued utterances fail, so read aloud stops with a problem instead of hanging.
+     */
+    private val stalled = Runnable {
+        if (live.isEmpty()) return@Runnable
+        val ids = live.toList()
+        live.clear()
+        longestQueued = 0
+        abandonFocus()
+        ids.forEach { listener?.onError(it) }
+    }
 
     override var listener: ReadAloudVoice.Listener? = null
 
@@ -118,6 +137,8 @@ class LiveVoice(
             return
         }
         live.add(utteranceId)
+        longestQueued = maxOf(longestQueued, text.length)
+        watch()
         if (tts.speak(text, TextToSpeech.QUEUE_ADD, Bundle(), utteranceId) != TextToSpeech.SUCCESS) {
             main.post { finished(utteranceId)?.let { listener?.onError(it) } }
         }
@@ -126,6 +147,7 @@ class LiveVoice(
     override fun stop() {
         engine?.stop()
         live.clear()
+        watch()
         if (!focusPause.lostForAWhile) abandonFocus()
     }
 
@@ -135,6 +157,7 @@ class LiveVoice(
         engine?.shutdown()
         engine = null
         live.clear()
+        watch()
         abandonFocus()
     }
 
@@ -142,7 +165,19 @@ class LiveVoice(
     private fun finished(id: String): String? {
         if (!live.remove(id)) return null
         if (live.isEmpty()) abandonFocus()
+        watch()
         return id
+    }
+
+    /** (Re)starts the wait for the engine's next callback while anything is queued. */
+    private fun watch() {
+        main.removeCallbacks(stalled)
+        if (live.isEmpty()) {
+            longestQueued = 0
+            return
+        }
+        // Slow speech, and engines that report no ranges, keep quiet for a long sentence.
+        main.postDelayed(stalled, stallTimeoutMs + (longestQueued * MS_PER_CHARACTER / rate).toLong())
     }
 
     /** Asks for the focus, again with the request still held after a pause for a moment. */
@@ -158,7 +193,10 @@ class LiveVoice(
             .build()
         focus = request
         val granted = audio.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
-        if (granted) focusPause.reset()
+        if (granted) {
+            focusPause.reset()
+            noisy.start()
+        }
         return granted
     }
 
@@ -166,17 +204,28 @@ class LiveVoice(
         focus?.let { audio.abandonAudioFocusRequest(it) }
         focus = null
         focusPause.reset()
+        noisy.stop()
     }
 
     private val progress = object : UtteranceProgressListener() {
         override fun onStart(utteranceId: String?) {
             utteranceId ?: return
-            main.post { if (utteranceId in live) listener?.onStart(utteranceId) }
+            main.post {
+                if (utteranceId in live) {
+                    watch()
+                    listener?.onStart(utteranceId)
+                }
+            }
         }
 
         override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
             utteranceId ?: return
-            main.post { if (utteranceId in live) listener?.onRange(utteranceId, start) }
+            main.post {
+                if (utteranceId in live) {
+                    watch()
+                    listener?.onRange(utteranceId, start)
+                }
+            }
         }
 
         override fun onDone(utteranceId: String?) {
@@ -195,5 +244,7 @@ class LiveVoice(
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 10_000L
+        const val STALL_TIMEOUT_MS = 20_000L
+        const val MS_PER_CHARACTER = 400f
     }
 }

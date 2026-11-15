@@ -14,7 +14,7 @@ import java.io.IOException
 /**
  * The audiobook's audio, played by Android's [MediaPlayer] as media (speech content) and with the
  * audio focus: another app taking the audio pauses it ([FocusListener]); after a pause for a moment
- * ([FocusPause]) the focus is kept until it comes back.
+ * ([FocusPause]) the focus is kept until it comes back. Headphones unplugged pause it too ([BecomingNoisy]).
  * The source is a content URI the reader chose; a file that is gone, or that the app may not read
  * any more, is [AudiobookProblem.AUDIO_GONE]. All calls and callbacks are on the main thread.
  */
@@ -31,6 +31,7 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
     private var prepared = false
     private var focus: AudioFocusRequest? = null
     private val focusPause = FocusPause()
+    private val noisy = BecomingNoisy(context) { listener?.onFocusLost() }
     private var rate = 1f
 
     /** Where a seek is going, until it lands: [MediaPlayer.getCurrentPosition] may still say the old place. */
@@ -186,6 +187,7 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
         if (audio.requestAudioFocus(request) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) return false
         focus = request
         focusPause.reset()
+        noisy.start()
         return true
     }
 
@@ -199,5 +201,6 @@ class MediaAudiobookPlayer(context: Context) : AudiobookPlayer {
         focus?.let { audio.abandonAudioFocusRequest(it) }
         focus = null
         focusPause.reset()
+        noisy.stop()
     }
 }

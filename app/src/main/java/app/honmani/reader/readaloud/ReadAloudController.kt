@@ -232,8 +232,12 @@ class ReadAloudController(
         var queued = 0
         for (item in items) {
             if (item.index <= lastReceived || item.text.isBlank()) continue
+            // A sentence the pronunciation rules leave nothing of is skipped like a blank one: the
+            // voice would never report it done.
+            val text = pronunciations().apply(item.text)
+            if (text.text.isBlank()) continue
             lastReceived = item.index
-            enqueue(item)
+            enqueue(item, text)
             queued++
         }
         if (end != null) pageEnd = end
@@ -363,10 +367,9 @@ class ReadAloudController(
         _state.value = _state.value.copy(phase = ReadAloudPhase.PROBLEM, problem = problem)
     }
 
-    private fun enqueue(item: SpokenSentence) {
+    private fun enqueue(item: SpokenSentence, text: SpokenText) {
         val max = minOf(voice.maxInputLength, MAX_PIECE)
         var offset = 0
-        val text = pronunciations().apply(item.text)
         if (text.changed) spoken[item.index] = text else spoken.remove(item.index)
         val pieces = splitForSpeech(text.text, max)
         for ((n, piece) in pieces.withIndex()) {

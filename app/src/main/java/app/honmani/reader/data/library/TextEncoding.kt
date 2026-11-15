@@ -120,7 +120,7 @@ object TextEncoding {
         }
     }
 
-    private fun bomLength(bytes: ByteArray) = when {
+    internal fun bomLength(bytes: ByteArray) = when {
         bytes.startsWith(0xEF, 0xBB, 0xBF) -> 3
         bytes.startsWith(0xFE, 0xFF) || bytes.startsWith(0xFF, 0xFE) -> 2
         else -> 0
