@@ -208,6 +208,36 @@ class AozoraTextTest {
     }
 
     @Test
+    fun styleRangesOverLinesStyleEachLine() {
+        val blocks = paragraphs(
+            aozora(
+                listOf(
+                    "［＃ここから太字］",
+                    "［＃２字下げ］一行目",
+                    "二［＃傍点］行［＃傍点終わり］目",
+                    "［＃ここで太字終わり］",
+                    "普通",
+                ).joinToString("\n"),
+            ),
+        )
+        assertEquals(
+            listOf(
+                Paragraph(listOf(Styled(AozoraStyle.BOLD, listOf(Text("一行目")))), AozoraLayout(indent = 2)),
+                Paragraph(
+                    listOf(
+                        Styled(
+                            AozoraStyle.BOLD,
+                            listOf(Text("二"), Styled(AozoraStyle.SESAME, listOf(Text("行"))), Text("目")),
+                        ),
+                    ),
+                ),
+                Paragraph(listOf(Text("普通"))),
+            ),
+            blocks.take(3),
+        )
+    }
+
+    @Test
     fun keepsTheMarkForCodePointsThatDoNotExist() {
         for (code in listOf("U+FFFFFF", "U+110000", "U+D800")) {
             assertEquals(

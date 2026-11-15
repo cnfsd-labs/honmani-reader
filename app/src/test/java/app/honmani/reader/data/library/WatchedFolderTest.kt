@@ -1,6 +1,7 @@
 package app.honmani.reader.data.library
 
 import android.content.Context
+import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.backup.FolderFile
 import app.honmani.reader.data.backup.FolderTarget
@@ -19,6 +20,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class WatchedFolderTest {
@@ -222,6 +224,23 @@ class WatchedFolderTest {
         assertEquals(WatchedFolder.State.Unavailable("Books"), watched.state())
         watched.setProblem(false)
         assertEquals(WatchedFolder.State.Watching("Books"), watched.state())
+    }
+
+    @Test
+    fun observersHearOfAScanProblemUntilTheyStop() {
+        val watched = watched(FakeFolderTarget())
+        watched.choose(tree1)
+        var changes = 0
+        val stop = watched.observe { changes++ }
+
+        watched.setProblem(true)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, changes)
+
+        stop()
+        watched.setProblem(false)
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(1, changes)
     }
 }
 

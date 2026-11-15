@@ -71,7 +71,8 @@ data class AozoraLayout(
  * Reads Aozora Bunko's plain-text format: furigana (漢字《かんじ》, ｜で始まる《よみ》), headings, page
  * breaks, emphasis marks and side lines, bold, italic, 縦中横, indentation (字下げ) and bottom
  * alignment (地付き, 字上げ), as notes on the text before them (［＃「…」に傍点］) or as ranges
- * (［＃傍点］…［＃傍点終わり］, ［＃ここから２字下げ］…［＃ここで字下げ終わり］). Other editor notes and
+ * (［＃傍点］…［＃傍点終わり］, over lines ［＃ここから太字］…［＃ここで太字終わり］ and
+ * ［＃ここから２字下げ］…［＃ここで字下げ終わり］). Other editor notes and
  * the notation guide are dropped; characters given as Unicode in a note (※［＃「…」、U+29E3D、…］)
  * are restored.
  */
@@ -112,10 +113,15 @@ object AozoraText {
         }
 
         var range = AozoraLayout()
+        var rangeStyles = emptyList<AozoraStyle>()
         for (line in lines.subList(bodyStart.coerceAtMost(lines.size), lines.size)) {
             val trimmed = line.trim()
             if (PAGE_BREAK.matches(trimmed)) {
                 finishChapter()
+                continue
+            }
+            rangeStyles(trimmed, rangeStyles)?.let {
+                rangeStyles = it
                 continue
             }
             rangeLayout(trimmed, range)?.let {
@@ -123,7 +129,7 @@ object AozoraText {
                 continue
             }
             // A line holding only an editor's note is dropped.
-            val block = parseLine(line, range) ?: continue
+            val block = parseLine(line, range, rangeStyles) ?: continue
             if (block is AozoraBlock.Heading && block.level <= 2) {
                 finishChapter()
                 title = block.inlines.plainText()
@@ -148,6 +154,20 @@ object AozoraText {
         return names.lastOrNull() ?: rest[0]
     }
 
+    /**
+     * The styles open after a line holding a style range note (ここから太字, ここで傍点終わり),
+     * or null for other lines.
+     */
+    private fun rangeStyles(line: String, current: List<AozoraStyle>): List<AozoraStyle>? {
+        if (!line.startsWith("［＃ここ") || line.indexOf('］') != line.length - 1) return null
+        val note = line.substring(2, line.length - 1)
+        if (note.startsWith("ここから")) AozoraStyle.of(note.removePrefix("ここから"))?.let { return current + it }
+        if (note.startsWith("ここで") && note.endsWith("終わり")) {
+            AozoraStyle.of(note.removePrefix("ここで").removeSuffix("終わり"))?.let { return current - it }
+        }
+        return null
+    }
+
     /** The layout after a line holding a range note (ここから…, ここで…終わり), or null for other lines. */
     private fun rangeLayout(line: String, current: AozoraLayout): AozoraLayout? {
         if (!line.startsWith("［＃ここ") || line.indexOf('］') != line.length - 1) return null
@@ -164,7 +184,7 @@ object AozoraText {
         return current
     }
 
-    private fun parseLine(raw: String, range: AozoraLayout): AozoraBlock? {
+    private fun parseLine(raw: String, range: AozoraLayout, rangeStyles: List<AozoraStyle>): AozoraBlock? {
         if (raw.isBlank()) return AozoraBlock.Blank
         var line = raw.replace(GAIJI) { match ->
             // Up to six hex digits can name a code point past U+10FFFF, or a lone surrogate.
@@ -179,8 +199,10 @@ object AozoraText {
             line = line.replace(BLOCK_HEADING_MARK, "")
         }
         var layout = range
-        // The inlines of the line, and of each style range opened on it (［＃傍点］…).
-        val frames = mutableListOf(Frame(null))
+        // The inlines of the line, and of each style range open on it: from lines before
+        // (［＃ここから太字］) or opened on it (［＃傍点］…).
+        val frames = (listOf(Frame(null)) + rangeStyles.map(::Frame)).toMutableList()
+        val opened = frames.size
         val text = StringBuilder()
         var rubyStart = -1
         var index = 0
@@ -233,7 +255,7 @@ object AozoraText {
                 c == '［' && line.startsWith("［＃", index) && line.indexOf('］', index) > index -> {
                     val close = line.indexOf('］', index)
                     val note = line.substring(index + 2, close)
-                    val atStart = frames.size == 1 && frames[0].inlines.isEmpty() && text.isBlank()
+                    val atStart = frames.size == opened && frames.all { it.inlines.isEmpty() } && text.isBlank()
                     flushText()
                     HEADING.matchEntire(note)?.let { level = headingLevel(it.groupValues[2]) }
                     STYLE_AFTER.matchEntire(note)?.let { match ->

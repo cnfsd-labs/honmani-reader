@@ -81,20 +81,21 @@ class RestoredBooks(private val file: File) {
     /** The position to give ttu for the book with content hash [hash], once. */
     fun takePosition(hash: String): RestoredPosition? {
         var taken: RestoredPosition? = null
-        update { state ->
+        // Taken even if the file keeps it (full storage): else every open would jump back to it.
+        update(evenIfUnsaved = true) { state ->
             taken = state.positions[hash]
             if (taken == null) state else state.copy(positions = state.positions - hash)
         }
         return taken
     }
 
-    private fun update(change: (State) -> State) {
+    private fun update(evenIfUnsaved: Boolean = false, change: (State) -> State) {
         val changed = synchronized(lock) {
             val before = current()
             val after = change(before)
             if (after == before) return@synchronized false
             // Memory follows the file: a change that could not be written (full storage) is dropped.
-            if (!save(after)) return@synchronized false
+            if (!save(after) && !evenIfUnsaved) return@synchronized false
             loaded = after
             true
         }

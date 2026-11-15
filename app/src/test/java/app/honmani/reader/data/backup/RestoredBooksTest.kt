@@ -39,4 +39,19 @@ class RestoredBooksTest {
         assertEquals(emptyList<WaitingBook>(), restored.waiting())
         assertNull(restored.takePosition("a"))
     }
+
+    @Test
+    fun aPositionIsTakenOnceEvenIfTheFileCannotBeWritten() {
+        val file = folder.root.resolve("restored-books.json")
+        RestoredBooks(file).setPosition("a", RestoredPosition(100, 0.1f))
+        val restored = RestoredBooks(file)
+        // A folder that cannot be written to: the file keeps the position.
+        folder.root.setWritable(false)
+        try {
+            assertEquals(RestoredPosition(100, 0.1f), restored.takePosition("a"))
+            assertNull(restored.takePosition("a"))
+        } finally {
+            folder.root.setWritable(true)
+        }
+    }
 }

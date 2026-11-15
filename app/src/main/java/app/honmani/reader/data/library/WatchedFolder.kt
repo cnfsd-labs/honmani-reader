@@ -46,6 +46,18 @@ class WatchedFolder(
         return if (!permitted(folder) || preferences.getBoolean(KEY_PROBLEM, false)) State.Unavailable(name) else State.Watching(name)
     }
 
+    /**
+     * Calls [onChange] (on the main thread) whenever the folder or its problem changes, also from a
+     * scan; returns the function that stops it.
+     */
+    fun observe(onChange: () -> Unit): () -> Unit {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == null || key == KEY_FOLDER || key == KEY_PROBLEM) onChange()
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        return { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
     /** The last scan found the folder unreadable ([problem]) or fine. */
     fun setProblem(problem: Boolean) {
         if (preferences.getBoolean(KEY_PROBLEM, false) != problem) preferences.edit().putBoolean(KEY_PROBLEM, problem).apply()

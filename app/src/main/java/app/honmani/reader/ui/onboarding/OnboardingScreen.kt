@@ -2,6 +2,8 @@ package app.honmani.reader.ui.onboarding
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -109,7 +111,9 @@ sealed interface StarterPackState {
                 items.any { it.state == CatalogItem.State.IN_PROGRESS } -> downloading
                 loaded.imports.any { it is ImportStatus.Failed } ->
                     Failed(loaded.imports.filterIsInstance<ImportStatus.Failed>().first().reason)
-                else -> downloading
+                // Requested before the process was stopped: still on its way only while queued or running.
+                loaded.imports.any { it is ImportStatus.Queued || it is ImportStatus.Running } -> downloading
+                else -> NotStarted
             }
         }
 
@@ -261,12 +265,17 @@ private fun OnboardingContent(
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val motion = LocalMotionEnabled.current
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
                         val forward = targetState.ordinal > initialState.ordinal
-                        (slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut())
+                        if (!motion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            (slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()) togetherWith
+                                (slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut())
+                        }
                     },
                     label = "onboarding page",
                 ) { shown ->

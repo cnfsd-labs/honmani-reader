@@ -29,12 +29,19 @@ class StarterPackStateTest {
     fun followsTheDownloads() {
         assertEquals(StarterPackState.NotStarted, StarterPackState.of(pack, DictionariesUiState.Loading, started = false))
         assertEquals(StarterPackState.NotStarted, StarterPackState.of(pack, state(0), started = false))
-        assertEquals(StarterPackState.Downloading(1, 4), StarterPackState.of(pack, state(1), started = true))
+        val queued = listOf(ImportStatus.Queued("q"))
+        assertEquals(StarterPackState.Downloading(1, 4), StarterPackState.of(pack, state(1, queued), started = true))
         assertEquals(StarterPackState.Ready, StarterPackState.of(pack, state(4), started = true))
         // Installed before (from the Dictionaries tab, say): ready without a download.
         assertEquals(StarterPackState.Ready, StarterPackState.of(pack, state(4), started = false))
         val failed = ImportStatus.Failed("x", ImportError.entries.first(), null)
         assertEquals(StarterPackState.Failed(), StarterPackState.of(pack, state(2, listOf(failed)), started = true))
+    }
+
+    @Test
+    fun aDownloadNothingRunsForAnyMoreIsOfferedAgain() {
+        // Started before the process was stopped, and its work is gone: not "Downloading" forever.
+        assertEquals(StarterPackState.NotStarted, StarterPackState.of(pack, state(1), started = true))
     }
 
     @Test
