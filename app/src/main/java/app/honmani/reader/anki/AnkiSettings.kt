@@ -191,8 +191,18 @@ class AnkiSettings(
         preferences.edit().putString(KEY_GOOGLE_VOICE, name).apply()
     }
 
-    /** The stored API key; null if there is none or it can't be decrypted any more. */
-    fun googleKey(): String? = devicePreferences.getString(KEY_GOOGLE_KEY, null)?.let(cipher::decrypt)
+    /**
+     * The stored API key; null if there is none or it can't be decrypted any more. A key that can't
+     * (the phone lost its Keystore key) is removed, so Settings no longer shows one and asks for it again.
+     */
+    fun googleKey(): String? {
+        val stored = devicePreferences.getString(KEY_GOOGLE_KEY, null) ?: return null
+        return cipher.decrypt(stored) ?: run {
+            devicePreferences.edit().remove(KEY_GOOGLE_KEY).apply()
+            _hasGoogleKey.value = false
+            null
+        }
+    }
 
     /** Stores [key]; a blank key removes it. */
     /** Saves (or with a blank [key] removes) the Google Cloud key; false if the phone could not encrypt it. */

@@ -89,6 +89,23 @@ class AnkiSettingsTest {
     }
 
     @Test
+    fun aKeyThePhoneCanNoLongerDecryptIsDropped_soSettingsAsksForItAgain() {
+        AnkiSettings(choices, plainCipher, device).setGoogleKey("key")
+        val lost = object : CredentialCipher {
+            override fun encrypt(plain: String) = plain
+
+            override fun decrypt(encrypted: String): String? = null
+        }
+        val settings = AnkiSettings(choices, lost, device)
+        assertTrue(settings.hasGoogleKey.value)
+
+        assertEquals(null, settings.googleKey())
+
+        assertFalse(settings.hasGoogleKey.value)
+        assertFalse(AnkiSettings(choices, plainCipher, device).hasGoogleKey.value)
+    }
+
+    @Test
     fun aRestoredBackupHasTheChoicesButNoKey() {
         AnkiSettings(choices, plainCipher, device).apply {
             setDeck("Japanese")

@@ -146,8 +146,11 @@ class WordsViewModel(
     private val repository: WordRepository,
     /** Adds a word to Anki with the sentence of a lookup (null: the latest). */
     private val addCard: suspend (WordEntity, WordLookupEntity?) -> AnkiResult = { _, _ -> AnkiResult.Refused },
-    /** Like [addCard], but puts the "in Anki" mark (word id to note id) in the map instead of writing it. */
-    private val addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>) -> AnkiResult = { word, _ -> addCard(word, null) },
+    /**
+     * Like [addCard], but puts the "in Anki" mark (word id to note id) in the map instead of writing it;
+     * the Boolean says whether the voice is asked.
+     */
+    private val addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>, Boolean) -> AnkiResult = { word, _, _ -> addCard(word, null) },
     /** Writes many "in Anki" marks (word id to note id) at once. */
     private val markInAnki: suspend (Map<Long, Long>) -> Unit = {},
     /** Where "Add all to Anki" runs, so it goes on if the screen is left; null: with the screen. */
@@ -388,7 +391,8 @@ class WordsViewModel(
                         leftOut++
                         continue
                     }
-                    when (val result = addCardDeferred(word, marks)) {
+                    // A voice that failed once (no key, offline, no Japanese) is not asked again for every card.
+                    when (val result = addCardDeferred(word, marks, audioProblem == null)) {
                         is AnkiResult.Added -> {
                             added++
                             audioProblem = audioProblem ?: result.audioProblem
@@ -513,7 +517,7 @@ class WordsViewModel(
                 WordsViewModel(
                     repository = container.wordRepository,
                     addCard = { word, lookup -> container.ankiExporter.add(word, lookup) },
-                    addCardDeferred = { word, marks -> container.ankiExporter.add(word, null, marks) },
+                    addCardDeferred = { word, marks, speak -> container.ankiExporter.add(word, null, marks, speak) },
                     markInAnki = { container.wordRepository.setAnkiNotes(it) },
                     longRunning = container.applicationScope,
                     ankiText = { list -> container.ankiExporter.textFile(list) },

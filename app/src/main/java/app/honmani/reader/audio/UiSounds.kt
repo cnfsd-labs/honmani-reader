@@ -53,13 +53,15 @@ class UiSounds(
             release()
             return
         }
-        val allowed = UiSoundRule.maySound(on, readerSpeaking, wordAudio.playing, audio.isMusicActive)
+        val allowed = allowed(on)
         Log.d(TAG, "${sound.name.lowercase()} ${if (allowed) "play" else "skipped (speech or media active)"}, media volume ${audio.getStreamVolume(AudioManager.STREAM_MUSIC)}")
         if (!allowed) return
         val active = pool ?: create()
         val id = ids[sound] ?: return
         if (id in loaded) active.play(id, 1f, 1f, 1, 0, 1f) else waiting = id
     }
+
+    private fun allowed(on: Boolean) = UiSoundRule.maySound(on, readerSpeaking, wordAudio.playing, audio.isMusicActive)
 
     private fun create(): SoundPool {
         val created = SoundPool.Builder()
@@ -77,7 +79,8 @@ class UiSounds(
             if (status == 0) loaded.add(sampleId)
             if (sampleId == waiting) {
                 waiting = null
-                if (status == 0) loadedPool.play(sampleId, 1f, 1f, 1, 0, 1f)
+                // Loading takes a moment: word audio or speech may have started meanwhile.
+                if (status == 0 && allowed(enabled.value)) loadedPool.play(sampleId, 1f, 1f, 1, 0, 1f)
             }
         }
         for (sound in UiSound.entries) ids[sound] = created.load(appContext, sound.resource, 1)

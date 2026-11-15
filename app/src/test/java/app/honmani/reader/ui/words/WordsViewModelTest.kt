@@ -7,6 +7,7 @@ import app.honmani.reader.data.dictionary.DictionaryImporter
 import app.honmani.reader.data.dictionary.index
 import app.honmani.reader.data.dictionary.writeZip
 import app.honmani.reader.anki.AnkiResult
+import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
@@ -68,7 +69,7 @@ class WordsViewModelTest {
     )
 
     private fun viewModel(
-        addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>) -> AnkiResult = { _, _ -> AnkiResult.Refused },
+        addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>, Boolean) -> AnkiResult = { _, _, _ -> AnkiResult.Refused },
         markInAnki: suspend (Map<Long, Long>) -> Unit = {},
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
     ): WordsViewModel {
@@ -116,7 +117,7 @@ class WordsViewModelTest {
         repeat(120) { repository.record(lookedUp("語$it")) }
         val written = mutableListOf<Map<Long, Long>>()
         val viewModel = viewModel(
-            addCardDeferred = { word, marks ->
+            addCardDeferred = { word, marks, _ ->
                 marks[word.id] = word.id + 1000
                 AnkiResult.Added(word.id + 1000)
             },
@@ -147,5 +148,26 @@ class WordsViewModelTest {
         val rows = written.trimEnd().split("\r\n")
         assertEquals(3, rows.size)
         assertEquals(setOf("猫", "犬"), rows.drop(1).map { it.substringBefore(',') }.toSet())
+    }
+
+    @Test
+    fun addAllToAnkiStopsAskingTheVoiceAfterItFailedOnce() = runTest {
+        repeat(3) { repository.record(lookedUp("語$it")) }
+        val asked = mutableListOf<Boolean>()
+        val viewModel = viewModel(
+            addCardDeferred = { word, marks, speak ->
+                asked += speak
+                marks[word.id] = word.id + 1000
+                AnkiResult.Added(word.id + 1000, if (speak) VoiceProblem.NETWORK else null)
+            },
+            markInAnki = { repository.setAnkiNotes(it) },
+        )
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.learning?.size == 3 }
+
+        viewModel.addAllToAnki()
+
+        assertEquals(AnkiOutcome.Many(3, null, VoiceProblem.NETWORK, 0), viewModel.ankiOutcomes.first())
+        assertEquals(listOf(true, false, false), asked)
     }
 }

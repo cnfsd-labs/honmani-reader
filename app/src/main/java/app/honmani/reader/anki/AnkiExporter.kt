@@ -65,10 +65,15 @@ class AnkiExporter(
     /**
      * Adds [word] with the sentence of [lookup], or of its latest lookup if null. With [deferred],
      * the word's "in Anki" mark (word id to note id) is put there instead of written, so a caller
-     * adding many can write them in one go ([WordRepository.setAnkiNotes]).
+     * adding many can write them in one go ([WordRepository.setAnkiNotes]). Without [speak] the voice is
+     * not asked (a caller adding many stops asking after it failed once).
      */
-    suspend fun add(word: WordEntity, lookup: WordLookupEntity? = null, deferred: MutableMap<Long, Long>? = null): AnkiResult =
-        add(content(word, lookup), deferred)
+    suspend fun add(
+        word: WordEntity,
+        lookup: WordLookupEntity? = null,
+        deferred: MutableMap<Long, Long>? = null,
+        speak: Boolean = true,
+    ): AnkiResult = add(content(word, lookup), deferred, speak)
 
     /** [words] as a text file for Anki's import ([AnkiTextFile]), for the chosen deck. */
     suspend fun textFile(words: List<WordEntity>): String {
@@ -174,10 +179,10 @@ class AnkiExporter(
     }
 
     /** Adds a card for [content] and marks the saved word, if there is one, as in Anki. */
-    suspend fun add(content: CardContent, deferred: MutableMap<Long, Long>? = null): AnkiResult = mutex.withLock {
+    suspend fun add(content: CardContent, deferred: MutableMap<Long, Long>? = null, speak: Boolean = true): AnkiResult = mutex.withLock {
         withContext(Dispatchers.IO) {
             try {
-                addLocked(content, deferred)
+                addLocked(content, deferred, speak)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -188,7 +193,7 @@ class AnkiExporter(
         }
     }
 
-    private suspend fun addLocked(content: CardContent, deferred: MutableMap<Long, Long>?): AnkiResult {
+    private suspend fun addLocked(content: CardContent, deferred: MutableMap<Long, Long>?, speak: Boolean): AnkiResult {
         if (anki.packageName() == null) return AnkiResult.NotInstalled
         if (!anki.hasPermission()) return AnkiResult.NoPermission
         val style = settings.cardStyle.value
@@ -227,7 +232,7 @@ class AnkiExporter(
                 sentenceAudio = clipSound(content, made)
             }
             // A note type of the reader's own may have no audio field: then nothing is spoken.
-            val voice = settings.voice(phoneVoice)?.takeIf { custom == null || custom.usesWordAudio || custom.usesSentenceAudio }
+            val voice = if (!speak) null else settings.voice(phoneVoice)?.takeIf { custom == null || custom.usesWordAudio || custom.usesSentenceAudio }
             if (voice != null) {
                 try {
                     // The reading, not the written form: a voice can misread kanji, never kana.

@@ -59,6 +59,26 @@ class WordAudioTest {
     }
 
     @Test
+    fun aWordStoppedWhileItsRecordingIsMadeDoesNotPlay_butIsKept() = runBlocking {
+        val voice = CountingVoice()
+        lateinit var audio: WordAudio
+        // The panel closes while the voice is still speaking into the file.
+        val stopping = object : CardVoice by voice {
+            override suspend fun speak(text: String, out: File, rate: Double) {
+                voice.speak(text, out, rate)
+                audio.stop()
+            }
+        }
+        audio = WordAudio(voice = { stopping }, dir = dir, main = Dispatchers.Unconfined)
+
+        assertEquals(null, audio.play("たべる"))
+
+        assertEquals(false, audio.playing)
+        assertEquals(0, audio.plays)
+        assertEquals(1, dir.listFiles()!!.size)
+    }
+
+    @Test
     fun aSentenceIsReadByThePhoneVoice_andOnlyTheLastOneIsKept() = runBlocking {
         val card = CountingVoice()
         val phone = CountingVoice()

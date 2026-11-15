@@ -29,7 +29,10 @@ class ExampleSentences(
         if (!enabled.value || store.state.value != ExampleState.Installed) return emptyList()
         return withContext(io) {
             try {
-                database()?.let { ExampleQuery.find(it, expression, reading, limit) }.orEmpty()
+                // Under the lock that may close and reopen the database: another lookup can't close it mid-query.
+                synchronized(this@ExampleSentences) {
+                    database()?.let { ExampleQuery.find(it, expression, reading, limit) }.orEmpty()
+                }
             } catch (e: SQLiteException) {
                 emptyList()
             }

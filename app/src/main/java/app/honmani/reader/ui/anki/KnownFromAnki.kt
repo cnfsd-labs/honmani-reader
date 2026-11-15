@@ -98,7 +98,7 @@ class KnownFromAnki internal constructor(
                 }
                 DeckWords.NotInstalled -> finish(context.getString(R.string.anki_not_installed))
                 DeckWords.NoPermission -> finish(context.getString(R.string.anki_no_permission))
-                is DeckWords.Failed -> finish(context.getString(R.string.anki_known_failed, result.reason))
+                is DeckWords.Failed -> finish(context.getString(R.string.anki_known_failed))
             }
         }
     }

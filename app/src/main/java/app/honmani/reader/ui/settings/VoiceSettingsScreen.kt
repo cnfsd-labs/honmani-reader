@@ -120,7 +120,11 @@ private fun VoiceSettingsContent() {
     val sample = rememberVoiceSamplePlayer()
 
     fun checkKey() {
-        val key = settings.googleKey() ?: return
+        val key = settings.googleKey() ?: run {
+            // It was saved but can no longer be read on this phone: it has to be entered again.
+            if (hasKey) check = KeyCheck.Failed(R.string.google_key_unreadable)
+            return
+        }
         check = KeyCheck.Checking
         keyChecks.launch(
             work = {

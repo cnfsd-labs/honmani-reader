@@ -19,6 +19,7 @@ sealed interface AnkiCheck {
     /** The reader's own note type can't be read ([problem]); see [AnkiResult.CustomUnusable]. */
     data class CustomUnusable(val name: String, val problem: CustomProblem) : AnkiCheck
 
+    /** [reason] is for the log and tests, never shown: the reader gets a sentence of their own. */
     data class Failed(val reason: String) : AnkiCheck
 }
 
@@ -31,6 +32,7 @@ sealed interface DeckWords {
 
     data object NoPermission : DeckWords
 
+    /** [reason] is for the log and tests, never shown. */
     data class Failed(val reason: String) : DeckWords
 }
 

@@ -583,6 +583,15 @@ class AnkiExporterTest {
     }
 
     @Test
+    fun aCardAddedWithoutSpeakingAsksNoVoice() = runBlocking {
+        val result = exporter.add(savedWord(), speak = false)
+
+        assertEquals(null, (result as AnkiResult.Added).audioProblem)
+        assertTrue(voice.spoken.isEmpty())
+        assertEquals("", anki.notes.single().fields[6])
+    }
+
+    @Test
     fun audioOffMakesNoAudio() = runBlocking {
         settings.setAudio(CardAudio.OFF)
 

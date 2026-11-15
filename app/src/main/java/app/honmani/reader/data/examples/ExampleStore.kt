@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,7 +56,7 @@ sealed interface ExampleState {
  * The downloaded example sentences: [file] (a SQLite database, opened read-only by
  * [ExampleSentences]). A few MB, so the download runs in the app's scope. The gzip file is checked
  * against [ExampleCatalog.sha256] before it is unpacked; an interrupted download leaves only
- * `.part` files, removed on the next try.
+ * `.part` files (named per download), removed on the next try.
  */
 class ExampleStore(
     private val dir: File,
@@ -72,15 +73,23 @@ class ExampleStore(
 
     private var job: Job? = null
 
+    /** Numbers the downloads, so a cancelled one still cleaning up never touches the next one's files. */
+    private var runs = 0
+
     /** Starts downloading; does nothing while it downloads or once it is installed. */
     fun download() {
         if (_state.value is ExampleState.Downloading || _state.value == ExampleState.Installed) return
         _state.value = ExampleState.Downloading(0f)
-        val gz = File(dir, "$FILE_NAME.gz.part")
-        val unpacked = File(dir, "$FILE_NAME.part")
+        val run = runs++
+        val gz = File(dir, "$FILE_NAME.$run.gz.part")
+        val unpacked = File(dir, "$FILE_NAME.$run.part")
         job = scope.launch {
             try {
-                withContext(io) { dir.mkdirs() }
+                withContext(io) {
+                    dir.mkdirs()
+                    // Left by a download the app was closed in (no other download ran yet in this process).
+                    if (run == 0) dir.listFiles { f -> f.name.startsWith(FILE_NAME) && f.name.endsWith(".part") }?.forEach { it.delete() }
+                }
                 download(catalog.url, gz) { done, total ->
                     val size = if (total > 0) total else catalog.sizeBytes
                     _state.value = ExampleState.Downloading((done.toFloat() / size).coerceIn(0f, 1f))
@@ -94,6 +103,8 @@ class ExampleStore(
                     } catch (e: ZipException) {
                         throw IOException("The downloaded file is damaged", e)
                     }
+                    // A cancelled download that was busy unpacking must not install itself after all.
+                    ensureActive()
                     if (!unpacked.renameTo(file)) throw IOException("Could not save the example sentences")
                     gz.delete()
                 }
@@ -104,7 +115,7 @@ class ExampleStore(
             } finally {
                 gz.delete()
                 unpacked.delete()
-                job = null
+                if (job === coroutineContext[Job]) job = null
             }
         }
     }
@@ -115,11 +126,8 @@ class ExampleStore(
         job = null
         _state.value = ExampleState.Available
         scope.launch {
-            withContext(io) {
-                file.delete()
-                File(dir, "$FILE_NAME.gz.part").delete()
-                File(dir, "$FILE_NAME.part").delete()
-            }
+            // A stopped download removes its own partial files.
+            withContext(io) { file.delete() }
         }
     }
 

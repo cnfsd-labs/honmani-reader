@@ -4,7 +4,9 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -12,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
@@ -54,10 +57,19 @@ fun rememberAnkiAccess(): AnkiAccess {
     val resources = LocalResources.current
     val anki = remember { (context.applicationContext as HonmaniApplication).container.ankiDroid }
     val pending = remember { arrayOfNulls<() -> Unit>(1) }
+    val activity = LocalActivity.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pending[0]
         pending[0] = null
-        if (granted) action?.invoke() else toast(context, resources.getString(R.string.anki_no_permission))
+        when {
+            granted -> action?.invoke()
+            // "Don't ask again": Android shows no dialog any more, only the app's settings can allow it.
+            activity != null && !ActivityCompat.shouldShowRequestPermissionRationale(activity, AnkiDroid.PERMISSION) -> {
+                toast(context, resources.getString(R.string.anki_no_permission_settings))
+                openAppSettings(context)
+            }
+            else -> toast(context, resources.getString(R.string.anki_no_permission))
+        }
     }
     return remember(launcher) {
         AnkiAccess(context, anki) { onGranted ->
@@ -116,7 +128,7 @@ fun showAnkiCheck(context: Context, result: AnkiCheck) {
         AnkiCheck.NotInstalled -> context.getString(R.string.anki_not_installed)
         AnkiCheck.NoPermission -> context.getString(R.string.anki_no_permission)
         is AnkiCheck.CustomUnusable -> context.getString(customProblemMessage(result.problem), result.name)
-        is AnkiCheck.Failed -> context.getString(R.string.anki_check_failed, result.reason)
+        is AnkiCheck.Failed -> context.getString(R.string.anki_check_failed)
     }
     toast(context, message)
 }
@@ -151,6 +163,16 @@ fun VoiceProblem.label(): Int = when (this) {
 
 private fun toast(context: Context, message: String) {
     Toast.makeText(context, message, if (message.length > 60) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+}
+
+private fun openAppSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        // A trimmed system without that page; the message says where to allow it.
+    }
 }
 
 private fun openStore(context: Context) {

@@ -70,8 +70,17 @@ class WordAudio(
     suspend fun playFile(file: File, label: String = "clip"): VoiceProblem? =
         withContext(main) { start(file, "sentence", label, 1.0, owned = false) }
 
-    /** Stops what is playing, if anything, and gives audio focus back. Call it on the main thread. */
+    /** Counts [stop] calls: a recording still being made when it is stopped is not played once ready. */
+    @Volatile
+    private var stops = 0
+
+    /** Stops what is playing, if anything (or about to play), and gives audio focus back. Call it on the main thread. */
     fun stop() {
+        stops++
+        release()
+    }
+
+    private fun release() {
         player?.release()
         player = null
         focus.release()
@@ -79,6 +88,7 @@ class WordAudio(
 
     private suspend fun play(text: String, voice: CardVoice, keep: Boolean, rate: Double): VoiceProblem? {
         if (text.isBlank()) return null
+        val stopsBefore = stops
         val file = try {
             mutex.withLock { record(voice, text, keep, rate) }
         } catch (e: CancellationException) {
@@ -89,7 +99,10 @@ class WordAudio(
             logWarning("Honmani.anki", "Making the word audio failed", e)
             return VoiceProblem.FAILED
         }
-        return withContext(main) { start(file, if (keep) "word" else "sentence", voice.id, rate, owned = true) }
+        return withContext(main) {
+            // Stopped while it was being made (the panel closed): it stays for next time but does not play.
+            if (stops != stopsBefore) null else start(file, if (keep) "word" else "sentence", voice.id, rate, owned = true)
+        }
     }
 
     private suspend fun record(voice: CardVoice, text: String, keep: Boolean, rate: Double): File = withContext(Dispatchers.IO) {
@@ -118,7 +131,7 @@ class WordAudio(
     }
 
     private fun start(file: File, kind: String, source: String, rate: Double, owned: Boolean): VoiceProblem? {
-        stop()
+        release()
         plays++
         Log.d(LOG_TAG, "play $kind source=$source rate=$rate")
         focus.request()
@@ -156,7 +169,7 @@ class WordAudio(
         } catch (e: Exception) {
             logWarning("Honmani.anki", "Playing the word audio failed", e)
             Log.w(LOG_TAG, "play $kind failed source=$source", e)
-            stop()
+            release()
             if (owned) file.delete()
             VoiceProblem.FAILED
         }

@@ -7,10 +7,12 @@ import java.security.MessageDigest
 import java.util.zip.GZIPOutputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -133,5 +135,42 @@ class ExampleStoreTest {
         advanceUntilIdle()
         assertEquals(ExampleState.Available, store.state.value)
         assertTrue(File(folder.root, "examples").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun aCancelledDownloadStillFinishingDoesNotBreakTheNextOne() = runTest(StandardTestDispatcher()) {
+        val stuck = CompletableDeferred<Unit>()
+        val second = CompletableDeferred<Unit>()
+        var calls = 0
+        val store = ExampleStore(
+            dir = File(folder.root, "examples"),
+            scope = this,
+            download = { _, destination, _ ->
+                if (++calls == 1) {
+                    // Blocking work that does not notice the cancel at once.
+                    withContext(NonCancellable) { stuck.await() }
+                    destination.writeBytes(gzipped)
+                } else {
+                    destination.writeBytes(gzipped)
+                    second.await()
+                }
+            },
+            catalog = catalog,
+            io = StandardTestDispatcher(testScheduler),
+        )
+        store.download()
+        advanceUntilIdle()
+        store.delete()
+        store.download()
+        advanceUntilIdle()
+
+        // The first one ends and cleans up while the second is between its download and unpacking.
+        stuck.complete(Unit)
+        advanceUntilIdle()
+        second.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(ExampleState.Installed, store.state.value)
+        assertEquals(listOf("examples.db"), File(folder.root, "examples").list().orEmpty().toList())
     }
 }
