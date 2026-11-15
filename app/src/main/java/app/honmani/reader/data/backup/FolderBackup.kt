@@ -143,9 +143,14 @@ class FolderBackup(
         return FoundBackup(file, name, device.getLong(KEY_FOUND_AT, 0L))
     }
 
-    /** The reader restored the [found] backup or declined it: it is not offered again (the file stays). */
+    /**
+     * The reader restored the [found] backup or declined it: it is not offered again (the file stays),
+     * nor are later ones found in this folder (another phone sharing it leaves a new one at almost
+     * every copy) until a folder is chosen again.
+     */
     fun dismissFound() {
-        device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT).apply()
+        device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT)
+            .putString(KEY_ANSWERED, device.getString(KEY_FOLDER, null)).apply()
         _found.value = null
     }
 
@@ -176,6 +181,7 @@ class FolderBackup(
         device.edit()
             .putString(KEY_FOLDER, folder)
             .remove(KEY_LAST)
+            .remove(KEY_ANSWERED)
             .putBoolean(KEY_FAILED, false)
             .apply()
         _state.value = read()
@@ -254,10 +260,32 @@ class FolderBackup(
             }
             copy
         }
-        // Only a readable backup is offered; anything else is just kept.
-        if (made != null) {
+        dropPreviousKept(folder)
+        device.edit().putString(KEY_KEPT_IN, folder).putString(KEY_KEPT_FILE, kept).putString(KEY_KEPT_NAME, name).apply()
+        // Only a readable backup is offered, and only until the reader answered an offer for this
+        // folder; anything else is just kept.
+        if (made != null && device.getString(KEY_ANSWERED, null) != folder) {
             device.edit().putString(KEY_FOUND_FILE, kept).putString(KEY_FOUND_NAME, name).putLong(KEY_FOUND_AT, made).apply()
             _found.value = FoundBackup(kept, name, made)
+        }
+    }
+
+    /**
+     * Two phones sharing the folder each keep the other's backup under a dated name at almost every
+     * copy, so only the newest one this install kept is left: the dated copy it kept before (in
+     * this folder, still under the name it gave it) is deleted. Files this install didn't name and
+     * its own current file are never touched. A failure only leaves the older copy behind.
+     */
+    private fun dropPreviousKept(folder: String) {
+        if (device.getString(KEY_KEPT_IN, null) != folder) return
+        val previous = device.getString(KEY_KEPT_FILE, null) ?: return
+        val name = device.getString(KEY_KEPT_NAME, null) ?: return
+        val dropped = runCatching { target.find(folder, name) == previous && target.delete(previous) }
+            .onFailure { logWarning("Honmani.backup", "An older kept backup could not be deleted", it) }
+            .getOrDefault(false)
+        if (dropped && _found.value?.file == previous) {
+            device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT).apply()
+            _found.value = null
         }
     }
 
@@ -288,5 +316,13 @@ class FolderBackup(
         private const val KEY_FOUND_FILE = "folder_backup_found_file"
         private const val KEY_FOUND_NAME = "folder_backup_found_name"
         private const val KEY_FOUND_AT = "folder_backup_found_at"
+
+        /** The folder in which the reader last answered an offer: later backups found there aren't offered. */
+        private const val KEY_ANSWERED = "folder_backup_answered"
+
+        /** The dated copy this install kept last, and in which folder: replaced by the next one. */
+        private const val KEY_KEPT_IN = "folder_backup_kept_in"
+        private const val KEY_KEPT_FILE = "folder_backup_kept_file"
+        private const val KEY_KEPT_NAME = "folder_backup_kept_name"
     }
 }

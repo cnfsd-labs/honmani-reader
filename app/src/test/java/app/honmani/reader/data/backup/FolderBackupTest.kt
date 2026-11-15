@@ -440,4 +440,69 @@ class FolderBackupTest {
 
         assertEquals(mapOf(file to "zip two, longer"), folder.files.mapValues { String(it.value) })
     }
+
+    @Test
+    fun twoPhonesOnOneFolderLeaveOnlyTheNewestDatedCopyOfEachOther() = runBlocking {
+        val otherDevice = ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("folder-backup-test-other", Context.MODE_PRIVATE).also { it.edit().clear().commit() }
+        val other = FolderBackup(otherDevice, folder, now = { clock })
+        val otherSource: File = Files.createTempFile("other", ".zip").toFile()
+        // A file the reader put there under a name like a kept one is never touched.
+        val own = "content://tree/a/honmani-backup-2020-01-01-0000.zip"
+        folder.files[own] = "the reader's".toByteArray()
+        backup.choose("content://tree/a")
+        other.choose("content://tree/a")
+        val minute = 60_000L
+        val times = (1..4).map { 1_794_580_735_235L + it * 10 * minute }
+        for ((round, at) in times.withIndex()) {
+            source.writeBytes(backupBytes(at))
+            backup.copy(source)
+            otherSource.writeBytes(backupBytes(at + 5 * minute))
+            other.copy(otherSource)
+            // Each phone answers its first offer; later backups of the other phone aren't offered.
+            if (round == 0) {
+                backup.dismissFound()
+                other.dismissFound()
+            }
+        }
+
+        // This phone kept the other's backup from the third round; the other phone kept this
+        // phone's last one; the other phone wrote last.
+        val keptOfOther = "content://tree/a/honmani-backup-${stamp(times[2] + 5 * minute)}.zip"
+        val keptOfThis = "content://tree/a/honmani-backup-${stamp(times[3])}.zip"
+        assertEquals(setOf(file, own, keptOfOther, keptOfThis), folder.files.keys)
+        assertEquals(times[3] + 5 * minute, BackupCodec.read(folder.files[file]!!.inputStream()).exportedAt)
+        assertNull(backup.found.value)
+        assertNull(other.found.value)
+    }
+
+    @Test
+    fun anUnansweredOfferMovesToTheNewerCopy() = runBlocking {
+        backup.choose("content://tree/a")
+        folder.files[file] = backupBytes(1_000L)
+        backup.copy(source)
+        folder.files[file] = backupBytes(1_000_000L)
+        source.writeText("zip two")
+        backup.copy(source)
+
+        val newer = "content://tree/a/honmani-backup-${stamp(1_000_000L)}.zip"
+        assertEquals(setOf(file, newer), folder.files.keys)
+        assertEquals(newer, backup.found.value?.file)
+    }
+
+    @Test
+    fun choosingTheFolderAgainOffersAgain() = runBlocking {
+        backup.choose("content://tree/a")
+        folder.files[file] = backupBytes(1_000L)
+        backup.copy(source)
+        backup.dismissFound()
+        folder.files[file] = backupBytes(1_000_000L)
+        backup.copy(source)
+        assertNull(backup.found.value)
+
+        backup.choose("content://tree/a")
+        folder.files[file] = backupBytes(2_000_000L)
+        backup.copy(source)
+        assertEquals(2_000_000L, backup.found.value?.exportedAt)
+    }
 }
