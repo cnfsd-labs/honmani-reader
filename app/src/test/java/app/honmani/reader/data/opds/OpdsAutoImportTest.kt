@@ -39,6 +39,9 @@ class OpdsAutoImportTest {
     private var pages = listOf<List<String>>()
     private val requests = mutableListOf<String>()
 
+    /** Runs on the server thread when a book is asked for, before it is sent. */
+    private var onDownload: (name: String) -> Unit = {}
+
     @Before
     fun setUp() {
         database = Room.inMemoryDatabaseBuilder(
@@ -70,6 +73,11 @@ class OpdsAutoImportTest {
                 }
                 path.startsWith("/download/") -> {
                     val name = path.substringAfter("/download/")
+                    onDownload(name)
+                    when {
+                        name.startsWith("gone") -> return@HeaderServer out.respond("404 Not Found", "")
+                        name.startsWith("huge") -> return@HeaderServer out.head("200 OK", "Content-Length: ${BookImporter.MAX_BOOK_BYTES + 1}")
+                    }
                     val bytes = if (name.endsWith(".txt")) "テキストの本。".toByteArray() else TestBooks.epub(title = name)
                     out.head("200 OK", "Content-Length: ${bytes.size}")
                     out.write(bytes)
@@ -140,6 +148,90 @@ class OpdsAutoImportTest {
         assertEquals(0, autoImport.run())
 
         assertFalse(requests.any { it.startsWith("/opds/new?page=2") })
+    }
+
+    @Test
+    fun aBookTheServerRefuses_isSkippedAndNotAskedForAgain() = runBlocking {
+        pages = listOf(listOf(book("gone", "jpn"), book("huge", "jpn"), book("a", "jpn")))
+        val id = addCatalog()
+
+        assertEquals(1, autoImport.run())
+
+        assertEquals(setOf("urn:a"), libraryIds())
+        assertEquals(
+            setOf("urn:gone", "urn:huge"),
+            database.bookDao().removedSourceIds(BookSource.OPDS).toSet(),
+        )
+        assertTrue(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+        synchronized(requests) { requests.clear() }
+
+        assertEquals(0, autoImport.run())
+
+        assertFalse(requests.any { it.startsWith("/download/") })
+    }
+
+    @Test
+    fun switchingAutomaticImportOff_stopsTheRunningImport() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn"), book("b", "jpn")))
+        val id = addCatalog()
+        onDownload = { name ->
+            if (name.startsWith("a")) {
+                runBlocking { repository.setAutoImport(id, false) }
+                autoImport.stop(id)
+            }
+        }
+
+        assertEquals(0, autoImport.run())
+
+        // a was being downloaded when the switch went off; b was never asked for.
+        assertTrue(libraryIds().isEmpty())
+        assertFalse(requests.any { it.startsWith("/download/b") })
+        assertFalse(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+        assertNull(autoImport.status.value)
+    }
+
+    @Test
+    fun deletingTheCatalogue_stopsTheRunningImport() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn"), book("b", "jpn")))
+        val id = addCatalog()
+        onDownload = { name -> if (name.startsWith("a")) runBlocking { repository.delete(id) } }
+
+        // Without stop(): a finishes, then the run notices the catalogue is gone.
+        assertEquals(1, autoImport.run())
+
+        assertEquals(setOf("urn:a"), libraryIds())
+        assertFalse(requests.any { it.startsWith("/download/b") })
+    }
+
+    @Test
+    fun anAddressChangedDuringTheRun_isNotMarkedComplete() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn")))
+        val id = addCatalog()
+        onDownload = {
+            runBlocking { repository.save(id, "Calibre", "http://127.0.0.1:${server.port}/opds?other", null, null) }
+        }
+
+        autoImport.run()
+
+        assertFalse(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+    }
+
+    @Test
+    fun aFirstRunThatReachesThePageLimit_isComplete() = runBlocking {
+        // Nothing wanted on any page: only English books.
+        pages = List(OpdsAutoImport.MAX_PAGES + 5) { listOf(book("e$it", "eng")) }
+        val id = addCatalog()
+
+        autoImport.run()
+
+        assertEquals(OpdsAutoImport.MAX_PAGES, requests.count { it.startsWith("/opds/new") })
+        assertTrue(database.opdsCatalogDao().find(id)!!.autoImportComplete)
+        synchronized(requests) { requests.clear() }
+
+        autoImport.run()
+
+        // Later runs stop at the first page without new books.
+        assertEquals(1, requests.count { it.startsWith("/opds/new") })
     }
 
     @Test

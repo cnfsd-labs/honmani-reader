@@ -11,11 +11,14 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -37,7 +40,11 @@ data class AutoImportStatus(
  * catalogue, later runs stop at the first page that brings nothing new.
  *
  * Books go into the library only; the reader imports one when it is first opened. A run that
- * fails (no connection, wrong login) is logged and tried again on a later start.
+ * fails (no connection, wrong login) is logged and tried again on a later start. A book the server
+ * refuses for good (gone, too large) is skipped and remembered like a removed one.
+ *
+ * A catalogue that is deleted, switched off or given another address or login during a run is left
+ * at once ([stop]); the run checks before every page and book.
  */
 class OpdsAutoImport(
     private val repository: OpdsRepository,
@@ -55,15 +62,38 @@ class OpdsAutoImport(
     private var job: Job? = null
     private var lastStart = 0L
 
+    /** A forced start came while a run was going: run again once it ends. */
+    @Volatile private var rerun = false
+
+    /** The catalogue being imported from, and the job doing it. */
+    @Volatile private var current: Pair<Long, Job>? = null
+
     /**
      * Starts a run, unless one is running or (without [force], as on app starts) the last one
      * started less than [MIN_INTERVAL_MS] ago. A catalogue just added or switched on forces one.
      */
     fun start(force: Boolean = false) {
-        if (job?.isActive == true) return
+        if (job?.isActive == true) {
+            // A catalogue just added or edited would otherwise wait for the next app start.
+            if (force) rerun = true
+            return
+        }
         if (!force && lastStart != 0L && now() - lastStart < MIN_INTERVAL_MS) return
         lastStart = now()
-        job = scope.launch { run() }
+        job = scope.launch {
+            do {
+                rerun = false
+                run()
+            } while (rerun)
+        }
+    }
+
+    /**
+     * Stops importing from catalogue [catalogId] (deleted, switched off, edited), including a book
+     * being downloaded; the run goes on with the other catalogues.
+     */
+    fun stop(catalogId: Long) {
+        current?.takeIf { it.first == catalogId }?.second?.cancel()
     }
 
     /** Imports from every catalogue with automatic import on; returns how many books were added. */
@@ -72,7 +102,7 @@ class OpdsAutoImport(
         try {
             for (catalog in repository.autoImportCatalogs()) {
                 added += try {
-                    importFrom(catalog)
+                    importStoppable(catalog)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -84,6 +114,27 @@ class OpdsAutoImport(
             _status.value = null
         }
         return added
+    }
+
+    /** [importFrom] in a child job that [stop] can cancel without ending the whole run. */
+    private suspend fun importStoppable(catalog: OpdsCatalogEntity): Int = coroutineScope {
+        val child = async { importFrom(catalog) }
+        current = catalog.id to child
+        try {
+            child.await()
+        } catch (e: CancellationException) {
+            if (!isActive) throw e
+            log("Automatic import from ${catalog.title} stopped")
+            0
+        } finally {
+            current = null
+        }
+    }
+
+    /** Whether [catalog] is still there with automatic import on and the same address and login. */
+    private suspend fun stillWanted(catalog: OpdsCatalogEntity): Boolean {
+        val latest = repository.catalog(catalog.id) ?: return false
+        return latest.autoImport && latest.url == catalog.url && latest.username == catalog.username
     }
 
     private suspend fun importFrom(catalog: OpdsCatalogEntity): Int {
@@ -102,20 +153,32 @@ class OpdsAutoImport(
         var url: String? = newest
         var pages = 0
         while (url != null && pages < MAX_PAGES) {
+            if (!stillWanted(catalog)) return added
             val feed = if (url == catalog.url) root else client.feed(server, url)
             pages++
             val wanted = feed.entries.filter { it.book != null && it.isJapanese && it.id !in known }
             for (entry in wanted) {
                 currentCoroutineContext().ensureActive()
+                if (!stillWanted(catalog)) return added
                 val status = AutoImportStatus(catalog.title, entry.title, added)
                 _status.value = status
-                if (add(server, entry, status)) added++
+                try {
+                    if (add(server, entry, status)) added++
+                } catch (e: OpdsException) {
+                    // A connection or login problem ends the run (tried again later); a book the
+                    // server refuses for good is skipped and not asked for again.
+                    if (e.reason != OpdsException.Reason.NOT_A_CATALOGUE && e.reason != OpdsException.Reason.TOO_LARGE) throw e
+                    log("Automatic import skipped ${entry.title}: ${e.message}")
+                    bookDao.insertRemoved(RemovedBookEntity(BookSource.OPDS, entry.id, now()))
+                }
                 known += entry.id
             }
             // Newest first: after one complete run, a page without new books means the rest is known.
             url = if (wanted.isEmpty() && catalog.autoImportComplete) null else feed.nextUrl
         }
-        if (url == null && !catalog.autoImportComplete) repository.setAutoImportComplete(catalog.id, true)
+        // The end of the catalogue, or as far as a first run reads: later runs stop at the first
+        // page without new books instead of reading all MAX_PAGES pages again on every start.
+        if (!catalog.autoImportComplete) repository.setAutoImportComplete(catalog)
         log("Automatic import from ${catalog.title}: $added added, $pages pages read")
         return added
     }
@@ -157,7 +220,10 @@ class OpdsAutoImport(
         /** At most one run per this interval, however often the app is opened. */
         const val MIN_INTERVAL_MS = 10 * 60 * 1000L
 
-        /** A first run reads at most this many pages (Calibre-Web: 60 books each). */
+        /**
+         * A first run reads at most this many pages (Calibre-Web: 60 books each); older books are
+         * left for browsing.
+         */
         const val MAX_PAGES = 100
 
         /**

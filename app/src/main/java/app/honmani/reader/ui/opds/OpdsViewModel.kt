@@ -105,6 +105,8 @@ class OpdsViewModel(
     private val downloadsDir: File,
     /** Starts an automatic import now (after a catalogue with it was saved). */
     private val startAutoImport: () -> Unit = {},
+    /** Stops an automatic import from a catalogue (deleted, switched off, new address or login). */
+    private val stopAutoImport: (Long) -> Unit = {},
     /** Reading progress sync with a catalogue's login; null leaves sync out of the dialog. */
     private val catalogSync: CatalogSync? = null,
 ) : ViewModel() {
@@ -370,6 +372,7 @@ class OpdsViewModel(
                 val (url, feed) = repository.connect(address, user, loginPassword)
                 if (!updateSync(syncProgress, url, user, loginPassword, password.isNotEmpty())) return@launch
                 val title = feed.title.ifBlank { url.substringAfter("://").substringBefore('/') }
+                val before = current.id?.let { repository.server(it) }
                 val id = repository.save(
                     id = current.id,
                     title = title,
@@ -379,6 +382,7 @@ class OpdsViewModel(
                     autoImport = autoImport,
                 )
                 editor.value = null
+                if (before != null && (!autoImport || before.url != url || before.username != user)) stopAutoImport(id)
                 if (autoImport) startAutoImport()
                 // With automatic import on, the books come by themselves: stay in the library,
                 // which shows them arriving. Without it, open the catalogue to pick books.
@@ -415,7 +419,10 @@ class OpdsViewModel(
     fun deleteCatalog(id: Long) {
         editor.value = null
         if (browsing.value?.catalog?.id == id) close()
-        viewModelScope.launch { repository.delete(id) }
+        viewModelScope.launch {
+            repository.delete(id)
+            stopAutoImport(id)
+        }
     }
 
     companion object {
@@ -445,6 +452,7 @@ class OpdsViewModel(
                     bookDao = container.bookDao,
                     downloadsDir = container.downloadsDir,
                     startAutoImport = { container.opdsAutoImport.start(force = true) },
+                    stopAutoImport = container.opdsAutoImport::stop,
                     catalogSync = CatalogSync(container.koSyncSettings, container.koSyncClient),
                 )
             }

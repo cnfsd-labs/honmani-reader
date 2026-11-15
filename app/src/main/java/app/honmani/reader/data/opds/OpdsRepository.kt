@@ -33,9 +33,18 @@ class OpdsRepository(
         dao.find(id)?.let { dao.update(it.copy(autoImport = enabled)) }
     }
 
-    suspend fun setAutoImportComplete(id: Long, complete: Boolean) {
-        dao.find(id)?.let { dao.update(it.copy(autoImportComplete = complete)) }
+    /**
+     * Marks [catalog] as gone through once, unless its address or login changed since the import
+     * read it (a new server is looked through from the start).
+     */
+    suspend fun setAutoImportComplete(catalog: OpdsCatalogEntity) {
+        dao.find(catalog.id)
+            ?.takeIf { it.url == catalog.url && it.username == catalog.username }
+            ?.let { dao.update(it.copy(autoImportComplete = true)) }
     }
+
+    /** Catalogue [id] with its state, or null if it is gone. */
+    suspend fun catalog(id: Long): OpdsCatalogEntity? = dao.find(id)
 
     /** The address and login of catalogue [id], or null if it is gone. */
     suspend fun server(id: Long): OpdsServer? = dao.find(id)?.let(::server)

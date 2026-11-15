@@ -155,7 +155,7 @@ fun SettingsScreen(
         onAutoImportChange = { catalog, enabled ->
             scope.launch {
                 container.opdsRepository.setAutoImport(catalog.id, enabled)
-                if (enabled) container.opdsAutoImport.start(force = true)
+                if (enabled) container.opdsAutoImport.start(force = true) else container.opdsAutoImport.stop(catalog.id)
             }
         },
         bottomBar = bottomBar,
