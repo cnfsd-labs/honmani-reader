@@ -68,6 +68,28 @@ class TextEncodingTest {
     }
 
     @Test
+    fun aShortUtf8FileCutInsideItsLastCharacterIsStillUtf8() {
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        val japanese = "吾輩は猫である".toByteArray(Charsets.UTF_8)
+        val truncated = japanese.copyOf(japanese.size - 1)
+        assertEquals(Charsets.UTF_8, TextEncoding.detect(truncated))
+        val decoded = TextEncoding.read(File(folder.root, "cut.txt").apply { writeBytes(bytes + truncated) })
+        assertEquals(Charsets.UTF_8, decoded.charset)
+        assertEquals(text + "吾輩は猫であ\uFFFD", decoded.text)
+    }
+
+    @Test
+    fun textThatDecodesToReplacementCharactersIsRefused() {
+        val garbage = ByteArray(4000) { if (it % 4 < 2) 0xFF.toByte() else 0xD8.toByte() }
+        val file = File(folder.root, "garbage.txt").apply { writeBytes(garbage) }
+        try {
+            TextEncoding.read(file)
+            org.junit.Assert.fail("expected UndecodableTextException")
+        } catch (_: TextEncoding.UndecodableTextException) {
+        }
+    }
+
+    @Test
     fun aFileOverTheLimitIsRefusedAndLeftAlone() {
         val bytes = text.toByteArray(Charsets.UTF_8)
         val file = File(folder.root, "huge.txt").apply { writeBytes(bytes) }

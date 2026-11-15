@@ -2,6 +2,7 @@ package app.honmani.reader.data.library
 
 import app.honmani.reader.data.TooLargeException
 import java.io.File
+import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CharacterCodingException
@@ -37,8 +38,15 @@ object TextEncoding {
         val bytes = file.readBytes()
         val charset = detect(bytes)
         val start = bomLength(bytes)
-        return Decoded(charset, String(bytes, start, bytes.size - start, charset), rewrite = charset != Charsets.UTF_8 || start != 0)
+        val text = String(bytes, start, bytes.size - start, charset)
+        // A wrong guess turns the book into replacement characters: refuse it instead.
+        val replaced = text.count { it == '\uFFFD' }
+        if (replaced > 1 && replaced * 100 > text.length) throw UndecodableTextException(charset)
+        return Decoded(charset, text, rewrite = charset != Charsets.UTF_8 || start != 0)
     }
+
+    /** The text decodes to too many replacement characters in [charset], the best guess. */
+    class UndecodableTextException(charset: Charset) : IOException("The text does not read as ${charset.name()}")
 
     /**
      * Rewrites [file] as UTF-8 (without BOM) unless it already is; returns the detected encoding.
@@ -59,8 +67,9 @@ object TextEncoding {
             bytes.startsWith(0xFF, 0xFE) -> return Charsets.UTF_16LE
         }
         val sample = bytes.copyOf(minOf(bytes.size, SAMPLE_BYTES))
-        // Valid UTF-8 of any length is almost never another encoding by accident.
-        if (decodes(sample, Charsets.UTF_8, complete = sample.size == bytes.size)) return Charsets.UTF_8
+        // Valid UTF-8 of any length is almost never another encoding by accident. A file cut
+        // inside its last character (an interrupted download) still counts.
+        if (decodes(sample, Charsets.UTF_8, complete = false)) return Charsets.UTF_8
         val candidates = listOfNotNull(
             charset("windows-31j") ?: charset("Shift_JIS"),
             charset("EUC-JP"),

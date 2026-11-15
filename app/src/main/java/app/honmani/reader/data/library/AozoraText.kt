@@ -185,8 +185,17 @@ object AozoraText {
         var rubyStart = -1
         var index = 0
 
+        // A ｜ stays in [text] until a 《reading》 uses it, so a bar without one remains as text.
         fun flushText(end: Int = text.length) {
-            if (end > 0) frames.last().inlines += AozoraInline.Text(text.substring(0, end))
+            var out = text.substring(0, end)
+            if (rubyStart in 1..end) {
+                // The base starts after this flush (a note between ｜ and 《): the bar goes.
+                out = out.removeRange(rubyStart - 1, rubyStart)
+                rubyStart = 0
+            } else if (rubyStart > end) {
+                rubyStart -= end
+            }
+            if (out.isNotEmpty()) frames.last().inlines += AozoraInline.Text(out)
             text.delete(0, end)
         }
 
@@ -199,15 +208,18 @@ object AozoraText {
             val c = line[index]
             when {
                 c == '｜' -> {
-                    flushText()
-                    rubyStart = 0
+                    text.append(c)
+                    rubyStart = text.length
                     index++
                 }
                 c == '《' && line.indexOf('》', index) > index -> {
                     val close = line.indexOf('》', index)
                     val reading = line.substring(index + 1, close)
                     val start = if (rubyStart >= 0) rubyStart else kanjiRunStart(text)
-                    if (start < text.length && reading.isNotBlank()) {
+                    // Without a ｜, brackets after kanji are a reading only if they hold no kanji
+                    // (雑誌《文藝春秋》 is a title in brackets).
+                    val isReading = reading.isNotBlank() && (rubyStart >= 0 || reading.none { isKanji(it) })
+                    if (start < text.length && isReading) {
                         val base = text.substring(start)
                         flushText(start)
                         text.clear()
@@ -247,6 +259,7 @@ object AozoraText {
                 }
             }
         }
+        rubyStart = -1 // a ｜ no reading followed stays as text
         flushText()
         // A range left open at the end of the line ends there.
         while (frames.size > 1) close(frames.last())
@@ -295,13 +308,14 @@ object AozoraText {
         var start = text.length
         while (start > 0) {
             val c = text[start - 1]
-            val isKanji = c in '\u3400'..'\u9FFF' || c in '\uF900'..'\uFAFF' || c in "々〆ヶ〇" ||
-                Character.isSurrogate(c)
-            if (!isKanji) break
+            if (!isKanji(c) && c !in "々〆ヶ〇") break
             start--
         }
         return start
     }
+
+    /** A kanji, or half of a surrogate pair (the rare kanji outside the BMP). */
+    private fun isKanji(c: Char) = c in '\u3400'..'\u9FFF' || c in '\uF900'..'\uFAFF' || Character.isSurrogate(c)
 
     private fun headingLevel(size: String) = when (size) {
         "大" -> 1

@@ -83,6 +83,28 @@ class AozoraTextTest {
     }
 
     @Test
+    fun bracketsWithKanjiAfterKanjiAreText_unlessABarAsksForRuby() {
+        assertEquals(Paragraph(listOf(Text("雑誌《文藝春秋》を読む"))), paragraphs(aozora("雑誌《文藝春秋》を読む")).first())
+        assertEquals(
+            Paragraph(listOf(Text("雑誌"), Ruby("文藝", "ぶんげい春秋"))),
+            paragraphs(aozora("雑誌｜文藝《ぶんげい春秋》")).first(),
+        )
+        assertEquals(
+            Paragraph(listOf(Ruby("本気", "マジ"), Text("で"), Ruby("倫敦", "ロンドン・ー"))),
+            paragraphs(aozora("本気《マジ》で倫敦《ロンドン・ー》")).first(),
+        )
+    }
+
+    @Test
+    fun aBarWithoutAReadingStaysAsText() {
+        assertEquals(Paragraph(listOf(Text("ａ｜ｂ"))), paragraphs(aozora("ａ｜ｂ")).first())
+        assertEquals(
+            Paragraph(listOf(Text("ａ｜ｂ"), Ruby("今", "いま"))),
+            paragraphs(aozora("ａ｜ｂ｜今《いま》")).first(),
+        )
+    }
+
+    @Test
     fun rubyOverKanaNeedsABar_otherwiseTheBracketsStay() {
         assertEquals(Paragraph(listOf(Text("ねこ《ネコ》"))), paragraphs(aozora("ねこ《ネコ》")).first())
     }
