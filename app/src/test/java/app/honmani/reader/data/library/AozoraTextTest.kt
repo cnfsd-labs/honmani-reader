@@ -253,10 +253,39 @@ class AozoraTextTest {
             Paragraph(listOf(Text("𩸽を食う"))),
             paragraphs(aozora("※［＃「魚＋花」、U+29E3D、1-2-3］を食う")).first(),
         )
+    }
+
+    // Expected characters checked against kJIS0213 in Unihan 18.0.0 (Unihan_OtherMappings.txt).
+    @Test
+    fun restoresJisX0213KanjiFromBothLevels() {
         assertEquals(
-            Paragraph(listOf(Text("※を食う"))),
-            paragraphs(aozora("※［＃「言＋墟のつくり」、第4水準2-88-74］を食う")).first(),
+            Paragraph(listOf(Text("𠮟る"))), // U+20B9F, 1,47,52
+            paragraphs(aozora("※［＃「口＋七」、第3水準1-47-52］る")).first(),
         )
+        assertEquals(
+            Paragraph(listOf(Text("𩸽を食う"))), // U+29E3D, 2,93,44
+            paragraphs(aozora("※［＃「魚＋花」、第4水準2-93-44］を食う")).first(),
+        )
+        assertEquals(
+            Paragraph(listOf(Text("譃と"))), // U+8B43, 2,88,74
+            paragraphs(aozora("※［＃「言＋墟のつくり」、第4水準2-88-74］と")).first(),
+        )
+        // The first record of each plane: U+4FF1 at 1,14,1 and U+20089 at 2,1,1.
+        assertEquals(
+            Paragraph(listOf(Text("\u4FF1\uD840\uDC89"))),
+            paragraphs(aozora("※［＃「人べん＋具」、第3水準1-14-1］※［＃「丿＋一」、第4水準2-1-1］")).first(),
+        )
+    }
+
+    @Test
+    fun keepsTheMarkForJisPositionsWithoutAKanji() {
+        // 1-1-1 is the ideographic space and 2-2-1 an empty row: neither is a kanji in Unihan.
+        for (position in listOf("第3水準1-1-1", "第4水準2-2-1", "第3水準1-95-1", "第4水準3-1-1")) {
+            assertEquals(
+                Paragraph(listOf(Text("※を食う"))),
+                paragraphs(aozora("※［＃「魚＋花」、$position］を食う")).first(),
+            )
+        }
     }
 
     @Test

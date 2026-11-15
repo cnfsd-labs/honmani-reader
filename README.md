@@ -137,7 +137,10 @@ libraries listed in the app under Settings → Help and about → About Honmani.
 their publishers and keep their own licences. The radical search ships EDRDG's RADKFILE, KRADFILE and
 KANJIDIC2 data (© Electronic Dictionary Research and Development Group,
 [CC BY-SA 4.0](https://www.edrdg.org/edrdg/licence.html)), converted by
-`scripts/radicals/build_radicals.py`. The optional example sentences (Settings → Reading → Example sentences,
+`scripts/radicals/build_radicals.py`. Aozora Bunko gaiji notes (第3水準/第4水準) are read with a JIS X 0213
+table from Unicode's [Unihan database](https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip)
+(Unicode 18.0.0, [Unicode License v3](https://www.unicode.org/license.txt)), converted by
+`scripts/jisx0213/build_jisx0213.py`. The optional example sentences (Settings → Reading → Example sentences,
 off until switched on) are from [Tatoeba](https://tatoeba.org) (Japanese sentences with English
 translations, [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/)), packed by
 `scripts/examples/build_examples.py` and downloaded from this repository's GitHub releases only when

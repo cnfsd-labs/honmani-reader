@@ -123,6 +123,8 @@
     <string name="about_ttu_libraries_details">Svelte, RxJS, zip.js and others · MIT, Apache 2.0, BSD and ISC licences</string>
     <string name="about_android_libraries">Android libraries</string>
     <string name="about_android_libraries_details">Kotlin, AndroidX, Jetpack Compose, Room, WorkManager, kotlinx · Apache License 2.0</string>
+    <string name="about_unihan">Unihan database</string>
+    <string name="about_unihan_details">JIS X 0213 kanji for Aozora Bunko texts · Unicode 18.0.0 · Unicode License v3 · © Unicode, Inc.</string>
     <string name="about_downloads">Downloaded content</string>
     <string name="about_downloads_details">Dictionaries and fonts come from their publishers when you download them, under their own licences.</string>
     <string name="about_examples">Example sentences (optional download)</string>

@@ -44,6 +44,7 @@ enum class LicenceText(@StringRes val title: Int, val asset: String) {
     /** Written by the build from ttu's bundle (see `BuildTtuTask`). */
     TTU_LIBRARIES(R.string.about_ttu_libraries, "licenses/ttu-libraries.txt"),
     APACHE(R.string.about_android_libraries, "licenses/apache-2.0.txt"),
+    UNICODE(R.string.about_unihan, "licenses/unicode.txt"),
     ;
 
     companion object {
@@ -109,6 +110,11 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
             item {
                 Entry(R.string.about_android_libraries, stringResource(R.string.about_android_libraries_details)) {
                     open = LicenceText.APACHE
+                }
+            }
+            item {
+                Entry(R.string.about_unihan, stringResource(R.string.about_unihan_details)) {
+                    open = LicenceText.UNICODE
                 }
             }
             item {

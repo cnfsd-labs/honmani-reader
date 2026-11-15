@@ -73,8 +73,8 @@ data class AozoraLayout(
  * alignment (地付き, 字上げ), as notes on the text before them (［＃「…」に傍点］) or as ranges
  * (［＃傍点］…［＃傍点終わり］, over lines ［＃ここから太字］…［＃ここで太字終わり］ and
  * ［＃ここから２字下げ］…［＃ここで字下げ終わり］). Other editor notes and
- * the notation guide are dropped; characters given as Unicode in a note (※［＃「…」、U+29E3D、…］)
- * are restored.
+ * the notation guide are dropped; characters given in a note as Unicode (※［＃「…」、U+29E3D、…］)
+ * or as a JIS X 0213 kanji (※［＃「…」、第4水準2-93-44］, see [JisX0213]) are restored.
  */
 object AozoraText {
     /**
@@ -190,7 +190,11 @@ object AozoraText {
             // Up to six hex digits can name a code point past U+10FFFF, or a lone surrogate.
             UNICODE.find(match.value)?.groupValues?.get(1)?.toInt(16)
                 ?.takeIf { Character.isValidCodePoint(it) && it !in 0xD800..0xDFFF }
-                ?.let { String(Character.toChars(it)) } ?: "※"
+                ?.let { String(Character.toChars(it)) }
+                ?: JIS_LEVEL.find(match.value)?.groupValues?.let { (_, plane, row, cell) ->
+                    JisX0213.character(number(plane), number(row), number(cell))
+                }
+                ?: "※"
         }
 
         var level = 0
@@ -380,6 +384,7 @@ object AozoraText {
     private val PAGE_BREAK = Regex("^［＃改(ページ|丁|段|見開き)］$")
     private val GAIJI = Regex("※［＃[^］]*］")
     private val UNICODE = Regex("U\\+([0-9A-Fa-f]{4,6})")
+    private val JIS_LEVEL = Regex("第[34]水準([12])-([0-9]{1,2})-([0-9]{1,2})")
     private val HEADING = Regex("^「(.+)」は(大|中|小)見出し$")
     private val BLOCK_HEADING = Regex("［＃(大|中|小)見出し］")
     private val BLOCK_HEADING_MARK = Regex("［＃(大|中|小)見出し(終わり)?］")

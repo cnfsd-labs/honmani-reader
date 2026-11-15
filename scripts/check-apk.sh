@@ -67,7 +67,7 @@ done
 echo "ttu files: $(grep -c '^assets/ttu/' <<<"$entries")"
 # The licences screen shows these; source maps (used to list the libraries) must not ship.
 for notice in 'assets/licenses/gpl-3.0.txt' 'assets/licenses/apache-2.0.txt' 'assets/licenses/ttu.txt' \
-  'assets/licenses/ttu-libraries.txt'; do
+  'assets/licenses/ttu-libraries.txt' 'assets/licenses/unicode.txt'; do
     if ! grep -qxF "$notice" <<<"$entries"; then
         echo "FAIL: $notice is missing"
         failed=1
