@@ -29,9 +29,60 @@ class SafeXmlTest {
     }
 
     @Test
-    fun rejectsADocumentTypeDeclaration() {
+    fun rejectsEntityDeclarations() {
         assertRejected("""<!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>""")
-        assertRejected("""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"><html/>""")
+        assertRejected("""<!DOCTYPE a [<!ENTITY % p "x">]><a/>""")
+        // UTF-16 text is scanned too.
+        try {
+            SafeXml.parse("""<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE a [<!ENTITY e "x">]><a>&e;</a>""".toByteArray(Charsets.UTF_16))
+            fail("accepted UTF-16 entity")
+        } catch (_: UnsupportedXmlException) {
+        }
+    }
+
+    @Test
+    fun refusesABillionLaughsDocumentBeforeParsing() {
+        val entities = (1..9).joinToString("") { i ->
+            val prev = "&l${i - 1};"
+            """<!ENTITY l$i "${prev.repeat(10)}">"""
+        }
+        val xml = """<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY l0 "lol">$entities]><lolz>&l9;</lolz>"""
+        try {
+            parse(xml)
+            fail("accepted billion laughs")
+        } catch (e: UnsupportedXmlException) {
+            assertEquals("This file uses XML features Honmani does not read.", e.message)
+        }
+    }
+
+    @Test
+    fun parsesANcxWithAPlainDoctype() {
+        val root = parse(
+            """<?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
+            <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+              <docTitle><text>本</text></docTitle><navMap/>
+            </ncx>""",
+        )
+        assertEquals("ncx", root.localName)
+        assertEquals("本", root.getElementsByTagNameNS("*", "text").item(0).textContent)
+    }
+
+    @Test
+    fun doesNotReadAnExternalDtd() {
+        val dtd = folder.newFile("secret.dtd").apply { writeText("<!ENTITY e \"TOP-SECRET\">") }
+        val xml = """<?xml version="1.0"?><!DOCTYPE a SYSTEM "${dtd.toURI()}"><a>&e;</a>"""
+        try {
+            val text = parse(xml).textContent
+            assertFalse(text, "TOP-SECRET" in text)
+        } catch (_: SAXException) {
+            // Undefined entity: also safe.
+        }
+    }
+
+    @Test
+    fun allowsTheWordEntityInText() {
+        assertFalse(SafeXml.declaresEntity("<a>&lt;!ENTITY is escaped; <!ENTIT></a>".toByteArray()))
     }
 
     @Test
