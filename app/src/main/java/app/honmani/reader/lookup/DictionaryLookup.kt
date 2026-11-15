@@ -234,6 +234,9 @@ class DictionaryLookup(
             .thenBy { it.term.id in pointers }
             .thenByDescending { it.matchesFurigana }
             .thenBy { it.term.id in kanaOnlyNamed }
+            // The short causative (読ます) after other readings of the same text: its ます forms
+            // are also polite forms, and in fewer steps, so しました would be 占む, いました 忌む.
+            .thenBy { Inflection.CAUSATIVE_SHORT in it.inflections }
             .thenBy { it.inflections.size }
             .thenByDescending { it.matchedExpression }
             // A name (JMnedict) after the ordinary words of the same match, however the dictionaries

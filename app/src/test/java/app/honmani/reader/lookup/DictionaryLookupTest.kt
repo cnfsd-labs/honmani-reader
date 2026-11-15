@@ -201,6 +201,24 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun aPolitePastRanksAboveTheSameTextReadAsAShortCausative() = runTest {
+        // Word classes and scores as in JMdict: しました is する + ました, not the past of 占ます,
+        // the short causative of the archaic 占む (fewer steps, but a rare form).
+        install(
+            "JMdict",
+            listOf("占む", "しむ", "v5", -200, "to occupy"),
+            listOf("する", "する", "vs", 999800, "to do"),
+            listOf("忌む", "いむ", "v5", -200, "to avoid"),
+            listOf("いる", "いる", "v1", 999800, "to be"),
+        )
+
+        val suru = lookup.lookup("しました").entries.filter { it.source == "しました" }
+        assertEquals(listOf("する", "占む"), suru.map { it.term.expression })
+        assertEquals(listOf(Inflection.STEM, Inflection.POLITE, Inflection.PAST), suru.first().inflections)
+        assertEquals("いる", lookup.lookup("いました").entries.first().term.expression)
+    }
+
+    @Test
     fun anEntryWithoutWordClassesBorrowsThoseOfTheSameWordInAnotherDictionary() = runTest {
         jmdict()
         install("Plain", listOf("食べる", "たべる", "", 1, "eat (plain)"))
