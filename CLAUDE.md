@@ -87,6 +87,7 @@ public: never copy those notes, personal details or discussions into it.
   (needs `:app:buildTtu` output or `TTU_DIR=...`). No Chromium build for Ubuntu 26.04 yet: set
   `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64` for install and run.
 - `testDebugUnitTest` also runs `:app:buildTtu` (Node and pnpm needed; `-x :app:buildTtu` fails).
+- This PC has 2 cores: run one Gradle build at a time. Before your own run, stop leftover runs (`./gradlew --stop`); a worker's lint (>1 h locally) slowed the coordinator's tests on 11-13. Leave full lint to CI when a targeted test is enough.
 - CI (`.github/workflows/android.yml`) runs all of this on every push (the browser tests as a parallel `browser`
   job, one retry, flaky tests named as warnings; `lintDebug` is the lint gate, release lint-vital is off) and cancels the running build:
   don't push while someone waits for an APK.
