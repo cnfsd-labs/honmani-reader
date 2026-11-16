@@ -79,7 +79,8 @@ name itself, see below).
   KOReader sync server of your choice: for EPUB books, Honmani sends that server an identifier
   computed from the book file (not its title or text), your reading position and percentage,
   the name of your phone model and a random id Honmani made for this phone (so the server can
-  tell your devices apart), and reads back the position saved by your other devices. You can
+  tell your devices apart), and reads back the position saved by your other devices: when you
+  open a book, and once when you download a book from a book server. You can
   also turn this on from a book server's settings, with that server's address and login.
   For KOReader's sync servers Honmani keeps only an MD5 hash of your password, encrypted on
   your phone, as KOReader does. Calibre-Web Automated checks your Calibre-Web password

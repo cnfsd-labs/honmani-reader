@@ -87,7 +87,8 @@ class ProgressSync(
     private sealed interface Found {
         data object None : Found
 
-        class Ahead(val document: Document, val characters: Long, val device: String) : Found
+        /** [percentage]: the server's, 0..1. */
+        class Ahead(val document: Document, val characters: Long, val device: String, val percentage: Double) : Found
 
         /** [at]: when the server stored it, in milliseconds. */
         class Behind(val document: Document, val characters: Long, val device: String, val local: Long, val at: Long) : Found
@@ -143,20 +144,7 @@ class ProgressSync(
         setBookmark: suspend (Long, Double) -> Unit,
         ask: suspend (SyncQuestion) -> Boolean = { false },
     ): PulledPosition? {
-        val account = settings.account.value ?: return null
-        if (book.format != BookFormat.EPUB) return null
-        // The request blocks in HttpURLConnection, which a timeout cannot interrupt: it runs on
-        // its own and is left behind when the deadline passes (its answer is dropped).
-        val lookup = CoroutineScope(currentCoroutineContext().minusKey(Job)).async { find(account, book, ttuId, bookmark) }
-        val found = try {
-            withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
-        } catch (e: IOException) {
-            Log.i(TAG, "No progress sync for this book: ${e.message}")
-            status?.failed(e, ttuId)
-            null
-        } finally {
-            lookup.cancel()
-        } ?: return null
+        val found = lookup(book, ttuId, bookmark) ?: return null
         return when (found) {
             Found.None -> {
                 resend()
@@ -190,6 +178,40 @@ class ProgressSync(
         }
     }
 
+    /**
+     * Once, when [book] was just downloaded from a book server and handed to ttu as [ttuId]: a
+     * position another device saved for the same file is written with [setBookmark] and shown in
+     * the library; one at the end ([FINISHED_PERCENTAGE], KOReader has no "finished" flag) also
+     * marks the book finished. Failures are only logged and recorded: the import never waits
+     * more than [PULL_TIMEOUT_MS] for it. Returns what was taken.
+     */
+    suspend fun pullOnImport(book: BookEntity, ttuId: Long, setBookmark: suspend (Long, Double) -> Unit): PulledPosition? {
+        // A new book has no position of its own yet.
+        val found = lookup(book, ttuId) { null to 0L } as? Found.Ahead ?: return null
+        val pulled = take(found.document, ttuId, found.characters, found.device, setBookmark)
+        books.setProgressByTtuId(ttuId, (found.characters.toDouble() / found.document.total).toFloat())
+        if (found.percentage >= FINISHED_PERCENTAGE) books.setFinished(book.id, now())
+        return pulled
+    }
+
+    /** The server's position for [book], or null if sync is off, the book isn't an EPUB, or it failed or took too long. */
+    private suspend fun lookup(book: BookEntity, ttuId: Long, bookmark: suspend () -> Pair<Long?, Long>): Found? {
+        val account = settings.account.value ?: return null
+        if (book.format != BookFormat.EPUB) return null
+        // The request blocks in HttpURLConnection, which a timeout cannot interrupt: it runs on
+        // its own and is left behind when the deadline passes (its answer is dropped).
+        val lookup = CoroutineScope(currentCoroutineContext().minusKey(Job)).async { find(account, book, ttuId, bookmark) }
+        return try {
+            withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
+        } catch (e: IOException) {
+            Log.i(TAG, "No progress sync for this book: ${e.message}")
+            status?.failed(e, ttuId)
+            null
+        } finally {
+            lookup.cancel()
+        }
+    }
+
     private suspend fun find(
         account: KoSyncAccount,
         book: BookEntity,
@@ -216,7 +238,7 @@ class ProgressSync(
             return Found.None
         }
         return if (local == null || characters > local || remoteAt == null) {
-            Found.Ahead(document, characters, remote.device)
+            Found.Ahead(document, characters, remote.device, remote.percentage)
         } else {
             Found.Behind(document, characters, remote.device, local, remoteAt)
         }
@@ -419,6 +441,9 @@ class ProgressSync(
         /** How long after [flush] a saved position still counts as part of leaving. */
         const val FLUSH_GRACE_NS = 10_000_000_000L
         const val MAX_DOCUMENTS = 3
+
+        /** KOReader's last page is often at 0.998 rather than 1. */
+        const val FINISHED_PERCENTAGE = 0.99
 
         /** Positions closer than this count as the same (a few characters' rounding). */
         const val MIN_CHANGE = 10

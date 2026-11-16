@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.data.library.BookDao
+import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.opds.OpdsCatalog
 import app.honmani.reader.data.opds.OpdsClient
@@ -22,6 +23,7 @@ import app.honmani.reader.data.opds.bookFileName
 import app.honmani.reader.data.sync.CatalogSync
 import app.honmani.reader.data.sync.KoSyncException
 import app.honmani.reader.ui.library.BookAdder
+import app.honmani.reader.ui.reader.TtuLibraryException
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -113,6 +115,8 @@ class OpdsViewModel(
     private val importOlderBooks: (Long) -> Unit = {},
     /** Reading progress sync with a catalogue's login; null leaves sync out of the dialog. */
     private val catalogSync: CatalogSync? = null,
+    /** Takes a book's reading position from progress sync once, after it was downloaded (book, ttu id). */
+    private val pullPosition: suspend (BookEntity, Long) -> Unit = { _, _ -> },
 ) : ViewModel() {
     private val browsing = MutableStateFlow<BrowseState?>(null)
     private val editor = MutableStateFlow<CatalogEditor?>(null)
@@ -309,7 +313,10 @@ class OpdsViewModel(
                 // itself moves to a background thread.
                 val result = temp.inputStream().use { adder.add(it, name, BookSource.OPDS, entry.id) }
                 when (result) {
-                    is BookAdder.Result.Added -> setDownload(entry.id, null)
+                    is BookAdder.Result.Added -> {
+                        setDownload(entry.id, null)
+                        result.book.ttuId?.let { pullPosition(result.book, it) }
+                    }
                     is BookAdder.Result.AlreadyInLibrary -> {
                         matched.update { it + entry.id }
                         setDownload(entry.id, null)
@@ -463,6 +470,16 @@ class OpdsViewModel(
                     stopAutoImport = container.opdsAutoImport::stop,
                     importOlderBooks = container.opdsAutoImport::importOlder,
                     catalogSync = CatalogSync(container.koSyncSettings, container.koSyncClient),
+                    // On the main thread (the bridge drives the WebView); sync is a bonus, so a
+                    // reader page that can't answer leaves the book at its start.
+                    pullPosition = { book, ttuId ->
+                        try {
+                            container.progressSync.pullOnImport(book, ttuId) { characters, progress ->
+                                container.ttuLibrary.setBookmark(ttuId, characters, progress)
+                            }
+                        } catch (_: TtuLibraryException) {
+                        }
+                    },
                 )
             }
         }

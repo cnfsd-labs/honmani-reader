@@ -486,6 +486,67 @@ class ProgressSyncTest {
         assertEquals(emptyMap<String, Any?>(), preferences.all.filterKeys { it != "kosync_device_id" })
     }
 
+    private suspend fun pullOnImport(of: BookEntity = book) =
+        sync.pullOnImport(of, 5) { characters, progress -> written = characters to progress }
+
+    @Test
+    fun onImport_anotherDevicesPositionIsWrittenAndShownInTheLibrary() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+
+        assertEquals(PulledPosition(58, "Kindle"), pullOnImport())
+
+        assertEquals(18L, written!!.first)
+        val row = database.bookDao().find(book.id)!!
+        assertEquals(18f / 31, row.progress, 1e-6f)
+        assertNull(row.finishedAt)
+        // Taken from the server: ttu's first save there doesn't go straight back.
+        sync.onPosition(5, 18)
+        sync.idle()
+        assertTrue(server.requests.none { it.method == "PUT" })
+    }
+
+    @Test
+    fun onImport_aPositionAtTheEndMarksTheBookFinished() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.998, "Kindle", "K1", timestamp = 2_000)
+
+        assertNotNull(pullOnImport())
+
+        assertEquals(clock, database.bookDao().find(book.id)!!.finishedAt)
+    }
+
+    @Test
+    fun onImport_noPosition_orThisPhonesOwn_changesNothing() = runBlocking {
+        assertNull(pullOnImport())
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.998, "Honmani (Test)", settings.deviceId, timestamp = 2_000)
+        assertNull(pullOnImport())
+
+        assertNull(written)
+        val row = database.bookDao().find(book.id)!!
+        assertEquals(0f, row.progress)
+        assertNull(row.finishedAt)
+    }
+
+    @Test
+    fun onImport_otherFormats_andSignedOut_askNothing() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+        assertNull(pullOnImport(book.copy(format = BookFormat.TXT)))
+        settings.signOut()
+        assertNull(pullOnImport())
+
+        assertNull(written)
+        assertTrue(server.requests.isEmpty())
+    }
+
+    @Test
+    fun onImport_aServerErrorIsRecorded_notThrown() = runBlocking {
+        server.down = true
+
+        assertNull(pullOnImport())
+
+        assertNull(written)
+        assertEquals(5L, status.state.value.failure!!.ttuId)
+    }
+
     private object PlainCipher : CredentialCipher {
         override fun encrypt(plain: String) = plain
 
