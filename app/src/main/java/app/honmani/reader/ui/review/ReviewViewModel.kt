@@ -295,8 +295,9 @@ class ReviewViewModel(
                 val word = active.current?.word?.expression.orEmpty()
                 val before = active.lastAction
                 action(active)
-                publish(active, keepRevealed)
+                // Counted before the finished state is published, so anything that sees it sees the count.
                 if (answered && active.current == null) swipeHint?.sessionFinished()
+                publish(active, keepRevealed)
                 if (answered) _cues.send(ReviewCue(gotIt, finished = active.current == null))
                 val done = active.lastAction.takeIf { it != before }
                 if (notice != null && word.isNotEmpty()) _notices.send(ReviewNotice(notice, word, done))
