@@ -171,6 +171,9 @@ fun WordsScreen(
     readNext: ReadNext? = null,
     onReadNext: (ReadNext) -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
+    /** Ids of the books in the library: a word's sentence from one of them offers "Open in book". */
+    libraryBookIds: Set<Long> = emptySet(),
+    onOpenBook: (Long) -> Unit = {},
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
     // Its own lookup panel, apart from the reader's: a search saves no word by itself.
@@ -433,6 +436,8 @@ fun WordsScreen(
                     onOfferKnown = knownFromAnki::start,
                     onDismissOffer = { ankiSettings.setKnownFromAnkiOffered(true) },
                     dueIds = dueIds,
+                    libraryBookIds = libraryBookIds,
+                    onOpenBook = onOpenBook,
                 )
                 WordsPage.REVIEW -> ReviewPage(
                     due = reviewDue,
@@ -544,6 +549,8 @@ private fun WordsContent(
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
     dueIds: Set<Long> = emptySet(),
+    libraryBookIds: Set<Long> = emptySet(),
+    onOpenBook: (Long) -> Unit = {},
 ) {
     // Above the keyboard when the filter field is typed in.
     Column(modifier = Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding()) {
@@ -659,6 +666,8 @@ private fun WordsContent(
             ankiEnabled = ankiEnabled,
             onOfferKnown = onOfferKnown,
             onDismissOffer = onDismissOffer,
+            libraryBookIds = libraryBookIds,
+            onOpenBook = onOpenBook,
         )
     }
 }
@@ -699,6 +708,8 @@ private fun WordList(
     ankiEnabled: Boolean = true,
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
+    libraryBookIds: Set<Long> = emptySet(),
+    onOpenBook: (Long) -> Unit = {},
 ) {
     when {
         words == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -751,6 +762,8 @@ private fun WordList(
                 val expanded = word.id == uiState.expanded
                 // Removals and reorders glide; still in E-ink mode.
                 Column(if (LocalMotionEnabled.current) Modifier.animateItem() else Modifier) {
+                    val lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList()
+                    val bookId = OpenInBook.bookOf(lookups, libraryBookIds)
                     WordRow(
                         word = word,
                         now = now,
@@ -759,7 +772,8 @@ private fun WordList(
                         frequency = uiState.frequencies[word.id],
                         due = word.id in dueIds,
                         expanded = expanded,
-                        lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList(),
+                        lookups = lookups,
+                        onOpenBook = bookId?.let { id -> { onOpenBook(id) } },
                         onToggleExpanded = { onToggleExpanded(word.id) },
                         onSetStarred = { onSetStarred(word.id, it) },
                         onMarkLearned = { onMarkLearned(word) },
@@ -1044,6 +1058,8 @@ private fun WordRow(
     ankiEnabled: Boolean = true,
     adding: Boolean = false,
     onIgnore: () -> Unit = {},
+    /** Opens the book of the word's latest sentence; null when that book is not in the library. */
+    onOpenBook: (() -> Unit)? = null,
 ) {
     val highlight = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1156,6 +1172,9 @@ private fun WordRow(
                 color = muted,
                 modifier = Modifier.padding(top = 6.dp),
             )
+            if (onOpenBook != null) {
+                TextButton(onClick = onOpenBook) { Text(stringResource(R.string.review_open_in_book)) }
+            }
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,

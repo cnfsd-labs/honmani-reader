@@ -1,7 +1,9 @@
 package app.honmani.reader.data.words
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReadingSessionTest {
@@ -33,5 +35,22 @@ class ReadingSessionTest {
     @Test
     fun theLatestSessionStaysTheLatestHoursAfterItsEnd() {
         assertEquals(10 * minute, ReadingSession.start(listOf(20 * minute, 10 * minute)))
+    }
+
+    @Test
+    fun leavingABookOffersTheSessionFromFiveLookups() {
+        assertFalse(ReadingSession.offersReview(10 * minute, lookupsInSession = 4, lookupsThisVisit = 4, offeredStart = null))
+        assertTrue(ReadingSession.offersReview(10 * minute, lookupsInSession = 5, lookupsThisVisit = 5, offeredStart = null))
+        // Earlier lookups of the same session count too, as long as this visit had one.
+        assertTrue(ReadingSession.offersReview(10 * minute, lookupsInSession = 7, lookupsThisVisit = 1, offeredStart = null))
+        assertFalse(ReadingSession.offersReview(10 * minute, lookupsInSession = 7, lookupsThisVisit = 0, offeredStart = null))
+    }
+
+    @Test
+    fun aSessionIsOfferedOnce() {
+        assertFalse(ReadingSession.offersReview(10 * minute, lookupsInSession = 9, lookupsThisVisit = 3, offeredStart = 10 * minute))
+        // A new session can be offered again.
+        assertTrue(ReadingSession.offersReview(90 * minute, lookupsInSession = 9, lookupsThisVisit = 9, offeredStart = 10 * minute))
+        assertFalse(ReadingSession.offersReview(null, lookupsInSession = 0, lookupsThisVisit = 0, offeredStart = null))
     }
 }

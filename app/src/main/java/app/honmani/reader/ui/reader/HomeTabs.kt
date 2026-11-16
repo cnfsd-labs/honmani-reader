@@ -173,6 +173,9 @@ internal fun HomeTabs(
                         reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
                             container.reviewScope.value = it
                         },
+                        libraryBookIds = remember(reviewBooks) { reviewBooks.mapTo(HashSet()) { it.id } },
+                        // Back from the book returns to Words.
+                        onOpenBook = library::open,
                     )
                     HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
                     HomeTab.SETTINGS -> SettingsScreen(

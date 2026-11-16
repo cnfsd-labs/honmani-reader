@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.data.words.ReadingSession
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
@@ -205,6 +206,34 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
     SideEffect { audio.pronunciationRules = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
     LaunchedEffect(atLibrary, current.ttuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
+    // Back from a book after a session of lookups: its words, once per session (ReadingSession.offersReview).
+    val sessionSnackbar = remember { SnackbarHostState() }
+    var bookOpenedAt by remember { mutableStateOf<Long?>(null) }
+    var offeredSession by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(atLibrary) {
+        if (!atLibrary) {
+            bookOpenedAt = System.currentTimeMillis()
+            return@LaunchedEffect
+        }
+        val openedAt = bookOpenedAt ?: return@LaunchedEffect
+        bookOpenedAt = null
+        val words = container.wordRepository
+        val session = words.session.first()
+        val start = session.start
+        val inSession = if (start == null) 0 else words.lookupCount(start).first()
+        val thisVisit = words.lookupCount(openedAt).first()
+        if (!ReadingSession.offersReview(start, inSession, thisVisit, offeredSession)) return@LaunchedEffect
+        offeredSession = start
+        val message = resources.getQuantityString(R.plurals.session_left_book, session.words.size, session.words.size)
+        val result = sessionSnackbar.showSnackbar(
+            message, resources.getString(R.string.session_left_book_action), withDismissAction = true, duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            overlays.openedFromMenu = false
+            overlays.sessionShown = true
+        }
+    }
+    LaunchedEffect(atLibrary) { if (!atLibrary) sessionSnackbar.currentSnackbarData?.dismiss() }
     // A passage the audiobook can't reach by turning pages: the book opens there, like a jump.
     SideEffect {
         audio.audiobook.navigate = { span ->
@@ -678,6 +707,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReaderSettingsScreen(onClose = { overlays.readerSettings = false; if (overlays.openedFromMenu) viewModel.openMenu() })
         }
         SnackbarHost(jumpSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+        // Above the home screen's navigation bar.
+        if (atLibrary) {
+            SnackbarHost(sessionSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
+        }
     }
 }
 

@@ -24,4 +24,15 @@ object ReadingSession {
         }
         return start
     }
+
+    /** Lookups a session needs before leaving a book offers its words. */
+    const val REVIEW_OFFER_LOOKUPS = 5
+
+    /**
+     * Whether leaving a book offers the session's words: the session (starting at [sessionStart])
+     * has [REVIEW_OFFER_LOOKUPS] lookups or more, at least one of them in this visit to the book
+     * ([lookupsThisVisit]), and was not offered before ([offeredStart], the last one offered).
+     */
+    fun offersReview(sessionStart: Long?, lookupsInSession: Int, lookupsThisVisit: Int, offeredStart: Long?): Boolean =
+        sessionStart != null && sessionStart != offeredStart && lookupsThisVisit > 0 && lookupsInSession >= REVIEW_OFFER_LOOKUPS
 }

@@ -556,6 +556,11 @@
     </plurals>
     <string name="session_empty">No words looked up yet. Tap a word while reading and it shows up here. A new session starts after a pause of half an hour.</string>
     <string name="session_open">Words from this session</string>
+    <plurals name="session_left_book">
+        <item quantity="one">%d word this session</item>
+        <item quantity="other">%d words this session</item>
+    </plurals>
+    <string name="session_left_book_action">Review</string>
     <string name="words_export">Export</string>
     <string name="export_csv">CSV file</string>
     <string name="export_csv_detail">All saved words with their lookup history, for a spreadsheet</string>
