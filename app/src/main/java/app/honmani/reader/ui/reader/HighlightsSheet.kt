@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
@@ -70,10 +72,13 @@ fun HighlightsSheet(
                     items(highlights, key = { it.id }) { highlight ->
                         ListItem(
                             leadingContent = {
+                                val colour = highlight.color.coerceIn(0, HIGHLIGHT_SWATCHES.lastIndex)
+                                val colourName = stringResource(HIGHLIGHT_NAMES[colour])
                                 Box(
                                     modifier = Modifier
                                         .size(16.dp)
-                                        .background(HIGHLIGHT_SWATCHES[highlight.color.coerceIn(0, HIGHLIGHT_SWATCHES.lastIndex)], CircleShape),
+                                        .background(HIGHLIGHT_SWATCHES[colour], CircleShape)
+                                        .semantics { contentDescription = colourName },
                                 )
                             },
                             headlineContent = { Text(highlight.text, maxLines = 2, overflow = TextOverflow.Ellipsis) },

@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.reader
 
 import androidx.compose.ui.graphics.Color
+import app.honmani.reader.R
 import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.sync.SectionStarts
 import kotlinx.serialization.json.addJsonArray
@@ -14,6 +15,9 @@ import kotlinx.serialization.json.putJsonArray
  * blue, pink. `assets/honmani/highlights.js` draws them with the same hues.
  */
 val HIGHLIGHT_SWATCHES = listOf(Color(0xFFFFD500), Color(0xFF3CC864), Color(0xFF4696FF), Color(0xFFFF5AA0))
+
+/** The names of [HIGHLIGHT_SWATCHES] for TalkBack, in the same order. */
+val HIGHLIGHT_NAMES = listOf(R.string.highlight_yellow, R.string.highlight_green, R.string.highlight_blue, R.string.highlight_pink)
 
 /**
  * What the page needs to draw a book's highlights (`highlights.js`): where each of its documents

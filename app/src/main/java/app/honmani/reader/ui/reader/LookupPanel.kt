@@ -590,9 +590,7 @@ data class HighlightControls(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HighlightBar(controls: HighlightControls) {
-    val names = listOf(
-        R.string.highlight_yellow, R.string.highlight_green, R.string.highlight_blue, R.string.highlight_pink,
-    ).map { stringResource(it) }
+    val names = HIGHLIGHT_NAMES.map { stringResource(it) }
     // What a new highlight covers: the reader's last choice if offered, else a sentence unless the page found none.
     var extent by remember(controls.extents.keys) {
         mutableStateOf(HighlightExtent.initial(controls.extents.keys, controls.rememberedExtent))
