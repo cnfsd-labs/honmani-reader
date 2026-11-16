@@ -463,7 +463,7 @@ private fun BarChart(title: String, bars: List<DayTotal>, label: @Composable (Da
     val color = MaterialTheme.colorScheme.primary
     val baseline = MaterialTheme.colorScheme.outlineVariant
     val readout = "${label(bar)} · ${duration(bar.seconds)} · ${characters(bar.characters)}"
-    val description = stringResource(R.string.stats_chart_description, title, bars.size)
+    val description = pluralStringResource(R.plurals.stats_chart_description, bars.size, title, bars.size)
     val previousLabel = stringResource(R.string.stats_chart_previous)
     val nextLabel = stringResource(R.string.stats_chart_next)
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
@@ -546,8 +546,9 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                 return@Column
             }
             val readout = "${stringResource(R.string.stats_week_of, week.start.format(dateFormat))} · ${speed(weekSpeed)}"
-            val description = stringResource(
-                R.string.stats_chart_description,
+            val description = pluralStringResource(
+                R.plurals.stats_chart_description,
+                measured.size,
                 stringResource(R.string.stats_speed_trend),
                 measured.size,
             )
