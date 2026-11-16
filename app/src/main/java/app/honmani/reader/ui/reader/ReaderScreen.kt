@@ -46,6 +46,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import app.honmani.reader.data.library.BookText
@@ -125,6 +126,8 @@ fun ReaderScreen(
 private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val panel by viewModel.panel.collectAsStateWithLifecycle()
     var atLibrary by remember { mutableStateOf(true) }
+    // Keeps the tabs' saved state (Words page, scroll positions) while a book is open, so Back returns to it.
+    val homeState = rememberSaveableStateHolder()
     // A picture of the book open in the zoom viewer (a tap on it).
     var picture by remember { mutableStateOf<ByteArray?>(null) }
     val tabState = rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
@@ -550,10 +553,12 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 Surface(modifier = Modifier.fillMaxSize()) {}
             }
         } else if (atLibrary) {
-            HomeTabs(
-                tabState, focusSearchState, addBookOnStartState, overlays, library, container, viewModel.diagnostics,
-                dictionaryUpdates.isNotEmpty(), dueToday, reviewNew, reviewScope, reviewBooks,
-            )
+            homeState.SaveableStateProvider("home") {
+                HomeTabs(
+                    tabState, focusSearchState, addBookOnStartState, overlays, library, container, viewModel.diagnostics,
+                    dictionaryUpdates.isNotEmpty(), dueToday, reviewNew, reviewScope, reviewBooks,
+                )
+            }
         }
         // A backup Android brought back from the previous phone, offered once on a new install.
         AutoBackupOffer()
