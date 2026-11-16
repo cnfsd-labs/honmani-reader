@@ -467,7 +467,15 @@ fun WordsScreen(
                     onOpenWord = { open { searchPanel.showSearched(it.expression, it.reading) } },
                     onHistory = search::setQuery,
                     onForget = search::forget,
-                    onForgetAll = search::forgetAll,
+                    onForgetAll = {
+                        search.forgetAll()
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                resources.getString(R.string.search_history_cleared), undoLabel, duration = SnackbarDuration.Long,
+                            )
+                            if (result == SnackbarResult.ActionPerformed) search.undoForgetAll()
+                        }
+                    },
                 )
             }
         }

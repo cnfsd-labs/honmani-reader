@@ -104,4 +104,24 @@ class SearchViewModelTest {
         assertFalse(viewModel.results.value.failed)
         assertTrue(viewModel.results.value.groups.isEmpty())
     }
+
+    @Test
+    fun undoAfterClearingRecentSearchesRestoresThem() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val history = MutableStateFlow(listOf("a", "b"))
+        var restored: List<String>? = null
+        val viewModel = SearchViewModel(
+            search = { LookupResult(emptyList()) },
+            history = history,
+            clearHistory = { history.value = emptyList() },
+            restoreHistory = { restored = it },
+        )
+        viewModel.forgetAll()
+        assertEquals(emptyList<String>(), history.value)
+        viewModel.undoForgetAll()
+        assertEquals(listOf("a", "b"), restored)
+        restored = null
+        viewModel.undoForgetAll()
+        assertEquals(null, restored)
+    }
 }

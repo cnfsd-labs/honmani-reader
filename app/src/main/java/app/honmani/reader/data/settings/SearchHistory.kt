@@ -22,6 +22,12 @@ class SearchHistory(private val preferences: SharedPreferences) {
 
     fun clear() = save(emptyList())
 
+    /** Brings back [entries] (an Undo of [clear]) after any searched since; the oldest drop out beyond [MAX_ENTRIES]. */
+    fun restore(entries: List<String>) {
+        val current = _entries.value
+        save((current + entries.filter { it !in current }).take(MAX_ENTRIES))
+    }
+
     private fun save(entries: List<String>) {
         _entries.value = entries
         preferences.edit().putString(KEY, JSONArray(entries).toString()).apply()

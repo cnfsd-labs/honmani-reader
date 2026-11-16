@@ -48,6 +48,7 @@ class SearchViewModel(
     private val addToHistory: (String) -> Unit = {},
     private val removeFromHistory: (String) -> Unit = {},
     private val clearHistory: () -> Unit = {},
+    private val restoreHistory: (List<String>) -> Unit = {},
     private val compute: CoroutineDispatcher = Dispatchers.Default,
     /** Whether the gloss index is being built: when it is done, English search finds more. */
     indexBuilding: StateFlow<Boolean> = MutableStateFlow(false),
@@ -94,7 +95,18 @@ class SearchViewModel(
 
     fun forget(query: String) = removeFromHistory(query)
 
-    fun forgetAll() = clearHistory()
+    private var cleared: List<String> = emptyList()
+
+    /** Clears the recent searches; [undoForgetAll] brings them back. */
+    fun forgetAll() {
+        cleared = history.value
+        clearHistory()
+    }
+
+    fun undoForgetAll() {
+        if (cleared.isNotEmpty()) restoreHistory(cleared)
+        cleared = emptyList()
+    }
 
     companion object {
         /** Pause after the last key before searching. */
@@ -113,6 +125,7 @@ class SearchViewModel(
                     addToHistory = history::add,
                     removeFromHistory = history::remove,
                     clearHistory = history::clear,
+                    restoreHistory = history::restore,
                     indexBuilding = container.glossIndex.building,
                 )
             }

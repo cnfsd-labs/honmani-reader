@@ -1015,6 +1015,7 @@
     <string name="radical_description">Radical %1$s, %2$s</string>
     <string name="search_history">Recent searches</string>
     <string name="search_history_clear">Clear</string>
+    <string name="search_history_cleared">Recent searches cleared</string>
     <string name="search_history_remove">Remove %1$s from recent searches</string>
     <string name="search_failed">Search failed. Try again.</string>
     <string name="search_nothing_found">Nothing in the dictionaries for \"%1$s\".</string>

@@ -28,4 +28,20 @@ class SearchHistoryTest {
         history.clear()
         assertEquals(emptyList<String>(), SearchHistory(preferences()).entries.value)
     }
+
+    @Test
+    fun undoingAClearBringsTheListBack_afterAnySearchedSince() {
+        val history = SearchHistory(preferences())
+        history.clear()
+        listOf("c", "b", "a").forEach { history.add(it) }
+        val cleared = history.entries.value
+        history.clear()
+        history.add("new")
+        history.add("b")
+
+        history.restore(cleared)
+
+        assertEquals(listOf("b", "new", "a", "c"), history.entries.value)
+        assertEquals(history.entries.value, SearchHistory(preferences()).entries.value)
+    }
 }
