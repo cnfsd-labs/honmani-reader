@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.lookup.Furigana
@@ -87,6 +90,10 @@ fun FuriganaDialog(
                                 label = { Text(run) },
                                 singleLine = true,
                                 isError = !FuriganaOverride.isReading(readings[field].trim()),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = if (field == readings.lastIndex) ImeAction.Done else ImeAction.Next,
+                                ),
+                                keyboardActions = KeyboardActions(onDone = { result?.let(onSave) }),
                                 modifier = Modifier.widthIn(min = 112.dp, max = 192.dp).semantics { contentDescription = label },
                             )
                         }

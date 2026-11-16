@@ -22,6 +22,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -45,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
@@ -181,6 +184,11 @@ internal fun FolderNameDialog(
 ) {
     var name by remember { mutableStateOf(initial) }
     var problem by remember { mutableStateOf<FolderResult?>(null) }
+    val save = {
+        onSave(name) { result ->
+            if (result is FolderResult.Done) onDismiss() else problem = result
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -193,6 +201,8 @@ internal fun FolderNameDialog(
                 },
                 label = { Text(stringResource(R.string.folder_name_label)) },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
                 isError = problem != null,
                 supportingText = problem?.let { result ->
                     {
@@ -207,11 +217,7 @@ internal fun FolderNameDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    onSave(name) { result ->
-                        if (result is FolderResult.Done) onDismiss() else problem = result
-                    }
-                },
+                onClick = save,
             ) { Text(confirm) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
