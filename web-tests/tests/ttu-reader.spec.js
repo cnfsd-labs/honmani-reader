@@ -435,7 +435,7 @@ test('the top bar\'s menu icon on a phone has a name for screen readers', async 
   // The tap-to-show strip along the top opens the bar.
   await page.mouse.click(180, 10);
 
-  await expect(page.getByRole('button', { name: 'More: jump, settings' })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'More: reader menu, jump, settings' })).toHaveCount(1);
 });
 
 test('Aozora Bunko text files (Shift_JIS, with markup) import as clean text', async ({ page }) => {

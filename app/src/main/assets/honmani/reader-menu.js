@@ -18,6 +18,11 @@
  * ignores the message while the lookup panel is open (the menu is a modal sheet already).
  * honmaniReaderMenu.isMenuSwipe(dx, dy, height) is that decision on its own.
  *
+ * ttu's reader bar gets a "Reader menu" entry next to its Settings entry, in the More dropdown on
+ * a phone and in the row of icons on a wide screen: a tap posts the same { type: 'reader.menu' }
+ * and closes the bar. ttu draws the dropdown only while it is open and the bar again whenever it
+ * shows, so the entry is added again after each change of the page (a MutationObserver).
+ *
  *   honmaniReaderMenu.openContents()
  *     Opens ttu's table of contents, as its button in the reader bar does: the bar is shown (a
  *     tap on the strip at the top of the page), the button clicked, and the bar closed again if
@@ -172,6 +177,79 @@
     button.click();
     return true;
   }
+
+  const SETTINGS_ENTRY = '[title="Go to Reader Settings"]';
+  const MENU_ENTRY_ATTRIBUTE = 'data-honmani-reader-menu';
+  const MENU_ENTRY = `[${MENU_ENTRY_ATTRIBUTE}]`;
+  const MENU_ENTRY_LABEL = 'Reader menu';
+  const SVG = 'http://www.w3.org/2000/svg';
+
+  /** Three lines, in the icon's text colour, sized like ttu's Font Awesome icons. */
+  function menuIcon() {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.height = '1em';
+    svg.style.width = '1em';
+    const path = document.createElementNS(SVG, 'path');
+    path.setAttribute('d', 'M1 2.5h14v2H1zM1 7h14v2H1zM1 11.5h14v2H1z');
+    path.setAttribute('fill', 'currentColor');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  /** Puts a "Reader menu" entry, shaped like ttu's Settings entry, first in each list that has one. */
+  function addMenuEntries() {
+    if (!window.location.pathname.startsWith('/b')) return;
+    for (const settings of document.querySelectorAll(SETTINGS_ENTRY)) {
+      const list = settings.parentElement;
+      if (!list || list.querySelector(`:scope > ${MENU_ENTRY}`)) continue;
+      const entry = document.createElement('div');
+      entry.className = settings.className;
+      entry.setAttribute('role', 'button');
+      entry.setAttribute('tabindex', '0');
+      entry.setAttribute('title', 'Open Reader Menu');
+      entry.setAttribute(MENU_ENTRY_ATTRIBUTE, '');
+      if (settings.querySelector('svg')) {
+        // The row of icons on a wide screen.
+        entry.setAttribute('aria-label', MENU_ENTRY_LABEL);
+        entry.appendChild(menuIcon());
+      } else {
+        entry.textContent = MENU_ENTRY_LABEL;
+      }
+      list.insertBefore(entry, list.firstChild);
+    }
+  }
+
+  let entriesQueued = false;
+  function queueMenuEntries() {
+    if (entriesQueued) return;
+    entriesQueued = true;
+    requestAnimationFrame(() => {
+      entriesQueued = false;
+      addMenuEntries();
+    });
+  }
+
+  function watchHeader() {
+    new MutationObserver(queueMenuEntries).observe(document.documentElement, { childList: true, subtree: true });
+    addMenuEntries();
+  }
+  if (document.documentElement) watchHeader();
+  else document.addEventListener('DOMContentLoaded', watchHeader);
+
+  // Capture phase, so ttu never sees the tap; a click outside closes its dropdown and bar.
+  const openFromEntry = (event) => {
+    const entry = event.target instanceof Element ? event.target.closest(MENU_ENTRY) : null;
+    if (!entry) return;
+    if (event.type === 'keyup' && event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    post({ type: 'reader.menu' });
+  };
+  window.addEventListener('click', openFromEntry, true);
+  window.addEventListener('keyup', openFromEntry, true);
 
   window.honmaniReaderMenu = Object.freeze({ openContents, closeContents, isMenuSwipe });
 })();

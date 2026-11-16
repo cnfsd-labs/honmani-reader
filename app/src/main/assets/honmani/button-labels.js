@@ -20,7 +20,7 @@
   function label() {
     for (const icon of document.querySelectorAll(MENU_ICON)) {
       icon.setAttribute('role', 'button');
-      icon.setAttribute('aria-label', 'More: jump, settings');
+      icon.setAttribute('aria-label', 'More: reader menu, jump, settings');
     }
     for (const [selector, name] of LABELS) {
       for (const button of document.querySelectorAll(`${selector}:not([aria-label])`)) {

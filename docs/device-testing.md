@@ -59,6 +59,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   tapping an open result's word folds it. TalkBack reads one "Show this word" action per folded result.
 - **Reader menu hint**: the first book ever opened shows "Swipe up or tap the bottom edge for the reader menu" once (after the
   audiobook snackbar if both apply); a faint grab bar sits in the strip. Reset: `device.xml` key `reader_menu_hint_shown`.
+- **Reader menu entry**: top bar -> More (portrait) shows "Reader menu" first; landscape shows a three-line icon first in
+  the row. A tap closes the bar and opens the bottom menu, in horizontal and vertical text.
 - **Reader bottom menu**: tap the strip under the text -> Contents, slider, Add bookmark, Bookmarks,
   Highlights, Search in book, Reader appearance and behaviour, Words from this session, Show progress (page reloads),
   Close book. Strip easy to hit with the gesture bar; edge turns still work. Long swipe up (~1/4 screen,
@@ -111,10 +113,10 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   mark). "+ New": grey on never-met words; read once, gone. "Off": none. Dark pages: stronger tints.
   First marks after install/dictionary change take seconds, then fade in within ~1 s; a turned page shows
   them at once.
-- Optional: hide furigana over known words (on reopening; lookup brings it back); tint sentences with
+- Optional: hide furigana over known words (once the settings close; lookup brings it back); tint sentences with
   exactly one unknown word.
 - **Mark words due for review** (on): due-today card -> amber tint (blue if the accent is amber/yellow;
-  WebView draws no underlines in highlights). Off + reopen -> Learning tint; answered -> Learning tint.
+  WebView draws no underlines in highlights). Off -> Learning tint; answered -> Learning tint.
 - **Book sheet** of a graded book: "You know N% of its words; M are new to you": N counts only Known
   (new user 0 %), Learning is neither. Mark Known -> N rises; "Words to learn before reading" lists the
   M, most used first. Difficulty and cover badge unchanged.
