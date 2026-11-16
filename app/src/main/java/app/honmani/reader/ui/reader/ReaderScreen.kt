@@ -1,46 +1,21 @@
 package app.honmani.reader.ui.reader
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.runtime.key
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
 import android.content.Context
-import android.content.ActivityNotFoundException
-import android.content.pm.ApplicationInfo
 import android.os.SystemClock
-import android.provider.Settings
-import android.util.Log
 import android.view.WindowManager
-import app.honmani.reader.data.settings.ReadAloudSettings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import app.honmani.reader.readaloud.AudiobookPhase
-import app.honmani.reader.readaloud.AudiobookProblem
 import androidx.compose.runtime.SideEffect
-import app.honmani.reader.readaloud.LiveVoice
-import app.honmani.reader.readaloud.ReadAloudController
 import app.honmani.reader.readaloud.ReadAloudPhase
 import app.honmani.reader.readaloud.SpokenSentence
-import app.honmani.reader.ui.theme.LocalMotionEnabled
-import app.honmani.reader.ui.theme.motionTween
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.delay
 import android.content.ContextWrapper
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,11 +25,8 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -66,35 +38,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.withFrameNanos
 import app.honmani.reader.data.library.BookText
-import app.honmani.reader.anki.GoogleCloudVoice
-import app.honmani.reader.data.library.BookEntity
-import app.honmani.reader.data.library.BookFormat
-import app.honmani.reader.readaloud.generate.SpeechPlan
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOf
-import app.honmani.reader.data.library.BookmarkEntity
-import app.honmani.reader.data.library.HighlightEntity
-import app.honmani.reader.data.library.PronunciationEntity
 import app.honmani.reader.readaloud.PronunciationRules
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -110,29 +67,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.settings.ReaderSettings
-import app.honmani.reader.data.words.SessionWords
-import app.honmani.reader.ui.HomeNavigationBar
-import app.honmani.reader.ui.HomeNavigationRail
 import app.honmani.reader.ui.review.ReviewScreen
-import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.HomeTab
-import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
 import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.library.AddBookStart
-import app.honmani.reader.ui.library.LibraryScreen
 import app.honmani.reader.ui.library.LibraryViewModel
 import app.honmani.reader.ui.onboarding.OnboardingScreen
-import app.honmani.reader.ui.progress.ProgressTab
 import app.honmani.reader.ui.settings.AutoBackupOffer
 import app.honmani.reader.ui.settings.ReaderSettingsScreen
-import app.honmani.reader.ui.settings.SettingsScreen
 import app.honmani.reader.ui.settings.syncFailureReason
-import app.honmani.reader.ui.words.SessionSheet
-import app.honmani.reader.ui.words.WordsScreen
 import app.honmani.reader.ui.words.openInDictionary
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.emitAll
@@ -177,10 +124,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var atLibrary by remember { mutableStateOf(true) }
     // A picture of the book open in the zoom viewer (a tap on it).
     var picture by remember { mutableStateOf<ByteArray?>(null) }
-    var tab by rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
+    val tabState = rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
+    var tab by tabState
     val context = LocalContext.current
     val resources = LocalResources.current
-    val shareTitle = stringResource(R.string.action_share_diagnostics)
     val anki = rememberAnkiAccess()
     val ankiEnabled = rememberAnkiEnabled()
     val container = remember { (context.applicationContext as HonmaniApplication).container }
@@ -249,7 +196,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
         onboardingChecked = true
     }
-    var addBookOnStart by remember { mutableStateOf<AddBookStart?>(null) }
+    val addBookOnStartState = remember { mutableStateOf<AddBookStart?>(null) }
+    var addBookOnStart by addBookOnStartState
     val overlays = rememberReaderOverlays()
     val current = rememberCurrentBook(container)
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
@@ -326,7 +274,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     // The launcher's "Search" shortcut: Words with its search field focused, out of an open book.
-    var focusSearch by rememberSaveable { mutableStateOf(false) }
+    val focusSearchState = rememberSaveable { mutableStateOf(false) }
+    var focusSearch by focusSearchState
     LaunchedEffect(container) {
         container.searchRequests.received.collect {
             if (!atLibrary) viewModel.closeBook()
@@ -348,7 +297,6 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val dueToday by remember(container) {
         flow { emitAll(container.reviewRepository.observeDueToday(container.reviewSettings.reviewsPerDay)) }
     }.collectAsStateWithLifecycle(emptyList())
-    val reviewDue = dueToday.size
     val reviewNew by remember(container) {
         flow { emitAll(container.reviewRepository.observeNewAvailable(container.reviewSettings.newPerDay)) }
     }.collectAsStateWithLifecycle(0)
@@ -497,61 +445,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             )
             ReaderAudioBars(audio, overlays, readAloudBarShown, audiobookBarShown, readAloudBarHeight) { readAloudBarHeight = it }
             val state = panel
-            // What the lookup panel offers for highlighting: the colours of a new selection (when
-            // selection lookup is on), or of the highlight a tap landed on, with "Remove highlight".
-            val savedMessage = stringResource(R.string.highlight_saved)
-            val removedMessage = stringResource(R.string.highlight_removed)
-            val undoLabel = stringResource(R.string.action_undo)
-            fun highlightControls(tap: TapLookup): HighlightControls? {
-                val existing = tap.highlightId?.let { id -> current.highlights.firstOrNull { it.id == id } }
-                if (existing != null) {
-                    return HighlightControls(
-                        current = existing.color,
-                        onPick = { color, _ -> scope.launch { container.highlightDao.setColor(existing.id, color) } },
-                        onRemove = {
-                            viewModel.dismiss()
-                            scope.launch {
-                                container.highlightDao.delete(existing.id)
-                                jumpSnackbar.currentSnackbarData?.dismiss()
-                                val result = jumpSnackbar.showSnackbar(removedMessage, undoLabel, duration = SnackbarDuration.Long)
-                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.put(existing)
-                            }
-                        },
-                    )
-                }
-                val extents = tap.selected
-                val hash = current.hash
-                val total = current.sectionsTotal
-                if (!tap.bySelection || extents == null || hash == null || total == null || !appSettings.selectionLookup) return null
-                return HighlightControls(
-                    current = null,
-                    extents = extents.available.mapValues { it.value.text },
-                    rememberedExtent = container.highlightSettings.extent.value,
-                    onExtentChosen = { container.highlightSettings.setExtent(it.name) },
-                    onPick = { color, extent ->
-                        val passage = extents[extent]
-                        viewModel.dismiss()
-                        scope.launch {
-                            val same = current.highlights.firstOrNull { it.start == passage.start && it.end == passage.end }
-                            jumpSnackbar.currentSnackbarData?.dismiss()
-                            if (same != null) {
-                                container.highlightDao.setColor(same.id, color)
-                                jumpSnackbar.showSnackbar(savedMessage)
-                            } else {
-                                val saved = container.highlightDao.saveReplacingOverlaps(
-                                    HighlightEntity(
-                                        contentHash = hash, start = passage.start, end = passage.end, color = color,
-                                        text = passage.text, total = total.toLong(), createdAt = System.currentTimeMillis(),
-                                    ),
-                                )
-                                val result = jumpSnackbar.showSnackbar(savedMessage, undoLabel, duration = SnackbarDuration.Long)
-                                if (result == SnackbarResult.ActionPerformed) container.highlightDao.undoSave(saved)
-                            }
-                        }
-                    },
-                    onRemove = null,
-                )
-            }
+            val highlightControls = rememberHighlightControls(current, container, scope, jumpSnackbar, appSettings.selectionLookup, viewModel::dismiss)
             val countedTap by viewModel.countedTap.collectAsStateWithLifecycle()
             if (state != null && !atLibrary) {
                 // The frame after this state was first composed: it has been drawn (for the log).
@@ -629,128 +523,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 Surface(modifier = Modifier.fillMaxSize()) {}
             }
         } else if (atLibrary) {
-            // Opaque, and on top: the tabs take all touches while ttu's list stays loaded below.
-            BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
-            // Tapping the open tab again scrolls the Library to its top and goes to the next page of Words and Progress;
-            // Settings return to their main list below.
-            var libraryTaps by remember { mutableIntStateOf(0) }
-            var wordsTaps by remember { mutableIntStateOf(0) }
-            var progressTaps by remember { mutableIntStateOf(0) }
-            val onSelectTab = { selected: HomeTab ->
-                if (selected == tab) {
-                    when (selected) {
-                        HomeTab.LIBRARY -> libraryTaps++
-                        HomeTab.WORDS -> wordsTaps++
-                        HomeTab.PROGRESS -> progressTaps++
-                        else -> Unit
-                    }
-                }
-                tab = selected
-                // A tab opens at its top level.
-                overlays.dictionariesShown = false
-            }
-            val badges = if (dictionaryUpdates.isNotEmpty()) setOf(HomeTab.SETTINGS) else emptySet()
-            val counts = mapOf(HomeTab.WORDS to reviewDue)
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                // In landscape (wider than tall) the tabs go at the side and the screens get no bottom bar.
-                val atTheSide = maxWidth > maxHeight
-                val motionOn = LocalMotionEnabled.current
-                val firstTab = remember { booleanArrayOf(true) }
-                val bottomBar = @Composable {
-                    if (!atTheSide) HomeNavigationBar(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
-                    // With the tabs at the side: what a screen pins above the bar stays clear of the system's.
-                    else Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
-                }
-                Row(modifier = Modifier.fillMaxSize()) {
-                    if (atTheSide) HomeNavigationRail(selected = tab, onSelect = onSelectTab, badges = badges, counts = counts)
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            // Opaque, so the book's page behind never shows while a tab fades in.
-                            .background(MaterialTheme.colorScheme.background)
-                            // The rail keeps clear of the system bars on its side.
-                            .then(if (atTheSide) Modifier.consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Start)) else Modifier),
-                    ) {
-                        // The tab you switch to fades in over the background (150 ms, from 40 %); the first
-                        // tab shown, and E-ink mode, have no fade. A tab is tappable from its first frame.
-                        key(tab) {
-                            val fade = remember { Animatable(if (motionOn && !firstTab[0]) TAB_FADE_START else 1f) }
-                            val fadeSpec = motionTween<Float>(TAB_FADE_MS)
-                            LaunchedEffect(Unit) {
-                                firstTab[0] = false
-                                fade.animateTo(1f, fadeSpec)
-                            }
-                            // The fade is a background-coloured veil over the tab's content, not an alpha on the
-                            // tab: the bottom bar (inside the screen) stays solid. It stops above the bar.
-                            var barHeight by remember { mutableIntStateOf(0) }
-                            val tabBar = @Composable {
-                                Box(Modifier.onSizeChanged { barHeight = it.height }) { bottomBar() }
-                                DisposableEffect(Unit) { onDispose { barHeight = 0 } }
-                            }
-                            val veil = MaterialTheme.colorScheme.background
-                            Box(Modifier.fillMaxSize()) {
-                        when (tab) {
-                            HomeTab.LIBRARY -> LibraryScreen(
-                                bottomBar = tabBar,
-                                viewModel = library,
-                                addBookOnStart = addBookOnStart,
-                                onAddBookStarted = { addBookOnStart = null },
-                                onShowProgress = { tab = HomeTab.PROGRESS },
-                                scrollToTop = libraryTaps,
-                            )
-                            HomeTab.WORDS -> WordsScreen(
-                                bottomBar = tabBar,
-                                pageCycle = wordsTaps,
-                                focusSearch = focusSearch,
-                                onSearchFocused = { focusSearch = false },
-                                reviewDue = reviewDue,
-                                reviewNew = reviewNew,
-                                dueIds = dueToday.mapTo(HashSet()) { it.id },
-                                onStartReview = { overlays.reviewShown = true },
-                                onShowStats = { tab = HomeTab.PROGRESS },
-                                reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
-                                    container.reviewScope.value = it
-                                },
-                            )
-                            HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
-                            HomeTab.SETTINGS -> SettingsScreen(
-                                bottomBar = tabBar,
-                                showingDictionaries = overlays.dictionariesShown,
-                                onShowDictionaries = { overlays.dictionariesShown = it },
-                                onOpenReaderSettings = {
-                                    overlays.openedFromMenu = false
-                                    overlays.readerSettings = true
-                                },
-                                onOpenSample = {
-                                    // Back from the book is the library, where it now is.
-                                    tab = HomeTab.LIBRARY
-                                    library.addSample(it)
-                                },
-                                onShareDiagnostics = {
-                                    val share = Intent(Intent.ACTION_SEND)
-                                        .setType("text/plain")
-                                        .putExtra(Intent.EXTRA_SUBJECT, "Honmani diagnostics")
-                                        .putExtra(Intent.EXTRA_TEXT, viewModel.diagnostics.report(context))
-                                    context.startActivity(Intent.createChooser(share, shareTitle))
-                                },
-                            )
-                        }
-                                if (fade.value < 1f) {
-                                    Box(
-                                        Modifier.fillMaxSize().drawBehind {
-                                            drawRect(
-                                                veil,
-                                                size = Size(size.width, (size.height - barHeight).coerceAtLeast(0f)),
-                                                alpha = 1f - fade.value,
-                                            )
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            HomeTabs(
+                tabState, focusSearchState, addBookOnStartState, overlays, library, container, viewModel.diagnostics,
+                dictionaryUpdates.isNotEmpty(), dueToday, reviewNew, reviewScope, reviewBooks,
+            )
         }
         // A backup Android brought back from the previous phone, offered once on a new install.
         AutoBackupOffer()
@@ -888,105 +664,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             )
         }
         ReaderAudiobookDialogs(setup, audio, current, overlays, container, scope, jumpSnackbar, backToMenu)
-        overlays.bookmarkDraft?.let { draft ->
-            val added = stringResource(R.string.bookmark_added)
-            BookmarkNameDialog(
-                title = stringResource(R.string.bookmark_dialog_title),
-                initial = draft.name,
-                onSave = { name ->
-                    overlays.bookmarkDraft = null
-                    val hash = current.hash
-                    if (hash != null) {
-                        scope.launch {
-                            container.bookmarkDao.put(
-                                BookmarkEntity(contentHash = hash, name = name, characters = draft.characters, total = draft.total, createdAt = System.currentTimeMillis()),
-                            )
-                            jumpSnackbar.currentSnackbarData?.dismiss()
-                            jumpSnackbar.showSnackbar(added)
-                        }
-                    }
-                },
-                onDismiss = { overlays.bookmarkDraft = null },
-            )
-        }
-        if (overlays.bookmarksShown && !atLibrary) {
-            BookmarksSheet(
-                bookmarks = current.bookmarks,
-                onOpen = { bookmark ->
-                    overlays.bookmarksShown = false
-                    val id = current.ttuId
-                    if (id != null) {
-                        val text = bookText
-                        val spot = text?.aroundPageStart(bookmark.characters.toInt())
-                        jumper.jump(
-                            id, bookmark.characters, bookmark.total, spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
-                            jumpMessage(bookmark.percent), backLabel,
-                        )
-                    }
-                },
-                onRename = { bookmark, name -> scope.launch { container.bookmarkDao.rename(bookmark.id, name) } },
-                onDelete = { bookmark -> scope.launch { container.bookmarkDao.delete(bookmark.id) } },
-                onUndoDelete = { bookmark -> scope.launch { container.bookmarkDao.put(bookmark) } },
-                onDismiss = { overlays.bookmarksShown = false },
-                onBack = backToMenu { overlays.bookmarksShown = false },
-            )
-        }
-        if (overlays.highlightsShown && !atLibrary) {
-            HighlightsSheet(
-                highlights = current.highlights,
-                onOpen = { highlight ->
-                    overlays.highlightsShown = false
-                    val id = current.ttuId
-                    if (id != null) {
-                        val text = bookText
-                        val spot = text?.aroundPageStart(highlight.start.toInt())
-                        jumper.jump(
-                            id, highlight.start, highlight.total, spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
-                            jumpMessage(highlight.percent), backLabel,
-                        )
-                    }
-                },
-                onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
-                onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
-                onDismiss = { overlays.highlightsShown = false },
-                onBack = backToMenu { overlays.highlightsShown = false },
-            )
-        }
-        if (overlays.pronunciationsShown && !atLibrary) {
-            val hash = current.hash
-            val corrected by produceState(emptyList<Pair<String, String>>(), overlays.pronunciationsShown) {
-                value = container.wordRepository.withCorrectedFurigana().mapNotNull { PronunciationRules.fromFurigana(it.expression, it.furigana) }
-            }
-            PronunciationsSheet(
-                items = current.pronunciations,
-                suggestions = corrected.filter { (text, _) -> current.pronunciations.none { it.text == text } },
-                onSave = { text, reading ->
-                    if (hash != null) scope.launch { container.pronunciationDao.put(PronunciationEntity(contentHash = hash, text = text, reading = reading, createdAt = System.currentTimeMillis())) }
-                },
-                onDelete = { item -> scope.launch { container.pronunciationDao.delete(item.id) } },
-                onUndoDelete = { item -> scope.launch { container.pronunciationDao.put(item) } },
-                onDismiss = { overlays.pronunciationsShown = false },
-                onBack = backToMenu { overlays.pronunciationsShown = false },
-            )
-        }
-        val searchedBook = current.ttuId
-        if (overlays.searchShown && searchedBook != null && !atLibrary) {
-            BookSearchScreen(
-                loadText = { container.searchableBook(searchedBook) },
-                onOpenHit = { hit, total ->
-                    overlays.searchShown = false
-                    jumper.jump(
-                        searchedBook, hit.characters.toLong(), total.toLong(), hit.hint, hit.match, null,
-                        resources.getString(R.string.jump_back_message, hit.percent), backLabel,
-                    )
-                },
-                onClose = { overlays.searchShown = false; if (overlays.openedFromMenu) viewModel.openMenu() },
-            )
-        }
-        if (overlays.sessionShown) {
-            val session by container.wordRepository.session.collectAsStateWithLifecycle(SessionWords(null, emptyList()))
-            SessionSheet(session, onDismiss = { overlays.sessionShown = false }, onBack = backToMenu { overlays.sessionShown = false })
-        }
+        ReaderBookSheets(overlays, current, container, scope, jumpSnackbar, jumper, bookText, atLibrary, backToMenu, viewModel::openMenu)
         if (overlays.reviewShown) {
             ReviewScreen(
                 onClose = { overlays.reviewShown = false },
@@ -1069,8 +747,6 @@ internal val FOOTER_HEIGHT = 32.dp
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"
-private const val TAB_FADE_MS = 150
-private const val TAB_FADE_START = 0.4f
 
 
 /** The panel leaves most of the page visible. */
