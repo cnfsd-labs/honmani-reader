@@ -383,7 +383,7 @@ private fun Thumbnail(url: String?, load: suspend (String) -> ImageBitmap?) {
 private fun catalogSyncErrorText(reason: KoSyncException.Reason) = when (reason) {
     KoSyncException.Reason.UNAUTHORIZED -> R.string.catalog_sync_error_unauthorized
     KoSyncException.Reason.SERVER -> R.string.sync_error_server
-    KoSyncException.Reason.HOTSPOT -> R.string.sync_error_hotspot
+    KoSyncException.Reason.HOTSPOT -> R.string.catalog_error_hotspot
     KoSyncException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
     KoSyncException.Reason.USE_HTTPS -> R.string.sync_error_use_https
     else -> R.string.catalog_sync_error_none
@@ -441,7 +441,7 @@ fun CatalogDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.catalog_password)) },
+                    label = { Text(stringResource(R.string.catalog_password_optional)) },
                     placeholder = if (editor.hasPassword) {
                         { Text(stringResource(R.string.catalog_password_kept)) }
                     } else {

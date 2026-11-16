@@ -435,7 +435,7 @@ private fun BooksToday(books: List<Pair<Long, DayTotal>>, titles: Map<Long, Stri
             for ((bookId, total) in books) {
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                     Text(
-                        titles[bookId] ?: "–",
+                        titles[bookId] ?: stringResource(R.string.stats_removed_book),
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

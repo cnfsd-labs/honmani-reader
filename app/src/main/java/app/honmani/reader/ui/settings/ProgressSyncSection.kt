@@ -122,7 +122,7 @@ private fun SignInDialog(onDismiss: () -> Unit, initialServer: String = "", init
                     KoSyncException.Reason.UNAUTHORIZED -> R.string.sync_error_unauthorized
                     KoSyncException.Reason.NETWORK -> R.string.sync_error_network
                     KoSyncException.Reason.SERVER -> R.string.sync_error_server
-                    KoSyncException.Reason.HOTSPOT -> R.string.sync_error_hotspot
+                    KoSyncException.Reason.HOTSPOT -> R.string.catalog_error_hotspot
                     KoSyncException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage
                     KoSyncException.Reason.USE_HTTPS -> R.string.sync_error_use_https
                 }
