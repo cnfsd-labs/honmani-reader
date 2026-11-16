@@ -64,6 +64,9 @@ interface BookDao {
     @Query("UPDATE book SET progress = :progress WHERE ttu_id = :ttuId AND progress != :progress")
     suspend fun setProgressByTtuId(ttuId: Long, progress: Float)
 
+    @Query("UPDATE book SET progress = :progress WHERE id = :id")
+    suspend fun setProgress(id: Long, progress: Float)
+
     /** Sets the progress of every book in [progress] (ttu id to 0..1) in one transaction: observers read once. */
     @Transaction
     suspend fun setProgressByTtuIds(progress: Map<Long, Float>) {

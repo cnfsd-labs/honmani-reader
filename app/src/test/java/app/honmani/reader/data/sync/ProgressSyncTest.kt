@@ -547,6 +547,56 @@ class ProgressSyncTest {
         assertEquals(5L, status.state.value.failure!!.ttuId)
     }
 
+    @Test
+    fun onAutoImport_theLibraryShowsTheProgress_andTheFirstOpenTakesThePosition() = runBlocking {
+        val id = database.bookDao().insert(
+            BookEntity(contentHash = "n", title = "犬", format = BookFormat.EPUB, fileName = "h.epub", addedAt = 0),
+        )
+        val imported = database.bookDao().find(id)!!
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+
+        sync.progressOnImport(imported)
+
+        assertEquals(18f / 31, database.bookDao().find(id)!!.progress, 1e-6f)
+        assertNull(database.bookDao().find(id)!!.finishedAt)
+        assertNull(written)
+        // Opened for the first time: ttu has no bookmark of its own, so the position is taken.
+        database.bookDao().setTtuBook(id, 9, "犬")
+        val pulled = sync.pull(database.bookDao().find(id)!!, 9, bookmark = { null to 0L }, setBookmark = { c, p -> written = c to p })
+        assertEquals(PulledPosition(58, "Kindle"), pulled)
+        assertEquals(18L, written!!.first)
+        assertEquals(18f / 31, database.bookDao().find(id)!!.progress, 1e-6f)
+    }
+
+    @Test
+    fun onAutoImport_aPositionAtTheEndMarksTheBookFinished_andErrorsAreRecorded() = runBlocking {
+        val id = database.bookDao().insert(
+            BookEntity(contentHash = "n", title = "犬", format = BookFormat.EPUB, fileName = "h.epub", addedAt = 0),
+        )
+        server.down = true
+        sync.progressOnImport(database.bookDao().find(id)!!)
+        assertNotNull(status.state.value.failure)
+        assertEquals(0f, database.bookDao().find(id)!!.progress)
+
+        server.down = false
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.998, "Kindle", "K1", timestamp = 2_000)
+        sync.progressOnImport(database.bookDao().find(id)!!)
+        assertEquals(clock, database.bookDao().find(id)!!.finishedAt)
+    }
+
+    @Test
+    fun onAutoImport_thisPhonesOwnPosition_orSignedOut_changesNothing() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.998, "Honmani (Test)", settings.deviceId, timestamp = 2_000)
+        sync.progressOnImport(book.copy(ttuId = null))
+        settings.signOut()
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.5, "Kindle", "K1", timestamp = 3_000)
+        sync.progressOnImport(book.copy(ttuId = null))
+
+        val row = database.bookDao().find(book.id)!!
+        assertEquals(0f, row.progress)
+        assertNull(row.finishedAt)
+    }
+
     private object PlainCipher : CredentialCipher {
         override fun encrypt(plain: String) = plain
 

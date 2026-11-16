@@ -1,6 +1,7 @@
 package app.honmani.reader.data.opds
 
 import app.honmani.reader.data.library.BookDao
+import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.RemovedBookEntity
@@ -62,6 +63,8 @@ class OpdsAutoImport(
     /** Whether a run that nobody asked for may download now (false on mobile data, by default). */
     private val networkAllowed: () -> Boolean = { true },
     private val log: (String) -> Unit = {},
+    /** Shows a new book's progress from progress sync, once (it never throws for a failed sync). */
+    private val syncProgress: suspend (BookEntity) -> Unit = {},
 ) {
     private val _status = MutableStateFlow<AutoImportStatus?>(null)
     val status: StateFlow<AutoImportStatus?> = _status.asStateFlow()
@@ -244,7 +247,7 @@ class OpdsAutoImport(
             }
             if (result is BookImporter.Result.Added) {
                 // Handed to the reader when first opened; nothing here can make the library drop it.
-                importer.restoreFor(result.book)
+                syncProgress(importer.restoreFor(result.book))
                 return true
             }
             // A copy of a book already in the library, or a file the library can't read: don't

@@ -940,6 +940,9 @@ private class FakeBookDao : BookDao {
     override suspend fun setProgressByTtuId(ttuId: Long, progress: Float) =
         change({ it.ttuId == ttuId }) { it.copy(progress = progress) }
 
+    override suspend fun setProgress(id: Long, progress: Float) =
+        change({ it.id == id }) { it.copy(progress = progress) }
+
     override suspend fun setCharactersByTtuId(ttuId: Long, characters: Long) =
         change({ it.ttuId == ttuId }) { it.copy(characters = characters) }
 

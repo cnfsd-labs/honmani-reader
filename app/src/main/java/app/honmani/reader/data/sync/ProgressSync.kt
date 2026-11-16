@@ -194,8 +194,20 @@ class ProgressSync(
         return pulled
     }
 
+    /**
+     * Once, when [book] was imported from a book server in the background, before ttu holds it:
+     * the library shows the progress another device saved for the same file, and one at the end
+     * marks the book finished. Nothing goes to ttu: when the book first opens, [pull] takes the
+     * position (ttu has none of its own then). Failures are only logged and recorded.
+     */
+    suspend fun progressOnImport(book: BookEntity) {
+        val found = lookup(book, null) { null to 0L } as? Found.Ahead ?: return
+        books.setProgress(book.id, (found.characters.toDouble() / found.document.total).toFloat())
+        if (found.percentage >= FINISHED_PERCENTAGE) books.setFinished(book.id, now())
+    }
+
     /** The server's position for [book], or null if sync is off, the book isn't an EPUB, or it failed or took too long. */
-    private suspend fun lookup(book: BookEntity, ttuId: Long, bookmark: suspend () -> Pair<Long?, Long>): Found? {
+    private suspend fun lookup(book: BookEntity, ttuId: Long?, bookmark: suspend () -> Pair<Long?, Long>): Found? {
         val account = settings.account.value ?: return null
         if (book.format != BookFormat.EPUB) return null
         // The request blocks in HttpURLConnection, which a timeout cannot interrupt: it runs on
@@ -215,14 +227,14 @@ class ProgressSync(
     private suspend fun find(
         account: KoSyncAccount,
         book: BookEntity,
-        ttuId: Long,
+        ttuId: Long?,
         bookmark: suspend () -> Pair<Long?, Long>,
     ): Found {
         val document = document(book) ?: return Found.None
         val remote = client.progress(account, document.id)
         status?.succeeded()
         val (local, savedAt) = bookmark()
-        local?.let { synchronized(synced) { synced[ttuId] = it } }
+        if (ttuId != null) local?.let { synchronized(synced) { synced[ttuId] = it } }
         if (remote == null || remote.deviceId == settings.deviceId) return Found.None
         val characters = document.characters(remote)
         val remoteAt = remote.timestamp?.let { it * 1000 }

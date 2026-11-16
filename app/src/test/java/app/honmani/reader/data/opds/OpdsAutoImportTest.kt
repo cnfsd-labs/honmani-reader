@@ -42,6 +42,9 @@ class OpdsAutoImportTest {
     private var pages = listOf<List<String>>()
     private val requests = mutableListOf<String>()
 
+    /** Source ids of the books whose sync progress was asked for. */
+    private val synced = mutableListOf<String>()
+
     /** Runs on the server thread when a book is asked for, before it is sent. */
     private var onDownload: (name: String) -> Unit = {}
 
@@ -66,6 +69,7 @@ class OpdsAutoImportTest {
             downloadsDir = File(folder.root, "downloads"),
             scope = CoroutineScope(Job()),
             networkAllowed = { networkAllowed },
+            syncProgress = { synced += it.sourceId!! },
         )
         server = HeaderServer { path, out ->
             synchronized(requests) { requests += path }
@@ -125,6 +129,17 @@ class OpdsAutoImportTest {
         assertTrue(OpdsRepository.offersOlderBooks(catalog))
         assertTrue(repository.catalogs.first().single().offerOlderBooks)
         assertNull(autoImport.status.value)
+    }
+
+    @Test
+    fun eachImportedBookAsksForItsSyncProgressOnce() = runBlocking {
+        pages = listOf(listOf(book("a", "jpn"), book("b", "eng")))
+        addCatalog()
+
+        autoImport.run()
+        autoImport.run()
+
+        assertEquals(listOf("urn:a"), synced)
     }
 
     @Test

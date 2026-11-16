@@ -436,6 +436,16 @@ class AppContainer(context: Context) {
             scope = applicationScope,
             log = { Log.i("Honmani.opds", it) },
             networkAllowed = { downloadSettings.overMobileData.value || !networkWatch.isMetered() },
+            // A bonus: whatever goes wrong, the book stays imported.
+            syncProgress = { book ->
+                try {
+                    progressSync.progressOnImport(book)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w("Honmani.sync", "No sync progress for an imported book", e)
+                }
+            },
         )
     }
 
