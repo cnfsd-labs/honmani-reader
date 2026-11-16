@@ -171,20 +171,6 @@ fun ReaderScreen(
     }
 }
 
-/** Android's text-to-speech settings, where a Japanese voice is installed; the main settings if there are none. */
-private fun openVoiceSettings(context: Context) {
-    val tts = Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        context.startActivity(tts)
-    } catch (_: ActivityNotFoundException) {
-        try {
-            context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        } catch (_: ActivityNotFoundException) {
-            // No settings app: nothing more to offer.
-        }
-    }
-}
-
 @Composable
 private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val panel by viewModel.panel.collectAsStateWithLifecycle()
@@ -204,76 +190,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val showPreviousSentence by container.appearanceSettings.showPreviousSentence.collectAsStateWithLifecycle()
     val sentenceEnds by container.ankiSettings.sentenceEnds.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val readAloudMessages = remember { Channel<String>(Channel.UNLIMITED) }
-    val audiobookMessages = remember { Channel<String>(Channel.UNLIMITED) }
-    val pageMessages = remember { merge(readAloudMessages.receiveAsFlow(), audiobookMessages.receiveAsFlow()) }
-    // The open book's "read this as that" list, set below once the book is known.
-    val pronunciationRules = remember { arrayOf(PronunciationRules.EMPTY) }
-    val readAloud = remember {
-        // The spoken text is only logged by a debug build.
-        val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        ReadAloudController(
-            voice = LiveVoice(context),
-            toPage = { readAloudMessages.trySend(it) },
-            initialRate = container.readAloudSettings.rate.value,
-            saveRate = container.readAloudSettings::setRate,
-            onSpoken = tracker::onActivity,
-            log = { if (debuggable) Log.i("ReadAloud", it) },
-            pronunciations = { pronunciationRules[0] },
-        )
-    }
-    val readAloudState by readAloud.state.collectAsStateWithLifecycle()
-    // The audiobook: the same bar and the same marks on the page, but the book follows a recording.
-    val audiobook = remember {
-        val debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-        AudiobookSession(
-            context = context,
-            container = container,
-            scope = scope,
-            toPage = { audiobookMessages.trySend(it) },
-            onPlaying = tracker::onActivity,
-            log = { if (debuggable) Log.i("Audiobook", it) },
-        )
-    }
-    val audiobookState by audiobook.controller.state.collectAsStateWithLifecycle()
-    // The engine, the focus and the queue go with the reader.
-    DisposableEffect(readAloud) { onDispose { readAloud.close() } }
-    DisposableEffect(audiobook) { onDispose { audiobook.close() } }
-    // About five times a second while the audio plays, the page is told which subtitle is heard.
-    LaunchedEffect(audiobookState.running) {
-        while (audiobookState.running) {
-            audiobook.controller.tick()
-            delay(AUDIOBOOK_TICK_MS)
-        }
-    }
-    // The screen stays on while the book is read aloud, and not a moment longer.
-    val rootView = LocalView.current
-    // The window flag, not View.keepScreenOn: that one is only passed on at the next frame, which
-    // a stopped or still screen never draws.
-    val keepScreenOn = readAloudState.running || audiobookState.running
-    // Time with sound playing (the voice speaking or the recording running) is also counted as listening;
-    // a pause, the end, a problem or leaving the book (both close) all clear it.
-    val audioPlaying = readAloudState.phase == ReadAloudPhase.SPEAKING || audiobookState.phase == AudiobookPhase.PLAYING
-    DisposableEffect(audioPlaying) {
-        tracker.setAudioPlaying(audioPlaying)
-        onDispose { tracker.setAudioPlaying(false) }
-    }
-    // Interface sounds keep quiet over speech.
-    DisposableEffect(keepScreenOn) {
-        container.uiSounds.readerSpeaking = keepScreenOn
-        onDispose { container.uiSounds.readerSpeaking = false }
-    }
-    DisposableEffect(rootView, keepScreenOn) {
-        val window = rootView.context.findActivity()?.window
-        if (keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
-    }
+    val audio = rememberReaderAudio(container, tracker, scope)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                readAloud.appStopped()
-                audiobook.controller.appStopped()
+                audio.readAloud.appStopped()
+                audio.audiobook.controller.appStopped()
                 tracker.setAudioPlaying(false)
                 // The state collection is stopped too, so the flag is cleared here, not by the effect.
                 context.findActivity()?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -303,13 +226,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         tracker.setLookupOpen(panel != null)
         // The panel's word audio never talks over the reader's voice: it ends before that goes on.
         if (panel == null) container.wordAudio.stop()
-        readAloud.panelChanged(panel != null)
-        audiobook.controller.panelChanged(panel != null)
+        audio.readAloud.panelChanged(panel != null)
+        audio.audiobook.controller.panelChanged(panel != null)
     }
     LaunchedEffect(atLibrary) {
         if (atLibrary) {
-            readAloud.close()
-            audiobook.close()
+            audio.readAloud.close()
+            audio.audiobook.close()
         }
         tracker.setVisible(!atLibrary)
         // Back at the library: the position reached goes to the sync server now.
@@ -332,11 +255,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
     val jumpSnackbar = remember { SnackbarHostState() }
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
-    SideEffect { pronunciationRules[0] = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
+    SideEffect { audio.pronunciationRules = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
     LaunchedEffect(atLibrary, current.ttuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
     // A passage the audiobook can't reach by turning pages: the book opens there, like a jump.
     SideEffect {
-        audiobook.navigate = { span ->
+        audio.audiobook.navigate = { span ->
             val id = current.ttuId
             if (id != null) {
                 scope.launch {
@@ -352,43 +275,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             }
         }
     }
-    // The audiobook's files, chosen with Android's own picker: the audio first, then its subtitles.
-    var pickedAudio by rememberSaveable { mutableStateOf<Uri?>(null) }
-    var pairingVersion by remember { mutableIntStateOf(0) }
-    val audiobookPaired = remember(current.hash, pairingVersion) { current.hash?.let { container.audiobookStore.pairing(it) } != null }
-    val subtitlesUnreadable = stringResource(R.string.audiobook_subtitles_unreadable)
-    val audiobookRemoved = stringResource(R.string.audiobook_removed)
-    // The audiobook made with a Google voice: the confirmation, and what the manage step shows of it.
-    val generatedModel = remember(current.book?.contentHash) {
-        current.book?.let { book ->
-            GeneratedAudiobookModel(
-                bookHash = book.contentHash,
-                epub = book.format == BookFormat.EPUB,
-                key = container.ankiSettings::googleKey,
-                loadVoices = { GoogleCloudVoice.voices(it) },
-                readPlan = { SpeechPlan.read(container.bookImporter.bookFile(book), pronunciationRules[0]) },
-                maker = container.audiobookMaker,
-                scheduler = container.audiobookScheduler,
-                freeBytes = { context.filesDir.usableSpace },
-                savedVoice = { container.ankiSettings.googleVoice.value },
-                scope = scope,
-            )
-        }
-    }
-    val makeState by remember(generatedModel) { generatedModel?.state ?: MutableStateFlow(MakeState()) }.collectAsStateWithLifecycle()
-    val generated by remember(current.hash, pairingVersion) {
-        current.hash?.let { generatedManage(container.audiobookMaker, container.audiobookScheduler, it) } ?: flowOf(null)
-    }.collectAsStateWithLifecycle(null)
-    // Plays the open book's audiobook from where it was left (the dialog's Play, the snackbar's, "Continue listening").
-    val playAudiobook = { id: Long ->
-        readAloud.close()
-        val phase = audiobook.controller.state.value.phase
-        if (phase == AudiobookPhase.PAUSED || phase == AudiobookPhase.ENDED) {
-            audiobook.controller.play()
-        } else if (phase != AudiobookPhase.PLAYING) {
-            audiobook.start(id)
-        }
-    }
+    val setup = rememberAudiobookSetup(container, current, audio, overlays, scope, jumpSnackbar)
     // Once per opening of a book: it counts as reading; with an audiobook the reader is told, or
     // (after "Continue listening" in the library) it plays. Never plays on its own otherwise.
     var announcedBook by rememberSaveable { mutableStateOf<String?>(null) }
@@ -407,11 +294,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         container.sessionModes.opened(hash)
         if (container.audiobookStore.pairing(hash) != null) {
             if (container.sessionModes.takeAutoplay(hash, SystemClock.elapsedRealtime())) {
-                playAudiobook(id)
+                audio.play(id)
             } else {
                 jumpSnackbar.currentSnackbarData?.dismiss()
                 val result = jumpSnackbar.showSnackbar(audiobookAvailable, audiobookAvailablePlay, withDismissAction = true, duration = SnackbarDuration.Long)
-                if (result == SnackbarResult.ActionPerformed) playAudiobook(id)
+                if (result == SnackbarResult.ActionPerformed) audio.play(id)
             }
         }
         // The one-time menu hint queues behind the audiobook snackbar (showSnackbar waits its turn).
@@ -420,53 +307,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     // The first playback of a session makes the book "listened to" for the library's Continue bubble.
-    LaunchedEffect(audiobookState.phase) {
-        if (audiobookState.phase == AudiobookPhase.PLAYING) audiobook.hash?.let(container.sessionModes::played)
-    }
-    val audiobookStarted = stringResource(R.string.audiobook_started)
-    val generatedDeleted = stringResource(R.string.audiobook_generated_deleted)
-    // The audiobook's audio and subtitles saved into a folder the reader picks.
-    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
-        val hash = current.hash
-        val title = current.book?.title.orEmpty()
-        if (tree != null && hash != null) {
-            scope.launch {
-                val result = container.audiobookExporter.export(hash, title, tree)
-                jumpSnackbar.currentSnackbarData?.dismiss()
-                jumpSnackbar.showSnackbar(result.message(context, title))
-            }
-        }
-    }
-    val audioPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            audiobook.keepAccess(uri)
-            pickedAudio = uri
-            overlays.audiobookStep = AudiobookStep.SUBTITLES
-        }
-    }
-    val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val audio = pickedAudio
-        val hash = current.hash
-        val id = current.ttuId
-        pickedAudio = null
-        if (audio != null && hash != null) {
-            if (uri == null || id == null) {
-                audiobook.discard(hash, audio)
-            } else {
-                scope.launch {
-                    audiobook.close()
-                    readAloud.close()
-                    if (audiobook.pair(hash, audio, uri)) {
-                        pairingVersion++
-                        audiobook.start(id)
-                    } else {
-                        audiobook.discard(hash, audio)
-                        jumpSnackbar.currentSnackbarData?.dismiss()
-                        jumpSnackbar.showSnackbar(subtitlesUnreadable)
-                    }
-                }
-            }
-        }
+    LaunchedEffect(audio.audiobookState.phase) {
+        if (audio.audiobookState.phase == AudiobookPhase.PLAYING) audio.audiobook.hash?.let(container.sessionModes::played)
     }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
     // Books opened with Honmani from other apps: added in the library, a single one opened.
@@ -558,11 +400,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
 
     // The room the read-aloud bar takes: the book lays itself out above it, since a bar over the
     // page would cut the end off every column of vertical text.
-    val readAloudBarShown = readAloudState.phase != ReadAloudPhase.OFF && !atLibrary
-    val audiobookBarShown = audiobookState.phase != AudiobookPhase.OFF && !atLibrary
+    val readAloudBarShown = audio.readAloudState.phase != ReadAloudPhase.OFF && !atLibrary
+    val audiobookBarShown = audio.audiobookState.phase != AudiobookPhase.OFF && !atLibrary
     var readAloudBarHeight by remember { mutableStateOf(0.dp) }
     val bookBottom = if (readAloudBarShown || audiobookBarShown) readAloudBarHeight else 0.dp
-    val density = LocalDensity.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize().then(frame?.let { Modifier.background(it) } ?: Modifier)) {
@@ -625,23 +466,23 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                 },
                 highlightsKey = current.highlights,
-                readAloudMessages = pageMessages,
+                readAloudMessages = audio.pageMessages,
                 onReadAloud = { message ->
                     when (message) {
                         is BridgeMessage.ReadAloudSentences ->
-                            readAloud.onSentences(message.gen, message.items.map { SpokenSentence(it.i, it.text) }, message.end)
-                        is BridgeMessage.ReadAloudLost -> readAloud.onLost(message.gen)
-                        is BridgeMessage.AudiobookLost -> audiobook.controller.onLost(message.gen)
+                            audio.readAloud.onSentences(message.gen, message.items.map { SpokenSentence(it.i, it.text) }, message.end)
+                        is BridgeMessage.ReadAloudLost -> audio.readAloud.onLost(message.gen)
+                        is BridgeMessage.AudiobookLost -> audio.audiobook.controller.onLost(message.gen)
                         is BridgeMessage.FollowState -> {
-                            readAloud.viewDetached(message.detached)
-                            audiobook.controller.viewDetached(message.detached)
+                            audio.readAloud.viewDetached(message.detached)
+                            audio.audiobook.controller.viewDetached(message.detached)
                         }
                         else -> Unit
                     }
                 },
                 onBookShown = {
-                    readAloud.pageReloaded()
-                    audiobook.controller.pageReloaded()
+                    audio.readAloud.pageReloaded()
+                    audio.audiobook.controller.pageReloaded()
                 },
                 volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown, panelSpeaking),
                 hideSelectionToolbar = appSettings.selectionLookup,
@@ -654,82 +495,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     // a moment: its size doesn't follow them, so they never reflow the page.
                     .windowInsetsPadding(if (appSettings.immersive && !atLibrary) bookInsets else WindowInsets.safeDrawing),
             )
-            // Back ends read aloud first (composed after the WebView, so it comes before its back);
-            // the lookup panel's own handler is composed later still and closes the panel before this.
-            BackHandler(enabled = readAloudBarShown) { readAloud.close() }
-            if (readAloudBarShown) {
-                val problem = readAloudState.problem
-                val ended = readAloudState.phase == ReadAloudPhase.ENDED
-                ReadAloudBar(
-                    playing = readAloudState.running,
-                    rate = readAloudState.rate,
-                    onPlayPause = readAloud::togglePlay,
-                    onPrevious = readAloud::previous,
-                    onNext = readAloud::next,
-                    onSpeed = { readAloud.setRate(ReadAloudSettings.nextRate(readAloudState.rate)) },
-                    onClose = readAloud::close,
-                    message = when {
-                        readAloudState.phase == ReadAloudPhase.PROBLEM && problem != null ->
-                            stringResource(R.string.read_aloud_problem, stringResource(problem.label()))
-                        ended -> stringResource(R.string.read_aloud_ended)
-                        else -> null
-                    },
-                    messageAction = if (readAloudState.phase == ReadAloudPhase.PROBLEM) stringResource(R.string.read_aloud_voice_settings) else null,
-                    onMessageAction = { openVoiceSettings(context) },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
-                )
-            }
-            // The audiobook's bar goes the same way: Back closes it, the book stays.
-            BackHandler(enabled = audiobookBarShown) { audiobook.close() }
-            if (audiobookBarShown) {
-                val problem = audiobookState.problem
-                val audiobookPhase = audiobookState.phase
-                val needsFiles = audiobookPhase == AudiobookPhase.PROBLEM && problem != AudiobookProblem.BOOK_UNSUPPORTED
-                ReadAloudBar(
-                    playing = audiobookState.running,
-                    rate = audiobookState.rate,
-                    onPlayPause = audiobook.controller::togglePlay,
-                    onPrevious = audiobook.controller::previous,
-                    onNext = audiobook.controller::next,
-                    onSpeed = { audiobook.controller.setRate(ReadAloudSettings.nextRate(audiobookState.rate)) },
-                    onClose = audiobook::close,
-                    message = when {
-                        audiobookPhase == AudiobookPhase.PROBLEM && problem != null ->
-                            stringResource(R.string.audiobook_problem, stringResource(problem.label()))
-                        audiobookPhase == AudiobookPhase.LOADING -> stringResource(R.string.audiobook_loading)
-                        audiobookPhase == AudiobookPhase.ENDED -> stringResource(R.string.audiobook_ended)
-                        audiobookState.doubtful -> stringResource(R.string.audiobook_doubtful, audiobookState.matched, audiobookState.total)
-                        else -> null
-                    },
-                    messageAction = if (needsFiles) stringResource(R.string.audiobook_change) else null,
-                    onMessageAction = {
-                        overlays.openedFromMenu = false
-                        overlays.audiobookStep = AudiobookStep.INTRO
-                    },
-                    previousDescription = stringResource(R.string.audiobook_previous),
-                    nextDescription = stringResource(R.string.audiobook_next),
-                    closeDescription = stringResource(R.string.audiobook_close),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .onSizeChanged { readAloudBarHeight = with(density) { it.height.toDp() } },
-                )
-            }
-            // Over the bar, not in it: the book keeps its size when the button comes and goes. Above
-            // ttu's 32 px footer (page counter) too, which sits just over the bar.
-            val following = readAloudBarShown && readAloudState.detached || audiobookBarShown && audiobookState.detached
-            if (following) {
-                FollowButton(
-                    onClick = {
-                        readAloud.follow()
-                        audiobook.controller.follow()
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 12.dp, bottom = readAloudBarHeight + FOOTER_HEIGHT + 8.dp),
-                )
-            }
+            ReaderAudioBars(audio, overlays, readAloudBarShown, audiobookBarShown, readAloudBarHeight) { readAloudBarHeight = it }
             val state = panel
             // What the lookup panel offers for highlighting: the colours of a new selection (when
             // selection lookup is on), or of the highlight a tap landed on, with "Remove highlight".
@@ -1085,8 +851,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onReadAloud = {
                     viewModel.closeMenu()
                     // One voice at a time: the recording stops when the phone starts reading.
-                    audiobook.close()
-                    readAloud.start()
+                    audio.audiobook.close()
+                    audio.readAloud.start()
                 },
                 pronunciationCount = current.pronunciations.size,
                 onPronunciations = {
@@ -1094,11 +860,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     overlays.openedFromMenu = true
                     overlays.pronunciationsShown = true
                 },
-                audiobookPaired = audiobookPaired || generated != null,
+                audiobookPaired = setup.paired || setup.generated != null,
                 onAudiobook = {
                     viewModel.closeMenu()
                     overlays.openedFromMenu = true
-                    overlays.audiobookStep = if (audiobookPaired || generated != null) AudiobookStep.MANAGE else AudiobookStep.INTRO
+                    overlays.audiobookStep = if (setup.paired || setup.generated != null) AudiobookStep.MANAGE else AudiobookStep.INTRO
                 },
                 onSettings = {
                     viewModel.closeMenu()
@@ -1121,93 +887,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDismiss = viewModel::closeMenu,
             )
         }
-        overlays.audiobookStep?.let { step ->
-            AudiobookDialog(
-                step = step,
-                onChooseAudio = {
-                    overlays.audiobookStep = null
-                    audioPicker.launch(arrayOf("audio/*", "application/ogg"))
-                },
-                onChooseSubtitles = {
-                    overlays.audiobookStep = null
-                    subtitlePicker.launch(arrayOf("*/*"))
-                },
-                onPlay = {
-                    overlays.audiobookStep = null
-                    val id = current.ttuId
-                    if (id != null) playAudiobook(id)
-                },
-                onChange = { overlays.audiobookStep = AudiobookStep.INTRO },
-                onExport = {
-                    overlays.audiobookStep = null
-                    exportPicker.launch(null)
-                },
-                onRemove = {
-                    overlays.audiobookStep = null
-                    val hash = current.hash
-                    if (hash != null) {
-                        scope.launch {
-                            audiobook.close()
-                            audiobook.remove(hash)
-                            pairingVersion++
-                            jumpSnackbar.currentSnackbarData?.dismiss()
-                            jumpSnackbar.showSnackbar(audiobookRemoved)
-                        }
-                    }
-                },
-                onDismiss = { overlays.audiobookStep = null },
-                onBack = backToMenu { overlays.audiobookStep = null },
-                makeBlock = generatedModel?.block(),
-                onMake = {
-                    overlays.audiobookStep = null
-                    generatedModel?.open()
-                    overlays.makeShown = true
-                },
-                generated = generated,
-                generatedActions = current.hash?.let { hash ->
-                    GeneratedActions(
-                        onCancel = { container.audiobookScheduler.cancel(hash) },
-                        onContinue = { capText ->
-                            scope.launch {
-                                val plan = withContext(Dispatchers.IO) { container.audiobookMaker.files(hash).readPlan() }
-                                if (plan != null) {
-                                    val cap = capText?.let(MakeState::parseDecimal) ?: plan.capUsd
-                                    container.audiobookScheduler.start(hash, plan.voice, cap, plan.mobileData)
-                                }
-                            }
-                        },
-                        onDelete = {
-                            overlays.audiobookStep = null
-                            scope.launch {
-                                container.audiobookScheduler.cancel(hash)
-                                audiobook.close()
-                                withContext(Dispatchers.IO) { container.audiobookMaker.delete(hash) }
-                                pairingVersion++
-                                jumpSnackbar.currentSnackbarData?.dismiss()
-                                jumpSnackbar.showSnackbar(generatedDeleted)
-                            }
-                        },
-                    )
-                },
-            )
-        }
-        val make = generatedModel
-        if (overlays.makeShown && make != null) {
-            AudiobookMakeDialog(
-                title = current.book?.title.orEmpty(),
-                state = makeState,
-                model = make,
-                readerSpeaking = audioPlaying,
-                onStarted = {
-                    overlays.makeShown = false
-                    scope.launch {
-                        jumpSnackbar.currentSnackbarData?.dismiss()
-                        jumpSnackbar.showSnackbar(audiobookStarted)
-                    }
-                },
-                onDismiss = { overlays.makeShown = false },
-            )
-        }
+        ReaderAudiobookDialogs(setup, audio, current, overlays, container, scope, jumpSnackbar, backToMenu)
         overlays.bookmarkDraft?.let { draft ->
             val added = stringResource(R.string.bookmark_added)
             BookmarkNameDialog(
@@ -1374,7 +1054,7 @@ private fun ImmersiveBars(hidden: Boolean) {
     }
 }
 
-private tailrec fun Context.findActivity(): Activity? = when (this) {
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
@@ -1385,14 +1065,12 @@ private val bookInsets: WindowInsets
     @Composable get() = WindowInsets.displayCutout.union(WindowInsets.ime)
 
 /** Height of ttu's page footer, in dp (CSS px), above the read-aloud bar. */
-private val FOOTER_HEIGHT = 32.dp
+internal val FOOTER_HEIGHT = 32.dp
 
 /** ttu's book list, which the tabs cover. */
 private const val LIBRARY_PATH = "/manage"
 private const val TAB_FADE_MS = 150
 private const val TAB_FADE_START = 0.4f
 
-/** How often the audiobook checks where the audio is, in milliseconds. */
-private const val AUDIOBOOK_TICK_MS = 200L
 
 /** The panel leaves most of the page visible. */
