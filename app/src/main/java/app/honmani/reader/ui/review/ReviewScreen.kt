@@ -113,6 +113,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -145,6 +146,8 @@ fun ReviewScreen(
     onClose: () -> Unit,
     /** Opens the book (by its library id) a card's sentence came from. */
     onOpenBook: (Long) -> Unit,
+    /** The book read last, offered when the session is done; null: only Close. */
+    continueBook: ReadNext.Continue? = null,
     viewModel: ReviewViewModel = viewModel(factory = ReviewViewModel.Factory),
     // Its own lookup panel: a look-up on a card saves no word and counts as no lapse.
     panelModel: ReaderViewModel = viewModel(key = "review", factory = ReaderViewModel.ReviewFactory),
@@ -220,6 +223,7 @@ fun ReviewScreen(
         if (motionOn && shown != null && state.revealed) {
             leaving = Leaving(shown, state.showSentence, cardKey(state), gotIt, from)
         }
+        if (from != 0f) viewModel.swiped()
         if (gotIt) viewModel.gotIt() else viewModel.forgot()
     }
 
@@ -254,6 +258,7 @@ fun ReviewScreen(
                         }
                         AnswerButtons(
                             revealed = state.revealed,
+                            swipeHint = state.swipeHint,
                             onReveal = viewModel::reveal,
                             onForgot = { answer(false, 0f) },
                             onGotIt = { answer(true, 0f) },
@@ -305,7 +310,7 @@ fun ReviewScreen(
                         }
                     }
                 } else if (!state.loading) {
-                    Finished(state, onClose, modifier = Modifier.weight(1f))
+                    Finished(state, onClose, continueBook, onOpenBook, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -370,8 +375,11 @@ private fun ReviewTopBar(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = viewModel::undo, enabled = state.canUndo) {
-                Text(stringResource(R.string.action_undo))
+            // Only once there is something to take back.
+            if (state.canUndo) {
+                TextButton(onClick = viewModel::undo) {
+                    Text(stringResource(R.string.action_undo))
+                }
             }
             if (card != null) {
                 Box {
@@ -718,7 +726,7 @@ private fun SpeakerButton(
 }
 
 @Composable
-private fun AnswerButtons(revealed: Boolean, onReveal: () -> Unit, onForgot: () -> Unit, onGotIt: () -> Unit) {
+private fun AnswerButtons(revealed: Boolean, swipeHint: Boolean, onReveal: () -> Unit, onForgot: () -> Unit, onGotIt: () -> Unit) {
     if (!revealed) {
         Button(
             onClick = onReveal,
@@ -742,7 +750,7 @@ private fun AnswerButtons(revealed: Boolean, onReveal: () -> Unit, onForgot: () 
                     .heightIn(min = BUTTON_HEIGHT),
             ) { Text(stringResource(R.string.review_got_it), maxLines = 1) }
         }
-        Text(
+        if (swipeHint) Text(
             stringResource(R.string.review_swipe_hint),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -752,7 +760,13 @@ private fun AnswerButtons(revealed: Boolean, onReveal: () -> Unit, onForgot: () 
 }
 
 @Composable
-private fun Finished(state: ReviewUiState, onClose: () -> Unit, modifier: Modifier = Modifier) {
+private fun Finished(
+    state: ReviewUiState,
+    onClose: () -> Unit,
+    continueBook: ReadNext.Continue?,
+    onOpenBook: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val answered = state.forgotten + state.remembered
     val motionOn = LocalMotionEnabled.current
     // Plays once when the session ends; the saved flag keeps a rotation from playing it again.
@@ -831,7 +845,15 @@ private fun Finished(state: ReviewUiState, onClose: () -> Unit, modifier: Modifi
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onClose) { Text(stringResource(R.string.review_done_close)) }
+        if (continueBook != null) {
+            Button(onClick = { onOpenBook(continueBook.bookId) }) {
+                Text(stringResource(R.string.review_continue_reading, continueBook.title), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onClose) { Text(stringResource(R.string.review_done_close)) }
+        } else {
+            Button(onClick = onClose) { Text(stringResource(R.string.review_done_close)) }
+        }
     }
 }
 

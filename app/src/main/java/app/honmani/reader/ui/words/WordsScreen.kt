@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.PanelUndo
 import app.honmani.reader.ui.reader.ReaderViewModel
+import app.honmani.reader.ui.review.ReadNext
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.nextPageInCycle
 import app.honmani.reader.ui.search.SearchContent
@@ -166,6 +167,9 @@ fun WordsScreen(
     onStartReview: () -> Unit = {},
     /** The Review page's Stats button. */
     onShowStats: () -> Unit = {},
+    /** What the Review page offers when there is nothing to review; null: nothing. */
+    readNext: ReadNext? = null,
+    onReadNext: (ReadNext) -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
@@ -439,6 +443,8 @@ fun WordsScreen(
                     // Unknown until both lists are loaded: no flash of the empty page.
                     hasWords = uiState.learning?.isEmpty() != true || uiState.known?.isEmpty() != true,
                     onShowStats = onShowStats,
+                    readNext = readNext,
+                    onReadNext = onReadNext,
                 )
                 WordsPage.DICTIONARY -> DictionaryPage(
                     padding = padding,

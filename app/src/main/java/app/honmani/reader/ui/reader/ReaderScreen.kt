@@ -67,6 +67,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.settings.ReaderSettings
+import app.honmani.reader.ui.review.ReadNext
 import app.honmani.reader.ui.review.ReviewScreen
 import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.rememberAnkiAccess
@@ -661,7 +662,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         ReaderAudiobookDialogs(setup, audio, current, overlays, container, scope, jumpSnackbar, backToMenu)
         ReaderBookSheets(overlays, current, container, scope, jumpSnackbar, jumper, bookText, atLibrary, backToMenu, viewModel::openMenu)
         if (overlays.reviewShown) {
+            val libraryState by library.uiState.collectAsStateWithLifecycle()
             ReviewScreen(
+                continueBook = ReadNext.of(libraryState) as? ReadNext.Continue,
                 onClose = { overlays.reviewShown = false },
                 onOpenBook = {
                     // Back from the book returns to Words and its review card.

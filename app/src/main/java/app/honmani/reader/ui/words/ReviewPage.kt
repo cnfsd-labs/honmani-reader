@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.ui.PullDownSheet
+import app.honmani.reader.ui.review.ReadNext
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.settings.ReviewSettingsSection
 import app.honmani.reader.ui.theme.LocalMotionEnabled
@@ -113,6 +115,9 @@ fun ReviewPage(
     hasWords: Boolean = true,
     /** The Stats button: on to the Progress tab. */
     onShowStats: () -> Unit = {},
+    /** Offered under the message when there is nothing to review: back to reading. */
+    readNext: ReadNext? = null,
+    onReadNext: (ReadNext) -> Unit = {},
 ) {
     val state = reviewPageState(choice.scope, due, newWords, starredLearning, hasWords)
     // Reviews only starts no new word.
@@ -164,6 +169,21 @@ fun ReviewPage(
                 ReviewPageMode.Ahead -> Message(R.string.review_page_ahead_title, R.string.review_page_ahead_body)
                 ReviewPageMode.NoStarred -> Message(R.string.review_page_no_starred_title, R.string.review_page_no_starred_body)
                 ReviewPageMode.NoWords -> Message(R.string.review_page_no_words_title, R.string.review_page_no_words_body)
+            }
+            if (readNext != null && state.mode in EMPTY_MODES) {
+                Spacer(Modifier.height(8.dp))
+                Button(onClick = { onReadNext(readNext) }) {
+                    Text(
+                        when (readNext) {
+                            is ReadNext.Continue -> stringResource(R.string.review_continue_reading, readNext.title)
+                            ReadNext.Sample -> stringResource(R.string.library_empty_sample)
+                            ReadNext.Library -> stringResource(R.string.review_go_to_library)
+                        },
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
             Spacer(Modifier.weight(1f))
             if (state.mode != ReviewPageMode.NoWords) FlowRow(
@@ -246,6 +266,9 @@ fun ReviewPage(
         )
     }
 }
+
+/** The page modes with nothing to start: they offer [ReadNext]. */
+private val EMPTY_MODES = setOf(ReviewPageMode.Nothing, ReviewPageMode.NoStarred, ReviewPageMode.NoWords)
 
 @Composable
 private fun Message(title: Int, body: Int) {

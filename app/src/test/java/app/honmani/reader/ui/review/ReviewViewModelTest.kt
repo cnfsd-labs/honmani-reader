@@ -13,6 +13,7 @@ import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.ReviewAutoPlay
 import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
+import app.honmani.reader.data.settings.ReviewSwipeHint
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
 import kotlinx.coroutines.CompletableDeferred
@@ -30,6 +31,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -106,16 +108,16 @@ class ReviewViewModelTest {
         )
     }
 
-    private fun model(): ReviewViewModel {
+    private fun model(hint: ReviewSwipeHint? = null): ReviewViewModel {
         val reviews = ReviewRepository(database)
-        return ReviewViewModel(reviews, WordRepository(database), settings, audio = audio, ringerNormal = { ringerNormal })
+        return ReviewViewModel(reviews, WordRepository(database), settings, audio = audio, ringerNormal = { ringerNormal }, swipeHint = hint)
             .also { owned += it }
     }
 
-    private fun started(): ReviewViewModel = runBlocking {
+    private fun started(hint: ReviewSwipeHint? = null): ReviewViewModel = runBlocking {
         word("猫", "ねこ", 2.0)
         word("犬", "いぬ", 1.0)
-        model().also {
+        model(hint).also {
             it.start()
             waitFor(it) { state -> state.card != null }
         }
@@ -123,6 +125,52 @@ class ReviewViewModelTest {
 
     private fun waitFor(model: ReviewViewModel, condition: (ReviewUiState) -> Boolean) = runBlocking {
         withTimeout(10_000) { model.state.first { condition(it) } }
+    }
+
+    @Test
+    fun undoIsOfferedOnlyOnceThereIsAnAnswer() {
+        val model = started()
+        assertFalse(model.state.value.canUndo)
+
+        model.reveal()
+        model.gotIt()
+        waitFor(model) { it.canUndo }
+    }
+
+    @Test
+    fun theSwipeHintGoesAfterTheThirdFinishedSession() {
+        val preferences = ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("review-swipe-hint-vm-test", Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val hint = ReviewSwipeHint(preferences)
+        repeat(ReviewSwipeHint.SESSIONS - 1) { hint.sessionFinished() }
+        val model = started(hint)
+        assertTrue(model.state.value.swipeHint)
+
+        model.reveal()
+        model.gotIt()
+        waitFor(model) { it.card?.expression == "犬" }
+        model.reveal()
+        model.gotIt()
+        waitFor(model) { it.card == null && it.remembered == 2 }
+
+        assertFalse(hint.shown)
+        model.start()
+        assertFalse(model.state.value.swipeHint)
+    }
+
+    @Test
+    fun aSwipeEndsTheSwipeHint() {
+        val preferences = ApplicationProvider.getApplicationContext<Context>()
+            .getSharedPreferences("review-swipe-hint-vm-test", Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        val model = started(ReviewSwipeHint(preferences))
+        assertTrue(model.state.value.swipeHint)
+
+        model.swiped()
+
+        assertFalse(model.state.value.swipeHint)
+        assertFalse(ReviewSwipeHint(preferences).shown)
     }
 
     @Test

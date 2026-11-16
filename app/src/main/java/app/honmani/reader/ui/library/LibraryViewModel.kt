@@ -105,7 +105,9 @@ data class LibraryUiState(
     /** Showing the hidden books (and only those) instead of the library. */
     val showHidden: Boolean = false,
     val hiddenCount: Int = 0,
-    /** The book read last, if the reader is still reading it: offered as "Continue reading". */
+    /** The book read last, if the reader is still reading it, even with the bubble swiped away: Review offers it. */
+    val lastBook: LibraryBook? = null,
+    /** [lastBook] unless its bubble was swiped away: offered as "Continue reading". */
     val continueBook: LibraryBook? = null,
     /** The last session of [continueBook] played its audiobook, which is still there: the bubble says "Continue listening". */
     val continueListening: Boolean = false,
@@ -322,6 +324,8 @@ class LibraryViewModel(
                 else -> inFolder.filter { it.status == shelf.status }
             }
             val inFolders = shown.groupingBy { it.folderId }.eachCount()
+            val last = entities.filter { !it.hidden && it.lastOpenedAt != null }.maxByOrNull { it.lastOpenedAt!! }
+            val lastBook = last?.let(::toLibraryBook)?.takeIf { it.status == ReadingStatus.READING }
             LibraryUiState(
                 books = onShelf.filter { LibrarySearch.matches(it, query, readings[it.id]) },
                 totalBooks = books.size,
@@ -332,12 +336,8 @@ class LibraryViewModel(
                 filter = shelf.status,
                 showHidden = shelf.hidden,
                 hiddenCount = hidden.size,
-                continueBook = entities
-                    .filter { !it.hidden && it.lastOpenedAt != null }
-                    .maxByOrNull { it.lastOpenedAt!! }
-                    ?.takeIf { continueKey(it) != dismissed }
-                    ?.let(::toLibraryBook)
-                    ?.takeIf { it.status == ReadingStatus.READING },
+                lastBook = lastBook,
+                continueBook = lastBook?.takeIf { continueKey(last!!) != dismissed },
                 query = query,
                 sort = sort,
                 skill = skill,

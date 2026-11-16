@@ -1093,6 +1093,8 @@
     <string name="review_done_counts">Forgot %1$d, got it %2$d.</string>
     <string name="review_done_empty">Nothing more is due right now. Words in Learning show up here as new words, except those you sent to Anki.</string>
     <string name="review_done_close">Close</string>
+    <string name="review_continue_reading">Continue reading %1$s</string>
+    <string name="review_go_to_library">Go to Library</string>
     <string name="review_bury">Bury until tomorrow</string>
     <string name="review_mark_known">Mark known</string>
     <string name="review_suspend">Don\'t review</string>

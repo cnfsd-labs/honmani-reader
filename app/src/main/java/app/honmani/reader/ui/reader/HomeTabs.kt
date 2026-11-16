@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.AppContainer
 import app.honmani.reader.R
 import app.honmani.reader.data.library.BookEntity
@@ -45,6 +46,7 @@ import app.honmani.reader.ui.library.AddBookStart
 import app.honmani.reader.ui.library.LibraryScreen
 import app.honmani.reader.ui.library.LibraryViewModel
 import app.honmani.reader.ui.progress.ProgressTab
+import app.honmani.reader.ui.review.ReadNext
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.settings.SettingsScreen
 import app.honmani.reader.ui.theme.LocalMotionEnabled
@@ -76,6 +78,7 @@ internal fun HomeTabs(
     val context = LocalContext.current
     val shareTitle = stringResource(R.string.action_share_diagnostics)
     val reviewDue = dueToday.size
+    val libraryState by library.uiState.collectAsStateWithLifecycle()
     // Opaque, and on top: the tabs take all touches while ttu's list stays loaded below.
     BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
     // Tapping the open tab again scrolls the Library to its top and goes to the next page of Words and Progress;
@@ -155,6 +158,18 @@ internal fun HomeTabs(
                         dueIds = dueToday.mapTo(HashSet()) { it.id },
                         onStartReview = { overlays.reviewShown = true },
                         onShowStats = { tab = HomeTab.PROGRESS },
+                        readNext = ReadNext.of(libraryState),
+                        onReadNext = { next ->
+                            when (next) {
+                                is ReadNext.Continue -> library.open(next.bookId)
+                                ReadNext.Library -> tab = HomeTab.LIBRARY
+                                ReadNext.Sample -> {
+                                    // Back from the book is the library, where it now is.
+                                    tab = HomeTab.LIBRARY
+                                    library.addSample()
+                                }
+                            }
+                        },
                         reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
                             container.reviewScope.value = it
                         },

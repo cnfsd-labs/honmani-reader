@@ -665,6 +665,7 @@ class LibraryViewModelTest {
             state.books?.any { it.status == ReadingStatus.FINISHED } == true
         }
         assertEquals(null, finished.continueBook)
+        assertEquals(null, finished.lastBook)
     }
 
     @Test
@@ -685,7 +686,9 @@ class LibraryViewModelTest {
         library.uiState.first { it.continueBook != null }
 
         library.dismissContinue()
-        library.uiState.first { it.continueBook == null && it.books?.isNotEmpty() == true }
+        val swiped = library.uiState.first { it.continueBook == null && it.books?.isNotEmpty() == true }
+        // Review still offers the book.
+        assertEquals(neko.id, swiped.lastBook?.id)
 
         dao.setLastOpened(neko.id, 3L)
         assertEquals(neko.id, library.uiState.first { it.continueBook != null }.continueBook!!.id)

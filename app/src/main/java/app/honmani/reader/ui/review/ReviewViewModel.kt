@@ -22,6 +22,7 @@ import app.honmani.reader.data.review.ReviewState
 import app.honmani.reader.data.settings.ReviewAutoPlay
 import app.honmani.reader.data.settings.ReviewAutoPlayContent
 import app.honmani.reader.data.settings.ReviewSettings
+import app.honmani.reader.data.settings.ReviewSwipeHint
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.FuriganaOverride
 import kotlinx.coroutines.Job
@@ -69,6 +70,8 @@ data class ReviewUiState(
     val showSentence: Boolean = true,
     /** Settings: the card shows the speaker buttons. */
     val speakers: Boolean = true,
+    /** The "swipe to answer" line shows under a revealed card ([ReviewSwipeHint]). */
+    val swipeHint: Boolean = false,
 )
 
 /** An answer the screen should let the reader feel (and, if switched on, hear); [finished] when it was the session's last card. */
@@ -103,6 +106,8 @@ class ReviewViewModel(
     private val audio: ReviewAudio = NoReviewAudio,
     /** True while the phone's ringer is on: auto-play stays silent on a phone set to vibrate or silent. */
     private val ringerNormal: () -> Boolean = { true },
+    /** When the swipe hint shows; null: never. */
+    private val swipeHint: ReviewSwipeHint? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<ReviewUiState> = _state.asStateFlow()
@@ -134,7 +139,7 @@ class ReviewViewModel(
     }
 
     private fun initialState() =
-        ReviewUiState(showSentence = settings.showSentence.value, speakers = settings.speakers.value)
+        ReviewUiState(showSentence = settings.showSentence.value, speakers = settings.speakers.value, swipeHint = swipeHint?.shown == true)
 
     /** Builds a fresh queue; the screen calls it each time it opens. */
     fun start() {
@@ -160,6 +165,12 @@ class ReviewViewModel(
     fun answer(grade: Grade) = act(answered = true, gotIt = grade != Grade.AGAIN) { it.answer(grade) }
 
     fun forgot() = answer(Grade.AGAIN)
+
+    /** A card was answered with a swipe (the answer itself comes through [forgot] or [gotIt]): the hint goes. */
+    fun swiped() {
+        swipeHint?.swiped()
+        _state.update { it.copy(swipeHint = false) }
+    }
 
     fun gotIt() = answer(Grade.GOOD)
 
@@ -285,6 +296,7 @@ class ReviewViewModel(
                 val before = active.lastAction
                 action(active)
                 publish(active, keepRevealed)
+                if (answered && active.current == null) swipeHint?.sessionFinished()
                 if (answered) _cues.send(ReviewCue(gotIt, finished = active.current == null))
                 val done = active.lastAction.takeIf { it != before }
                 if (notice != null && word.isNotEmpty()) _notices.send(ReviewNotice(notice, word, done))
@@ -349,6 +361,7 @@ class ReviewViewModel(
                         val manager = (this[APPLICATION_KEY] as HonmaniApplication).getSystemService(AudioManager::class.java)
                         manager == null || manager.ringerMode == AudioManager.RINGER_MODE_NORMAL
                     },
+                    swipeHint = container.reviewSwipeHint,
                 )
             }
         }
