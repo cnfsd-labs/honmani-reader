@@ -255,6 +255,7 @@ fun LibraryScreen(
     }
     val noticeText = notice?.let { noticeText(it) }
     val retryLabel = stringResource(R.string.onboarding_retry)
+    val undoLabel = stringResource(R.string.action_undo)
     LaunchedEffect(noticeText) {
         if (noticeText != null) {
             // A failure that can be repeated gets a Retry action; failures stay up longer than a plain notice.
@@ -264,18 +265,34 @@ fun LibraryScreen(
                 is LibraryNotice.ResetFailed -> failed.bookId?.let { id -> { viewModel.resetProgress(id) } }
                 else -> null
             }
-            val longLived = retry != null || failed is LibraryNotice.ReaderFailed ||
+            // "Mark as finished" can be taken back: an Undo action, as long as the other Undo snackbars.
+            val undo: (() -> Unit)? = (failed as? LibraryNotice.MarkedFinished)?.let { marked ->
+                { viewModel.undoFinished(marked.bookId, marked.previousFinishedAt) }
+            }
+            val longLived = retry != null || undo != null || failed is LibraryNotice.ReaderFailed ||
                 failed is LibraryNotice.ResetFailed || failed is LibraryNotice.CopyFailed ||
                 (failed is LibraryNotice.AudiobookExport && failed.result !is AudiobookExportResult.Saved)
             val result = snackbarHostState.showSnackbar(
                 message = noticeText,
-                actionLabel = if (retry != null) retryLabel else null,
+                actionLabel = if (retry != null) retryLabel else if (undo != null) undoLabel else null,
                 withDismissAction = retry != null,
                 duration = if (longLived) SnackbarDuration.Long else SnackbarDuration.Short,
             )
             notice = null
-            if (result == SnackbarResult.ActionPerformed) retry?.invoke()
+            if (result == SnackbarResult.ActionPerformed) (retry ?: undo)?.invoke()
         }
+    }
+
+    // A book just finished: its end card, with a next book to read.
+    val finishCard by viewModel.finishCard.collectAsStateWithLifecycle()
+    finishCard?.let { card ->
+        val facts by remember(card.bookId) { viewModel.finishFacts(card.bookId) }.collectAsStateWithLifecycle(FinishFacts())
+        FinishCardDialog(
+            card = card,
+            facts = facts,
+            onOpenNext = { viewModel.closeFinishCard(openNext = true) },
+            onClose = { viewModel.closeFinishCard(openNext = false) },
+        )
     }
 
     val browsing = opdsState.browsing
@@ -504,6 +521,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.CopySaved -> stringResource(R.string.library_copy_saved, notice.title)
     is LibraryNotice.CopyFailed -> stringResource(R.string.library_copy_failed, notice.title)
     is LibraryNotice.AudiobookExport -> notice.result.message(LocalContext.current, notice.title)
+    is LibraryNotice.MarkedFinished -> stringResource(R.string.marked_finished, notice.title)
     is LibraryNotice.PassedWhileReading -> pluralStringResource(R.plurals.passed_while_reading, notice.count, notice.count)
     is LibraryNotice.FolderImported -> {
         val resources = LocalContext.current.resources
@@ -798,7 +816,11 @@ private fun LibraryContent(
                 detailsFor = null
                 onOpen(book.id)
             },
-            onMarkFinished = { onMarkFinished(book.id) },
+            onMarkFinished = {
+                // The end card follows, then the Undo snackbar, which the sheet would cover.
+                detailsFor = null
+                onMarkFinished(book.id)
+            },
             onResetProgress = { pendingReset = book },
             onSetHidden = {
                 // Hiding takes the book off this shelf: the sheet goes with it.

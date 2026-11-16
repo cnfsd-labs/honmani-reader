@@ -62,6 +62,12 @@ class WordRepository(
 
     /** How many lookups were recorded in a library book. */
     fun bookLookupCount(bookId: Long): Flow<Int> = dao.countLookups(bookId)
+
+    /**
+     * How many saved words were looked up in a library book. Counted from the kept example
+     * lookups, so a word whose lookups in this book were all pruned for newer ones is left out.
+     */
+    fun bookWordCount(bookId: Long): Flow<Int> = dao.countBookWords(bookId)
     val starred = dao.observeStarred()
     val learned = dao.observeLearned()
 

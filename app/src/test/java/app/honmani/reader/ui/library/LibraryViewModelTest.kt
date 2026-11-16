@@ -730,6 +730,49 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun markingFinished_showsTheEndCard_andClosingItOffersAnUndoThatKeepsThePosition() = runBlocking {
+        val book = addAndWait("neko.epub", TestBooks.epub(author = "一"))
+        val other = addAndWait("inu.epub", TestBooks.epub(author = "二"))
+        dao.setProgress(book.id, 0.4f)
+
+        viewModel.markFinished(book.id)
+        val card = withTimeout(5_000) { viewModel.finishCard.first { it != null } }!!
+        assertEquals(book.id, card.bookId)
+        assertEquals(other.id, card.next?.id)
+        assertTrue(card.marked)
+
+        viewModel.closeFinishCard(openNext = false)
+        assertNull(viewModel.finishCard.value)
+        val notice = nextNotice() as LibraryNotice.MarkedFinished
+        assertEquals(book.id, notice.bookId)
+        viewModel.undoFinished(notice.bookId, notice.previousFinishedAt)
+
+        val undone = eventually { dao.find(book.id)?.takeIf { it.finishedAt == null } }
+        assertEquals(0.4f, undone.progress)
+    }
+
+    @Test
+    fun readingABookToItsEnd_showsTheEndCardWhenTheBookCloses_onlyTheFirstTime() = runBlocking {
+        val book = addAndWait("neko.epub", TestBooks.epub())
+
+        ttu.onMessage(LibraryMessage.Finished(book.ttuId!!))
+        eventually { dao.find(book.id)?.finishedAt }
+        assertNull(viewModel.finishCard.value)
+        viewModel.bookClosed()
+        val card = withTimeout(5_000) { viewModel.finishCard.first { it != null } }!!
+        assertEquals(book.id, card.bookId)
+        assertEquals(false, card.marked)
+        assertNull(card.next)
+        viewModel.closeFinishCard(openNext = false)
+
+        // Already finished: reaching the end again brings no second card.
+        ttu.onMessage(LibraryMessage.Finished(book.ttuId!!))
+        viewModel.bookClosed()
+        delay(100)
+        assertNull(viewModel.finishCard.value)
+    }
+
+    @Test
     fun aFailedProgressReset_namesTheBookSoTheNoticeCanRetry() = runBlocking {
         val book = addAndWait("neko.epub", TestBooks.epub())
         page.failResets = true
@@ -950,6 +993,9 @@ private class FakeBookDao : BookDao {
         change({ it.ttuId == ttuId }) { it.copy(characters = characters) }
 
     override suspend fun setFinished(id: Long, finishedAt: Long, now: Long) =
+        change({ it.id == id }) { it.copy(finishedAt = finishedAt) }
+
+    override suspend fun restoreFinished(id: Long, finishedAt: Long?, now: Long) =
         change({ it.id == id }) { it.copy(finishedAt = finishedAt) }
 
     override suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long, now: Long) =

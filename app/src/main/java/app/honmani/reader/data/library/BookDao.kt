@@ -79,6 +79,10 @@ interface BookDao {
     @Query("UPDATE book SET finished_at = :finishedAt, updated_at = :now WHERE id = :id")
     suspend fun setFinished(id: Long, finishedAt: Long, now: Long = UpdateClock.now())
 
+    /** Puts back what "finished" was before a "Mark as finished" (Undo); the reading position stays. */
+    @Query("UPDATE book SET finished_at = :finishedAt, updated_at = :now WHERE id = :id")
+    suspend fun restoreFinished(id: Long, finishedAt: Long?, now: Long = UpdateClock.now())
+
     /** Marks the book ttu holds as [ttuId] finished, unless it already is. */
     @Query("UPDATE book SET finished_at = :finishedAt, updated_at = :now WHERE ttu_id = :ttuId AND finished_at IS NULL")
     suspend fun setFinishedByTtuId(ttuId: Long, finishedAt: Long, now: Long = UpdateClock.now())

@@ -35,6 +35,7 @@ import app.honmani.reader.data.library.WatchedFolderScan
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.stats.FinishedBooks
+import app.honmani.reader.data.stats.ReadingStats
 import app.honmani.reader.data.sync.SyncQuestion
 import app.honmani.reader.lookup.Romaji
 import app.honmani.reader.lookup.TextReading
@@ -184,6 +185,9 @@ sealed interface LibraryNotice {
     /** The chosen folder cannot be read or written. */
     data object FolderUnusable : LibraryNotice
 
+    /** "Mark as finished" was done (the end card closed); Undo puts back [previousFinishedAt]. */
+    data class MarkedFinished(val title: String, val bookId: Long, val previousFinishedAt: Long?) : LibraryNotice
+
     /** An audiobook export ended with [result]. */
     data class AudiobookExport(val title: String, val result: AudiobookExportResult) : LibraryNotice
 }
@@ -269,6 +273,8 @@ class LibraryViewModel(
     private val listeningChanges: Flow<Int> = flowOf(0),
     /** The next opening of the book (content hash) starts its audiobook. */
     private val armAutoplay: (contentHash: String) -> Unit = {},
+    /** What the end card tells about a book (by id): time read, lookups, words saved. */
+    private val finishFacts: (bookId: Long) -> Flow<FinishFacts> = { flowOf(FinishFacts()) },
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -293,10 +299,51 @@ class LibraryViewModel(
         _syncQuestion.map { it?.first }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     private val _notices = Channel<LibraryNotice>(Channel.BUFFERED)
 
-    /** A book was closed: how many due words passed while reading it, if any. */
+    private val _finishCard = MutableStateFlow<FinishCard?>(null)
+
+    /** The end card of a book that just became finished; null: none. */
+    val finishCard: StateFlow<FinishCard?> = _finishCard
+
+    /** A book read to its end in the reader (by id), whose end card waits until the book is closed. */
+    @Volatile
+    private var reachedEnd: Long? = null
+
+    /** A book was closed: how many due words passed while reading it, if any; the end card of a book read to its end. */
     fun bookClosed() {
         val passed = takePassedWhileReading()
         if (passed > 0) _notices.trySend(LibraryNotice.PassedWhileReading(passed))
+        reachedEnd?.let { id ->
+            reachedEnd = null
+            viewModelScope.launch { showFinishCard(id, marked = false, previousFinishedAt = null) }
+        }
+    }
+
+    fun finishFacts(bookId: Long): Flow<FinishFacts> = finishFacts.invoke(bookId)
+
+    private suspend fun showFinishCard(id: Long, marked: Boolean, previousFinishedAt: Long?) {
+        val book = dao.find(id) ?: return
+        val graded = grades.first()
+        val next = NextBook.choose(dao.observeAll().first().map(::toLibraryBook), id, skill.first()) {
+            graded[it.contentHash]?.difficulty?.score?.takeIf { score -> score > 0 }
+        }
+        _finishCard.value = FinishCard(book.id, book.title, next, marked, previousFinishedAt)
+    }
+
+    /** Closes the end card, opening the suggested book if [openNext]; after a "Mark as finished" without it, Undo is offered. */
+    fun closeFinishCard(openNext: Boolean) {
+        val card = _finishCard.value ?: return
+        _finishCard.value = null
+        val next = card.next
+        if (openNext && next != null) {
+            open(next.id)
+        } else if (card.marked) {
+            _notices.trySend(LibraryNotice.MarkedFinished(card.title, card.bookId, card.previousFinishedAt))
+        }
+    }
+
+    /** Takes back a "Mark as finished": "finished" is as before; the reading position never changed. */
+    fun undoFinished(id: Long, previousFinishedAt: Long?) {
+        viewModelScope.launch { dao.restoreFinished(id, previousFinishedAt) }
     }
     val notices: Flow<LibraryNotice> = _notices.receiveAsFlow()
 
@@ -371,7 +418,12 @@ class LibraryViewModel(
             }
         }
         viewModelScope.launch {
-            ttu.finished.collect { ttuId -> dao.setFinishedByTtuId(ttuId, now()) }
+            ttu.finished.collect { ttuId ->
+                val before = dao.findByTtuId(ttuId)
+                dao.setFinishedByTtuId(ttuId, now())
+                // Only the moment a book becomes finished gets an end card, once it is closed.
+                if (before != null && before.finishedAt == null) reachedEnd = before.id
+            }
         }
     }
 
@@ -804,8 +856,13 @@ class LibraryViewModel(
         }
     }
 
+    /** Marks the book finished and shows its end card; closing the card offers Undo. */
     fun markFinished(id: Long) {
-        viewModelScope.launch { dao.setFinished(id, now()) }
+        viewModelScope.launch {
+            val previous = dao.find(id)?.finishedAt
+            dao.setFinished(id, now())
+            if (previous == null) showFinishCard(id, marked = true, previousFinishedAt = null)
+        }
     }
 
     /** Starts the book over: ttu forgets its reading position (and that it was finished). */
@@ -977,6 +1034,13 @@ class LibraryViewModel(
                         }
                     },
                     recordFinished = container.finishedBookDao::record,
+                    finishFacts = { id ->
+                        combine(
+                            container.readingDao.observeBook(id),
+                            container.wordRepository.bookLookupCount(id),
+                            container.wordRepository.bookWordCount(id),
+                        ) { days, lookups, words -> FinishFacts(ReadingStats.book(days).seconds, lookups, words) }
+                    },
                     forgetStatistics = { bookId, hash ->
                         container.readingDao.deleteBook(bookId)
                         container.finishedBookDao.forget(hash)

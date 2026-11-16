@@ -1261,6 +1261,19 @@
     <string name="milestone_anki">First Anki card</string>
     <string name="milestone_speed">%1$s characters/hour over 2 weeks</string>
     <string name="milestone_reached">Milestone: %1$s</string>
+    <string name="finish_card_title">Book finished</string>
+    <string name="finish_card_time">Reading time: %1$s</string>
+    <plurals name="finish_card_lookups">
+        <item quantity="one">%1$s lookup</item>
+        <item quantity="other">%1$s lookups</item>
+    </plurals>
+    <plurals name="finish_card_words">
+        <item quantity="one">%1$s word saved</item>
+        <item quantity="other">%1$s words saved</item>
+    </plurals>
+    <string name="finish_card_next">Next up: %1$s</string>
+    <string name="finish_card_open">Open</string>
+    <string name="marked_finished">Marked “%1$s” as finished</string>
     <plurals name="passed_while_reading">
         <item quantity="one">%1$d due word passed while reading</item>
         <item quantity="other">%1$d due words passed while reading</item>

@@ -84,6 +84,13 @@ interface WordDao : TombstoneWriter {
     @Query("SELECT COUNT(*) FROM lookup_event WHERE book_id = :bookId")
     fun countLookups(bookId: Long): Flow<Int>
 
+    /** Saved words (not ignored) with a kept lookup in a library book. */
+    @Query(
+        "SELECT COUNT(DISTINCT word_lookup.word_id) FROM word_lookup JOIN word ON word.id = word_lookup.word_id " +
+            "WHERE word_lookup.book_id = :bookId AND word.ignored = 0",
+    )
+    fun countBookWords(bookId: Long): Flow<Int>
+
     @Insert
     suspend fun insertLookupEvent(event: LookupEventEntity): Long
 

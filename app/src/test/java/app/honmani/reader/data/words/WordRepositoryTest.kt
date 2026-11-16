@@ -72,6 +72,20 @@ class WordRepositoryTest {
     }
 
     @Test
+    fun aBooksWordCount_countsEachSavedWordLookedUpInItOnce_notIgnoredOnes() = runTest {
+        repository.record(lookup("猫", bookTitle = "猫"))
+        repository.record(lookup("猫", sentence = "猫が鳴く。", bookTitle = "猫"))
+        repository.record(lookup("犬", bookTitle = "猫"))
+        repository.record(lookup("鳥"))
+        assertEquals(2, repository.bookWordCount(1L).first())
+        assertEquals(3, repository.bookLookupCount(1L).first())
+
+        repository.setIgnored(repository.find("犬", "よみ")!!.id, true)
+        assertEquals(1, repository.bookWordCount(1L).first())
+        assertEquals(0, repository.bookWordCount(2L).first())
+    }
+
+    @Test
     fun aNoteSurvivesLookingTheWordUpAgainAndTakingThatBack() = runTest {
         repository.record(lookup("猫", sentence = "猫がいる。"))
         val id = learning().single().id
