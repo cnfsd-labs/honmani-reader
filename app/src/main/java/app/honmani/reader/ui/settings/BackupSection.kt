@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.InfoAction
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.FolderBackupState
 import app.honmani.reader.data.backup.RestoreSummary
@@ -131,7 +132,7 @@ private fun FolderBackupRow() {
             Column {
                 Text(
                     when (val current = state) {
-                        FolderBackupState.Off -> stringResource(R.string.backup_folder_details)
+                        FolderBackupState.Off -> stringResource(R.string.backup_folder_summary)
                         FolderBackupState.Unavailable -> stringResource(R.string.backup_folder_unavailable)
                         is FolderBackupState.On -> current.lastAt?.let {
                             stringResource(
@@ -146,7 +147,12 @@ private fun FolderBackupRow() {
                 }
             }
         },
-        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                InfoAction(stringResource(R.string.backup_folder_title), stringResource(R.string.backup_folder_details))
+                Switch(checked = on, onCheckedChange = null)
+            }
+        },
         modifier = Modifier.toggleable(value = on, role = Role.Switch) { _ ->
             // Off, or no longer reachable: pick the folder (again); otherwise switch off.
             if (state is FolderBackupState.On) folderBackup.disable() else pick.launch(null)
@@ -220,13 +226,18 @@ private fun SyncFolderRow() {
                         Text(stringResource(R.string.sync_folder_unavailable))
                     }
                 }
-                Text(stringResource(R.string.sync_folder_details))
+                Text(stringResource(R.string.sync_folder_summary))
                 if (state is SyncFolderState.Unavailable) {
                     TextButton(onClick = syncFolder::disable) { Text(stringResource(R.string.backup_folder_switch_off)) }
                 }
             }
         },
-        trailingContent = { Switch(checked = on, onCheckedChange = null) },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                InfoAction(stringResource(R.string.sync_folder_title), stringResource(R.string.sync_folder_details))
+                Switch(checked = on, onCheckedChange = null)
+            }
+        },
         modifier = Modifier.toggleable(value = on, role = Role.Switch) { _ ->
             // Off, or no longer reachable: pick the folder (again); otherwise switch off.
             if (state is SyncFolderState.On) syncFolder.disable() else pick.launch(null)

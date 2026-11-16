@@ -8,6 +8,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import app.honmani.reader.R
@@ -29,4 +33,12 @@ fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) {
         text = { Text(text) },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.ok)) } },
     )
+}
+
+/** An [InfoButton] that opens its own [InfoDialog]: the info slot of a settings row. */
+@Composable
+fun InfoAction(title: String, text: String, modifier: Modifier = Modifier) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    InfoButton(onClick = { open = true }, modifier = modifier)
+    if (open) InfoDialog(title = title, text = text, onDismiss = { open = false })
 }

@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.InfoAction
 import app.honmani.reader.anki.AnkiCard
 import app.honmani.reader.anki.AnkiNoteTypeInfo
 import app.honmani.reader.anki.CardStyle
@@ -239,9 +241,12 @@ private fun DeckPicker(
 @Composable
 private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) {
     Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
-        Text(stringResource(R.string.card_style), style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.card_style), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            InfoAction(stringResource(R.string.card_style), stringResource(R.string.card_style_details))
+        }
         Text(
-            text = stringResource(R.string.card_style_details),
+            text = stringResource(R.string.card_style_summary),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

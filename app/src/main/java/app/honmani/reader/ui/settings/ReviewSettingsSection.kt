@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.InfoAction
 import app.honmani.reader.data.review.ReviewLimit
 import app.honmani.reader.data.settings.ReviewAutoPlay
 import app.honmani.reader.data.settings.ReviewAutoPlayContent
@@ -93,7 +94,8 @@ fun ReviewSettingsSection() {
     )
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_auto_play)) },
-        supportingContent = { Text(stringResource(R.string.review_settings_auto_play_details)) },
+        supportingContent = { Text(stringResource(R.string.review_settings_auto_play_summary)) },
+        trailingContent = { InfoAction(stringResource(R.string.review_settings_auto_play), stringResource(R.string.review_settings_auto_play_details)) },
     )
     Chips {
         val modes = listOf(

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.InfoAction
 import app.honmani.reader.data.settings.DaySettings
 import java.util.Calendar
 
@@ -32,7 +33,8 @@ fun DayStartSection() {
     val startHour by settings.startHour.collectAsStateWithLifecycle()
     ListItem(
         headlineContent = { Text(stringResource(R.string.settings_day_start)) },
-        supportingContent = { Text(stringResource(R.string.settings_day_start_details)) },
+        supportingContent = { Text(stringResource(R.string.settings_day_start_summary)) },
+        trailingContent = { InfoAction(stringResource(R.string.settings_day_start), stringResource(R.string.settings_day_start_details)) },
     )
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
