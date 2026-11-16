@@ -186,7 +186,7 @@ data class MenuPlace(val characters: Long, val total: Int, val charactersPerHour
 private fun timeLeft(place: MenuPlace, left: Long): String {
     val speed = place.charactersPerHour?.takeIf { it > 0 } ?: return ""
     if (left <= 0) return ""
-    return " · " + stringResource(R.string.book_time_left, duration(left * 3_600 / speed))
+    return " · " + stringResource(R.string.book_time_left, duration((left * 3_600 / speed).coerceAtLeast(60)))
 }
 
 /** A slider over the whole book with its label; letting go jumps there. */

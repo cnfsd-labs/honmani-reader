@@ -229,7 +229,8 @@ private fun timeToRead(stats: BookStatistics, book: LibraryBook): String? {
     val share = if (reading) (1f - book.progress).coerceIn(0f, 1f) else 1f
     return stringResource(
         if (reading) R.string.book_time_left else R.string.book_time_whole,
-        duration((characters * share * 3_600 / speed).toLong()),
+        // At least a minute: "About under a minute left" reads badly.
+        duration((characters * share * 3_600 / speed).toLong().coerceAtLeast(60)),
     )
 }
 
