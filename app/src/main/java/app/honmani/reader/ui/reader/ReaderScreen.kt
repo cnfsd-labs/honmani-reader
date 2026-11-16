@@ -327,47 +327,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         onboardingChecked = true
     }
     var addBookOnStart by remember { mutableStateOf<AddBookStart?>(null) }
-    // Honmani's reader settings, from the Settings tab or the reader's top bar.
-    var readerSettings by rememberSaveable { mutableStateOf(false) }
-    // The open sub-screen came from the reader menu: Back returns there (a tap outside or a swipe down closes to the book).
-    var openedFromMenu by rememberSaveable { mutableStateOf(false) }
-    // ttu's table of contents also opens from its own bar, so the menu's Contents keeps its own mark.
-    var contentsFromMenu by rememberSaveable { mutableStateOf(false) }
-    // The words of this reading session, from the reader's bottom menu.
-    var sessionShown by rememberSaveable { mutableStateOf(false) }
-    // The search in the open book, from the reader's bottom menu; ttu's id of the book.
-    var searchShown by rememberSaveable { mutableStateOf(false) }
-    var openTtuId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val overlays = rememberReaderOverlays()
+    val current = rememberCurrentBook(container)
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
-    var bookmarksShown by rememberSaveable { mutableStateOf(false) }
-    var bookmarkDraft by rememberSaveable(stateSaver = BookmarkDraft.Saver) { mutableStateOf<BookmarkDraft?>(null) }
     val jumpSnackbar = remember { SnackbarHostState() }
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
-    val bookHash by produceState<String?>(null, openTtuId) {
-        value = openTtuId?.let { container.bookDao.findByTtuId(it)?.contentHash }
-    }
-    val bookmarks by remember(bookHash) {
-        bookHash?.let { container.bookmarkDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
-    }.collectAsState(emptyList())
-    // Highlights: the list (reader menu), and the book's section table the page needs to draw them
-    // and the lookup panel to save one (null for a book that is not an EPUB: no highlighting there).
-    var highlightsShown by rememberSaveable { mutableStateOf(false) }
-    val highlights by remember(bookHash) {
-        bookHash?.let { container.highlightDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
-    }.collectAsState(emptyList())
-    var pronunciationsShown by rememberSaveable { mutableStateOf(false) }
-    val pronunciations by remember(bookHash) {
-        bookHash?.let { container.pronunciationDao.observe(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
-    }.collectAsState(emptyList())
-    SideEffect { pronunciationRules[0] = PronunciationRules(pronunciations.map { it.text to it.reading }) }
-    val sectionsTotal by produceState<Int?>(null, openTtuId) {
-        value = openTtuId?.let { id -> container.bookDao.findByTtuId(id)?.let { container.sectionStarts(it)?.total } }
-    }
-    LaunchedEffect(atLibrary, openTtuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
+    SideEffect { pronunciationRules[0] = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
+    LaunchedEffect(atLibrary, current.ttuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
     // A passage the audiobook can't reach by turning pages: the book opens there, like a jump.
     SideEffect {
         audiobook.navigate = { span ->
-            val id = openTtuId
+            val id = current.ttuId
             if (id != null) {
                 scope.launch {
                     val text = container.searchableBook(id)
@@ -383,17 +353,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     // The audiobook's files, chosen with Android's own picker: the audio first, then its subtitles.
-    var audiobookStep by rememberSaveable { mutableStateOf<AudiobookStep?>(null) }
     var pickedAudio by rememberSaveable { mutableStateOf<Uri?>(null) }
     var pairingVersion by remember { mutableIntStateOf(0) }
-    val audiobookPaired = remember(bookHash, pairingVersion) { bookHash?.let { container.audiobookStore.pairing(it) } != null }
+    val audiobookPaired = remember(current.hash, pairingVersion) { current.hash?.let { container.audiobookStore.pairing(it) } != null }
     val subtitlesUnreadable = stringResource(R.string.audiobook_subtitles_unreadable)
     val audiobookRemoved = stringResource(R.string.audiobook_removed)
     // The audiobook made with a Google voice: the confirmation, and what the manage step shows of it.
-    var makeShown by rememberSaveable { mutableStateOf(false) }
-    val openBook by produceState<BookEntity?>(null, openTtuId) { value = openTtuId?.let { container.bookDao.findByTtuId(it) } }
-    val generatedModel = remember(openBook?.contentHash) {
-        openBook?.let { book ->
+    val generatedModel = remember(current.book?.contentHash) {
+        current.book?.let { book ->
             GeneratedAudiobookModel(
                 bookHash = book.contentHash,
                 epub = book.format == BookFormat.EPUB,
@@ -409,8 +376,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     val makeState by remember(generatedModel) { generatedModel?.state ?: MutableStateFlow(MakeState()) }.collectAsStateWithLifecycle()
-    val generated by remember(bookHash, pairingVersion) {
-        bookHash?.let { generatedManage(container.audiobookMaker, container.audiobookScheduler, it) } ?: flowOf(null)
+    val generated by remember(current.hash, pairingVersion) {
+        current.hash?.let { generatedManage(container.audiobookMaker, container.audiobookScheduler, it) } ?: flowOf(null)
     }.collectAsStateWithLifecycle(null)
     // Plays the open book's audiobook from where it was left (the dialog's Play, the snackbar's, "Continue listening").
     val playAudiobook = { id: Long ->
@@ -428,13 +395,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val audiobookAvailable = stringResource(R.string.audiobook_available)
     val audiobookAvailablePlay = stringResource(R.string.audiobook_available_play)
     val menuHint = stringResource(R.string.reader_menu_hint)
-    LaunchedEffect(bookHash, atLibrary) {
-        val hash = bookHash
+    LaunchedEffect(current.hash, atLibrary) {
+        val hash = current.hash
         if (hash == null) {
             announcedBook = null
             return@LaunchedEffect
         }
-        val id = openTtuId
+        val id = current.ttuId
         if (atLibrary || announcedBook == hash || id == null) return@LaunchedEffect
         announcedBook = hash
         container.sessionModes.opened(hash)
@@ -460,8 +427,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     val generatedDeleted = stringResource(R.string.audiobook_generated_deleted)
     // The audiobook's audio and subtitles saved into a folder the reader picks.
     val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
-        val hash = bookHash
-        val title = openBook?.title.orEmpty()
+        val hash = current.hash
+        val title = current.book?.title.orEmpty()
         if (tree != null && hash != null) {
             scope.launch {
                 val result = container.audiobookExporter.export(hash, title, tree)
@@ -474,13 +441,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (uri != null) {
             audiobook.keepAccess(uri)
             pickedAudio = uri
-            audiobookStep = AudiobookStep.SUBTITLES
+            overlays.audiobookStep = AudiobookStep.SUBTITLES
         }
     }
     val subtitlePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val audio = pickedAudio
-        val hash = bookHash
-        val id = openTtuId
+        val hash = current.hash
+        val id = current.ttuId
         pickedAudio = null
         if (audio != null && hash != null) {
             if (uri == null || id == null) {
@@ -501,8 +468,6 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             }
         }
     }
-    // The Dictionaries screen, under Settings; lookups without a dictionary open it directly.
-    var dictionariesShown by rememberSaveable { mutableStateOf(false) }
     val library: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)
     // Books opened with Honmani from other apps: added in the library, a single one opened.
     LaunchedEffect(library) {
@@ -528,12 +493,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
     }
     // The review screen, from Words or the launcher's "Review" shortcut.
-    var reviewShown by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(container) {
         container.searchRequests.reviewReceived.collect {
             if (!atLibrary) viewModel.closeBook()
             tab = HomeTab.WORDS
-            reviewShown = true
+            overlays.reviewShown = true
         }
     }
     // Words due, for the badge on the Words tab, and the new words a session would start.
@@ -571,8 +535,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // Reader settings the app itself acts on (volume buttons, long-press lookup), kept in ttu's
     // storage, read again when a book opens and after the reader settings close.
     var settingsVersion by remember { mutableStateOf(0) }
-    val appSettings by produceState(ReaderSettings(), atLibrary, readerSettings, settingsVersion) {
-        if (atLibrary || readerSettings) return@produceState
+    val appSettings by produceState(ReaderSettings(), atLibrary, overlays.readerSettings, settingsVersion) {
+        if (atLibrary || overlays.readerSettings) return@produceState
         value = try {
             ReaderSettings.fromStorage(viewModel.ttuLibrary.readSettings()).also {
                 // The rest of the app drops its animations in E-ink mode too.
@@ -588,9 +552,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
 
     // The book's background, also behind the status and navigation bars while a book is shown.
     var bookBackground by remember { mutableStateOf<Color?>(null) }
-    val frame = bookBackground.takeIf { !atLibrary && !readerSettings }
+    val frame = bookBackground.takeIf { !atLibrary && !overlays.readerSettings }
     BarIcons(background = frame)
-    ImmersiveBars(hidden = appSettings.hidesBars(atLibrary, readerSettings))
+    ImmersiveBars(hidden = appSettings.hidesBars(atLibrary, overlays.readerSettings))
 
     // The room the read-aloud bar takes: the book lays itself out above it, since a bar over the
     // page would cut the end off every column of vertical text.
@@ -610,7 +574,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 ttuLibrary = viewModel.ttuLibrary,
                 booksDir = viewModel.booksDir,
                 onBookChanged = {
-                    openTtuId = it
+                    current.ttuId = it
                     viewModel.onBookChanged(it)
                     tracker.setBook(it)
                 },
@@ -621,13 +585,13 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onOpenSettings = {
                     viewModel.dismiss()
-                    openedFromMenu = false
-                    readerSettings = true
+                    overlays.openedFromMenu = false
+                    overlays.readerSettings = true
                 },
                 onOpenMenu = viewModel::openMenu,
                 onContentsClosedByBack = {
-                    if (contentsFromMenu) viewModel.openMenu()
-                    contentsFromMenu = false
+                    if (overlays.contentsFromMenu) viewModel.openMenu()
+                    overlays.contentsFromMenu = false
                 },
                 onImage = {
                     viewModel.dismiss()
@@ -660,7 +624,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         }
                     }
                 },
-                highlightsKey = highlights,
+                highlightsKey = current.highlights,
                 readAloudMessages = pageMessages,
                 onReadAloud = { message ->
                     when (message) {
@@ -741,8 +705,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     },
                     messageAction = if (needsFiles) stringResource(R.string.audiobook_change) else null,
                     onMessageAction = {
-                        openedFromMenu = false
-                        audiobookStep = AudiobookStep.INTRO
+                        overlays.openedFromMenu = false
+                        overlays.audiobookStep = AudiobookStep.INTRO
                     },
                     previousDescription = stringResource(R.string.audiobook_previous),
                     nextDescription = stringResource(R.string.audiobook_next),
@@ -773,7 +737,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             val removedMessage = stringResource(R.string.highlight_removed)
             val undoLabel = stringResource(R.string.action_undo)
             fun highlightControls(tap: TapLookup): HighlightControls? {
-                val existing = tap.highlightId?.let { id -> highlights.firstOrNull { it.id == id } }
+                val existing = tap.highlightId?.let { id -> current.highlights.firstOrNull { it.id == id } }
                 if (existing != null) {
                     return HighlightControls(
                         current = existing.color,
@@ -790,8 +754,8 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     )
                 }
                 val extents = tap.selected
-                val hash = bookHash
-                val total = sectionsTotal
+                val hash = current.hash
+                val total = current.sectionsTotal
                 if (!tap.bySelection || extents == null || hash == null || total == null || !appSettings.selectionLookup) return null
                 return HighlightControls(
                     current = null,
@@ -802,7 +766,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         val passage = extents[extent]
                         viewModel.dismiss()
                         scope.launch {
-                            val same = highlights.firstOrNull { it.start == passage.start && it.end == passage.end }
+                            val same = current.highlights.firstOrNull { it.start == passage.start && it.end == passage.end }
                             jumpSnackbar.currentSnackbarData?.dismiss()
                             if (same != null) {
                                 container.highlightDao.setColor(same.id, color)
@@ -859,7 +823,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onOpenDictionaries = {
                         // Leave the book for the Dictionaries screen.
                         tab = HomeTab.SETTINGS
-                        dictionariesShown = true
+                        overlays.dictionariesShown = true
                         viewModel.ttuLibrary.show(LIBRARY_PATH)
                     },
                     highlight = highlightControls(state.tap),
@@ -917,7 +881,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 }
                 tab = selected
                 // A tab opens at its top level.
-                dictionariesShown = false
+                overlays.dictionariesShown = false
             }
             val badges = if (dictionaryUpdates.isNotEmpty()) setOf(HomeTab.SETTINGS) else emptySet()
             val counts = mapOf(HomeTab.WORDS to reviewDue)
@@ -976,7 +940,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                                 reviewDue = reviewDue,
                                 reviewNew = reviewNew,
                                 dueIds = dueToday.mapTo(HashSet()) { it.id },
-                                onStartReview = { reviewShown = true },
+                                onStartReview = { overlays.reviewShown = true },
                                 onShowStats = { tab = HomeTab.PROGRESS },
                                 reviewChoice = ReviewScopeChoice(reviewScope, reviewBooks.filter { !it.hidden }) {
                                     container.reviewScope.value = it
@@ -985,11 +949,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                             HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
                             HomeTab.SETTINGS -> SettingsScreen(
                                 bottomBar = tabBar,
-                                showingDictionaries = dictionariesShown,
-                                onShowDictionaries = { dictionariesShown = it },
+                                showingDictionaries = overlays.dictionariesShown,
+                                onShowDictionaries = { overlays.dictionariesShown = it },
                                 onOpenReaderSettings = {
-                                    openedFromMenu = false
-                                    readerSettings = true
+                                    overlays.openedFromMenu = false
+                                    overlays.readerSettings = true
                                 },
                                 onOpenSample = {
                                     // Back from the book is the library, where it now is.
@@ -1045,21 +1009,21 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         }
         val menuOpen by viewModel.menuOpen.collectAsStateWithLifecycle()
         // The book's text, only while the menu, the bookmark list or a new bookmark needs it (the slider, names, the page's spot).
-        val textWanted = !atLibrary && (menuOpen || bookmarksShown || bookmarkDraft != null || highlightsShown)
-        val bookText by produceState<BookText?>(null, openTtuId, textWanted) {
-            val id = openTtuId
+        val textWanted = !atLibrary && (menuOpen || overlays.bookmarksShown || overlays.bookmarkDraft != null || overlays.highlightsShown)
+        val bookText by produceState<BookText?>(null, current.ttuId, textWanted) {
+            val id = current.ttuId
             value = if (textWanted && id != null) container.searchableBook(id) else null
         }
         // Back from a sub-screen that came from the menu: close it and show the menu again; null otherwise.
-        val backToMenu = { close: () -> Unit -> if (openedFromMenu) ({ close(); viewModel.openMenu() }) else null }
+        val backToMenu = { close: () -> Unit -> if (overlays.openedFromMenu) ({ close(); viewModel.openMenu() }) else null }
         val jumpMessage = { percent: Int -> resources.getString(R.string.jump_back_message, percent) }
         val backLabel = stringResource(R.string.jump_back_action)
         val defaultName = { percent: Int -> resources.getString(R.string.bookmark_default_name, percent) }
         if (menuOpen && !atLibrary) {
             val syncState by container.koSyncStatus.state.collectAsStateWithLifecycle()
-            val syncFailure = syncState.failureFor(openTtuId)
+            val syncFailure = syncState.failureFor(current.ttuId)
             val place by produceState<MenuPlace?>(null, bookText) {
-                val id = openTtuId
+                val id = current.ttuId
                 val text = bookText
                 value = if (id == null || text == null) null else {
                     val characters = try {
@@ -1077,7 +1041,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 syncFailure = syncFailure?.let { syncFailureReason(it) },
                 place = place,
                 onJump = { characters ->
-                    val id = openTtuId
+                    val id = current.ttuId
                     val text = bookText
                     if (id != null && text != null) {
                         viewModel.closeMenu()
@@ -1095,28 +1059,28 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         viewModel.closeMenu()
                         val name = BookPlace.defaultName(text.around(here.characters.toInt())?.after.orEmpty())
                             ?: defaultName(BookPlace.percent(here.characters, here.total.toLong()))
-                        bookmarkDraft = BookmarkDraft(here.characters, here.total.toLong(), name)
+                        overlays.bookmarkDraft = BookmarkDraft(here.characters, here.total.toLong(), name)
                     }
                 },
                 onBookmarks = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    bookmarksShown = true
+                    overlays.openedFromMenu = true
+                    overlays.bookmarksShown = true
                 },
                 onHighlights = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    highlightsShown = true
+                    overlays.openedFromMenu = true
+                    overlays.highlightsShown = true
                 },
                 onContents = {
                     viewModel.closeMenu()
-                    contentsFromMenu = true
+                    overlays.contentsFromMenu = true
                     viewModel.ttuLibrary.openContents()
                 },
                 onSearch = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    searchShown = true
+                    overlays.openedFromMenu = true
+                    overlays.searchShown = true
                 },
                 onReadAloud = {
                     viewModel.closeMenu()
@@ -1124,27 +1088,27 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     audiobook.close()
                     readAloud.start()
                 },
-                pronunciationCount = pronunciations.size,
+                pronunciationCount = current.pronunciations.size,
                 onPronunciations = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    pronunciationsShown = true
+                    overlays.openedFromMenu = true
+                    overlays.pronunciationsShown = true
                 },
                 audiobookPaired = audiobookPaired || generated != null,
                 onAudiobook = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    audiobookStep = if (audiobookPaired || generated != null) AudiobookStep.MANAGE else AudiobookStep.INTRO
+                    overlays.openedFromMenu = true
+                    overlays.audiobookStep = if (audiobookPaired || generated != null) AudiobookStep.MANAGE else AudiobookStep.INTRO
                 },
                 onSettings = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    readerSettings = true
+                    overlays.openedFromMenu = true
+                    overlays.readerSettings = true
                 },
                 onSessionWords = {
                     viewModel.closeMenu()
-                    openedFromMenu = true
-                    sessionShown = true
+                    overlays.openedFromMenu = true
+                    overlays.sessionShown = true
                 },
                 onCloseBook = viewModel::closeBook,
                 onSetShowProgress = {
@@ -1157,30 +1121,30 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onDismiss = viewModel::closeMenu,
             )
         }
-        audiobookStep?.let { step ->
+        overlays.audiobookStep?.let { step ->
             AudiobookDialog(
                 step = step,
                 onChooseAudio = {
-                    audiobookStep = null
+                    overlays.audiobookStep = null
                     audioPicker.launch(arrayOf("audio/*", "application/ogg"))
                 },
                 onChooseSubtitles = {
-                    audiobookStep = null
+                    overlays.audiobookStep = null
                     subtitlePicker.launch(arrayOf("*/*"))
                 },
                 onPlay = {
-                    audiobookStep = null
-                    val id = openTtuId
+                    overlays.audiobookStep = null
+                    val id = current.ttuId
                     if (id != null) playAudiobook(id)
                 },
-                onChange = { audiobookStep = AudiobookStep.INTRO },
+                onChange = { overlays.audiobookStep = AudiobookStep.INTRO },
                 onExport = {
-                    audiobookStep = null
+                    overlays.audiobookStep = null
                     exportPicker.launch(null)
                 },
                 onRemove = {
-                    audiobookStep = null
-                    val hash = bookHash
+                    overlays.audiobookStep = null
+                    val hash = current.hash
                     if (hash != null) {
                         scope.launch {
                             audiobook.close()
@@ -1191,16 +1155,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         }
                     }
                 },
-                onDismiss = { audiobookStep = null },
-                onBack = backToMenu { audiobookStep = null },
+                onDismiss = { overlays.audiobookStep = null },
+                onBack = backToMenu { overlays.audiobookStep = null },
                 makeBlock = generatedModel?.block(),
                 onMake = {
-                    audiobookStep = null
+                    overlays.audiobookStep = null
                     generatedModel?.open()
-                    makeShown = true
+                    overlays.makeShown = true
                 },
                 generated = generated,
-                generatedActions = bookHash?.let { hash ->
+                generatedActions = current.hash?.let { hash ->
                     GeneratedActions(
                         onCancel = { container.audiobookScheduler.cancel(hash) },
                         onContinue = { capText ->
@@ -1213,7 +1177,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                             }
                         },
                         onDelete = {
-                            audiobookStep = null
+                            overlays.audiobookStep = null
                             scope.launch {
                                 container.audiobookScheduler.cancel(hash)
                                 audiobook.close()
@@ -1228,30 +1192,30 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             )
         }
         val make = generatedModel
-        if (makeShown && make != null) {
+        if (overlays.makeShown && make != null) {
             AudiobookMakeDialog(
-                title = openBook?.title.orEmpty(),
+                title = current.book?.title.orEmpty(),
                 state = makeState,
                 model = make,
                 readerSpeaking = audioPlaying,
                 onStarted = {
-                    makeShown = false
+                    overlays.makeShown = false
                     scope.launch {
                         jumpSnackbar.currentSnackbarData?.dismiss()
                         jumpSnackbar.showSnackbar(audiobookStarted)
                     }
                 },
-                onDismiss = { makeShown = false },
+                onDismiss = { overlays.makeShown = false },
             )
         }
-        bookmarkDraft?.let { draft ->
+        overlays.bookmarkDraft?.let { draft ->
             val added = stringResource(R.string.bookmark_added)
             BookmarkNameDialog(
                 title = stringResource(R.string.bookmark_dialog_title),
                 initial = draft.name,
                 onSave = { name ->
-                    bookmarkDraft = null
-                    val hash = bookHash
+                    overlays.bookmarkDraft = null
+                    val hash = current.hash
                     if (hash != null) {
                         scope.launch {
                             container.bookmarkDao.put(
@@ -1262,15 +1226,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         }
                     }
                 },
-                onDismiss = { bookmarkDraft = null },
+                onDismiss = { overlays.bookmarkDraft = null },
             )
         }
-        if (bookmarksShown && !atLibrary) {
+        if (overlays.bookmarksShown && !atLibrary) {
             BookmarksSheet(
-                bookmarks = bookmarks,
+                bookmarks = current.bookmarks,
                 onOpen = { bookmark ->
-                    bookmarksShown = false
-                    val id = openTtuId
+                    overlays.bookmarksShown = false
+                    val id = current.ttuId
                     if (id != null) {
                         val text = bookText
                         val spot = text?.aroundPageStart(bookmark.characters.toInt())
@@ -1283,16 +1247,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onRename = { bookmark, name -> scope.launch { container.bookmarkDao.rename(bookmark.id, name) } },
                 onDelete = { bookmark -> scope.launch { container.bookmarkDao.delete(bookmark.id) } },
                 onUndoDelete = { bookmark -> scope.launch { container.bookmarkDao.put(bookmark) } },
-                onDismiss = { bookmarksShown = false },
-                onBack = backToMenu { bookmarksShown = false },
+                onDismiss = { overlays.bookmarksShown = false },
+                onBack = backToMenu { overlays.bookmarksShown = false },
             )
         }
-        if (highlightsShown && !atLibrary) {
+        if (overlays.highlightsShown && !atLibrary) {
             HighlightsSheet(
-                highlights = highlights,
+                highlights = current.highlights,
                 onOpen = { highlight ->
-                    highlightsShown = false
-                    val id = openTtuId
+                    overlays.highlightsShown = false
+                    val id = current.ttuId
                     if (id != null) {
                         val text = bookText
                         val spot = text?.aroundPageStart(highlight.start.toInt())
@@ -1304,58 +1268,58 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
                 onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
-                onDismiss = { highlightsShown = false },
-                onBack = backToMenu { highlightsShown = false },
+                onDismiss = { overlays.highlightsShown = false },
+                onBack = backToMenu { overlays.highlightsShown = false },
             )
         }
-        if (pronunciationsShown && !atLibrary) {
-            val hash = bookHash
-            val corrected by produceState(emptyList<Pair<String, String>>(), pronunciationsShown) {
+        if (overlays.pronunciationsShown && !atLibrary) {
+            val hash = current.hash
+            val corrected by produceState(emptyList<Pair<String, String>>(), overlays.pronunciationsShown) {
                 value = container.wordRepository.withCorrectedFurigana().mapNotNull { PronunciationRules.fromFurigana(it.expression, it.furigana) }
             }
             PronunciationsSheet(
-                items = pronunciations,
-                suggestions = corrected.filter { (text, _) -> pronunciations.none { it.text == text } },
+                items = current.pronunciations,
+                suggestions = corrected.filter { (text, _) -> current.pronunciations.none { it.text == text } },
                 onSave = { text, reading ->
                     if (hash != null) scope.launch { container.pronunciationDao.put(PronunciationEntity(contentHash = hash, text = text, reading = reading, createdAt = System.currentTimeMillis())) }
                 },
                 onDelete = { item -> scope.launch { container.pronunciationDao.delete(item.id) } },
                 onUndoDelete = { item -> scope.launch { container.pronunciationDao.put(item) } },
-                onDismiss = { pronunciationsShown = false },
-                onBack = backToMenu { pronunciationsShown = false },
+                onDismiss = { overlays.pronunciationsShown = false },
+                onBack = backToMenu { overlays.pronunciationsShown = false },
             )
         }
-        val searchedBook = openTtuId
-        if (searchShown && searchedBook != null && !atLibrary) {
+        val searchedBook = current.ttuId
+        if (overlays.searchShown && searchedBook != null && !atLibrary) {
             BookSearchScreen(
                 loadText = { container.searchableBook(searchedBook) },
                 onOpenHit = { hit, total ->
-                    searchShown = false
+                    overlays.searchShown = false
                     jumper.jump(
                         searchedBook, hit.characters.toLong(), total.toLong(), hit.hint, hit.match, null,
                         resources.getString(R.string.jump_back_message, hit.percent), backLabel,
                     )
                 },
-                onClose = { searchShown = false; if (openedFromMenu) viewModel.openMenu() },
+                onClose = { overlays.searchShown = false; if (overlays.openedFromMenu) viewModel.openMenu() },
             )
         }
-        if (sessionShown) {
+        if (overlays.sessionShown) {
             val session by container.wordRepository.session.collectAsStateWithLifecycle(SessionWords(null, emptyList()))
-            SessionSheet(session, onDismiss = { sessionShown = false }, onBack = backToMenu { sessionShown = false })
+            SessionSheet(session, onDismiss = { overlays.sessionShown = false }, onBack = backToMenu { overlays.sessionShown = false })
         }
-        if (reviewShown) {
+        if (overlays.reviewShown) {
             ReviewScreen(
-                onClose = { reviewShown = false },
+                onClose = { overlays.reviewShown = false },
                 onOpenBook = {
                     // Back from the book returns to Words and its review card.
-                    reviewShown = false
+                    overlays.reviewShown = false
                     library.open(it)
                 },
             )
         }
-        if (readerSettings) {
+        if (overlays.readerSettings) {
             // On top of everything; closing it reloads the reader if anything changed.
-            ReaderSettingsScreen(onClose = { readerSettings = false; if (openedFromMenu) viewModel.openMenu() })
+            ReaderSettingsScreen(onClose = { overlays.readerSettings = false; if (overlays.openedFromMenu) viewModel.openMenu() })
         }
         SnackbarHost(jumpSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
