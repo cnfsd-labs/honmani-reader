@@ -1,5 +1,7 @@
 package app.honmani.reader.ui.reader
 
+import app.honmani.reader.data.stats.ReadingStats
+import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.words.ReadingSession
 import app.honmani.reader.diagnostics.logWarning
 import android.app.Activity
@@ -600,7 +602,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     } catch (_: Exception) {
                         null
                     }
-                    MenuPlace(characters ?: 0L, text.total)
+                    // The speed the book's sheet uses for its time left: recent days, else all reading.
+                    val speed = try {
+                        val days = container.readingDao.observeAll().first()
+                        ReadingStats.period(days, container.dayClock.today(), StatsPeriod.ALL).charactersPerHour
+                            ?: ReadingStats.book(days).charactersPerHour
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        null
+                    }
+                    MenuPlace(characters ?: 0L, text.total, speed)
                 }
             }
             ReaderMenuSheet(

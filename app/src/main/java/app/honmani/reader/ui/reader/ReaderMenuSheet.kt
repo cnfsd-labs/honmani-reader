@@ -39,6 +39,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.ui.stats.duration
 
 /**
  * The reader's bottom menu, opened by a tap on the footer of the page or a long swipe up anywhere on it (`reader-menu.js`): the
@@ -174,8 +175,19 @@ fun ReaderMenuSheet(
     }
 }
 
-/** Where the reader is and how long the book is, in ttu's characters. */
-data class MenuPlace(val characters: Long, val total: Int)
+/**
+ * Where the reader is and how long the book is, in ttu's characters; [charactersPerHour] is the
+ * reader's speed from the statistics (null without enough reading), for the time left.
+ */
+data class MenuPlace(val characters: Long, val total: Int, val charactersPerHour: Long? = null)
+
+/** " · About 2 h 5 min left" at the reader's speed for [left] characters; empty without a speed or at the end. */
+@Composable
+private fun timeLeft(place: MenuPlace, left: Long): String {
+    val speed = place.charactersPerHour?.takeIf { it > 0 } ?: return ""
+    if (left <= 0) return ""
+    return " · " + stringResource(R.string.book_time_left, duration(left * 3_600 / speed))
+}
 
 /** A slider over the whole book with its label; letting go jumps there. */
 @Composable
@@ -193,7 +205,7 @@ private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
                 BookPlace.percent(characters, total.toLong()),
                 numbers.format(characters),
                 numbers.format(total),
-            ),
+            ) + timeLeft(place, total - characters),
             style = MaterialTheme.typography.bodyMedium,
         )
         Slider(
