@@ -24,7 +24,7 @@ fun PanelUndo(viewModel: ReaderViewModel, hostState: SnackbarHostState) {
                 },
                 change.expression,
             )
-            val result = hostState.showSnackbar(message, resources.getString(R.string.action_undo), duration = SnackbarDuration.Short)
+            val result = hostState.showSnackbar(message, resources.getString(R.string.action_undo), duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) viewModel.undo(change)
         }
     }
