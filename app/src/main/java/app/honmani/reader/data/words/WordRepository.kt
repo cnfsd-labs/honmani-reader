@@ -340,6 +340,11 @@ class WordRepository(
 
     suspend fun markLearning(id: Long) = dao.markLearning(id)
 
+    /** Moves a saved word back to Learning by its written form and reading; nothing if it isn't saved. */
+    suspend fun markLearning(expression: String, reading: String) {
+        dao.find(expression, reading)?.let { dao.markLearning(it.id) }
+    }
+
     /** Deletes a word with its lookups and returns them, for [restore]; null if it is gone. */
     suspend fun delete(id: Long): DeletedWord? = database.withTransaction {
         val word = dao.find(id) ?: return@withTransaction null

@@ -15,6 +15,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import app.honmani.reader.ui.reader.LookupPanel
+import app.honmani.reader.ui.reader.PanelUndo
 import app.honmani.reader.ui.reader.ReaderViewModel
 import app.honmani.reader.ui.review.ReviewScopeChoice
 import app.honmani.reader.ui.nextPageInCycle
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -136,7 +138,6 @@ import app.honmani.reader.ui.known.KnownWordsCard
 import app.honmani.reader.ui.known.KnownWordsSheet
 import app.honmani.reader.ui.anki.showAnkiCheck
 import app.honmani.reader.ui.anki.showAnkiResult
-import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.FrequencyBadge
 import app.honmani.reader.ui.reader.GlossLines
@@ -343,11 +344,9 @@ fun WordsScreen(
     LaunchedEffect(searchPanel) {
         searchPanel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
-    LaunchedEffect(searchPanel) {
-        searchPanel.learnedWords.collect {
-            showMovedToKnown(context, it)
-        }
-    }
+    // The search panel's changes get their own host, above the panel (the Scaffold's is under it).
+    val panelSnackbar = remember { SnackbarHostState() }
+    PanelUndo(searchPanel, panelSnackbar)
     // Back from Words or Dictionary goes to Review, the page the tab opens on, as Progress's sections go to the first.
     BackHandler(enabled = panel == null && pager.currentPage != WordsPage.REVIEW.ordinal) {
         scope.launch { pager.animateScrollToPage(WordsPage.REVIEW.ordinal) }
@@ -489,12 +488,14 @@ fun WordsScreen(
                 onShowKanji = searchPanel::showKanji,
                 onBack = { searchPanel.back() },
                 onLearn = searchPanel::learn,
+                onRemove = searchPanel::removeWord,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
             )
         }
     }
+    SnackbarHost(panelSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 

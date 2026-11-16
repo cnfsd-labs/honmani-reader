@@ -72,7 +72,6 @@ import app.honmani.reader.ui.HomeTab
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
-import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.library.AddBookStart
 import app.honmani.reader.ui.library.LibraryViewModel
@@ -306,11 +305,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     LaunchedEffect(viewModel) {
         viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
-    LaunchedEffect(viewModel) {
-        viewModel.learnedWords.collect {
-            showMovedToKnown(context, it)
-        }
-    }
+    PanelUndo(viewModel, jumpSnackbar)
 
     // The words with a review card due today, for their tint in the book (word-marks.js).
     val dueWords = remember(dueToday) { dueToday.mapTo(HashSet()) { it.expression } as Set<String> }

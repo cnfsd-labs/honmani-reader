@@ -6,7 +6,9 @@ import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.data.dictionary.DictionaryEntity
 import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.TermEntity
+import app.honmani.reader.data.words.DeletedWord
 import app.honmani.reader.data.words.LookedUpWord
+import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.LookupUndo
 import app.honmani.reader.data.words.WordUndo
 import app.honmani.reader.data.words.WordRepository
@@ -802,7 +804,7 @@ class ReaderViewModelTest {
 
         assertEquals(listOf("record 食べ物", "learned 食べ物"), steps)
         assertTrue(WordRepository.key("食べ物", "食べ物") in (model.panel.value as LookupPanelState.Results).learned)
-        assertEquals("食べ物", model.learnedWords.first())
+        assertEquals(PanelChange.Learned("食べ物", "食べ物"), model.changes.first())
         // Once known, the menu offers it no more: a second tap on it changes nothing.
         model.markLearned(other)
         assertEquals(2, steps.size)
@@ -834,5 +836,84 @@ class ReaderViewModelTest {
         model.markLearned(group)
 
         assertTrue((model.panel.value as LookupPanelState.Results).learned.isEmpty())
+    }
+
+    @Test
+    fun undoingMarkLearned_movesTheWordBackToLearning() = runTest {
+        val steps = mutableListOf<String>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べる"), entry("食べ物", "食べ"))) },
+            compute = Dispatchers.Unconfined,
+            saveLearned = { expression, _ -> steps += "learned $expression" },
+            saveLearning = { expression, reading -> steps += "learning $expression $reading" },
+        )
+        model.onTap(tap("食べる"))
+        val other = (model.panel.value as LookupPanelState.Results).groups[1]
+        val key = WordRepository.key("食べ物", "食べ物")
+        model.markLearned(other)
+        val change = model.changes.first()
+
+        model.undo(change)
+
+        assertEquals(listOf("learned 食べ物", "learning 食べ物 食べ物"), steps)
+        assertFalse(key in (model.panel.value as LookupPanelState.Results).learned)
+        // The menu offers it again.
+        model.markLearned(other)
+        assertEquals("learned 食べ物", steps.last())
+    }
+
+    @Test
+    fun removeFromWords_deletesTheWord_andUndoPutsItBackAsItWas() = runTest {
+        val key = WordRepository.key("食べる", "食べる")
+        val saved = mutableSetOf(key)
+        val word = WordEntity(id = 7, expression = "食べる", reading = "食べる", gloss = "eat", starred = true,
+            lookupCount = 2, firstLookedUpAt = 1, lastLookedUpAt = 2, rankKey = 0.0, lastSentence = "", lastSurfaceStart = 0, lastSurfaceEnd = 0,
+        )
+        val deleted = DeletedWord(word, emptyList())
+        var restored: DeletedWord? = null
+        val search = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(emptyList()) },
+            compute = Dispatchers.Unconfined,
+            origin = LookupOrigin.SEARCH,
+            savedAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.filterTo(HashSet()) { it in saved } },
+            starredAmong = { words -> words.map { WordRepository.key(it.first, it.second) }.filterTo(HashSet()) { it in saved } },
+            deleteWord = { expression, reading -> deleted.takeIf { saved.remove(WordRepository.key(expression, reading)) } },
+            restoreWord = { restored = it; saved += WordRepository.key(it.word.expression, it.word.reading) },
+        )
+        search.showSearched(LookupGroups.from(LookupResult(listOf(entry("食べる", "taberu")))).single())
+        val group = (search.panel.value as LookupPanelState.Results).groups.single()
+        assertTrue(key in (search.panel.value as LookupPanelState.Results).saved)
+
+        search.removeWord(group)
+
+        val panel = search.panel.value as LookupPanelState.Results
+        assertFalse(key in panel.saved)
+        assertFalse(key in panel.starred)
+        assertTrue(saved.isEmpty())
+        val change = search.changes.first()
+        assertEquals("食べる", change.expression)
+
+        search.undo(change)
+
+        assertTrue(restored === deleted)
+        val after = search.panel.value as LookupPanelState.Results
+        assertTrue(key in after.saved)
+        assertTrue(key in after.starred)
+    }
+
+    @Test
+    fun removeFromWords_offersNothingForAWordNotSaved() {
+        var deletes = 0
+        val search = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(emptyList()) },
+            compute = Dispatchers.Unconfined,
+            origin = LookupOrigin.SEARCH,
+            deleteWord = { _, _ -> deletes++; null },
+        )
+        search.showSearched(LookupGroups.from(LookupResult(listOf(entry("食べる", "taberu")))).single())
+
+        search.removeWord((search.panel.value as LookupPanelState.Results).groups.single())
+
+        assertEquals(0, deletes)
     }
 }

@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.reader
 
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -98,6 +99,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -190,6 +192,8 @@ fun LookupPanel(
     onReadSentence: () -> Unit = {},
     /** "+ Learn" of a word found by a search: save it to Words; null (a tap in a book, which saves by itself) shows none. */
     onLearn: ((LookupGroup) -> Unit)? = null,
+    /** "Remove from Words" of a saved word found by a search, from its "In Words" label; null offers none. */
+    onRemove: ((LookupGroup) -> Unit)? = null,
     /** "Don't count": takes back what this tap changed (see [ReaderViewModel.dontCount]); null when it changed nothing. */
     onDontCount: (() -> Unit)? = null,
     /** The highlight swatches (a selection's lookup, or a tap on a highlighted word); null shows none. */
@@ -485,6 +489,11 @@ fun LookupPanel(
                                     onLookupWord = onLookupWord,
                                     onLearn = if (onLearn != null && state.previous == null) {
                                         { onLearn(group) }
+                                    } else {
+                                        null
+                                    },
+                                    onRemove = if (onRemove != null && state.previous == null) {
+                                        { onRemove(group) }
                                     } else {
                                         null
                                     },
@@ -853,6 +862,8 @@ private fun LookupGroupItem(
     onMarkLearned: (() -> Unit)? = null,
     onListen: () -> Unit = {},
     onLearn: (() -> Unit)? = null,
+    /** Removes the saved word from Words; offered from the "In Words" label. */
+    onRemove: (() -> Unit)? = null,
     saved: Boolean = false,
     kanji: Map<String, KanjiInfo> = emptyMap(),
     onShowKanji: (String) -> Unit = {},
@@ -971,7 +982,7 @@ private fun LookupGroupItem(
             FoldedMeaning(group)
             return@Column
         }
-        if (onLearn != null) LearnButton(saved, onLearn)
+        if (onLearn != null) LearnButton(saved, onLearn, onRemove)
         val brief = detail == Detail.BRIEF
         // Grammar ("te-form · teiru") and dictionary names only in the full view.
         if (!brief) InflectionLabels(group)
@@ -1000,22 +1011,59 @@ private fun LookupGroupItem(
     }
 }
 
-/** "+ Learn" for a word found by a search, or that it is in Words already. */
+/**
+ * "+ Learn" for a word found by a search, or that it is in Words already; that label opens a small
+ * menu to remove the word again ([onRemove]), for one saved by mistake.
+ */
 @Composable
-private fun LearnButton(saved: Boolean, onLearn: () -> Unit) {
+private fun LearnButton(saved: Boolean, onLearn: () -> Unit, onRemove: (() -> Unit)?) {
     if (saved) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(
-                Icons.Filled.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                stringResource(R.string.lookup_in_words),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
+        var menu by remember { mutableStateOf(false) }
+        Box {
+            Row(
+                modifier = if (onRemove != null) {
+                    Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClickLabel = stringResource(R.string.lookup_in_words_options)) { menu = true }
+                        .padding(vertical = 6.dp, horizontal = 4.dp)
+                } else {
+                    Modifier
+                },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    stringResource(R.string.lookup_in_words),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (onRemove != null) {
+                    // Shows that the label opens a menu.
+                    Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            if (onRemove != null) {
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_remove_from_words)) },
+                        onClick = {
+                            menu = false
+                            onRemove()
+                        },
+                    )
+                }
+            }
         }
     } else {
         FilledTonalButton(onClick = onLearn) {

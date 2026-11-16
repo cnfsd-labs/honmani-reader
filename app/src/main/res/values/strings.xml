@@ -388,6 +388,8 @@
     <string name="action_undo">Undo</string>
     <string name="word_moved_to_learned">%1$s moved to Known</string>
     <string name="word_deleted">%1$s deleted</string>
+    <string name="word_removed_from_words">%1$s removed from Words</string>
+    <string name="action_remove_from_words">Remove from Words</string>
 
     <string name="action_add_to_anki">Add to Anki</string>
     <string name="action_add_to_anki_with_sentence">Add to Anki with this sentence</string>
@@ -1015,6 +1017,7 @@
     <string name="search_english_pending">Getting English search ready: a minute after a dictionary is installed. Searching in Japanese and romaji works already.</string>
     <string name="lookup_learn">+ Learn</string>
     <string name="lookup_in_words">In Words</string>
+    <string name="lookup_in_words_options">Show options for this saved word</string>
     <string name="shortcut_search">Search</string>
     <string name="shortcut_search_long">Search dictionaries</string>
     <string name="shortcut_review">Review</string>

@@ -11,10 +11,12 @@ import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.CardContent
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.dictionary.FailureReason
+import app.honmani.reader.data.words.DeletedWord
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.LookupOrigin
 import app.honmani.reader.data.words.LookupUndo
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.data.words.WordStatus
 import app.honmani.reader.diagnostics.ReaderDiagnostics
 import app.honmani.reader.lookup.KanjiInfo
 import app.honmani.reader.lookup.LookupGroup
@@ -132,6 +134,12 @@ class ReaderViewModel(
     private val learnedAmong: suspend (Collection<Pair<String, String>>) -> Set<String> = { emptySet() },
     /** Moves the saved word (expression, reading) to Known, as "Mark as learned" in Words does. */
     private val saveLearned: suspend (expression: String, reading: String) -> Unit = { _, _ -> },
+    /** Moves the saved word (expression, reading) back to Learning: the undo of [saveLearned]. */
+    private val saveLearning: suspend (expression: String, reading: String) -> Unit = { _, _ -> },
+    /** Deletes the saved word (expression, reading) as the word list does; null if it isn't saved. */
+    private val deleteWord: suspend (expression: String, reading: String) -> DeletedWord? = { _, _ -> null },
+    /** Puts back a word [deleteWord] removed (undo). */
+    private val restoreWord: suspend (DeletedWord) -> Unit = {},
     /** The furigana corrections of these words (expression, reading) that have one, by [WordRepository.key]. */
     private val furiganaAmong: suspend (Collection<Pair<String, String>>) -> Map<String, String> = { emptyMap() },
     /** Saves the furigana correction of the saved word (expression, reading); blank removes it. */
@@ -723,10 +731,10 @@ class ReaderViewModel(
         emptySet()
     }
 
-    private val _learnedWords = Channel<String>(Channel.BUFFERED)
+    private val _changes = Channel<PanelChange>(Channel.BUFFERED)
 
-    /** Words moved to Known from the panel (their written form), to tell the reader. */
-    val learnedWords: Flow<String> = _learnedWords.receiveAsFlow()
+    /** Changes made from the panel (a word moved to Known or removed), to offer an undo for. */
+    val changes: Flow<PanelChange> = _changes.receiveAsFlow()
 
     /**
      * "Mark as learned" for [group] of the tapped text: saves the word first if this lookup hasn't
@@ -746,12 +754,72 @@ class ReaderViewModel(
                 record(tap, group).join()
                 saveLearned(group.expression, group.reading)
                 if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
-                _learnedWords.send(group.expression)
+                _changes.send(PanelChange.Learned(group.expression, group.reading))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log("Marking a word as learned failed: $e")
                 updateResults(tap) { it.copy(learned = it.learned - key) }
+            }
+        }
+    }
+
+    /**
+     * "Remove from Words" for [group], a saved word: deletes it as the word list's delete does,
+     * so a later lookup saves it again.
+     */
+    fun removeWord(group: LookupGroup) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        if (state.previous != null) return
+        val tap = state.tap
+        val key = WordRepository.key(group.expression, group.reading)
+        if (key !in state.saved) return
+        updateResults(tap) {
+            it.copy(saved = it.saved - key, starred = it.starred - key, ignored = it.ignored - key, learned = it.learned - key)
+        }
+        keep(key)
+        viewModelScope.launch {
+            try {
+                deleteWord(group.expression, group.reading)?.let { _changes.send(PanelChange.Removed(it)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Removing a word failed: $e")
+                updateResults(tap) { it.copy(saved = it.saved + key) }
+            }
+        }
+    }
+
+    /** Takes back [change]: the word goes back to Learning, or a removed word comes back as it was. */
+    fun undo(change: PanelChange) {
+        viewModelScope.launch {
+            try {
+                when (change) {
+                    is PanelChange.Learned -> saveLearning(change.expression, change.reading)
+                    is PanelChange.Removed -> restoreWord(change.deleted)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Undoing a change failed: $e")
+                return@launch
+            }
+            val key = WordRepository.key(change.expression, change.reading)
+            _panel.update { panel ->
+                if (panel !is LookupPanelState.Results) return@update panel
+                when (change) {
+                    is PanelChange.Learned -> panel.copy(learned = panel.learned - key)
+                    is PanelChange.Removed -> {
+                        val word = change.deleted.word
+                        fun Set<String>.with(on: Boolean) = if (on) this + key else this
+                        panel.copy(
+                            saved = panel.saved + key,
+                            starred = panel.starred.with(word.starred),
+                            ignored = panel.ignored.with(word.ignored),
+                            learned = panel.learned.with(word.status == WordStatus.LEARNED),
+                        )
+                    }
+                }
             }
         }
     }
@@ -961,6 +1029,11 @@ class ReaderViewModel(
                     },
                     learnedAmong = { container.wordRepository.learnedAmong(it) },
                     saveLearned = { expression, reading -> container.wordRepository.markLearned(expression, reading) },
+                    saveLearning = { expression, reading -> container.wordRepository.markLearning(expression, reading) },
+                    deleteWord = { expression, reading ->
+                        container.wordRepository.find(expression, reading)?.let { container.wordRepository.delete(it.id) }
+                    },
+                    restoreWord = { container.wordRepository.restore(it) },
                     furiganaAmong = { container.wordRepository.furiganaAmong(it) },
                     saveFurigana = { expression, reading, furigana ->
                         container.wordRepository.setFurigana(expression, reading, furigana)
@@ -978,5 +1051,20 @@ class ReaderViewModel(
                 )
             }
         }
+    }
+}
+
+/** A change made from the lookup panel that the reader can undo from a snackbar. */
+sealed interface PanelChange {
+    val expression: String
+    val reading: String
+
+    /** "Mark as learned": the word was in Learning before (a known word offers no such action). */
+    data class Learned(override val expression: String, override val reading: String) : PanelChange
+
+    /** "Remove from Words": the word as it was, with its lookups. */
+    class Removed(val deleted: DeletedWord) : PanelChange {
+        override val expression get() = deleted.word.expression
+        override val reading get() = deleted.word.reading
     }
 }

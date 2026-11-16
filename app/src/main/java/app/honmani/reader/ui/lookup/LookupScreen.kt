@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,9 +59,9 @@ import app.honmani.reader.R
 import app.honmani.reader.ui.anki.rememberAnkiAccess
 import app.honmani.reader.ui.anki.rememberAnkiEnabled
 import app.honmani.reader.ui.anki.showAnkiResult
-import app.honmani.reader.ui.anki.showMovedToKnown
 import app.honmani.reader.ui.anki.showVoiceProblem
 import app.honmani.reader.ui.reader.LookupPanel
+import app.honmani.reader.ui.reader.PanelUndo
 import app.honmani.reader.ui.reader.ReaderViewModel
 import app.honmani.reader.ui.reader.TapLookup
 
@@ -107,11 +110,8 @@ fun LookupScreen(
     LaunchedEffect(viewModel) {
         viewModel.voiceProblems.collect { showVoiceProblem(context, it) }
     }
-    LaunchedEffect(viewModel) {
-        viewModel.learnedWords.collect {
-            showMovedToKnown(context, it)
-        }
-    }
+    val undoSnackbar = remember { SnackbarHostState() }
+    PanelUndo(viewModel, undoSnackbar)
     BackHandler { if (!viewModel.back()) onDone() }
 
     Column(
@@ -188,6 +188,7 @@ fun LookupScreen(
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
                 )
             }
+            SnackbarHost(undoSnackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
 }
