@@ -15,7 +15,12 @@ sealed interface GlossItem {
     data class Ruby(val base: String, val reading: String, val keyword: Boolean = false, val query: String? = null) : GlossItem
 
     /** A label such as "noun", "transitive" or "abbr.". */
-    data class Tag(val text: String) : GlossItem
+    data class Tag(val text: String) : GlossItem {
+        companion object {
+            /** Labels next to each other as drawn in one chip: "cop · aux-v", one separator each, no stray spaces. */
+            fun join(tags: List<Tag>): String = tags.map { it.text.trim() }.filter { it.isNotEmpty() }.joinToString(" · ")
+        }
+    }
 }
 
 enum class GlossStyle {

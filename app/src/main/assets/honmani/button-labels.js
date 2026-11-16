@@ -4,6 +4,7 @@
  * page-turn strips at the left and right edges. ttu draws them again whenever the page changes,
  * so the names are set again after each change of the page. Also the top bar's icon on the right on
  * a phone (a plain div that opens a small menu with Jump, Images, Settings), which has no name at all.
+ * ttu's contents buttons get the app's word for them ("Contents").
  */
 (() => {
   'use strict';
@@ -12,6 +13,9 @@
     ['button.fixed.inset-x-0.top-0', 'Show the reader menu'],
     ['button.fixed.left-0.w-5', 'Page to the left'],
     ['button.fixed.right-0.w-5', 'Page to the right'],
+    // ttu's own titles say "Table of Contents"; the rest of the app says "Contents".
+    ['[title="Open Table of Contents"]', 'Contents'],
+    ['[title="Close Table of Contents"]', 'Close contents'],
   ];
 
   /** ttu's header menu on narrow screens: the icon inside the popover that only shows below the sm breakpoint. */

@@ -89,6 +89,7 @@ import app.honmani.reader.data.stats.ReadingLevel
 import app.honmani.reader.ui.InfoButton
 import app.honmani.reader.ui.InfoDialog
 import app.honmani.reader.ui.ProgressBar
+import app.honmani.reader.ui.mediumDateFormat
 import app.honmani.reader.ui.nextPageInCycle
 import app.honmani.reader.ui.stats.StatTile
 import app.honmani.reader.ui.stats.StatisticsContent
@@ -100,7 +101,6 @@ import app.honmani.reader.ui.theme.motionTween
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlinx.coroutines.launch
 
 /** Sections of the Progress tab. */
@@ -391,7 +391,7 @@ private fun NextMilestones(next: List<Milestone>) {
  */
 @Composable
 private fun AllMilestones(milestones: List<Milestone>, recentSince: LocalDate) {
-    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT) }
+    val dateFormat = remember { mediumDateFormat() }
     var explaining by rememberSaveable { mutableStateOf(false) }
     if (explaining) {
         InfoDialog(stringResource(R.string.progress_milestones), stringResource(R.string.progress_milestones_how), onDismiss = { explaining = false })

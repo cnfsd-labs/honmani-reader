@@ -3,6 +3,7 @@ package app.honmani.reader.ui.settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -10,6 +11,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -19,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -30,6 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.data.sync.KoSyncException
+import app.honmani.reader.ui.InfoAction
 import kotlinx.coroutines.launch
 
 /**
@@ -140,7 +144,19 @@ private fun SignInDialog(onDismiss: () -> Unit, initialServer: String = "", init
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
-                Text(stringResource(R.string.sync_message), style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.sync_message),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    InfoAction(title = stringResource(R.string.sync_servers_title), text = stringResource(R.string.sync_servers_info))
+                }
+                SuggestionChip(
+                    onClick = { server = KOREADER_SYNC_SERVER },
+                    label = { Text(stringResource(R.string.sync_use_koreader_server)) },
+                    enabled = !checking,
+                )
                 OutlinedTextField(
                     value = server,
                     onValueChange = { server = it },
@@ -189,3 +205,6 @@ private fun SignInDialog(onDismiss: () -> Unit, initialServer: String = "", init
         },
     )
 }
+
+/** KOReader's public sync server, filled in by the dialog's chip. */
+private const val KOREADER_SYNC_SERVER = "https://sync.koreader.rocks"

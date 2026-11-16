@@ -85,13 +85,12 @@ import app.honmani.reader.data.difficulty.GradingState
 import app.honmani.reader.ui.ProgressBar
 import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.ui.difficultyBand
+import app.honmani.reader.ui.mediumDateFormat
 import app.honmani.reader.ui.progress.ProgressViewModel
 import app.honmani.reader.ui.stats.BookStatistics
 import app.honmani.reader.ui.stats.StatisticsViewModel
 import app.honmani.reader.ui.stats.duration
 import app.honmani.reader.ui.stats.number
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -496,7 +495,9 @@ private fun Statistics(stats: BookStatistics) {
             Fact(
                 label = stringResource(R.string.book_read_so_far),
                 value = number(stats.position),
-                detail = stats.bookCharacters?.let { stringResource(R.string.book_of_characters, number(it)) },
+                // Characters read: the book's length when known, else the unit alone.
+                detail = stats.bookCharacters?.let { stringResource(R.string.book_of_characters, number(it)) }
+                    ?: pluralStringResource(R.plurals.book_characters_unit, stats.position.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()),
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
@@ -513,7 +514,7 @@ private fun Statistics(stats: BookStatistics) {
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
-        val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+        val dateFormat = remember { mediumDateFormat() }
         val dayClock = remember { (context.applicationContext as HonmaniApplication).container.dayClock }
         val dates = listOfNotNull(
             reading.firstDay?.let { stringResource(R.string.book_first_read, it.format(dateFormat)) },

@@ -243,6 +243,7 @@ test('the reader bar keeps the table of contents; its Settings entry opens the a
   // ttu shows its bar after a tap on the strip at the top of the page.
   await page.mouse.click(page.viewportSize().width / 2, 10);
   await expect(page.locator('[title="Open Table of Contents"]')).toBeVisible();
+  await expect(page.locator('[title="Open Table of Contents"]')).toHaveAttribute('aria-label', 'Contents');
   for (const title of ['Complete Book', 'Toggle Fullscreen', 'Go to Statistics', 'Go to Book Manager', 'Open Custom Point Actions']) {
     for (const element of await page.locator(`[title="${title}"]`).all()) await expect(element).toBeHidden();
   }

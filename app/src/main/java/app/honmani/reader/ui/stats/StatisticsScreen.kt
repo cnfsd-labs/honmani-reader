@@ -68,12 +68,12 @@ import app.honmani.reader.data.stats.StatsPeriod
 import app.honmani.reader.data.stats.WeekSpeed
 import app.honmani.reader.ui.InfoButton
 import app.honmani.reader.ui.InfoDialog
+import app.honmani.reader.ui.mediumDateFormat
 
 import java.text.NumberFormat
 import android.text.format.DateFormat
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import java.time.format.FormatStyle
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -165,7 +165,7 @@ fun StatisticsContent(
                 }
                 StatsPeriod.ALL -> {
                     SpeedTrend(summary.speedTrend)
-                    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+                    val dateFormat = remember { mediumDateFormat() }
                     BarChart(
                         title = stringResource(R.string.stats_week_chart),
                         bars = summary.chart,
@@ -183,7 +183,7 @@ fun StatisticsContent(
 private fun RefoldDialog(viewModel: StatisticsViewModel, onDismiss: () -> Unit) {
     var info by remember { mutableStateOf<StatisticsViewModel.RefoldInfo?>(null) }
     LaunchedEffect(viewModel) { info = viewModel.refoldInfo() }
-    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+    val dateFormat = remember { mediumDateFormat() }
     val current = info
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -527,7 +527,7 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
     var selected by rememberSaveable(weeks.size) { mutableStateOf(measured.lastOrNull()?.index ?: -1) }
     val color = MaterialTheme.colorScheme.primary
     val grid = MaterialTheme.colorScheme.outlineVariant
-    val dateFormat = remember { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM) }
+    val dateFormat = remember { mediumDateFormat() }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(

@@ -100,13 +100,18 @@ private fun annotated(items: List<GlossItem>, onLookup: (String) -> Unit): Annot
     val keyword = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
     val link = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary))
     return buildAnnotatedString {
-        items.forEachIndexed { i, item ->
-            when (item) {
+        var i = 0
+        while (i < items.size) {
+            when (val item = items[i]) {
                 is GlossItem.Tag -> {
-                    // A label after text is set off by a space.
-                    if (i > 0 && items[i - 1] !is GlossItem.Tag) append(' ')
-                    withStyle(tag) { append(" ${item.text} ") }
-                    if (items.getOrNull(i + 1) != null) append(' ')
+                    // Labels next to each other share one chip; a chip is set off from text by one space.
+                    val run = items.drop(i).takeWhile { it is GlossItem.Tag }.filterIsInstance<GlossItem.Tag>()
+                    if (i > 0) append(' ')
+                    // Thin spaces pad the chip's background without reading as gaps.
+                    withStyle(tag) { append("\u2009${GlossItem.Tag.join(run)}\u2009") }
+                    i += run.size
+                    if (i < items.size) append(' ')
+                    continue
                 }
                 is GlossItem.Text -> {
                     val styled: AnnotatedString.Builder.() -> Unit = {
@@ -125,6 +130,7 @@ private fun annotated(items: List<GlossItem>, onLookup: (String) -> Unit): Annot
                 }
                 is GlossItem.Ruby -> append(item.base) // only in lines without furigana, so not reached
             }
+            i++
         }
     }
 }

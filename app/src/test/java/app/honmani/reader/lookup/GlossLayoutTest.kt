@@ -131,4 +131,10 @@ class GlossLayoutTest {
         val inside = GlossLine(listOf(GlossItem.Text("to eat"), GlossItem.Tag("colloquial"), GlossItem.Text("(rare)")))
         assertEquals(inside, inside.tagsLast())
     }
+
+    @Test
+    fun `labels side by side join with one separator and no stray spaces`() {
+        assertEquals("n", GlossItem.Tag.join(listOf(GlossItem.Tag("n "))))
+        assertEquals("cop · aux-v", GlossItem.Tag.join(listOf(GlossItem.Tag(" cop"), GlossItem.Tag(""), GlossItem.Tag("aux-v  "))))
+    }
 }

@@ -88,11 +88,14 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
                 }) { Text(stringResource(R.string.backup_save)) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    choosing = false
-                    // Some file managers don't know zip's type, or call it something else.
-                    open.launch(arrayOf(BackupCodec.MIME_TYPE, "application/x-zip-compressed", "application/octet-stream"))
-                }) { Text(stringResource(R.string.backup_restore)) }
+                Row {
+                    TextButton(onClick = { choosing = false }) { Text(stringResource(R.string.action_cancel)) }
+                    TextButton(onClick = {
+                        choosing = false
+                        // Some file managers don't know zip's type, or call it something else.
+                        open.launch(arrayOf(BackupCodec.MIME_TYPE, "application/x-zip-compressed", "application/octet-stream"))
+                    }) { Text(stringResource(R.string.backup_restore)) }
+                }
             },
         )
     }
@@ -319,7 +322,7 @@ fun AutoBackupOffer(viewModel: BackupViewModel = viewModel(factory = BackupViewM
     // Its own restore's progress and result only: Settings shows those of its own.
     var restoring by rememberSaveable { mutableStateOf(false) }
     offer?.let { madeAt ->
-        val date = remember(madeAt) { DateFormat.getDateInstance(DateFormat.LONG).format(Date(madeAt)) }
+        val date = remember(madeAt) { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(madeAt)) }
         AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.auto_backup_offer_title)) },

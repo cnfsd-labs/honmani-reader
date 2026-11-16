@@ -431,7 +431,7 @@
     <string name="network_activity_title">Network activity</string>
     <string name="network_activity_summary">What Honmani has contacted since it started</string>
     <string name="network_activity_details">The latest requests Honmani made: dictionary downloads, book servers, progress sync and Google voices. Only the server name is listed, never addresses, logins or keys. The list stays on this phone and is cleared when the app stops.</string>
-    <string name="network_activity_empty">Nothing yet. Honmani only uses the network when you ask it to.</string>
+    <string name="network_activity_empty">Nothing yet. Honmani only uses the network for what you ask for or set up: downloads, book servers (when the app starts, too, if one downloads new books automatically) and progress sync.</string>
     <string name="network_activity_clear">Clear</string>
     <string name="network_purpose_dictionary">Dictionary download</string>
     <string name="network_purpose_book_server">Book server</string>
@@ -1062,7 +1062,7 @@
     <string name="review_page_no_starred_title">No starred words</string>
     <string name="review_page_no_starred_body">None of the words you are learning is starred. Star a word in your Words list or in the lookup panel, then come back.</string>
     <string name="review_page_settings">Review settings</string>
-    <string name="review_page_stats">Stats</string>
+    <string name="review_page_stats">Progress</string>
     <string name="review_page_no_words_title">No words yet</string>
     <string name="review_page_no_words_body">Words you tap while reading show up here, and you can practise them in a review.</string>
     <string name="review_start">Start</string>
@@ -1386,6 +1386,10 @@
     <string name="book_nothing_counted">No reading counted in this book yet.</string>
     <string name="book_read_so_far">Read so far</string>
     <string name="book_of_characters">of %1$s characters</string>
+    <plurals name="book_characters_unit">
+        <item quantity="one">character</item>
+        <item quantity="other">characters</item>
+    </plurals>
     <string name="book_per_hour">characters/hour</string>
     <string name="book_first_read">First read %1$s</string>
     <string name="book_finished_on">finished %1$s</string>
@@ -1497,7 +1501,10 @@
     <string name="sync_signed_in">%1$s on %2$s</string>
     <string name="sync_needs_password">%1$s on %2$s: this phone can no longer read the saved password. Tap to enter it again; positions not yet sent are kept.</string>
     <string name="sync_signed_in_details">Signed in as %1$s on %2$s. Your reading position in EPUBs is saved there and taken from there when you open a book. Books match when every device has the same file.</string>
-    <string name="sync_message">Use a KOReader sync server: sync.koreader.rocks, your own, Calibre-Web Automated (your web login) or Komga (an API key as user name). Sign in with your KOReader account.</string>
+    <string name="sync_message">Use a KOReader sync server and sign in with your account there.</string>
+    <string name="sync_use_koreader_server">Use KOReader\'s server</string>
+    <string name="sync_servers_title">Sync servers</string>
+    <string name="sync_servers_info">KOReader\'s own server (sync.koreader.rocks) or your own KOReader sync server: sign in with your KOReader account.\n\nCalibre-Web Automated: its address with your web login.\n\nKomga: its address with an API key as user name.</string>
     <string name="sync_server">Server</string>
     <string name="sync_server_hint">https://sync.koreader.rocks</string>
     <string name="sync_username">User name</string>
