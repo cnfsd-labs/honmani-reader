@@ -197,11 +197,12 @@ class AudiobookMakerWorkerTest {
         maker.freeze(plan())
         useMaker(maker)
         val reached = CompletableDeferred<Unit>()
-        // A request can't be interrupted: the stuck one is answered only after the cancel.
+        // A request can't be interrupted: the stuck ones are answered only after the cancel. Every
+        // request from the fifth on waits, so the other of the two parallel requests can't run ahead.
         val answer = CompletableDeferred<Unit>()
         behave = { call, text ->
-            if (call == 4) {
-                reached.complete(Unit)
+            if (call >= 4) {
+                if (call == 4) reached.complete(Unit)
                 answer.await()
             }
             mp3(text)
