@@ -228,6 +228,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     }
     SideEffect { audio.pronunciationRules = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
     LaunchedEffect(atLibrary, current.ttuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
+    // After the effect above: the page can report the book before the reader leaves the library,
+    // and leaving it would dismiss the jump's "Back to where you were".
+    var bookShown by remember { mutableStateOf(false) }
+    LaunchedEffect(atLibrary, current.ttuId, bookShown) {
+        if (atLibrary || !bookShown) return@LaunchedEffect
+        overlays.openAt?.let { place ->
+            overlays.openAt = null
+            jumpToLookup(place)
+        }
+    }
     // Back from a book after a session of lookups: its words, once per session (ReadingSession.offersReview).
     val sessionSnackbar = remember { SnackbarHostState() }
     var bookOpenedAt by remember { mutableStateOf<Long?>(null) }
@@ -443,6 +453,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                     atLibrary = it
                     if (it) {
+                        bookShown = false
                         viewModel.dismiss()
                         library.bookClosed()
                     }
@@ -478,10 +489,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onBookShown = {
                     audio.readAloud.pageReloaded()
                     audio.audiobook.controller.pageReloaded()
-                    overlays.openAt?.let { place ->
-                        overlays.openAt = null
-                        jumpToLookup(place)
-                    }
+                    bookShown = true
                 },
                 volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown, panelSpeaking),
                 hideSelectionToolbar = appSettings.selectionLookup,
