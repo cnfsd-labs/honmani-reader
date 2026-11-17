@@ -156,6 +156,8 @@ class ReviewViewModelTest {
 
         assertFalse(hint.shown)
         model.start()
+        // start() builds the new (empty) session in a coroutine: wait for it before reading the state.
+        waitFor(model) { !it.loading && it.remembered == 0 }
         assertFalse(model.state.value.swipeHint)
     }
 
