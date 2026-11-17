@@ -41,6 +41,13 @@ internal class ReaderOverlays(bookmarkDraft: MutableState<BookmarkDraft?>) {
     var bookmarksShown by mutableStateOf(false)
     var bookmarkDraft by bookmarkDraft
 
+    /**
+     * A place to jump to once the book being opened from Words or a review card ("Open in book") is
+     * on screen: library book id to ttu's character count. Not kept over a rotation (the jump would
+     * come too late to matter).
+     */
+    var openAt by mutableStateOf<Pair<Long, Long>?>(null)
+
     /** The open book's highlight list (reader menu). */
     var highlightsShown by mutableStateOf(false)
     var pronunciationsShown by mutableStateOf(false)

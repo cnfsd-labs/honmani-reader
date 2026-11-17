@@ -175,7 +175,10 @@ internal fun HomeTabs(
                         },
                         libraryBookIds = remember(reviewBooks) { reviewBooks.mapTo(HashSet()) { it.id } },
                         // Back from the book returns to Words.
-                        onOpenBook = library::open,
+                        onOpenBook = { id, position ->
+                            overlays.openAt = position?.let { id to it }
+                            library.open(id)
+                        },
                     )
                     HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
                     HomeTab.SETTINGS -> SettingsScreen(

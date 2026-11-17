@@ -18,6 +18,16 @@ class TapLookupTest {
     }
 
     @Test
+    fun parse_readsTheLookupsPlaceInTheBook() {
+        val message = { position: String -> """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"position":$position}""" }
+
+        assertEquals(1_234L, TapLookup.parse(message("1234"))?.position)
+        assertEquals(0L, TapLookup.parse(message("0"))?.position)
+        assertNull(TapLookup.parse(message("-1"))?.position)
+        assertNull(TapLookup.parse("""{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0}""")?.position)
+    }
+
+    @Test
     fun parse_marksALongPressLookup() {
         val message = """{"type":"lookup","text":"猫","sentence":"猫","sentenceOffset":0,"selection":true}"""
 

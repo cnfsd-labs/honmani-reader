@@ -144,8 +144,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReviewScreen(
     onClose: () -> Unit,
-    /** Opens the book (by its library id) a card's sentence came from. */
-    onOpenBook: (Long) -> Unit,
+    /** Opens the book (by its library id) a card's sentence came from, at the sentence's place (ttu's character count) if known. */
+    onOpenBook: (bookId: Long, position: Long?) -> Unit,
     /** The book read last, offered when the session is done; null: only Close. */
     continueBook: ReadNext.Continue? = null,
     viewModel: ReviewViewModel = viewModel(factory = ReviewViewModel.Factory),
@@ -310,7 +310,7 @@ fun ReviewScreen(
                         }
                     }
                 } else if (!state.loading) {
-                    Finished(state, onClose, continueBook, onOpenBook, modifier = Modifier.weight(1f))
+                    Finished(state, onClose, continueBook, { onOpenBook(it, null) }, modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -352,7 +352,7 @@ private fun ReviewTopBar(
     viewModel: ReviewViewModel,
     onClose: () -> Unit,
     onLookUp: (ReviewCardUi) -> Unit,
-    onOpenBook: (Long) -> Unit,
+    onOpenBook: (Long, Long?) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
@@ -400,8 +400,9 @@ private fun ReviewTopBar(
                             MenuItem(R.string.furigana_correct, close) { editingFurigana = true }
                         }
                         MenuItem(R.string.action_lookup_word, close) { onLookUp(card) }
-                        val bookId = card.sentence?.bookId
-                        if (bookId != null) MenuItem(R.string.review_open_in_book, close) { onOpenBook(bookId) }
+                        val sentence = card.sentence
+                        val bookId = sentence?.bookId
+                        if (bookId != null) MenuItem(R.string.review_open_in_book, close) { onOpenBook(bookId, sentence.position) }
                         MenuItem(R.string.review_not_a_word, close, viewModel::ignore)
                         MenuItem(R.string.review_remove, close, viewModel::remove)
                     }

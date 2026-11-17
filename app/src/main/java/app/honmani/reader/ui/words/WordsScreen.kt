@@ -173,7 +173,7 @@ fun WordsScreen(
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
     /** Ids of the books in the library: a word's sentence from one of them offers "Open in book". */
     libraryBookIds: Set<Long> = emptySet(),
-    onOpenBook: (Long) -> Unit = {},
+    onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
     viewModel: WordsViewModel = viewModel(factory = WordsViewModel.Factory),
     search: SearchViewModel = viewModel(factory = SearchViewModel.Factory),
     // Its own lookup panel, apart from the reader's: a search saves no word by itself.
@@ -558,7 +558,7 @@ private fun WordsContent(
     onDismissOffer: () -> Unit = {},
     dueIds: Set<Long> = emptySet(),
     libraryBookIds: Set<Long> = emptySet(),
-    onOpenBook: (Long) -> Unit = {},
+    onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
 ) {
     // Above the keyboard when the filter field is typed in.
     Column(modifier = Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding()) {
@@ -717,7 +717,7 @@ private fun WordList(
     onOfferKnown: () -> Unit = {},
     onDismissOffer: () -> Unit = {},
     libraryBookIds: Set<Long> = emptySet(),
-    onOpenBook: (Long) -> Unit = {},
+    onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
 ) {
     when {
         words == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -771,7 +771,7 @@ private fun WordList(
                 // Removals and reorders glide; still in E-ink mode.
                 Column(if (LocalMotionEnabled.current) Modifier.animateItem() else Modifier) {
                     val lookups = if (expanded) uiState.lookups.filter { it.wordId == word.id } else emptyList()
-                    val bookId = OpenInBook.bookOf(lookups, libraryBookIds)
+                    val place = OpenInBook.placeOf(lookups, libraryBookIds)
                     WordRow(
                         word = word,
                         now = now,
@@ -781,7 +781,7 @@ private fun WordList(
                         due = word.id in dueIds,
                         expanded = expanded,
                         lookups = lookups,
-                        onOpenBook = bookId?.let { id -> { onOpenBook(id) } },
+                        onOpenBook = place?.let { { onOpenBook(it.bookId, it.position) } },
                         onToggleExpanded = { onToggleExpanded(word.id) },
                         onSetStarred = { onSetStarred(word.id, it) },
                         onMarkLearned = { onMarkLearned(word) },

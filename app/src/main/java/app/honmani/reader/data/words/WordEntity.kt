@@ -112,6 +112,8 @@ data class WordLookupEntity(
     @ColumnInfo(name = "book_title") val bookTitle: String? = null,
     @ColumnInfo(name = "looked_up_at") val lookedUpAt: Long,
     @ColumnInfo(defaultValue = "'READER'") val origin: LookupOrigin = LookupOrigin.READER,
+    /** ttu's character count before the looked-up text in [bookId] ("Open in book" goes there); null if unknown. */
+    val position: Long? = null,
 )
 
 /**

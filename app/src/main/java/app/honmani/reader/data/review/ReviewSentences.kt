@@ -10,6 +10,8 @@ data class ReviewSentence(
     val end: Int,
     val bookId: Long?,
     val bookTitle: String?,
+    /** ttu's character count of the lookup in [bookId], if known ("Open in book" goes there). */
+    val position: Long? = null,
 )
 
 object ReviewSentences {
@@ -20,7 +22,7 @@ object ReviewSentences {
      */
     fun pick(word: WordEntity, lookups: List<WordLookupEntity>, reviews: Int): ReviewSentence? {
         val found = lookups
-            .map { ReviewSentence(it.sentence, it.surfaceStart, it.surfaceEnd, it.bookId, it.bookTitle) }
+            .map { ReviewSentence(it.sentence, it.surfaceStart, it.surfaceEnd, it.bookId, it.bookTitle, it.position) }
             .filter(::usable)
             .distinctBy { it.text }
         if (found.isNotEmpty()) return found[reviews.coerceAtLeast(0) % found.size]

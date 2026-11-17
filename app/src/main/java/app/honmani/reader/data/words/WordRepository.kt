@@ -25,6 +25,8 @@ data class LookedUpWord(
     val bookId: Long? = null,
     val bookTitle: String? = null,
     val origin: LookupOrigin = LookupOrigin.READER,
+    /** ttu's character count before [surface] in the book, if the page measured it. */
+    val position: Long? = null,
 )
 
 data class WordCounts(val learning: Int = 0, val starred: Int = 0, val learned: Int = 0, val forAnki: Int = 0)
@@ -190,6 +192,7 @@ class WordRepository(
                     bookTitle = word.bookTitle,
                     lookedUpAt = time,
                     origin = word.origin,
+                    position = word.position?.takeIf { word.bookId != null },
                 ),
             )
             dao.pruneLookups(wordId, KEPT_LOOKUPS)

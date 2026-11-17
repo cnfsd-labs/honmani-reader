@@ -209,6 +209,23 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
     val jumpSnackbar = remember { SnackbarHostState() }
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }
+    // "Open in book" on a saved word: once its book is on screen, a jump to the lookup's place (with "Back to where you were").
+    val jumpToLookup = { (bookId, position): Pair<Long, Long> ->
+        val ttuId = current.ttuId
+        if (ttuId != null) {
+            scope.launch {
+                if (container.bookDao.find(bookId)?.ttuId != ttuId) return@launch
+                val text = container.searchableBook(ttuId) ?: return@launch
+                val characters = position.coerceIn(0L, text.total.toLong())
+                val spot = text.around(characters.toInt())
+                jumper.jump(
+                    ttuId, characters, text.total.toLong(), spot?.hint.orEmpty(), spot?.match.orEmpty(), text,
+                    resources.getString(R.string.jump_back_message, BookPlace.percent(characters, text.total.toLong())),
+                    resources.getString(R.string.jump_back_action),
+                )
+            }
+        }
+    }
     SideEffect { audio.pronunciationRules = PronunciationRules(current.pronunciations.map { it.text to it.reading }) }
     LaunchedEffect(atLibrary, current.ttuId) { jumpSnackbar.currentSnackbarData?.dismiss() }
     // Back from a book after a session of lookups: its words, once per session (ReadingSession.offersReview).
@@ -461,6 +478,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 onBookShown = {
                     audio.readAloud.pageReloaded()
                     audio.audiobook.controller.pageReloaded()
+                    overlays.openAt?.let { place ->
+                        overlays.openAt = null
+                        jumpToLookup(place)
+                    }
                 },
                 volumeKeysTurnPages = VolumeKeys.turnPages(appSettings.volumeKeys, readAloudBarShown || audiobookBarShown, panelSpeaking),
                 hideSelectionToolbar = appSettings.selectionLookup,
@@ -712,10 +733,11 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReviewScreen(
                 continueBook = ReadNext.of(libraryState) as? ReadNext.Continue,
                 onClose = { overlays.reviewShown = false },
-                onOpenBook = {
+                onOpenBook = { id, position ->
                     // Back from the book returns to Words and its review card.
                     overlays.reviewShown = false
-                    library.open(it)
+                    overlays.openAt = position?.let { id to it }
+                    library.open(id)
                 },
             )
         }

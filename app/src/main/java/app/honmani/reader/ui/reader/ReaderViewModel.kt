@@ -916,6 +916,7 @@ class ReaderViewModel(
             sentence = tap.sentence,
             surfaceStart = tap.sentenceOffset,
             origin = origin,
+            position = tap.position,
         )
         val openBook = book
         return (recordScope ?: viewModelScope).launch(Dispatchers.Main.immediate) {

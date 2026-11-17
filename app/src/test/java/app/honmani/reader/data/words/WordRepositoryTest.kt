@@ -3,6 +3,7 @@ package app.honmani.reader.data.words
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.ui.words.OpenInBook
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -54,6 +55,27 @@ class WordRepositoryTest {
     )
 
     private suspend fun learning() = repository.learning.first()
+
+    @Test
+    fun aLookupKeepsItsPlaceInTheBook_andOpenInBookGoesThere() = runTest {
+        // Saved before positions were kept (or in a book the page could not measure): the book only.
+        val undo = repository.record(lookup("猫", sentence = "猫がいる。", bookTitle = "本"))!!
+        val id = undo.wordId
+        val old = repository.latestLookups(id).single()
+        assertEquals(null, old.position)
+        assertEquals(OpenInBook.Place(1L, null), OpenInBook.placeOf(listOf(old), setOf(1L)))
+        now += 2 * 60 * 60 * 1000L
+        repository.record(lookup("猫", sentence = "猫が鳴いた。", bookTitle = "本").copy(position = 1_234))
+        now += 2 * 60 * 60 * 1000L
+        // A later lookup without a place (a book that is not an EPUB, say) does not hide the known one.
+        repository.record(lookup("猫", sentence = "猫だ。", bookTitle = "本"))
+        val lookups = repository.latestLookups(id)
+        assertEquals(1_234L, lookups.single { it.sentence == "猫が鳴いた。" }.position)
+        assertEquals(OpenInBook.Place(1L, 1_234L), OpenInBook.placeOf(lookups, setOf(1L)))
+        // No book, no place: a position is only kept with the book it is in.
+        val searched = repository.record(lookup("犬").copy(position = 5))!!
+        assertEquals(null, repository.latestLookups(searched.wordId).single().position)
+    }
 
     @Test
     fun aPreparedWordKeepsTheBooksSentenceWithoutCountingALookup() = runTest {

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "e77d07671181ec9ea920deea18de87f0",
+    "identityHash": "a9bdb8bbe2c476a47d1b7ebef170c461",
     "entities": [
       {
         "tableName": "dictionary",
@@ -1037,7 +1037,7 @@
       },
       {
         "tableName": "word_lookup",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `word_id` INTEGER NOT NULL, `surface` TEXT NOT NULL, `sentence` TEXT NOT NULL, `surface_start` INTEGER NOT NULL, `surface_end` INTEGER NOT NULL, `book_id` INTEGER, `book_title` TEXT, `looked_up_at` INTEGER NOT NULL, `origin` TEXT NOT NULL DEFAULT 'READER', FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `word_id` INTEGER NOT NULL, `surface` TEXT NOT NULL, `sentence` TEXT NOT NULL, `surface_start` INTEGER NOT NULL, `surface_end` INTEGER NOT NULL, `book_id` INTEGER, `book_title` TEXT, `looked_up_at` INTEGER NOT NULL, `origin` TEXT NOT NULL DEFAULT 'READER', `position` INTEGER, FOREIGN KEY(`word_id`) REFERENCES `word`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -1097,6 +1097,11 @@
             "affinity": "TEXT",
             "notNull": true,
             "defaultValue": "'READER'"
+          },
+          {
+            "fieldPath": "position",
+            "columnName": "position",
+            "affinity": "INTEGER"
           }
         ],
         "primaryKey": {
@@ -1798,7 +1803,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e77d07671181ec9ea920deea18de87f0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9bdb8bbe2c476a47d1b7ebef170c461')"
     ]
   }
 }

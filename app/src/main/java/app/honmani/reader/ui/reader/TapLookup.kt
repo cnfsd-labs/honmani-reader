@@ -359,6 +359,8 @@ data class TapLookup(
     val selected: HighlightExtents? = null,
     /** A tap on a character inside this saved highlight (`highlight.id`), else null. */
     val highlightId: Long? = null,
+    /** ttu's character count before the looked-up text (as highlights count), where the page could measure it; else null. */
+    val position: Long? = null,
 ) {
     companion object {
         // Generous bounds; the bridge sends at most 20 code points and 400 sentence chars.
@@ -390,6 +392,7 @@ data class TapLookup(
                 bySelection = envelope.selection,
                 selected = if (envelope.selection) extentsOf(envelope.highlight) else null,
                 highlightId = envelope.highlightId?.takeIf { it > 0 && !envelope.selection },
+                position = envelope.position?.takeIf { it >= 0 },
             )
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
@@ -435,6 +438,7 @@ data class TapLookup(
         val selection: Boolean = false,
         val highlight: HighlightEnvelope? = null,
         val highlightId: Long? = null,
+        val position: Long? = null,
     )
 
     @Serializable

@@ -30,7 +30,9 @@
  * "honmaniSelectionLookup" = "0" (Honmani's reader settings) turns both off and leaves the book
  * text natively selectable (otherwise it is not: user-select: none). A selection message also
  * carries "highlight": { start, end, text }, the whole selection as a place in the book
- * (highlights.js), and a tap inside a highlight carries "highlightId": its id.
+ * (highlights.js), and a tap inside a highlight carries "highlightId": its id. Every lookup
+ * carries "position", ttu's character count before its first character (highlights.js measure),
+ * where the book was open has highlights (an EPUB): "Open in book" on a saved word goes there.
  *
  * Furigana (<rt>, <rp>) is not part of the scanned text; a tap on furigana scans from the start
  * of the base text it reads. Scanning stops at the end of the
@@ -370,6 +372,9 @@
     const ruby = rubyWithin(paragraphRuby, start, text.length);
     if (ruby.length > 0) message.ruby = ruby;
     if (previous) message.previousSentence = previous;
+    const place = window.honmaniHighlights ? rangeFromText(block, start, start + 1) : null;
+    const measured = place && window.honmaniHighlights.measure(place);
+    if (measured) message.position = measured.start;
     return message;
   }
 
