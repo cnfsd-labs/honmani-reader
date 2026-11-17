@@ -415,8 +415,9 @@ adb shell bmgr enable false
 ## Library selection
 
 - Long press a cover: selection starts with it (tint, outline, check); taps now select or unselect, no
-  book opens. The bar shows "N selected" with Add to folder, Hide (Unhide on the hidden shelf), Mark as
-  finished and a menu with Details (one book only) and Remove. Back or X ends the selection; so does
+  book opens. The bar shows "N selected" and icons for Details (greyed unless one book is selected), Add
+  to folder, Hide (Unhide on the hidden shelf), Mark as finished and Remove, no overflow menu; on a 360 dp
+  phone all icons stay visible (the count may shrink to the number). Back or X ends the selection; so does
   every action. Rotating keeps it; a book hidden or removed meanwhile drops out.
 - Mark as finished on several books: no end cards, one "Marked N books as finished" snackbar whose Undo
   puts back each one. Remove on several: one dialog ("Remove N books?") with the statistics checkbox.

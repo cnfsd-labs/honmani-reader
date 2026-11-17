@@ -3,9 +3,9 @@ package app.honmani.reader.ui.library
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -1093,8 +1093,10 @@ private val SelectionSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray
 private const val MIXED_FOLDERS = -1L
 
 /**
- * Replaces the toolbar while books are selected: the count, then what can be done with all of
- * them; "Details" (only for one book) and "Remove" wait in the overflow menu.
+ * Replaces the toolbar while books are selected: the count, then every action as an icon.
+ * "Details" comes first (the most used) and works on one book only. Six 48 dp buttons fill
+ * 288 dp of a 360 dp phone, so the count gets what is left and shrinks to the bare number
+ * when "N selected" does not fit.
  */
 @Composable
 private fun SelectionBar(
@@ -1109,7 +1111,6 @@ private fun SelectionBar(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -1119,15 +1120,26 @@ private fun SelectionBar(
         IconButton(onClick = onClear) {
             Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear_selection))
         }
+        val label = pluralStringResource(R.plurals.library_selected, count, count)
+        var compact by remember(label) { mutableStateOf(false) }
         Text(
-            text = pluralStringResource(R.plurals.library_selected, count, count),
+            text = if (compact) count.toString() else label,
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
+            softWrap = false,
             overflow = TextOverflow.Ellipsis,
+            onTextLayout = { if (!compact && it.hasVisualOverflow) compact = true },
             modifier = Modifier
                 .weight(1f)
-                .semantics { liveRegion = LiveRegionMode.Polite },
+                .padding(horizontal = 4.dp)
+                .semantics {
+                    contentDescription = label
+                    liveRegion = LiveRegionMode.Polite
+                },
         )
+        IconButton(onClick = { onDetails?.invoke() }, enabled = onDetails != null) {
+            Icon(Icons.Filled.Info, contentDescription = stringResource(R.string.library_selection_details))
+        }
         IconButton(onClick = onFolder) {
             Icon(painterResource(R.drawable.ic_folder), contentDescription = stringResource(R.string.book_folder_add))
         }
@@ -1140,31 +1152,8 @@ private fun SelectionBar(
         IconButton(onClick = onMarkFinished) {
             Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.action_mark_finished))
         }
-        Box {
-            var menu by remember { mutableStateOf(false) }
-            IconButton(onClick = { menu = true }) {
-                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
-            }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                if (onDetails != null) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.library_selection_details)) },
-                        leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
-                        onClick = {
-                            menu = false
-                            onDetails()
-                        },
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_remove)) },
-                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                    onClick = {
-                        menu = false
-                        onRemove()
-                    },
-                )
-            }
+        IconButton(onClick = onRemove) {
+            Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_remove))
         }
     }
 }
