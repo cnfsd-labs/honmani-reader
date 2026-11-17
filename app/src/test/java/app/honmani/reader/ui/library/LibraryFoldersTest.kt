@@ -239,6 +239,35 @@ class LibraryFoldersTest {
         assertNull(database.bookDao().find(neko)!!.folderId)
     }
 
+    @Test
+    fun selectedBooksMoveTogether_intoAFolderOrANewOne_andOutOfAny() = runBlocking {
+        val neko = addBook("neko")
+        val inu = addBook("inu")
+        val tori = addBook("tori")
+        val novels = folder("Novels")
+
+        viewModel.moveToFolder(listOf(neko, inu), novels)
+        state { it.folders.singleOrNull()?.count == 2 }
+        assertEquals(novels, database.bookDao().find(inu)!!.folderId)
+        assertNull(database.bookDao().find(tori)!!.folderId)
+
+        val created = kotlinx.coroutines.CompletableDeferred<FolderResult>()
+        viewModel.createFolderFor("Fresh", listOf(inu, tori)) { created.complete(it) }
+        val fresh = (withTimeout(5_000) { created.await() } as FolderResult.Done).id
+        state { it.folders.any { f -> f.id == fresh && f.count == 2 } }
+        assertEquals(novels, database.bookDao().find(neko)!!.folderId)
+
+        // A taken name moves nothing.
+        val refused = kotlinx.coroutines.CompletableDeferred<FolderResult>()
+        viewModel.createFolderFor("novels", listOf(neko)) { refused.complete(it) }
+        assertEquals(FolderResult.Duplicate, withTimeout(5_000) { refused.await() })
+        assertEquals(novels, database.bookDao().find(neko)!!.folderId)
+
+        viewModel.moveToFolder(listOf(neko, inu, tori), null)
+        state { it.folders.all { f -> f.count == 0 } }
+        assertNull(database.bookDao().find(neko)!!.folderId)
+    }
+
     private fun viewModelKeeping(view: LibraryFolderView) = owned(
         LibraryViewModel(
             dao = database.bookDao(),

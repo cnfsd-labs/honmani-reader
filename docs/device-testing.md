@@ -412,6 +412,16 @@ adb shell bmgr enable false
   download stops, no book appears, adding it again afterwards works. In airplane mode **Add to library**
   shows a readable error and can be retried.
 
+## Library selection
+
+- Long press a cover: selection starts with it (tint, outline, check); taps now select or unselect, no
+  book opens. The bar shows "N selected" with Add to folder, Hide (Unhide on the hidden shelf), Mark as
+  finished and a menu with Details (one book only) and Remove. Back or X ends the selection; so does
+  every action. Rotating keeps it; a book hidden or removed meanwhile drops out.
+- Mark as finished on several books: no end cards, one "Marked N books as finished" snackbar whose Undo
+  puts back each one. Remove on several: one dialog ("Remove N books?") with the statistics checkbox.
+- TalkBack reads a selected cover as "Selected".
+
 ## Tabs, Progress, Appearance
 
 - Tapping the open tab: Words and Progress go to their next page and wrap (Words restarts at Review);

@@ -1,5 +1,15 @@
 package app.honmani.reader.ui.library
 
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -266,8 +276,14 @@ fun LibraryScreen(
                 else -> null
             }
             // "Mark as finished" can be taken back: an Undo action, as long as the other Undo snackbars.
-            val undo: (() -> Unit)? = (failed as? LibraryNotice.MarkedFinished)?.let { marked ->
-                { viewModel.undoFinished(marked.bookId, marked.previousFinishedAt) }
+            val undo: (() -> Unit)? = when (failed) {
+                is LibraryNotice.MarkedFinished -> {
+                    { viewModel.undoFinished(failed.bookId, failed.previousFinishedAt) }
+                }
+                is LibraryNotice.MarkedFinishedBooks -> {
+                    { viewModel.undoFinished(failed.previous) }
+                }
+                else -> null
             }
             val longLived = retry != null || undo != null || failed is LibraryNotice.ReaderFailed ||
                 failed is LibraryNotice.ResetFailed || failed is LibraryNotice.CopyFailed ||
@@ -412,6 +428,11 @@ fun LibraryScreen(
             onResetProgress = viewModel::resetProgress,
             onMarkFinished = viewModel::markFinished,
             onSetHidden = viewModel::setHidden,
+            onRemoveBooks = viewModel::remove,
+            onMarkBooksFinished = viewModel::markFinished,
+            onSetBooksHidden = viewModel::setHidden,
+            onMoveBooksToFolder = viewModel::moveToFolder,
+            onCreateFolderFor = viewModel::createFolderFor,
             onSaveCopy = saveCopy,
             audiobookExportable = { viewModel.audiobookExportable(it.contentHash) },
             onExportAudiobook = { book ->
@@ -522,6 +543,8 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.CopyFailed -> stringResource(R.string.library_copy_failed, notice.title)
     is LibraryNotice.AudiobookExport -> notice.result.message(LocalContext.current, notice.title)
     is LibraryNotice.MarkedFinished -> stringResource(R.string.marked_finished, notice.title)
+    is LibraryNotice.MarkedFinishedBooks ->
+        pluralStringResource(R.plurals.marked_finished_books, notice.previous.size, notice.previous.size)
     is LibraryNotice.PassedWhileReading -> pluralStringResource(R.plurals.passed_while_reading, notice.count, notice.count)
     is LibraryNotice.FolderImported -> {
         val resources = LocalContext.current.resources
@@ -600,6 +623,12 @@ private fun LibraryContent(
     onRenameFolder: (id: Long, name: String, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
     onDeleteFolder: (id: Long) -> Unit = {},
     onMoveToFolder: (bookId: Long, folderId: Long?) -> Unit = { _, _ -> },
+    /** The same for several selected books at once. */
+    onRemoveBooks: (ids: Collection<Long>, deleteStatistics: Boolean) -> Unit = { _, _ -> },
+    onMarkBooksFinished: (ids: Collection<Long>) -> Unit = {},
+    onSetBooksHidden: (ids: Collection<Long>, hidden: Boolean) -> Unit = { _, _ -> },
+    onMoveBooksToFolder: (ids: Collection<Long>, folderId: Long?) -> Unit = { _, _ -> },
+    onCreateFolderFor: (name: String, ids: Collection<Long>, done: (FolderResult) -> Unit) -> Unit = { _, _, _ -> },
     /** The difficulty to show on a cover; null for none. */
     difficulty: (LibraryBook) -> Int? = { null },
     onSort: (LibrarySort) -> Unit = {},
@@ -617,6 +646,18 @@ private fun LibraryContent(
     var creatingFolder by remember { mutableStateOf(false) }
     var searching by rememberSaveable { mutableStateOf(false) }
     val books = uiState.books
+    // Selected books (a long press starts selecting); while any are, the selection bar replaces the toolbar.
+    var selected by rememberSaveable(stateSaver = SelectionSaver) { mutableStateOf(emptySet<Long>()) }
+    val selecting = selected.isNotEmpty()
+    var pendingRemoveMany by remember { mutableStateOf<Set<Long>?>(null) }
+    var pickingFolderForSelection by remember { mutableStateOf(false) }
+    var namingFolderForSelection by remember { mutableStateOf(false) }
+    // Books that leave the shelf (removed, hidden, filtered out) leave the selection.
+    LaunchedEffect(books) {
+        val shown = books?.mapTo(HashSet()) { it.id } ?: return@LaunchedEffect
+        if (!shown.containsAll(selected)) selected = selected.filterTo(LinkedHashSet()) { it in shown }
+    }
+    val toggle: (Long) -> Unit = { id -> selected = if (id in selected) selected - id else selected + id }
     val gridState = rememberLazyGridState()
     // A new order or filter starts at the top; coming back from a book keeps the place.
     var shownOrder by rememberSaveable { mutableStateOf(uiState.sort to uiState.filter) }
@@ -637,6 +678,8 @@ private fun LibraryContent(
     }
     // The hidden shelf is opened like a page (from the end of the library), so back leaves it.
     BackHandler(enabled = uiState.showHidden && !searching) { onShowHidden(false) }
+    // Declared last, so it comes first: back ends the selection before anything else.
+    BackHandler(enabled = selecting) { selected = emptySet() }
 
     Scaffold(
         modifier = modifier,
@@ -659,7 +702,7 @@ private fun LibraryContent(
                     val lastContinue = remember { arrayOfNulls<LibraryBook>(1) }
                     uiState.continueBook?.let { lastContinue[0] = it }
                     AnimatedVisibility(
-                        visible = uiState.continueBook != null && !searching,
+                        visible = uiState.continueBook != null && !searching && !selecting,
                         enter = if (LocalMotionEnabled.current) fadeIn() + expandVertically() else EnterTransition.None,
                         exit = if (LocalMotionEnabled.current) fadeOut() + shrinkVertically() else ExitTransition.None,
                     ) {
@@ -675,7 +718,7 @@ private fun LibraryContent(
                     }
                     // Only once there is a folder: without one the library looks as it always did.
                     // Closed, the chosen folder still shows as one small chip: a filter is never invisible.
-                    val foldersShown = uiState.totalBooks > 0 && uiState.folders.isNotEmpty() && !uiState.showHidden
+                    val foldersShown = uiState.totalBooks > 0 && uiState.folders.isNotEmpty() && !uiState.showHidden && !selecting
                     if (foldersShown && uiState.foldersOpen) {
                         FolderBar(
                             folders = uiState.folders,
@@ -691,7 +734,36 @@ private fun LibraryContent(
                             ActiveFolderChip(folder.name) { onSelectFolder(null) }
                         }
                     }
-                    if (uiState.totalBooks > 0) {
+                    if (selecting) {
+                        SelectionBar(
+                            count = selected.size,
+                            hiddenShelf = uiState.showHidden,
+                            onClear = { selected = emptySet() },
+                            onSetHidden = {
+                                onSetBooksHidden(selected, !uiState.showHidden)
+                                selected = emptySet()
+                            },
+                            onFolder = { pickingFolderForSelection = true },
+                            onMarkFinished = {
+                                onMarkBooksFinished(selected)
+                                selected = emptySet()
+                            },
+                            onRemove = {
+                                val single = selected.singleOrNull()
+                                if (single != null) {
+                                    pendingRemove = books?.firstOrNull { it.id == single }
+                                } else {
+                                    pendingRemoveMany = selected
+                                }
+                            },
+                            onDetails = selected.singleOrNull()?.let { id ->
+                                {
+                                    detailsFor = id
+                                    selected = emptySet()
+                                }
+                            },
+                        )
+                    } else if (uiState.totalBooks > 0) {
                         LibraryToolbar(
                             uiState = uiState,
                             searching = searching,
@@ -791,8 +863,10 @@ private fun LibraryContent(
                             modifier = if (LocalMotionEnabled.current) Modifier.animateItem() else Modifier,
                             book = book,
                             opening = book.id == uiState.opening,
-                            onOpen = { onOpen(book.id) },
-                            onShowDetails = { detailsFor = book.id },
+                            selecting = selecting,
+                            selected = book.id in selected,
+                            onOpen = { if (selecting) toggle(book.id) else onOpen(book.id) },
+                            onLongPress = { toggle(book.id) },
                             difficulty = difficulty(book),
                         )
                     }
@@ -921,6 +995,7 @@ private fun LibraryContent(
                         // Removing deletes the book's files: no undo, a confirmation only.
                         if (removedMessage != null) scope.launch { snackbarHostState.showSnackbar(removedMessage) }
                         detailsFor = null
+                        selected = emptySet()
                     },
                 ) { Text(stringResource(R.string.action_remove)) }
             },
@@ -930,6 +1005,167 @@ private fun LibraryContent(
                 }
             },
         )
+    }
+
+    pendingRemoveMany?.let { ids ->
+        var deleteStatistics by remember(ids) { mutableStateOf(false) }
+        val count = ids.size
+        val removedBooks = pluralStringResource(R.plurals.books_removed, count, count)
+        AlertDialog(
+            onDismissRequest = { pendingRemoveMany = null },
+            title = { Text(pluralStringResource(R.plurals.remove_books_title, count, count)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.remove_books_message))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .toggleable(deleteStatistics, role = Role.Checkbox) { deleteStatistics = it },
+                    ) {
+                        Checkbox(checked = deleteStatistics, onCheckedChange = null)
+                        Text(
+                            stringResource(R.string.remove_books_statistics),
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRemoveBooks(ids, deleteStatistics)
+                        pendingRemoveMany = null
+                        selected = emptySet()
+                        // As for one book: the files are deleted, so no undo, a confirmation only.
+                        scope.launch { snackbarHostState.showSnackbar(removedBooks) }
+                    },
+                ) { Text(stringResource(R.string.action_remove)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRemoveMany = null }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+
+    if (pickingFolderForSelection) {
+        val chosen = books.orEmpty().filter { it.id in selected }.map { it.folderId }.distinct()
+        FolderPickerDialog(
+            folders = uiState.folders,
+            // Books in different folders: none of the choices is checked.
+            chosen = if (chosen.size == 1) chosen.single() else MIXED_FOLDERS,
+            onPick = { folderId ->
+                pickingFolderForSelection = false
+                onMoveBooksToFolder(selected, folderId)
+                selected = emptySet()
+            },
+            onNew = {
+                pickingFolderForSelection = false
+                namingFolderForSelection = true
+            },
+            onDismiss = { pickingFolderForSelection = false },
+        )
+    }
+
+    if (namingFolderForSelection) {
+        FolderNameDialog(
+            title = stringResource(R.string.folder_new_title),
+            initial = "",
+            confirm = stringResource(R.string.folder_create),
+            onSave = { name, done ->
+                val ids = selected
+                onCreateFolderFor(name, ids) { result ->
+                    if (result is FolderResult.Done) selected = emptySet()
+                    done(result)
+                }
+            },
+            onDismiss = { namingFolderForSelection = false },
+        )
+    }
+}
+
+/** Saves the selected book ids across rotation. */
+private val SelectionSaver = Saver<Set<Long>, LongArray>(save = { it.toLongArray() }, restore = { it.toSet() })
+
+/** A folder id no folder has: the folder picker then checks none of its choices. */
+private const val MIXED_FOLDERS = -1L
+
+/**
+ * Replaces the toolbar while books are selected: the count, then what can be done with all of
+ * them; "Details" (only for one book) and "Remove" wait in the overflow menu.
+ */
+@Composable
+private fun SelectionBar(
+    count: Int,
+    hiddenShelf: Boolean,
+    onClear: () -> Unit,
+    onSetHidden: () -> Unit,
+    onFolder: () -> Unit,
+    onMarkFinished: () -> Unit,
+    onRemove: () -> Unit,
+    onDetails: (() -> Unit)?,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+            .padding(horizontal = 4.dp),
+    ) {
+        IconButton(onClick = onClear) {
+            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear_selection))
+        }
+        Text(
+            text = pluralStringResource(R.plurals.library_selected, count, count),
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+        )
+        IconButton(onClick = onFolder) {
+            Icon(painterResource(R.drawable.ic_folder), contentDescription = stringResource(R.string.book_folder_add))
+        }
+        IconButton(onClick = onSetHidden) {
+            Icon(
+                painterResource(if (hiddenShelf) R.drawable.ic_visible else R.drawable.ic_hidden),
+                contentDescription = stringResource(if (hiddenShelf) R.string.action_unhide_book else R.string.action_hide_book),
+            )
+        }
+        IconButton(onClick = onMarkFinished) {
+            Icon(Icons.Filled.CheckCircle, contentDescription = stringResource(R.string.action_mark_finished))
+        }
+        Box {
+            var menu by remember { mutableStateOf(false) }
+            IconButton(onClick = { menu = true }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
+            }
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                if (onDetails != null) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.library_selection_details)) },
+                        leadingIcon = { Icon(Icons.Filled.Info, contentDescription = null) },
+                        onClick = {
+                            menu = false
+                            onDetails()
+                        },
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_remove)) },
+                    leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                    onClick = {
+                        menu = false
+                        onRemove()
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -1408,21 +1644,55 @@ private fun BookCard(
     book: LibraryBook,
     opening: Boolean,
     onOpen: () -> Unit,
-    onShowDetails: () -> Unit,
+    /** Starts selecting with this book, or (while selecting) selects or unselects it. */
+    onLongPress: () -> Unit,
     difficulty: Int? = null,
+    /** Whether books are being selected: a tap then selects instead of opening. */
+    selecting: Boolean = false,
+    selected: Boolean = false,
 ) {
     val interactions = remember { MutableInteractionSource() }
+    val selectedState = stringResource(R.string.library_book_selected)
+    val notSelectedState = stringResource(R.string.library_book_not_selected)
     Column(
-        modifier = modifier.combinedClickable(
-            interactionSource = interactions,
-            indication = LocalIndication.current,
-            role = Role.Button,
-            onClick = onOpen,
-            onLongClick = onShowDetails,
-        ),
+        modifier = modifier
+            .combinedClickable(
+                interactionSource = interactions,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClickLabel = if (selecting) stringResource(R.string.library_select_toggle) else null,
+                onClick = onOpen,
+                onLongClickLabel = stringResource(R.string.library_select),
+                onLongClick = onLongPress,
+            )
+            .semantics {
+                if (selecting) {
+                    this.selected = selected
+                    stateDescription = if (selected) selectedState else notSelectedState
+                }
+            },
     ) {
         Box(Modifier.pressScale(interactions)) {
             Cover(book, elevation = 3.dp)
+            if (selected) {
+                // A tint and an outline over the whole cover, and a check in its middle.
+                val shape = RoundedCornerShape(10.dp)
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), shape)
+                        .border(3.dp, MaterialTheme.colorScheme.primary, shape),
+                )
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(40.dp)
+                        .background(MaterialTheme.colorScheme.surface, CircleShape),
+                )
+            }
             if (difficulty != null) {
                 // The book's difficulty, small, in the corner the finished check doesn't use.
                 DifficultyBadge(difficulty, modifier = Modifier.align(Alignment.TopStart).padding(4.dp))

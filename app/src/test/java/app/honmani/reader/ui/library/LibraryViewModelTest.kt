@@ -715,6 +715,63 @@ class LibraryViewModelTest {
     }
 
     @Test
+    fun selectedBooksAreHiddenAndUnhiddenTogether() = runBlocking {
+        val neko = addAndWait("neko.epub", TestBooks.epub())
+        val kokoro = addAndWait("kokoro.epub", TestBooks.epub(title = "こころ"))
+        val inu = addAndWait("inu.epub", TestBooks.epub(title = "犬"))
+
+        viewModel.setHidden(listOf(neko.id, kokoro.id), true)
+        val library = viewModel.uiState.first { it.hiddenCount == 2 && it.books?.size == 1 }
+        assertEquals(inu.id, library.books!!.single().id)
+
+        viewModel.setHidden(listOf(neko.id, kokoro.id), false)
+        viewModel.uiState.first { it.hiddenCount == 0 && it.books?.size == 3 }
+        Unit
+    }
+
+    @Test
+    fun markingSelectedBooksFinished_showsNoEndCard_andOneUndoRestoresEach() = runBlocking {
+        val neko = addAndWait("neko.epub", TestBooks.epub())
+        val kokoro = addAndWait("kokoro.epub", TestBooks.epub(title = "こころ"))
+        val done = addAndWait("inu.epub", TestBooks.epub(title = "犬"))
+        dao.setProgress(neko.id, 0.4f)
+        dao.setFinished(done.id, 7L)
+
+        viewModel.markFinished(listOf(neko.id, kokoro.id, done.id))
+        val notice = nextNotice() as LibraryNotice.MarkedFinishedBooks
+        // The book finished before keeps its date and is not part of the Undo.
+        assertEquals(mapOf(neko.id to null, kokoro.id to null), notice.previous)
+        assertEquals(42L, dao.find(neko.id)?.finishedAt)
+        assertEquals(42L, dao.find(kokoro.id)?.finishedAt)
+        assertEquals(7L, dao.find(done.id)?.finishedAt)
+        assertNull(viewModel.finishCard.value)
+
+        viewModel.undoFinished(notice.previous)
+        eventually { dao.books.value.takeIf { list -> list.count { it.finishedAt == null } == 2 } }
+        assertEquals(0.4f, dao.find(neko.id)!!.progress)
+        assertEquals(7L, dao.find(done.id)?.finishedAt)
+    }
+
+    @Test
+    fun removingSelectedBooksRemovesEachOne_andLeavesTheOthers() = runBlocking {
+        val neko = addAndWait("neko.epub", TestBooks.epub())
+        val kokoro = addAndWait("kokoro.epub", TestBooks.epub(title = "こころ"))
+        val inu = addAndWait("inu.epub", TestBooks.epub(title = "犬"))
+
+        viewModel.remove(listOf(neko.id, kokoro.id))
+        eventually {
+            dao.books.value.takeIf { it.size == 1 && !importer.bookFile(neko).exists() && !importer.bookFile(kokoro).exists() }
+        }
+
+        assertEquals(inu.id, dao.books.value.single().id)
+        assertTrue(importer.bookFile(inu).exists())
+        assertEquals(
+            setOf(neko.ttuId, kokoro.ttuId),
+            page.commands.filter { it.first == "remove" }.map { it.second["ttuId"]!!.jsonPrimitive.long }.toSet(),
+        )
+    }
+
+    @Test
     fun markingFinishedLastsUntilTheBookIsReset() = runBlocking {
         val book = addAndWait("neko.epub", TestBooks.epub())
 

@@ -188,6 +188,12 @@ sealed interface LibraryNotice {
     /** "Mark as finished" was done (the end card closed); Undo puts back [previousFinishedAt]. */
     data class MarkedFinished(val title: String, val bookId: Long, val previousFinishedAt: Long?) : LibraryNotice
 
+    /**
+     * Several books were marked finished at once (no end cards); Undo puts back each one's
+     * [previous] finished time (book id to time, null: not finished before).
+     */
+    data class MarkedFinishedBooks(val previous: Map<Long, Long?>) : LibraryNotice
+
     /** An audiobook export ended with [result]. */
     data class AudiobookExport(val title: String, val result: AudiobookExportResult) : LibraryNotice
 }
@@ -344,6 +350,28 @@ class LibraryViewModel(
     /** Takes back a "Mark as finished": "finished" is as before; the reading position never changed. */
     fun undoFinished(id: Long, previousFinishedAt: Long?) {
         viewModelScope.launch { dao.restoreFinished(id, previousFinishedAt) }
+    }
+
+    /**
+     * Marks the selected books finished, without end cards; books already finished keep their date.
+     * One notice offers Undo for all of them.
+     */
+    fun markFinished(ids: Collection<Long>) {
+        viewModelScope.launch {
+            val previous = LinkedHashMap<Long, Long?>()
+            for (id in ids) {
+                val book = dao.find(id) ?: continue
+                if (book.finishedAt != null) continue
+                previous[id] = null
+                dao.setFinished(id, now())
+            }
+            if (previous.isNotEmpty()) _notices.trySend(LibraryNotice.MarkedFinishedBooks(previous))
+        }
+    }
+
+    /** Takes back a batch "Mark as finished" ([LibraryNotice.MarkedFinishedBooks]). */
+    fun undoFinished(previous: Map<Long, Long?>) {
+        viewModelScope.launch { for ((id, finishedAt) in previous) dao.restoreFinished(id, finishedAt) }
     }
     val notices: Flow<LibraryNotice> = _notices.receiveAsFlow()
 
@@ -810,6 +838,22 @@ class LibraryViewModel(
         viewModelScope.launch { folders.move(bookId, folderId) }
     }
 
+    /** Puts the selected books in a folder; null takes them out of any. */
+    fun moveToFolder(bookIds: Collection<Long>, folderId: Long?) {
+        val folders = folders ?: return
+        viewModelScope.launch { for (id in bookIds) folders.move(id, folderId) }
+    }
+
+    /** Makes a folder and puts the selected books in it; [done] gets the outcome (a refused name, say). */
+    fun createFolderFor(name: String, bookIds: Collection<Long>, done: (FolderResult) -> Unit = {}) {
+        val folders = folders ?: return
+        viewModelScope.launch {
+            val result = folders.create(name)
+            if (result is FolderResult.Done) for (id in bookIds) folders.move(id, result.id)
+            done(result)
+        }
+    }
+
     /** Shows the hidden books instead of the library, or goes back to all books. */
     fun showHidden(show: Boolean) {
         shelf.value = Shelf(hidden = show, folderId = shelf.value.folderId)
@@ -817,6 +861,11 @@ class LibraryViewModel(
 
     fun setHidden(id: Long, hidden: Boolean) {
         viewModelScope.launch { dao.setHidden(id, hidden) }
+    }
+
+    /** Hides or unhides the selected books. */
+    fun setHidden(ids: Collection<Long>, hidden: Boolean) {
+        viewModelScope.launch { for (id in ids) dao.setHidden(id, hidden) }
     }
 
     fun setSort(sort: LibrarySort) = saveSort(sort.name)
@@ -919,6 +968,14 @@ class LibraryViewModel(
         // Under addMutex: a watched-folder scan must not add the book again while it is removed.
         // Not cancellable: leaving the library right after must not leave the file or the bookmarks behind.
         viewModelScope.launch { withContext(NonCancellable) { addMutex.withLock { removeNow(id, deleteStatistics) } } }
+    }
+
+    /** Removes the selected books, as [remove] does each one, in one go that leaving the library does not stop. */
+    fun remove(ids: Collection<Long>, deleteStatistics: Boolean = false) {
+        val list = ids.toList()
+        viewModelScope.launch {
+            withContext(NonCancellable) { for (id in list) addMutex.withLock { removeNow(id, deleteStatistics) } }
+        }
     }
 
     private suspend fun removeNow(id: Long, deleteStatistics: Boolean) {

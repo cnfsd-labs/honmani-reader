@@ -168,6 +168,16 @@
     <string name="remove_book_title">Remove “%1$s”?</string>
     <string name="remove_book_message">The book and your reading position are deleted from Honmani. The file you added it from stays on your phone. Your reading time, words and statistics stay.</string>
     <string name="remove_book_statistics">Also delete this book’s reading statistics</string>
+    <plurals name="remove_books_title">
+        <item quantity="one">Remove %d book?</item>
+        <item quantity="other">Remove %d books?</item>
+    </plurals>
+    <string name="remove_books_message">The books and your reading positions are deleted from Honmani. The files you added them from stay on your phone. Your reading time, words and statistics stay.</string>
+    <string name="remove_books_statistics">Also delete these books’ reading statistics</string>
+    <plurals name="books_removed">
+        <item quantity="one">Removed %d book</item>
+        <item quantity="other">Removed %d books</item>
+    </plurals>
 
     <string name="add_book_files">Files on this phone</string>
     <string name="add_book_files_details">EPUB or text files (Aozora Bunko)</string>
@@ -352,6 +362,16 @@
     <string name="audiobook_available">This book has an audiobook</string>
     <string name="audiobook_available_play">Play</string>
     <string name="action_hide_book">Hide</string>
+    <plurals name="library_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="action_clear_selection">Clear selection</string>
+    <string name="library_selection_details">Details</string>
+    <string name="library_select">Select</string>
+    <string name="library_select_toggle">Select or unselect</string>
+    <string name="library_book_selected">Selected</string>
+    <string name="library_book_not_selected">Not selected</string>
     <string name="action_unhide_book">Unhide</string>
     <string name="action_close_search">Close search</string>
     <string name="action_retry">Try again</string>
@@ -1282,6 +1302,10 @@
     <string name="finish_card_next">Next up: %1$s</string>
     <string name="finish_card_open">Open</string>
     <string name="marked_finished">Marked “%1$s” as finished</string>
+    <plurals name="marked_finished_books">
+        <item quantity="one">Marked %d book as finished</item>
+        <item quantity="other">Marked %d books as finished</item>
+    </plurals>
     <plurals name="passed_while_reading">
         <item quantity="one">%1$d due word passed while reading</item>
         <item quantity="other">%1$d due words passed while reading</item>
