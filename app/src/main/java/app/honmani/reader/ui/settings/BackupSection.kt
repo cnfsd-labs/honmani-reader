@@ -37,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.ui.library.exportResultText
 import app.honmani.reader.ui.InfoAction
 import app.honmani.reader.data.backup.BackupCodec
 import app.honmani.reader.data.backup.FolderBackupState
@@ -107,6 +108,7 @@ fun BackupSection(viewModel: BackupViewModel = viewModel(factory = BackupViewMod
     )
     FolderBackupRow()
     SyncFolderRow()
+    ExportLibraryRow()
     // A backup that was already in a newly chosen backup folder: offered once, when nothing else shows.
     val found by viewModel.foundBackup.collectAsStateWithLifecycle()
     LaunchedEffect(found, state) {
@@ -413,4 +415,39 @@ private fun RestoredText(summary: RestoreSummary) {
         }
         Text(stringResource(R.string.backup_restored_not_included))
     }
+}
+
+/**
+ * Settings → Back up and restore → Export library: the book files themselves, which the backup
+ * file leaves out. The same export as in the Library's + sheet ([LibraryExporter]).
+ */
+@Composable
+private fun ExportLibraryRow() {
+    val context = LocalContext.current
+    val exporter = remember { (context.applicationContext as HonmaniApplication).container.libraryExporter }
+    val progress by exporter.progress.collectAsStateWithLifecycle()
+    val result by exporter.lastResult.collectAsStateWithLifecycle()
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) exporter.start(uri)
+    }
+    val running = progress
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.library_export)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.library_export_backup_details))
+                val total = running?.total
+                when {
+                    running != null && total == null -> Text(stringResource(R.string.library_exporting_start))
+                    running != null && total != null ->
+                        Text(stringResource(R.string.library_exporting, running.done + 1, total, running.current))
+                    else -> result?.let { Text(exportResultText(it)) }
+                }
+                if (running != null) {
+                    TextButton(onClick = exporter::cancel) { Text(stringResource(R.string.action_cancel)) }
+                }
+            }
+        },
+        modifier = Modifier.clickable(enabled = running == null) { pick.launch(null) },
+    )
 }

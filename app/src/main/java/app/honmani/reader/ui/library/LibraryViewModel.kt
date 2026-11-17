@@ -22,7 +22,7 @@ import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.library.DocumentTree
-import app.honmani.reader.data.library.ExportNames
+import app.honmani.reader.data.library.LibraryExporter
 import app.honmani.reader.data.library.FolderResult
 import app.honmani.reader.data.library.Folders
 import app.honmani.reader.data.settings.LibraryFolderView
@@ -263,7 +263,7 @@ class LibraryViewModel(
     private val forgetPronunciations: suspend (contentHash: String) -> Unit = {},
     /** The reader's folders; null: no folders. */
     private val folders: Folders? = null,
-    /** Opens a folder the user picked (a tree address) for the folder import and the export. */
+    /** Opens a folder the user picked (a tree address) for the folder import. */
     private val openTree: (Uri) -> DocumentTree? = { null },
     /** Keeps the chosen folder and the open folder row over a restart; null: kept in memory only. */
     private val folderView: LibraryFolderView? = null,
@@ -281,11 +281,18 @@ class LibraryViewModel(
     private val armAutoplay: (contentHash: String) -> Unit = {},
     /** What the end card tells about a book (by id): time read, lookups, words saved. */
     private val finishFacts: (bookId: Long) -> Flow<FinishFacts> = { flowOf(FinishFacts()) },
+    /** "Export library", shared with Settings; null: no export. */
+    private val exporter: LibraryExporter? = null,
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
     private val batch = MutableStateFlow<BatchProgress?>(null)
     private var batchJob: Job? = null
+
+    /** The folder import, or else an export (perhaps started in Settings). */
+    private val shownBatch = combine(batch, exporter?.progress ?: flowOf(null)) { batch, export ->
+        batch ?: export?.let { BatchProgress(exporting = true, done = it.done, total = it.total, current = it.current) }
+    }
     private var watchJob: Job? = null
     private val shelf = MutableStateFlow(Shelf(folderId = folderView?.chosen))
     private val foldersOpen = MutableStateFlow(folderView?.open ?: false)
@@ -380,7 +387,7 @@ class LibraryViewModel(
             combine(dao.observeAll(), grades, sortName, skill, dismissedContinue) { entities, grades, sort, skill, dismissed ->
                 Ordering(entities, grades, LibrarySort.fromName(sort), skill, dismissed)
             },
-            combine(adding, batch) { adding, batch -> adding to batch },
+            combine(adding, shownBatch) { adding, batch -> adding to batch },
             opening,
             combine(shelf, folderList, foldersOpen) { shelf, folders, open -> Triple(shelf, folders, open) },
             searchTerms,
@@ -629,7 +636,7 @@ class LibraryViewModel(
      * with a progress row and one summary at the end. Does nothing while another batch runs.
      */
     fun importFolder(tree: Uri) {
-        if (batchJob?.isActive == true) return
+        if (batchJob?.isActive == true || exporter?.running == true) return
         batchJob = viewModelScope.launch {
             batch.value = BatchProgress(exporting = false)
             var imported = 0
@@ -676,71 +683,16 @@ class LibraryViewModel(
         }
     }
 
-    /** Writes every library book's own file into the folder [tree], named by title. */
+    /** Writes every library book's own file into the folder [tree], named by title (see [LibraryExporter]). */
     fun exportLibrary(tree: Uri) {
         if (batchJob?.isActive == true) return
-        batchJob = viewModelScope.launch {
-            batch.value = BatchProgress(exporting = true)
-            var exported = 0
-            var failed = 0
-            var stopped = false
-            var report = false
-            try {
-                val documents = openTree(tree)
-                if (documents == null) {
-                    _notices.send(LibraryNotice.FolderUnusable)
-                    return@launch
-                }
-                val books = dao.observeAll().first()
-                if (books.isEmpty()) {
-                    _notices.send(LibraryNotice.NothingToExport)
-                    return@launch
-                }
-                val entries = withContext(Dispatchers.IO) { documents.children(documents.rootId) }
-                if (entries == null) {
-                    _notices.send(LibraryNotice.FolderUnusable)
-                    return@launch
-                }
-                val taken = entries.mapTo(mutableSetOf()) { it.name.lowercase() }
-                report = true
-                for ((index, book) in books.withIndex()) {
-                    // Exported before into this folder: keep that file rather than adding "Title (2)".
-                    val file = importer.bookFile(book)
-                    val already = withContext(Dispatchers.IO) {
-                        ExportNames.previousExport(book.title, book.format.extension, file.length(), entries)
-                            ?.let { entry -> documents.open(entry.id) }
-                            ?.let { input -> runCatching { ExportNames.sameBytes(file, input) }.getOrDefault(false) } == true
-                    }
-                    if (already) {
-                        exported++
-                        continue
-                    }
-                    val name = ExportNames.unique(book.title, book.format.extension, taken)
-                    batch.value = BatchProgress(exporting = true, done = index, total = books.size, current = name)
-                    val mime = if (book.format == BookFormat.TXT) "text/plain" else "application/epub+zip"
-                    val target = withContext(Dispatchers.IO) { documents.createFile(documents.rootId, mime, name) }
-                    if (target == null) {
-                        failed++
-                        continue
-                    }
-                    try {
-                        writeDocument(file, target)
-                        exported++
-                    } catch (e: CancellationException) {
-                        withContext(NonCancellable + Dispatchers.IO) { documents.delete(target) }
-                        throw e
-                    } catch (e: Exception) {
-                        logWarning("Honmani.library", "Exporting a book failed", e)
-                        withContext(Dispatchers.IO) { documents.delete(target) }
-                        failed++
-                    }
-                }
-            } catch (e: CancellationException) {
-                stopped = true
-                throw e
-            } finally {
-                batch.value = null
-                if (report) _notices.trySend(LibraryNotice.LibraryExported(exported, failed, stopped))
+        exporter?.start(tree) { result ->
+            when (result) {
+                is LibraryExporter.Result.Exported ->
+                    _notices.trySend(LibraryNotice.LibraryExported(result.exported, result.failed, result.stopped))
+                LibraryExporter.Result.NothingToExport -> _notices.trySend(LibraryNotice.NothingToExport)
+                LibraryExporter.Result.FolderUnusable -> _notices.trySend(LibraryNotice.FolderUnusable)
+                null -> Unit
             }
         }
     }
@@ -748,6 +700,7 @@ class LibraryViewModel(
     /** Stops the running folder import or export; what was done stays. */
     fun cancelBatch() {
         batchJob?.cancel()
+        exporter?.cancel()
     }
 
     /** Opens the book once the book being opened (perhaps asking "Where to continue?") is open. */
@@ -1091,6 +1044,7 @@ class LibraryViewModel(
                         }
                     },
                     recordFinished = container.finishedBookDao::record,
+                    exporter = container.libraryExporter,
                     finishFacts = { id ->
                         combine(
                             container.readingDao.observeBook(id),

@@ -353,6 +353,9 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
   deleted, a further position and reading on both reach the other phone on its next start ("Synced with
   <phone>"): the reading adds up, and starting again changes nothing and doesn't rewrite the file. A
   file from a newer Honmani: "<phone> has a newer Honmani".
+- Export library (Settings -> Backup, also the Library's + sheet): pick a folder -> "Exporting N of M: <title>"
+  with Cancel in the row, then "Exported N books"; a second export can't start meanwhile; one started
+  from the + sheet shows its progress in Settings too (and the Library's progress row for either).
 - Android's backup over USB without a Google account (debug-only local transport; the phone's backup
   setting is off by default, undo afterwards):
 

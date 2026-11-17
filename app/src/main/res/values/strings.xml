@@ -257,6 +257,7 @@
     <string name="add_book_folder_details">Adds every EPUB and text file in it and its subfolders, once</string>
     <string name="library_export">Export library</string>
     <string name="library_export_details">Saves a copy of every book in a folder you choose</string>
+    <string name="library_export_backup_details">Saves a copy of every book in a folder you choose. The backup file doesn\'t include books.</string>
     <string name="library_folder_searching">Looking for books…</string>
     <string name="library_folder_importing">Importing %1$d of %2$d: %3$s</string>
     <string name="library_exporting_start">Getting ready to export…</string>

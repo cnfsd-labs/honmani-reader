@@ -46,6 +46,7 @@ import app.honmani.reader.data.examples.ExampleSentences
 import app.honmani.reader.data.examples.ExampleStore
 import app.honmani.reader.data.fonts.FontStore
 import app.honmani.reader.data.library.ResolverDocumentTree
+import app.honmani.reader.data.library.LibraryExporter
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.WatchedFolder
 import app.honmani.reader.data.library.BookmarkDao
@@ -528,6 +529,30 @@ class AppContainer(context: Context) {
 
     /** Makes generated audiobooks (Google voice, one request per sentence) into `files/audiobook/generated`. */
     val audiobookMaker: AudiobookMaker by lazy { AudiobookMaker(File(appContext.filesDir, "audiobook/generated"), audiobookStore) }
+
+    /** "Export library" (Library + sheet and Settings → Back up and restore): one export at a time. */
+    val libraryExporter: LibraryExporter by lazy {
+        val resolver = appContext.contentResolver
+        LibraryExporter(
+            scope = applicationScope,
+            books = { bookDao.observeAll().first() },
+            bookFile = bookImporter::bookFile,
+            openTree = { uri ->
+                try {
+                    ResolverDocumentTree(resolver, uri)
+                } catch (_: IllegalArgumentException) {
+                    // Not a tree address.
+                    null
+                }
+            },
+            writeDocument = { file, uri ->
+                withContext(Dispatchers.IO) {
+                    val out = resolver.openOutputStream(uri, "wt") ?: throw java.io.IOException("Cannot write $uri")
+                    out.use { output -> file.inputStream().use { it.copyTo(output) } }
+                }
+            },
+        )
+    }
 
     /** Saves a book's audiobook (audio and subtitles) into a folder the reader picks. */
     val audiobookExporter: AudiobookExporter by lazy {

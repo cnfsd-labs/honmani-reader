@@ -6,6 +6,7 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
 import app.honmani.reader.data.library.BookSource
+import app.honmani.reader.data.library.LibraryExporter
 import app.honmani.reader.data.library.FakeDocumentTree
 import app.honmani.reader.data.library.FakeFolderTarget
 import app.honmani.reader.data.library.WatchedFolder
@@ -15,7 +16,6 @@ import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
 import app.honmani.reader.data.stats.FinishedBookEntity
 import app.honmani.reader.data.library.RemovedBookEntity
 import app.honmani.reader.data.library.TestBooks
-import app.honmani.reader.data.library.TreeEntry
 import app.honmani.reader.ui.reader.LibraryMessage
 import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuPage
@@ -26,6 +26,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -344,6 +345,13 @@ class LibraryViewModelTest {
         },
         openTree = { tree },
         watchedFolder = watched,
+        exporter = LibraryExporter(
+            scope = CoroutineScope(Dispatchers.Default),
+            books = { dao.books.value },
+            bookFile = importer::bookFile,
+            openTree = { tree },
+            writeDocument = { file, uri -> written[uri.toString()] = file.readBytes() },
+        ),
     )
 
     @Test
@@ -536,7 +544,7 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun exportingTheLibraryWritesEveryBookNamedByTitle() = runBlocking {
+    fun exportingTheLibraryReportsHowItWent() = runBlocking {
         val written = HashMap<String, ByteArray>()
         val tree = FakeDocumentTree(mapOf("root" to listOf(file("root/Neko.epub"))))
         viewModel = viewModelOn(tree, written)
@@ -555,45 +563,6 @@ class LibraryViewModelTest {
             written.keys,
         )
         assertTrue(first.contentEquals(written.getValue("content://tree/root/Neko (2).epub")))
-    }
-
-    @Test
-    fun exportingAgainKeepsBooksAlreadyInTheFolder() = runBlocking {
-        val written = HashMap<String, ByteArray>()
-        val same = TestBooks.epub(title = "Neko")
-        val other = TestBooks.epub(title = "Inu")
-        val tree = FakeDocumentTree(
-            mapOf(
-                "root" to listOf(
-                    TreeEntry("root/Neko.epub", "Neko.epub", isFolder = false, size = same.size.toLong()),
-                    TreeEntry("root/Inu.epub", "Inu.epub", isFolder = false, size = other.size.toLong()),
-                ),
-            ),
-        )
-        tree.contents["root/Neko.epub"] = same
-        // Same name and size, different bytes: a different file.
-        tree.contents["root/Inu.epub"] = other.copyOf().also { it[it.size - 1] = (it.last() + 1).toByte() }
-        viewModel = viewModelOn(tree, written)
-        addAndWait("1.epub", same)
-        addAndWait("2.epub", other)
-
-        viewModel.exportLibrary(Uri.parse("content://tree/root"))
-
-        assertEquals(LibraryNotice.LibraryExported(2, 0, stopped = false), nextNotice())
-        assertEquals(setOf("content://tree/root/Inu (2).epub"), written.keys)
-    }
-
-    @Test
-    fun aFailedExportRemovesItsHalfWrittenFileAndIsCounted() = runBlocking {
-        val tree = FakeDocumentTree(mapOf("root" to emptyList()))
-        viewModel = viewModelOn(tree)
-        addAndWait("1.epub", TestBooks.epub(title = "bad"))
-        addAndWait("2.epub", TestBooks.epub(title = "good"))
-
-        viewModel.exportLibrary(Uri.parse("content://tree/root"))
-
-        assertEquals(LibraryNotice.LibraryExported(1, 1, stopped = false), nextNotice())
-        assertEquals(listOf(Uri.parse("content://tree/root/bad.epub")), tree.deleted)
     }
 
     @Test

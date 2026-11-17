@@ -151,6 +151,7 @@ import app.honmani.reader.readaloud.AudiobookExportResult
 import app.honmani.reader.audio.UiSound
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
+import app.honmani.reader.data.library.LibraryExporter
 import app.honmani.reader.data.opds.AutoImportStatus
 import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.ui.DifficultyBadge
@@ -557,16 +558,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
         ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
         batchSentence(sentence, notice.stopped, notice.incomplete)
     }
-    is LibraryNotice.LibraryExported -> {
-        val resources = LocalContext.current.resources
-        val sentence = BatchSummary.sentence(
-            listOf(
-                notice.exported to { n -> resources.getQuantityString(R.plurals.library_exported, n, n) },
-                notice.failed to { n -> resources.getString(R.string.library_folder_failed, n) },
-            ),
-        ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
-        batchSentence(sentence, notice.stopped, false)
-    }
+    is LibraryNotice.LibraryExported -> exportedText(notice.exported, notice.failed, notice.stopped)
     is LibraryNotice.WatchedFolderAdded -> {
         val resources = LocalContext.current.resources
         BatchSummary.sentence(
@@ -581,6 +573,26 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     LibraryNotice.NoBooksInFolder -> stringResource(R.string.library_folder_no_books)
     LibraryNotice.NothingToExport -> stringResource(R.string.library_export_empty)
     LibraryNotice.FolderUnusable -> stringResource(R.string.library_folder_unusable)
+}
+
+/** How "Export library" ended, for the Library's snackbar and Settings → Back up and restore. */
+@Composable
+internal fun exportResultText(result: LibraryExporter.Result): String = when (result) {
+    is LibraryExporter.Result.Exported -> exportedText(result.exported, result.failed, result.stopped)
+    LibraryExporter.Result.NothingToExport -> stringResource(R.string.library_export_empty)
+    LibraryExporter.Result.FolderUnusable -> stringResource(R.string.library_folder_unusable)
+}
+
+@Composable
+private fun exportedText(exported: Int, failed: Int, stopped: Boolean): String {
+    val resources = LocalContext.current.resources
+    val sentence = BatchSummary.sentence(
+        listOf(
+            exported to { n -> resources.getQuantityString(R.plurals.library_exported, n, n) },
+            failed to { n -> resources.getString(R.string.library_folder_failed, n) },
+        ),
+    ).ifEmpty { resources.getString(R.string.library_folder_nothing_new) }
+    return batchSentence(sentence, stopped, false)
 }
 
 @Composable
