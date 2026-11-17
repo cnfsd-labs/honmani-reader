@@ -17,6 +17,8 @@ import app.honmani.reader.data.opds.OpdsClient
 import app.honmani.reader.data.opds.OpdsEntry
 import app.honmani.reader.data.opds.OpdsException
 import app.honmani.reader.data.opds.OpdsRepository
+import app.honmani.reader.data.opds.JapaneseBooks
+import app.honmani.reader.data.opds.OpdsFeed
 import app.honmani.reader.data.opds.OpdsSearch
 import app.honmani.reader.data.opds.OpdsServer
 import app.honmani.reader.data.opds.bookFileName
@@ -47,6 +49,13 @@ data class CatalogPage(
     val loadingMore: Boolean = false,
     /** The last next page failed to load: the list offers a retry instead of loading it again by itself. */
     val loadMoreFailed: Boolean = false,
+    /** Only the Japanese books of the feed are shown ("Japanese books" without a feed of its own). */
+    val japaneseOnly: Boolean = false,
+    /**
+     * A [japaneseOnly] page's last load read its page limit without a Japanese book: the list
+     * waits for a tap before reading further.
+     */
+    val foundNone: Boolean = false,
 )
 
 data class BrowseState(
@@ -55,6 +64,8 @@ data class BrowseState(
     val pages: List<CatalogPage> = emptyList(),
     val loading: Boolean = true,
     val error: OpdsException.Reason? = null,
+    /** The start feed offers "Japanese books" (it links a languages feed or a feed of books). */
+    val japaneseShortcut: Boolean = false,
 ) {
     val page: CatalogPage? get() = pages.lastOrNull()
 
@@ -125,6 +136,12 @@ class OpdsViewModel(
     /** Entries added in this session that matched a book already in the library. */
     private val matched = MutableStateFlow<Set<String>>(emptySet())
     private var server: OpdsServer? = null
+
+    /** The open catalogue's start feed, for finding its Japanese books. */
+    private var rootFeed: OpdsFeed? = null
+
+    /** Where "Japanese books" leads, per catalogue address, found once per session. */
+    private val japaneseSources = HashMap<String, JapaneseBooks.Source?>()
     private var loadJob: Job? = null
 
     /** The last feed request, for retrying it. */
@@ -156,7 +173,40 @@ class OpdsViewModel(
                 return@launch
             }
             this@OpdsViewModel.server = server
-            request { push(server.url, catalog.title, server) }
+            rootFeed = null
+            request {
+                val root = push(server.url, catalog.title, server)
+                rootFeed = root
+                val shortcut = JapaneseBooks.available(root, server.url)
+                browsing.update { it?.copy(japaneseShortcut = shortcut) }
+            }
+        }
+    }
+
+    /**
+     * Opens "Japanese books": the server's own feed of them, or its newest books with only the
+     * Japanese ones shown. [title] names the page.
+     */
+    fun openJapanese(title: String) {
+        val server = server ?: return
+        val root = rootFeed ?: return
+        loadJob?.cancel()
+        browsing.update { it?.copy(loading = true, error = null) }
+        loadJob = viewModelScope.launch {
+            request {
+                val key = server.url
+                val source = if (key in japaneseSources) {
+                    japaneseSources[key]
+                } else {
+                    JapaneseBooks.find(root, server.url) { client.feed(server, it) }.also { japaneseSources[key] = it }
+                }
+                when (source) {
+                    is JapaneseBooks.Source.LanguageFeed -> push(source.url, title, server)
+                    is JapaneseBooks.Source.Filtered -> pushJapanese(source.url, title, server)
+                    // Not offered then, but an empty page says so rather than nothing happening.
+                    null -> addPage(CatalogPage(server.url, title, emptyList(), null, null, japaneseOnly = true))
+                }
+            }
         }
     }
 
@@ -192,14 +242,20 @@ class OpdsViewModel(
         replaceTop { it.copy(loadingMore = true, loadMoreFailed = false) }
         viewModelScope.launch {
             try {
-                val feed = client.feed(server, next)
+                val more = if (page.japaneseOnly) {
+                    JapaneseBooks.loadFiltered(next) { client.feed(server, it) }
+                } else {
+                    val feed = client.feed(server, next)
+                    JapaneseBooks.FilteredPage(feed.entries, feed.nextUrl?.takeIf { it != next }, foundNone = false)
+                }
                 // The page may no longer be on top (an entry was opened meanwhile): it still gets its entries.
                 replacePage(page.url) { top ->
                     val known = top.entries.mapTo(HashSet()) { it.id }
                     top.copy(
-                        entries = top.entries + feed.entries.filter { it.id !in known },
-                        nextUrl = feed.nextUrl?.takeIf { it != next },
+                        entries = top.entries + more.entries.filter { it.id !in known },
+                        nextUrl = more.nextUrl,
                         loadingMore = false,
+                        foundNone = more.foundNone,
                     )
                 }
             } catch (_: OpdsException) {
@@ -239,6 +295,7 @@ class OpdsViewModel(
         loadJob?.cancel()
         browsing.value = null
         server = null
+        rootFeed = null
         lastRequest = null
     }
 
@@ -252,16 +309,28 @@ class OpdsViewModel(
         }
     }
 
-    private suspend fun push(url: String, title: String, server: OpdsServer) {
+    private suspend fun push(url: String, title: String, server: OpdsServer): OpdsFeed {
         val feed = client.feed(server, url)
-        val page = CatalogPage(
-            url = url,
-            // The title of the entry the user tapped (or the search terms); the feed's own otherwise.
-            title = title.ifBlank { feed.title },
-            entries = feed.entries,
-            nextUrl = feed.nextUrl?.takeIf { it != url },
-            search = feed.search,
+        addPage(
+            CatalogPage(
+                url = url,
+                // The title of the entry the user tapped (or the search terms); the feed's own otherwise.
+                title = title.ifBlank { feed.title },
+                entries = feed.entries,
+                nextUrl = feed.nextUrl?.takeIf { it != url },
+                search = feed.search,
+            ),
         )
+        return feed
+    }
+
+    /** Opens the feed at [url] with only its Japanese books, reading on until there are some. */
+    private suspend fun pushJapanese(url: String, title: String, server: OpdsServer) {
+        val found = JapaneseBooks.loadFiltered(url) { client.feed(server, it) }
+        addPage(CatalogPage(url, title, found.entries, found.nextUrl, null, japaneseOnly = true, foundNone = found.foundNone))
+    }
+
+    private fun addPage(page: CatalogPage) {
         browsing.update { state -> state?.copy(pages = state.pages + page, loading = false, error = null) }
     }
 

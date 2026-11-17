@@ -81,6 +81,8 @@ fun CatalogBrowser(
     onBack: () -> Unit,
     onDone: () -> Unit,
     onOpenFeed: (url: String, title: String) -> Unit,
+    /** "Japanese books" on the start page, with the page's title. */
+    onOpenJapanese: (title: String) -> Unit,
     onDownload: (OpdsEntry) -> Unit,
     onSearch: (String) -> Unit,
     onLoadMore: () -> Unit,
@@ -144,7 +146,7 @@ fun CatalogBrowser(
             when {
                 error != null -> CatalogError(error, onRetry, onChangeLogin)
                 page == null -> Unit
-                page.entries.isEmpty() -> Text(
+                page.entries.isEmpty() && !page.japaneseOnly -> Text(
                     text = stringResource(R.string.catalog_feed_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
@@ -153,6 +155,19 @@ fun CatalogBrowser(
                         .padding(32.dp),
                 )
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (state.pages.size == 1 && state.japaneseShortcut) {
+                        item(key = "japanese") {
+                            val title = stringResource(R.string.catalog_japanese_books)
+                            ListItem(
+                                leadingContent = { Icon(painterResource(R.drawable.ic_translate), contentDescription = null) },
+                                headlineContent = { Text(title) },
+                                supportingContent = { Text(stringResource(R.string.catalog_japanese_books_details)) },
+                                trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                                modifier = Modifier.clickable { onOpenJapanese(title) },
+                            )
+                            HorizontalDivider()
+                        }
+                    }
                     if (state.pages.size == 1 && (offerOlderBooks || olderRequested)) {
                         item(key = "older") {
                             ListItem(
@@ -187,19 +202,39 @@ fun CatalogBrowser(
                         }
                         HorizontalDivider()
                     }
+                    if (page.japaneseOnly && page.entries.isEmpty()) {
+                        item(key = "none") {
+                            Text(
+                                text = stringResource(
+                                    if (page.nextUrl == null) R.string.catalog_japanese_none else R.string.catalog_japanese_none_yet,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                            )
+                        }
+                    }
                     if (page.nextUrl != null) {
                         item(key = "more") {
                             // Reaching the end of the list loads the next page (keyed by its address: a page
-                            // of only known entries adds none but moves on); a failed one waits for a tap.
-                            if (!page.loadMoreFailed) LaunchedEffect(page.nextUrl) { onLoadMore() }
+                            // of only known entries adds none but moves on); a failed one waits for a tap, as
+                            // does "Japanese books" after many pages without one.
+                            val waitForTap = page.loadMoreFailed || page.foundNone
+                            if (!waitForTap) LaunchedEffect(page.nextUrl) { onLoadMore() }
                             Box(
                                 contentAlignment = Alignment.Center,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(16.dp),
                             ) {
-                                if (page.loadMoreFailed) {
+                                if (page.loadingMore) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                } else if (page.loadMoreFailed) {
                                     TextButton(onClick = onLoadMore) { Text(stringResource(R.string.action_retry)) }
+                                } else if (page.foundNone) {
+                                    TextButton(onClick = onLoadMore) { Text(stringResource(R.string.catalog_japanese_keep_looking)) }
                                 } else {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                                 }

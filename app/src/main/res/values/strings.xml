@@ -234,6 +234,11 @@
     <string name="catalog_delete_message">Books you downloaded from it stay in your library.</string>
     <string name="catalog_search_hint">Title, author…</string>
     <string name="catalog_feed_empty">Nothing here.</string>
+    <string name="catalog_japanese_books">Japanese books</string>
+    <string name="catalog_japanese_books_details">Only the books in Japanese</string>
+    <string name="catalog_japanese_none">No Japanese books found in this catalogue.</string>
+    <string name="catalog_japanese_none_yet">No Japanese books among the newest books so far.</string>
+    <string name="catalog_japanese_keep_looking">Keep looking</string>
     <string name="catalog_change_login">Change login</string>
     <string name="catalog_in_library">In your library</string>
     <string name="catalog_no_epub">No EPUB or text file on the server</string>

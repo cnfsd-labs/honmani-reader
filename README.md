@@ -54,7 +54,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   later than midnight (Settings, Goal and time); reading time per day and book (time with an audiobook or Read aloud playing is counted
   separately) can be exported as a CSV for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
-- Your own book server (OPDS, such as Calibre-Web): browse, search, download. A folder on the phone: add
+- Your own book server (OPDS, such as Calibre-Web): browse, search, download; "Japanese books" at the top
+  of its start page lists only those. A folder on the phone: add
   it once, or watch it (Settings, Books and sync) and its new books join when the library opens
 - Accent colours, or a random one every day or every launch (Settings, Appearance)
 - Reading progress sync with KOReader (e-readers, Calibre-Web Automated, Komga), to the character

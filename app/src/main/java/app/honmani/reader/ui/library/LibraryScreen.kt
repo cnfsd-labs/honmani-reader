@@ -398,6 +398,7 @@ fun LibraryScreen(
             onBack = { opds.back() },
             onDone = opds::close,
             onOpenFeed = opds::openFeed,
+            onOpenJapanese = opds::openJapanese,
             onDownload = opds::download,
             onSearch = opds::search,
             onLoadMore = opds::loadMore,
