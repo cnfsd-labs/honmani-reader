@@ -276,6 +276,8 @@ data class BackupWordLookup(
     @SerialName("at") val lookedUpAt: Long,
     /** `LookupOrigin` name: only reader lookups count against a review card; PREPARE is no lookup. */
     val origin: String = "READER",
+    /** ttu's character count before the looked-up text in [book] ("Open in book" goes there). */
+    val position: Long? = null,
 )
 
 @Serializable

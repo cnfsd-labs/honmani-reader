@@ -206,6 +206,7 @@ class Backup(
                         bookTitle = lookup.bookTitle,
                         lookedUpAt = lookup.lookedUpAt,
                         origin = lookup.origin.name,
+                        position = lookup.position,
                     )
                 },
                 card = tables.cards[word.id]?.let { backupCard(it).copy(updatedAt = if (sync != null) it.updatedAt else 0) },
@@ -387,6 +388,7 @@ class Backup(
                             bookTitle = lookup.bookTitle,
                             lookedUpAt = lookup.lookedUpAt,
                             origin = LookupOrigin.entries.firstOrNull { it.name == lookup.origin } ?: LookupOrigin.READER,
+                            position = lookup.position,
                         )
                     }
                 // The backup's card wins: restoring is meant to bring the review memory back as it was.

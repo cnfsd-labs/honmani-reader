@@ -197,7 +197,7 @@ class BackupTest {
         database.readingDao().markRefoldExported(book.id, "2026-10-20", 200, listenSeconds = 100)
         // A book removed from the library: its reading still counts.
         read(99, "2026-10-19", seconds = 300, characters = 1_000)
-        words.record(lookup("猫", book.id))
+        words.record(lookup("猫", book.id).copy(position = 1_234))
         words.record(lookup("犬", null))
         val dog = words.find("犬", "よみ")!!
         words.markLearned(dog.id)
@@ -299,6 +299,8 @@ class BackupTest {
         assertEquals(5_000L, new.database.bookDao().find(added.id)?.characters)
         assertEquals(5_000L, new.days().filter { it.bookId == added.id }.sumOf { it.characters })
         assertEquals(1, new.database.wordDao().countLookups(added.id).first())
+        // "Open in book" still finds the place the word was looked up.
+        assertEquals(1_234L, new.database.backupDao().wordLookups().single { it.bookId == added.id }.position)
         assertEquals(RestoredPosition(5_000, 0.25f, savedAt = LAST_OPENED), new.restored.takePosition("hash-a"))
         assertNull(new.restored.takePosition("hash-a"))
         assertTrue(new.restored.waiting().none { it.key == "hash-a" })

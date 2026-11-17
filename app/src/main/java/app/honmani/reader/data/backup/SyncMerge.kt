@@ -334,6 +334,7 @@ class SyncMerge(
                     bookTitle = lookup.bookTitle,
                     lookedUpAt = lookup.lookedUpAt,
                     origin = LookupOrigin.entries.firstOrNull { it.name == lookup.origin } ?: LookupOrigin.READER,
+                    position = lookup.position,
                 )
             }
             word.card?.let { card ->
