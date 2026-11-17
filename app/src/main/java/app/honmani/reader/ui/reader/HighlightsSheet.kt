@@ -2,15 +2,21 @@ package app.honmani.reader.ui.reader
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,6 +28,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +48,7 @@ import kotlinx.coroutines.launch
 /**
  * The reader's highlights in this book, in reading order: a tap jumps there, the bin removes one
  * with an Undo. Each row shows the passage (two lines at most), its colour and where it is.
+ * [onShare] sends one highlight, or all of them, to the share sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +57,7 @@ fun HighlightsSheet(
     onOpen: (HighlightEntity) -> Unit,
     onDelete: (HighlightEntity) -> Unit,
     onUndoDelete: (HighlightEntity) -> Unit,
+    onShare: (List<HighlightEntity>) -> Unit,
     onDismiss: () -> Unit,
     /** Back (not a tap outside): returns to the reader menu; null closes like a tap outside. */
     onBack: (() -> Unit)? = null,
@@ -69,6 +78,15 @@ fun HighlightsSheet(
                 )
             } else {
                 LazyColumn(modifier = Modifier.padding(bottom = 48.dp), overscrollEffect = null) {
+                    item(key = "share-all") {
+                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { onShare(highlights) }) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.highlight_share_all))
+                            }
+                        }
+                    }
                     items(highlights, key = { it.id }) { highlight ->
                         ListItem(
                             leadingContent = {
@@ -84,15 +102,20 @@ fun HighlightsSheet(
                             headlineContent = { Text(highlight.text, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text(stringResource(R.string.book_search_position, highlight.percent)) },
                             trailingContent = {
-                                IconButton(onClick = {
-                                    onDelete(highlight)
-                                    scope.launch {
-                                        snackbar.currentSnackbarData?.dismiss()
-                                        val result = snackbar.showSnackbar(removed, undo, duration = SnackbarDuration.Long)
-                                        if (result == SnackbarResult.ActionPerformed) onUndoDelete(highlight)
+                                Row {
+                                    IconButton(onClick = { onShare(listOf(highlight)) }) {
+                                        Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.highlight_share))
                                     }
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.highlight_delete))
+                                    IconButton(onClick = {
+                                        onDelete(highlight)
+                                        scope.launch {
+                                            snackbar.currentSnackbarData?.dismiss()
+                                            val result = snackbar.showSnackbar(removed, undo, duration = SnackbarDuration.Long)
+                                            if (result == SnackbarResult.ActionPerformed) onUndoDelete(highlight)
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.highlight_delete))
+                                    }
                                 }
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -1,11 +1,13 @@
 package app.honmani.reader.ui.reader
 
+import android.content.Intent
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -86,6 +88,8 @@ internal fun ReaderBookSheets(
         )
     }
     if (overlays.highlightsShown && !atLibrary) {
+        val context = LocalContext.current
+        val shareTitle = stringResource(R.string.highlight_share)
         HighlightsSheet(
             highlights = current.highlights,
             onOpen = { highlight ->
@@ -102,6 +106,11 @@ internal fun ReaderBookSheets(
             },
             onDelete = { highlight -> scope.launch { container.highlightDao.delete(highlight.id) } },
             onUndoDelete = { highlight -> scope.launch { container.highlightDao.put(highlight) } },
+            onShare = { highlights ->
+                val text = HighlightShareText.all(highlights, current.book?.title)
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                context.startActivity(Intent.createChooser(send, shareTitle))
+            },
             onDismiss = { overlays.highlightsShown = false },
             onBack = backToMenu { overlays.highlightsShown = false },
         )

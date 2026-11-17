@@ -543,6 +543,8 @@
     <string name="highlight_removed">Highlight removed</string>
     <string name="highlight_list_empty">No highlights yet. Select text with a long press, then pick a colour in the lookup panel.</string>
     <string name="highlight_delete">Delete highlight</string>
+    <string name="highlight_share">Share highlight</string>
+    <string name="highlight_share_all">Share all</string>
     <string name="jump_back_message">Jumped to %1$d%%</string>
     <string name="jump_back_action">Back to where you were</string>
     <string name="reader_menu_close_book">Close book</string>
