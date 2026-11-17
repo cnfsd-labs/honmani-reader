@@ -94,7 +94,16 @@ data class WordsUiState(
     val session: SessionWords = SessionWords(null, emptyList()),
     /** The search text for the lists ([filterWords]); empty shows all. */
     val query: String = "",
+    /** The book the lists are narrowed to (words looked up in it); null shows all. */
+    val book: WordsBook? = null,
+    /** Ids of the words looked up in [book]; null without a book or until loaded. */
+    val bookWords: Set<Long>? = null,
+    /** Ids of the books with at least one lookup, the ones the book filter offers. */
+    val lookedUpBooks: Set<Long> = emptySet(),
 )
+
+/** A book the Words lists are narrowed to. */
+data class WordsBook(val id: Long, val title: String)
 
 /** How adding to Anki went: one word, or several from "Add all". */
 sealed interface AnkiOutcome {
@@ -185,6 +194,11 @@ class WordsViewModel(
     private val filter = MutableStateFlow(WordFilter.LEARNING)
     private val expanded = MutableStateFlow<Long?>(null)
     private val query = MutableStateFlow("")
+    private val book = MutableStateFlow<WordsBook?>(null)
+    /** The chosen book with its words, together so a new choice never shows the old book's words. */
+    private val bookWords: Flow<Pair<WordsBook?, Set<Long>?>> = book.flatMapLatest { chosen ->
+        if (chosen == null) flowOf(null to null) else repository.bookWordIds(chosen.id).map { chosen to it }
+    }
     private val _changes = Channel<WordChange>(Channel.BUFFERED)
     private val _ankiOutcomes = Channel<AnkiOutcome>(Channel.BUFFERED)
     private val ankiProgress = MutableStateFlow<Pair<Int, Int>?>(null)
@@ -263,6 +277,8 @@ class WordsViewModel(
             .combine(frequencies.onStart { emit(emptyMap()) }) { state, found -> state.copy(frequencies = found) }
             .combine(session) { state, session -> state.copy(session = session) }
             .combine(query) { state, query -> state.copy(query = query) }
+            .combine(bookWords) { state, (book, words) -> state.copy(book = book, bookWords = words) }
+            .combine(repository.lookedUpBookIds.onStart { emit(emptySet()) }) { state, books -> state.copy(lookedUpBooks = books) }
             .combine(grammarWords) { state, grammar ->
                 state.copy(notInAnki = state.learning.orEmpty().count { it.ankiNoteId == null && it.id !in grammar })
             }
@@ -270,6 +286,11 @@ class WordsViewModel(
 
     fun setQuery(value: String) {
         query.value = value
+    }
+
+    /** Shows only the words looked up in [value]; null shows all. */
+    fun setBook(value: WordsBook?) {
+        book.value = value
     }
 
     fun setFilter(value: WordFilter) {

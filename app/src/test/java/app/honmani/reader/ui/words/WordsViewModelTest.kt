@@ -112,6 +112,31 @@ class WordsViewModelTest {
     }
 
     @Test
+    fun theBookFilterShowsTheWordsLookedUpInThatBookEachInEveryBookItWasIn() = runTest {
+        repository.record(lookedUp("猫").copy(bookId = 1, bookTitle = "A"))
+        repository.record(lookedUp("犬").copy(bookId = 2, bookTitle = "B"))
+        repository.record(lookedUp("鳥").copy(bookId = 1, bookTitle = "A"))
+        repository.record(lookedUp("鳥").copy(sentence = "鳥が飛ぶ。", bookId = 2, bookTitle = "B"))
+        repository.record(lookedUp("魚"))
+        val viewModel = viewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        fun shown(state: WordsUiState) = filterByBook(state.learning!!, state.bookWords).map { it.expression }.toSet()
+
+        val all = viewModel.uiState.first { it.learning?.size == 4 && it.lookedUpBooks.isNotEmpty() }
+        assertEquals(setOf(1L, 2L), all.lookedUpBooks)
+        assertEquals(setOf("猫", "犬", "鳥", "魚"), shown(all))
+
+        viewModel.setBook(WordsBook(1, "A"))
+        assertEquals(setOf("猫", "鳥"), shown(viewModel.uiState.first { it.book?.id == 1L && it.bookWords != null }))
+
+        viewModel.setBook(WordsBook(2, "B"))
+        assertEquals(setOf("犬", "鳥"), shown(viewModel.uiState.first { it.book?.id == 2L && it.bookWords != null }))
+
+        viewModel.setBook(null)
+        assertEquals(setOf("猫", "犬", "鳥", "魚"), shown(viewModel.uiState.first { it.book == null }))
+    }
+
+    @Test
     fun savedWordsShowTheirFrequencyOnlyWhenSwitchedOnAndKnownToTheDictionary() = runTest {
         repository.record(lookedUp("猫"))
         repository.record(lookedUp("犬"))

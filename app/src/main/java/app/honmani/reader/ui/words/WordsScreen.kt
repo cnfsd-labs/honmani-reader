@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.ui.reader.LookupPanel
 import app.honmani.reader.ui.reader.PanelUndo
 import app.honmani.reader.ui.reader.ReaderViewModel
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -413,6 +415,10 @@ fun WordsScreen(
                     padding = padding,
                     onFilter = viewModel::setFilter,
                     onQuery = viewModel::setQuery,
+                    onBook = viewModel::setBook,
+                    books = remember(reviewChoice.books, uiState.lookedUpBooks) {
+                        reviewChoice.books.filter { it.id in uiState.lookedUpBooks }
+                    },
                     onToggleExpanded = viewModel::toggleExpanded,
                     onToggleReadWord = viewModel::toggleReadWord,
                     onSetStarred = viewModel::setStarred,
@@ -548,6 +554,9 @@ private fun WordsContent(
     onExportPackage: () -> Unit,
     onShowIgnored: () -> Unit = {},
     onQuery: (String) -> Unit = {},
+    /** The library books with a lookup, offered by the book filter. */
+    books: List<BookEntity> = emptyList(),
+    onBook: (WordsBook?) -> Unit = {},
     onExportCsv: () -> Unit = {},
     onShowSession: () -> Unit = {},
     onShowHelp: () -> Unit = {},
@@ -568,6 +577,7 @@ private fun WordsContent(
             onQuery("")
         }
         BackHandler(enabled = searchOpen, onBack = closeSearch)
+        var pickBook by rememberSaveable { mutableStateOf(false) }
         // One quiet row: Learning and Known as chips, a magnifier for the filter, the menu.
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -623,11 +633,41 @@ private fun WordsContent(
                 onShowHelp = onShowHelp,
                 onShowSession = onShowSession,
                 onShowIgnored = onShowIgnored,
+                onPickBook = if (books.isNotEmpty()) ({ pickBook = true }) else null,
                 onExport = onExport,
                 onExportPackage = onExportPackage,
                 onExportCsv = onExportCsv,
                 ankiEnabled = ankiEnabled,
                 exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
+            )
+        }
+        // The book the lists are narrowed to: a tap picks another, the cross shows all books.
+        val book = uiState.book
+        if (book != null) {
+            InputChip(
+                selected = true,
+                onClick = { pickBook = true },
+                label = { Text(book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                trailingIcon = {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.words_all_books_description),
+                        modifier = Modifier.size(18.dp).clickable { onBook(null) },
+                    )
+                },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+        if (pickBook) {
+            BookPickerDialog(
+                books = books,
+                title = stringResource(R.string.words_pick_book),
+                allLabel = stringResource(R.string.words_all_books),
+                onPick = { picked ->
+                    pickBook = false
+                    onBook(picked?.let { WordsBook(it.id, it.title) })
+                },
+                onDismiss = { pickBook = false },
             )
         }
         val progress = uiState.ankiProgress
@@ -655,8 +695,9 @@ private fun WordsContent(
             filter = filter,
             listState = listStates[filter.ordinal],
             words = (if (filter == WordFilter.LEARNING) uiState.learning else uiState.known)
-                ?.let { filterWords(it, uiState.query) },
-            knownByReading = if (filter == WordFilter.KNOWN) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
+                ?.let { filterByBook(filterWords(it, uiState.query), uiState.bookWords) },
+            // Known from reading alone: never looked up, so in no book.
+            knownByReading = if (filter == WordFilter.KNOWN && uiState.book == null) filterReadWords(uiState.knownByReading, uiState.query) else emptyList(),
             uiState = uiState,
             now = now,
             dueIds = dueIds,
@@ -724,7 +765,11 @@ private fun WordList(
             CircularProgressIndicator()
         }
         words.isEmpty() && knownByReading.isEmpty() -> Text(
-            text = if (uiState.query.isBlank()) stringResource(emptyText(filter)) else stringResource(R.string.words_search_empty, uiState.query.trim()),
+            text = when {
+                uiState.query.isNotBlank() -> stringResource(R.string.words_search_empty, uiState.query.trim())
+                uiState.book != null -> stringResource(R.string.words_book_empty, uiState.book.title)
+                else -> stringResource(emptyText(filter))
+            },
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier
@@ -895,6 +940,8 @@ private fun WordsMenu(
     onShowHelp: () -> Unit,
     onShowSession: () -> Unit,
     onShowIgnored: () -> Unit,
+    /** Opens the book filter's picker; null while no book has a lookup. */
+    onPickBook: (() -> Unit)?,
     onExport: () -> Unit,
     onExportPackage: () -> Unit,
     onExportCsv: () -> Unit,
@@ -945,6 +992,18 @@ private fun WordsMenu(
                 onClick = {
                     open = false
                     onShowIgnored()
+                },
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .clip(RoundedCornerShape(16.dp)),
+            )
+            if (onPickBook != null) DropdownMenuItem(
+                text = { Text(stringResource(R.string.words_pick_book_open), style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(painterResource(R.drawable.ic_book_file), contentDescription = null) },
+                colors = MenuDefaults.itemColors(leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                onClick = {
+                    open = false
+                    onPickBook()
                 },
                 modifier = Modifier
                     .padding(horizontal = 8.dp)

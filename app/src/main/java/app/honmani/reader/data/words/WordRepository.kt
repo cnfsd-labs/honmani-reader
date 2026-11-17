@@ -70,6 +70,12 @@ class WordRepository(
      * lookups, so a word whose lookups in this book were all pruned for newer ones is left out.
      */
     fun bookWordCount(bookId: Long): Flow<Int> = dao.countBookWords(bookId)
+
+    /** Ids of the words looked up in [bookId] (a word looked up in several books is in each). */
+    fun bookWordIds(bookId: Long): Flow<Set<Long>> = dao.observeBookWordIds(bookId).map { it.toSet() }
+
+    /** Ids of the books with at least one kept lookup. */
+    val lookedUpBookIds: Flow<Set<Long>> = dao.observeLookedUpBookIds().map { it.toSet() }
     val starred = dao.observeStarred()
     val learned = dao.observeLearned()
 

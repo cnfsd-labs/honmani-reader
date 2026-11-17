@@ -1149,6 +1149,11 @@
     <string name="review_settings_days">%1$d days</string>
     <string name="words_search_clear">Clear search</string>
     <string name="words_search_empty">No saved words match \"%1$s\".</string>
+    <string name="words_pick_book_open">Words from one book…</string>
+    <string name="words_pick_book">Words from which book?</string>
+    <string name="words_all_books">All books</string>
+    <string name="words_all_books_description">Show all books</string>
+    <string name="words_book_empty">No words in this list were looked up in %1$s.</string>
     <string name="listen_failed">Can\'t say it: %1$s.</string>
     <string name="lookup_nothing_found">No entry for “%1$s”.</string>
     <string name="lookup_no_dictionaries">No dictionary is installed yet. Get one in Settings → Dictionaries – it takes a minute.</string>

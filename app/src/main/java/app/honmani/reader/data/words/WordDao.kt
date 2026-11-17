@@ -91,6 +91,14 @@ interface WordDao : TombstoneWriter {
     )
     fun countBookWords(bookId: Long): Flow<Int>
 
+    /** Words with a kept lookup in [bookId], for the Words tab's book filter. */
+    @Query("SELECT DISTINCT word_id FROM word_lookup WHERE book_id = :bookId")
+    fun observeBookWordIds(bookId: Long): Flow<List<Long>>
+
+    /** Books with at least one kept lookup. */
+    @Query("SELECT DISTINCT book_id FROM word_lookup WHERE book_id IS NOT NULL")
+    fun observeLookedUpBookIds(): Flow<List<Long>>
+
     @Insert
     suspend fun insertLookupEvent(event: LookupEventEntity): Long
 

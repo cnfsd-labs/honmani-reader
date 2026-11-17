@@ -92,6 +92,10 @@ fun searchWords(words: List<WordEntity>, query: String): List<WordEntity> {
     }
 }
 
+/** [words] looked up in the chosen book ([WordsUiState.bookWords]); null keeps all. */
+fun filterByBook(words: List<WordEntity>, bookWords: Set<Long>?): List<WordEntity> =
+    if (bookWords == null) words else words.filter { it.id in bookWords }
+
 /** The same for words known from reading alone, which have only the word itself. */
 fun filterReadWords(words: List<Pair<String, Int>>, query: String): List<Pair<String, Int>> {
     val wanted = query.trim().lowercase()

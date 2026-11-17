@@ -53,6 +53,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
+import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.ui.review.ReadNext
@@ -239,32 +240,55 @@ fun ReviewPage(
         }
     }
     if (pickBook) {
-        AlertDialog(
-            onDismissRequest = { pickBook = false },
-            title = { Text(stringResource(R.string.review_pick_book)) },
-            text = {
-                LazyColumn {
-                    items(choice.books, key = { it.id }) { book ->
-                        Text(
-                            book.title,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    pickBook = false
-                                    choice.onChange(ReviewScope.Book(book.id, book.title))
-                                }
-                                .heightIn(min = 48.dp)
-                                .padding(vertical = 12.dp),
-                        )
-                    }
-                }
+        BookPickerDialog(
+            books = choice.books,
+            title = stringResource(R.string.review_pick_book),
+            onPick = { book ->
+                pickBook = false
+                if (book != null) choice.onChange(ReviewScope.Book(book.id, book.title))
             },
-            confirmButton = {},
-            dismissButton = { TextButton(onClick = { pickBook = false }) { Text(stringResource(android.R.string.cancel)) } },
+            onDismiss = { pickBook = false },
         )
     }
+}
+
+/**
+ * Picks one of [books]: "A book…" on the Review page, the book filter of the Words list. [allLabel],
+ * if given, heads the list and picks no book (null).
+ */
+@Composable
+internal fun BookPickerDialog(
+    books: List<BookEntity>,
+    title: String,
+    onPick: (BookEntity?) -> Unit,
+    onDismiss: () -> Unit,
+    allLabel: String? = null,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            @Composable
+            fun row(label: String, onClick: () -> Unit) {
+                Text(
+                    label,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onClick)
+                        .heightIn(min = 48.dp)
+                        .padding(vertical = 12.dp),
+                )
+            }
+            LazyColumn {
+                if (allLabel != null) item(key = "all") { row(allLabel) { onPick(null) } }
+                items(books, key = { it.id }) { book -> row(book.title) { onPick(book) } }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) } },
+    )
 }
 
 /** The page modes with nothing to start: they offer [ReadNext]. */
