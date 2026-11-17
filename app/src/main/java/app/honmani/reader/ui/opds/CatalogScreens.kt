@@ -306,6 +306,7 @@ fun catalogErrorText(reason: OpdsException.Reason): Int = when (reason) {
     OpdsException.Reason.SERVER -> R.string.catalog_error_server
     OpdsException.Reason.NETWORK -> R.string.catalog_error_network
     OpdsException.Reason.CERTIFICATE -> R.string.catalog_error_certificate
+    OpdsException.Reason.HTTP_ONLY -> R.string.catalog_error_http_only
     OpdsException.Reason.TOO_LARGE -> R.string.catalog_error_too_large
     OpdsException.Reason.HOTSPOT -> R.string.catalog_error_hotspot
     OpdsException.Reason.PASSWORD_STORAGE -> R.string.error_password_storage

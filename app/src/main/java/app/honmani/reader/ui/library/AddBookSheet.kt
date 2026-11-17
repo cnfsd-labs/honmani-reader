@@ -12,6 +12,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -75,7 +76,13 @@ fun AddBookSheet(
                 ListItem(
                     leadingContent = { Icon(painterResource(R.drawable.ic_cloud), contentDescription = null) },
                     headlineContent = { Text(catalog.title) },
-                    supportingContent = { Text(catalog.url.substringAfter("://")) },
+                    supportingContent = {
+                        if (catalog.needsPassword) {
+                            Text(stringResource(R.string.catalog_password_needed), color = MaterialTheme.colorScheme.error)
+                        } else {
+                            Text(catalog.url.substringAfter("://"))
+                        }
+                    },
                     trailingContent = {
                         IconButton(onClick = { onEditCatalog(catalog) }) {
                             Icon(
@@ -85,7 +92,10 @@ fun AddBookSheet(
                         }
                     },
                     colors = colors,
-                    modifier = Modifier.clickable(role = Role.Button) { onOpenCatalog(catalog) },
+                    // Opening it would only fail for the missing password: ask for it instead.
+                    modifier = Modifier.clickable(role = Role.Button) {
+                        if (catalog.needsPassword) onEditCatalog(catalog) else onOpenCatalog(catalog)
+                    },
                 )
             }
             ListItem(

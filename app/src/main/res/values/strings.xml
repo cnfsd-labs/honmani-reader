@@ -246,6 +246,8 @@
     <string name="catalog_error_not_a_catalogue">No book catalogue at this address. For Calibre-Web, enter the address you open in the browser.</string>
     <string name="catalog_error_server">The server had a problem. Try again in a moment.</string>
     <string name="catalog_error_network">The server could not be reached. Check the address and your connection.</string>
+    <string name="catalog_error_http_only">This server doesn\'t use https. Type the address with http:// in front, for example http://192.168.1.5:8083.</string>
+    <string name="catalog_password_needed">Password needed: tap to type it</string>
     <string name="catalog_error_certificate">The server\'s certificate is not trusted. If it uses your own certificate authority, install it in Android\'s security settings.</string>
     <string name="catalog_error_hotspot">This Wi-Fi is a hotspot with a login page, and this address is not encrypted (http), so Honmani does not send your password here. Use https, a VPN or another network.</string>
     <string name="catalog_error_too_large">The server sent more than Honmani can handle.</string>

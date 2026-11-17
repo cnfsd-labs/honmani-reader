@@ -57,6 +57,46 @@ class OpdsRepositoryTest {
     }
 
     @Test
+    fun addingAListedServerAgain_fillsInItsPasswordInsteadOfAddingIt() = runTest {
+        // A restored backup lists the server with its user name but without the password.
+        val restored = repository.save(null, "Calibre-Web", "http://127.0.0.1:7300/opds", "test", "")
+        assertTrue(repository.catalogs.first().single().needsPassword)
+
+        val again = repository.save(null, "Calibre-Web", "https://127.0.0.1:7300/opds/", "test", "secret")
+
+        assertEquals(restored, again)
+        val catalog = repository.catalogs.first().single()
+        assertTrue(catalog.hasPassword)
+        assertFalse(catalog.needsPassword)
+        assertEquals("secret", repository.server(restored)!!.password)
+
+        // Another login on the same server is another catalogue.
+        repository.save(null, "Calibre-Web", "http://127.0.0.1:7300/opds", "guest", "pw")
+        assertEquals(2, repository.catalogs.first().size)
+    }
+
+    @Test
+    fun anAddressWithoutSchemeOnAPlainHttpServer_saysToTypeHttp_withoutSendingTheLogin() = runTest {
+        val server = PlainHttpServer()
+        try {
+            val client = OpdsRepository(dao, ReversingCipher(), OpdsClient(connectTimeoutMs = 2_000, readTimeoutMs = 2_000))
+            assertEquals(OpdsException.Reason.HTTP_ONLY, connectError(client, "127.0.0.1:${server.port}"))
+            // Typed with https:// the certificate error stays: the user asked for https.
+            assertEquals(OpdsException.Reason.CERTIFICATE, connectError(client, "https://127.0.0.1:${server.port}"))
+            assertTrue(server.requests.none { it.contains("Authorization", ignoreCase = true) })
+        } finally {
+            server.stop()
+        }
+    }
+
+    private suspend fun connectError(repository: OpdsRepository, address: String) = try {
+        repository.connect(address, "reader", "pw")
+        null
+    } catch (e: OpdsException) {
+        e.reason
+    }
+
+    @Test
     fun noUserNameMeansNoPassword() = runTest {
         val id = repository.save(null, "Public", "https://a.example/opds", " ", "pw")
         assertNull(dao.find(id)!!.username)
@@ -89,4 +129,39 @@ private class FakeOpdsCatalogDao : OpdsCatalogDao {
         catalogs.update { list -> list.map { if (it.id == catalog.id) catalog else it } }
 
     override suspend fun delete(id: Long) = catalogs.update { list -> list.filterNot { it.id == id } }
+}
+
+/** Answers every connection with a plain-http 401 at once, so a TLS handshake to it fails. */
+private class PlainHttpServer {
+    private val socket = java.net.ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
+    val port = socket.localPort
+    val requests: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+    init {
+        Thread {
+            while (!socket.isClosed) {
+                val client = try {
+                    socket.accept()
+                } catch (_: Exception) {
+                    break
+                }
+                client.use {
+                    it.soTimeout = 500
+                    it.getOutputStream().write(
+                        "HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .toByteArray(),
+                    )
+                    it.shutdownOutput()
+                    val received = java.io.ByteArrayOutputStream()
+                    try {
+                        it.getInputStream().copyTo(received)
+                    } catch (_: Exception) {
+                    }
+                    requests += received.toString(Charsets.ISO_8859_1.name())
+                }
+            }
+        }.apply { isDaemon = true }.start()
+    }
+
+    fun stop() = socket.close()
 }

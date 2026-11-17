@@ -15,7 +15,10 @@ data class OpdsCatalog(
     val autoImport: Boolean = true,
     /** The first automatic import read only the newest books: offer "Import older books". */
     val offerOlderBooks: Boolean = false,
-)
+) {
+    /** It has a user name but no password, as a restored backup leaves it: the login has to be typed again. */
+    val needsPassword: Boolean get() = username != null && !hasPassword
+}
 
 /** The book catalogues the user added, with their logins. */
 class OpdsRepository(
@@ -69,6 +72,9 @@ class OpdsRepository(
             try {
                 return url to client.feed(OpdsServer(url, username, password), url)
             } catch (e: OpdsException) {
+                if (e.reason == OpdsException.Reason.CERTIFICATE && !hasScheme(address) && speaksPlainHttp(url)) {
+                    throw OpdsException(OpdsException.Reason.HTTP_ONLY, "${'$'}url has no https", e)
+                }
                 if (e.reason != OpdsException.Reason.NOT_A_CATALOGUE) throw e
                 if (failure == null) failure = e
             }
@@ -77,7 +83,24 @@ class OpdsRepository(
     }
 
     /**
-     * Adds a catalogue, or updates catalogue [id]. A null [password] on an update keeps the
+     * Whether the server of the https [url] answers over plain http. Asked without the login: over
+     * http it goes only once the user typed http:// and saw the warning.
+     */
+    private suspend fun speaksPlainHttp(url: String): Boolean {
+        val http = "http://" + url.substringAfter("://")
+        return try {
+            client.feed(OpdsServer(http, null, null), http)
+            true
+        } catch (e: OpdsException) {
+            e.reason == OpdsException.Reason.UNAUTHORIZED || e.reason == OpdsException.Reason.NOT_A_CATALOGUE ||
+                e.reason == OpdsException.Reason.SERVER || e.reason == OpdsException.Reason.HOTSPOT
+        }
+    }
+
+    /**
+     * Adds a catalogue, or updates catalogue [id]. A new one with the address (http or https) and
+     * user name of one already listed updates that one instead: adding a restored server again
+     * fills in its password rather than listing it twice. A null [password] on an update keeps the
      * stored one; an empty one removes it. A null [autoImport] keeps the setting (on for new ones).
      */
     suspend fun save(
@@ -89,7 +112,7 @@ class OpdsRepository(
         autoImport: Boolean? = null,
     ): Long {
         val user = username?.trim()?.ifEmpty { null }
-        val existing = id?.let { dao.find(it) }
+        val existing = if (id != null) dao.find(id) else dao.observeAll().first().firstOrNull { sameServer(it, url, user) }
         val passwordCipher = when {
             user == null -> null
             password == null -> existing?.passwordCipher
@@ -135,11 +158,21 @@ class OpdsRepository(
         fun offersOlderBooks(catalog: OpdsCatalogEntity) =
             catalog.autoImport && catalog.autoImportComplete && !catalog.olderBooksImported
 
+        private fun hasScheme(address: String) = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(address.trim())
+
+        /** Whether [catalog] is the server of [url] with login [user]; http and https count as one. */
+        internal fun sameServer(catalog: OpdsCatalogEntity, url: String, user: String?): Boolean {
+            fun key(u: String) = u.substringAfter("://").trimEnd('/').let { rest ->
+                rest.substringBefore('/').lowercase() + rest.drop(rest.substringBefore('/').length)
+            }
+            return catalog.username == user && key(catalog.url) == key(url)
+        }
+
         /** The URLs to try for what the user typed, most likely first. */
         internal fun candidateUrls(address: String): List<String> {
             val trimmed = address.trim().trimEnd('/')
             if (trimmed.isEmpty()) return emptyList()
-            val url = if (Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(trimmed)) trimmed else "https://$trimmed"
+            val url = if (hasScheme(trimmed)) trimmed else "https://$trimmed"
             return if (url.endsWith("/opds")) listOf(url) else listOf(url, "$url/opds")
         }
     }

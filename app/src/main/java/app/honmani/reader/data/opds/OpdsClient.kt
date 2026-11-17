@@ -48,6 +48,9 @@ class OpdsException(val reason: Reason, message: String, cause: Throwable? = nul
         /** TLS failed, usually a self-signed certificate. */
         CERTIFICATE,
 
+        /** An address typed without http:// or https:// failed over https, but the server speaks plain http. */
+        HTTP_ONLY,
+
         /** The server asked for the login over http on a hotspot with a login page: not sent. */
         HOTSPOT,
 
