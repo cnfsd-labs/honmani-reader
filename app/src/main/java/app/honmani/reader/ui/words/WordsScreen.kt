@@ -1175,7 +1175,8 @@ private fun WordRow(
                 )
             }
             Text(
-                text = details(word, now),
+                // The sentences above name their books already.
+                text = details(word, now, withBook = lookups.isEmpty()),
                 style = MaterialTheme.typography.labelSmall,
                 color = muted,
                 modifier = Modifier.padding(top = 6.dp),
@@ -1281,7 +1282,7 @@ private fun Sentence(sentence: AnnotatedString, source: String?, maxLines: Int) 
 
 /** "3 lookups · 2 days ago · 吾輩は猫である" */
 @Composable
-private fun details(word: WordEntity, now: Long): String {
+private fun details(word: WordEntity, now: Long, withBook: Boolean = true): String {
     // Words marked as known without a lookup (word lists, Anki decks) were never looked up.
     if (word.lookupCount == 0) return word.lastBookTitle.orEmpty()
     val count = pluralStringResource(R.plurals.words_lookup_count, word.lookupCount, word.lookupCount)
@@ -1291,7 +1292,7 @@ private fun details(word: WordEntity, now: Long): String {
     } else {
         DateUtils.getRelativeTimeSpanString(word.lastLookedUpAt, now, DateUtils.MINUTE_IN_MILLIS).toString()
     }
-    return listOfNotNull(count, time, word.lastBookTitle).joinToString(" · ")
+    return listOfNotNull(count, time, word.lastBookTitle?.takeIf { withBook }).joinToString(" · ")
 }
 
 /** The sentence with the looked-up text emphasised. */
