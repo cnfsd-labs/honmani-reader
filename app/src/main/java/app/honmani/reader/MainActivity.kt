@@ -9,16 +9,22 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.ui.HonmaniApp
+import app.honmani.reader.ui.anki.AnkiProblemDialog
+import app.honmani.reader.ui.anki.AnkiProblemHost
+import app.honmani.reader.ui.anki.AnkiProblemNotice
 import app.honmani.reader.ui.search.SearchRequests
 import app.honmani.reader.ui.reader.LocalExampleSentences
 import app.honmani.reader.ui.theme.HonmaniTheme
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), AnkiProblemHost {
+    override val ankiProblem = mutableStateOf<AnkiProblemNotice?>(null)
+
     /**
      * Turns a page (true: the next) when a volume button is pressed; set while a book is open
      * and the reader wants it, so the buttons change the volume everywhere else.
@@ -55,6 +61,7 @@ class MainActivity : ComponentActivity() {
             HonmaniTheme(accent = accent, customHue = customHue, eInk = eInk, animations = animations) {
                 CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
                     HonmaniApp()
+                    AnkiProblemDialog(this, onOpenCardSettings = { container.searchRequests.receive(Intent(SearchRequests.ACTION_ANKI_SETTINGS)) })
                 }
             }
         }

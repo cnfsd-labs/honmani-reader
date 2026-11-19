@@ -9,9 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.MainActivity
+import app.honmani.reader.ui.anki.AnkiProblemDialog
+import app.honmani.reader.ui.anki.AnkiProblemHost
+import app.honmani.reader.ui.anki.AnkiProblemNotice
+import app.honmani.reader.ui.search.SearchRequests
 import app.honmani.reader.ui.reader.LocalExampleSentences
 import app.honmani.reader.ui.theme.HonmaniTheme
 
@@ -20,7 +25,9 @@ import app.honmani.reader.ui.theme.HonmaniTheme
  * ("Honmani" in its selection menu), text shared to Honmani, or a word typed in (from Words).
  * A text file shared to Honmani is a book: it goes on to the library.
  */
-class LookupActivity : ComponentActivity() {
+class LookupActivity : ComponentActivity(), AnkiProblemHost {
+    override val ankiProblem = mutableStateOf<AnkiProblemNotice?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -40,6 +47,10 @@ class LookupActivity : ComponentActivity() {
             HonmaniTheme(accent = accent, customHue = customHue, eInk = eInk, animations = animations) {
                 CompositionLocalProvider(LocalExampleSentences provides container.exampleSentences) {
                     LookupScreen(initialText = text, onDone = ::finish, preview = isPreview(intent))
+                    AnkiProblemDialog(this, onOpenCardSettings = {
+                        startActivity(Intent(this, MainActivity::class.java).setAction(SearchRequests.ACTION_ANKI_SETTINGS))
+                        finish()
+                    })
                 }
             }
         }

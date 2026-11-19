@@ -98,6 +98,7 @@ internal fun HomeTabs(
         tab = selected
         // A tab opens at its top level.
         overlays.dictionariesShown = false
+        overlays.ankiSettingsShown = false
     }
     val badges = if (dictionaryUpdate) setOf(HomeTab.SETTINGS) else emptySet()
     val counts = mapOf(HomeTab.WORDS to reviewDue)
@@ -193,6 +194,8 @@ internal fun HomeTabs(
                         bottomBar = tabBar,
                         showingDictionaries = overlays.dictionariesShown,
                         onShowDictionaries = { overlays.dictionariesShown = it },
+                        showingAnkiSettings = overlays.ankiSettingsShown,
+                        onShowAnkiSettings = { overlays.ankiSettingsShown = it },
                         onOpenReaderSettings = {
                             overlays.openedFromMenu = false
                             overlays.readerSettings = true

@@ -14,15 +14,21 @@ class SearchRequests {
 
     private val reviews = Channel<Unit>(Channel.CONFLATED)
 
+    private val ankiSettings = Channel<Unit>(Channel.CONFLATED)
+
     val received: Flow<Unit> = requests.receiveAsFlow()
 
     val reviewReceived: Flow<Unit> = reviews.receiveAsFlow()
+
+    /** "Open card settings" in the dialog about the reader's own note type (here or in the lookup window). */
+    val ankiSettingsReceived: Flow<Unit> = ankiSettings.receiveAsFlow()
 
     /** Takes [intent] if it asks for a search or a review; true if it did. */
     fun receive(intent: Intent?): Boolean {
         when (intent?.action) {
             ACTION_SEARCH -> requests.trySend(Unit)
             ACTION_REVIEW -> reviews.trySend(Unit)
+            ACTION_ANKI_SETTINGS -> ankiSettings.trySend(Unit)
             else -> return false
         }
         return true
@@ -31,5 +37,6 @@ class SearchRequests {
     companion object {
         const val ACTION_SEARCH = "app.honmani.reader.action.SEARCH"
         const val ACTION_REVIEW = "app.honmani.reader.action.REVIEW"
+        const val ACTION_ANKI_SETTINGS = "app.honmani.reader.action.ANKI_SETTINGS"
     }
 }

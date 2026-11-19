@@ -654,9 +654,11 @@
     <string name="custom_source_sentence_audio">Sentence audio</string>
     <string name="custom_source_pitch">Pitch accent</string>
     <string name="custom_source_frequency">Frequency</string>
-    <string name="anki_custom_not_chosen">No note type of your own is chosen. Pick one in Settings, Flashcards, Anki, Card type, My own.</string>
-    <string name="anki_custom_missing">The note type \"%1$s\" is not in AnkiDroid any more. Pick it again in Settings, Flashcards, Anki, Card type, My own.</string>
-    <string name="anki_custom_no_word">No field of \"%1$s\" is set to take the word. Check it in Settings, Flashcards, Anki, Card type, My own.</string>
+    <string name="anki_custom_not_chosen">No note type of your own is chosen. Pick one in Settings → Flashcards → Anki → Card type → My own.</string>
+    <string name="anki_custom_missing">The note type \"%1$s\" is not in AnkiDroid any more. Pick it again in Settings → Flashcards → Anki → Card type → My own.</string>
+    <string name="anki_custom_no_word">No field of \"%1$s\" is set to take the word. Check it in Settings → Flashcards → Anki → Card type → My own.</string>
+    <string name="anki_custom_problem_title">Your note type can\'t take cards</string>
+    <string name="anki_open_card_settings">Open card settings</string>
     <string name="sentence_ends">Sentence ends</string>
     <string name="sentence_ends_details">Characters that end a sentence; a line break always does.</string>
     <string name="sentence_ends_save">Save</string>
@@ -882,7 +884,7 @@
     <string name="audiobook_paused_network">No connection to Google. Honmani will try again later.</string>
     <string name="audiobook_make">Make one with a Google voice (costs money)</string>
     <string name="audiobook_make_epub_only">EPUB only</string>
-    <string name="audiobook_make_no_key">To make an audiobook with a Google voice, first enter your own Google Cloud API key in Settings, Flashcards, Voice.</string>
+    <string name="audiobook_make_no_key">To make an audiobook with a Google voice, first enter your own Google Cloud API key in Settings → Flashcards → Voice.</string>
     <string name="audiobook_make_title">Make an audiobook</string>
     <string name="audiobook_make_checking">Checking your key and loading the voices…</string>
     <string name="audiobook_make_unreadable">This book could not be read to count its text.</string>

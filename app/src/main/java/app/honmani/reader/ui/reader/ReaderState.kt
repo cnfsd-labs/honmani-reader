@@ -59,6 +59,9 @@ internal class ReaderOverlays(bookmarkDraft: MutableState<BookmarkDraft?>) {
     /** The Dictionaries screen, under Settings; lookups without a dictionary open it directly. */
     var dictionariesShown by mutableStateOf(false)
 
+    /** Settings' Anki page, from "Open card settings" (not kept: it is only ever a moment old). */
+    var ankiSettingsShown by mutableStateOf(false)
+
     /** The review screen, from Words or the launcher's "Review" shortcut. */
     var reviewShown by mutableStateOf(false)
 

@@ -89,6 +89,9 @@ fun SettingsScreen(
     /** The Dictionaries screen, kept by the caller so a lookup without dictionaries can open it. */
     showingDictionaries: Boolean = false,
     onShowDictionaries: (Boolean) -> Unit = {},
+    /** The Anki page, kept by the caller so "Open card settings" can open it. */
+    showingAnkiSettings: Boolean = false,
+    onShowAnkiSettings: (Boolean) -> Unit = {},
     /** Adds a sample book to the library (if it isn't there) and opens it. */
     onOpenSample: (SampleBook) -> Unit = {},
 ) {
@@ -129,6 +132,10 @@ fun SettingsScreen(
             return
         }
         else -> Unit
+    }
+    if (showingAnkiSettings) {
+        AnkiSettingsScreen(onBack = { onShowAnkiSettings(false) })
+        return
     }
     if (showingDictionaries) {
         DictionariesScreen(onBack = { onShowDictionaries(false) })

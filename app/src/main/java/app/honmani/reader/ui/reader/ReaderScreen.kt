@@ -363,6 +363,15 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             overlays.reviewShown = true
         }
     }
+    // "Open card settings" from the dialog about the reader's own Anki note type.
+    LaunchedEffect(container) {
+        container.searchRequests.ankiSettingsReceived.collect {
+            if (!atLibrary) viewModel.closeBook()
+            overlays.reviewShown = false
+            tab = HomeTab.SETTINGS
+            overlays.ankiSettingsShown = true
+        }
+    }
     // Words due, for the badge on the Words tab, and the new words a session would start.
     val reviewScope by container.reviewScope.collectAsStateWithLifecycle()
     val reviewBooks by remember(container) { container.bookDao.observeAll() }.collectAsStateWithLifecycle(emptyList())
