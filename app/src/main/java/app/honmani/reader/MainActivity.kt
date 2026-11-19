@@ -38,16 +38,20 @@ class MainActivity : ComponentActivity(), AnkiProblemHost {
         val appearance = container.appearanceSettings
         // A new start of the app (not a rotation) may pick a new random accent, before the first frame.
         if (savedInstanceState == null) appearance.refreshRandomAccent(container.dayClock.today().toEpochDay(), newLaunch = true)
-        // Once per app start (not on rotation): new books from catalogues with automatic import,
+        // Once per process (not on rotation, but also after Android killed the app in the background
+        // and recreates it with saved state): new books from catalogues with automatic import,
         // new versions of installed dictionaries (offered in Dictionaries, not installed), and
         // grading books that have no difficulty yet.
-        if (savedInstanceState == null) {
+        if (container.claimStartWork()) {
             container.opdsAutoImport.start()
             container.dictionaryUpdateChecker.start()
             container.startGrading()
             container.startGlossIndex()
             container.checkAutoBackupOffer()
             container.sweepLeftovers()
+        }
+        // The launch intent and shortcuts only on a new start: a recreated activity got its intent already.
+        if (savedInstanceState == null) {
             container.openedBooks.receive(intent)
             container.searchRequests.receive(intent)
             addSearchShortcut()

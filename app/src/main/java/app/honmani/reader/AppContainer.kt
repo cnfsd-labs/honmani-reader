@@ -140,6 +140,7 @@ import app.honmani.reader.ui.reader.TtuLibrary
 import app.honmani.reader.ui.reader.TtuLibraryException
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -969,6 +970,14 @@ class AppContainer(context: Context) {
         }
         syncFolder.write()
     }
+
+    private val startWorkClaimed = AtomicBoolean(false)
+
+    /**
+     * True only on the first call in this process: the per-start work runs once per process, also
+     * when Android recreates the activity with saved state after killing the app in the background.
+     */
+    fun claimStartWork(): Boolean = startWorkClaimed.compareAndSet(false, true)
 
     /** Once per app start: a backup another phone left is offered (see [AutoBackup.offer]). */
     fun checkAutoBackupOffer() {
