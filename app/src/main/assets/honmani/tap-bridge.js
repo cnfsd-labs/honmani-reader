@@ -798,9 +798,8 @@
     cancelHold();
     lastLongPress = null;
     if (!event.isPrimary || event.pointerType === 'mouse') return;
-    // At document start there may be no <html> yet; each touch checks again.
-  syncNoSelect();
-  document.addEventListener('DOMContentLoaded', syncNoSelect);
+    // At document start there may be no <html> yet, and the setting may change: each touch checks again.
+    syncNoSelect();
     const target = event.target;
     if (!selectionLookupOn() || !(target instanceof Element)) return;
     const root = target.closest(BOOK_ROOT_SELECTOR);
