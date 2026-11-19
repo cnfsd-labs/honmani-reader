@@ -394,7 +394,8 @@ private fun BookRow(
             when {
                 inLibrary -> Icon(
                     Icons.Filled.CheckCircle,
-                    contentDescription = stringResource(R.string.catalog_in_library),
+                    // The status text already says "In your library".
+                    contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 download is DownloadState.Running -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
