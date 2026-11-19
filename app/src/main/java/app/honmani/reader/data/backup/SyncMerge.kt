@@ -115,10 +115,13 @@ class SyncMerge(
             mergePronunciations(file, markers)
             // Still inside the transaction, as in a restore: a kill can't leave days under unknown ids.
             restored.addWaiting(waiting)
+            // Here too: once the book rows hold the further position, merging the file again finds nothing to pass on.
+            for ((book, savedAt) in positions) restored.setPosition(book.contentHash, Backup.position(book, savedAt))
         }
+        // A kill from here on is made good by merging the file again (it is not yet marked as seen):
+        // milestones and stretches merge the same, and word progress is set for words that have none here.
         milestones.restore(file.milestones.mapNotNull { (id, day) -> runCatching { id to LocalDate.parse(day) }.getOrNull() }.toMap())
         stretches.merge(file.stretches.mapValues { (_, steps) -> steps.toIntArray() })
-        for ((book, savedAt) in positions) restored.setPosition(book.contentHash, Backup.position(book, savedAt))
         wordProgress.restore(progress)
     }
 
