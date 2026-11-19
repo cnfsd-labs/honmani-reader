@@ -161,6 +161,22 @@ class StatisticsViewModelTest {
     }
 
     @Test
+    fun aNewTimeZoneOrDayStartMovesTodayOnWithinAMinute() = runTest {
+        lookupTimes.value = listOf(millis(today, 21))
+        val viewModel = viewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        assertEquals(1, viewModel.uiState.filterNotNull().first().lookups)
+
+        // An hour before midnight here, but the day changed (the phone moved east): no waiting for midnight.
+        today = today.plusDays(1)
+        clock = clock.plusSeconds(61)
+        testScheduler.advanceTimeBy(61_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(0, viewModel.uiState.value?.lookups)
+    }
+
+    @Test
     fun theCsvHasOneRowPerDayWithAllBooksAdded() = runTest {
         var written = "" to ""
         val viewModel = viewModel(

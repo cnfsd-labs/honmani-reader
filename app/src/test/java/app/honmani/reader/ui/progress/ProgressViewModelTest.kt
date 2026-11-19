@@ -30,7 +30,7 @@ import org.robolectric.RobolectricTestRunner
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class ProgressViewModelTest {
-    private val today = LocalDate.of(2026, 10, 21)
+    private var today = LocalDate.of(2026, 10, 21)
     private val days = MutableStateFlow(listOf(ReadingDayEntity(1, today.minusDays(1).toString(), 3_600, 20_000)))
     private val store = MilestoneStore(
         ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("progress-test", Context.MODE_PRIVATE),
@@ -61,6 +61,20 @@ class ProgressViewModelTest {
         today = { today },
         zone = { ZoneId.of("Asia/Tokyo") },
     )
+
+    @Test
+    fun todayMovesOnWhileTheScreenStaysOpen() = runTest {
+        val viewModel = viewModel()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        assertEquals(today, viewModel.uiState.value!!.today)
+
+        // Midnight, a new time zone or day start hour: within a minute, without new data.
+        today = today.plusDays(1)
+        testScheduler.advanceTimeBy(61_000L)
+        testScheduler.runCurrent()
+
+        assertEquals(today, viewModel.uiState.value!!.today)
+    }
 
     @Test
     fun removedFinishedBooksStillCountTowardsTheBookMilestones() = runTest {

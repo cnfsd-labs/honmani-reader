@@ -3,6 +3,10 @@ package app.honmani.reader.data.time
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 
 /**
  * Which day a moment belongs to: the one place that turns time into a reading or review day.
@@ -23,6 +27,17 @@ class DayClock(
 
     /** The day it is now. */
     fun today(): LocalDate = date(now())
+
+    /**
+     * The day it is ([today] by default), again whenever it changes: when the next day starts, and
+     * within a minute of a new time zone or start hour, so a screen left open moves on to the new day.
+     */
+    fun days(today: () -> LocalDate = ::today): Flow<LocalDate> = flow {
+        while (true) {
+            emit(today())
+            delay((startOfDay(now(), 1) - now()).coerceIn(1_000L, 60_000L))
+        }
+    }.distinctUntilChanged()
 
     /** [date] as an epoch day. */
     fun localDay(time: Long): Long = date(time).toEpochDay()

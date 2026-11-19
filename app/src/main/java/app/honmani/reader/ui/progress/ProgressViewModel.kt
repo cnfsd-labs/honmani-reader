@@ -84,7 +84,8 @@ class ProgressViewModel(
     private val zone: () -> ZoneId = ZoneId::systemDefault,
     /** The hour a day starts at ([DayClock]); 0 is midnight. */
     private val startHour: () -> Int = { 0 },
-    private val today: () -> LocalDate = { DayClock(zone, startHour).today() },
+    private val now: () -> Long = System::currentTimeMillis,
+    private val today: () -> LocalDate = { DayClock(zone, startHour, now).today() },
     /** The skill; by default from speed alone (no words read). */
     private val skill: Flow<SkillEstimate> = SkillTracker(days, books, grades, flowOf(WordKnowledge.EMPTY), today = today).estimate,
     private val reviews: Flow<ReviewSummary> = flowOf(ReviewSummary()),
@@ -97,10 +98,12 @@ class ProgressViewModel(
         Library(books, grades, skill, reviews, goal, recorded)
     }
 
+    /** Today, again when the day changes (midnight, a new time zone or start hour) while the screen is open. */
+    private val day = DayClock(zone, startHour, now).days(today)
+
     val uiState: StateFlow<ProgressUiState?> =
-        combine(days, library, wordsLearned, ankiCards, store.seen) { rows, (books, grades, skill, reviews, goalMinutes, recorded), learned, anki, seen ->
-            val today = today()
-            val dayClock = DayClock(zone, startHour)
+        combine(days, library, combine(wordsLearned, ankiCards, day, ::Triple), store.seen) { rows, (books, grades, skill, reviews, goalMinutes, recorded), (learned, anki, today), seen ->
+            val dayClock = DayClock(zone, startHour, now)
             val data = ProgressionData(
                 days = rows.perBookAndDay().map { DayTotal(LocalDate.parse(it.day), it.seconds, it.characters) },
                 finished = FinishedBooks.merge(books, recorded).map { book ->
@@ -134,7 +137,7 @@ class ProgressViewModel(
             )
         }
             .onEach { state ->
-                store.record(state.milestones.filter { it.reached }.map { it.id }, today())
+                store.record(state.milestones.filter { it.reached }.map { it.id }, state.today)
                 // The first run (or a fresh restore) takes the level as known, silently.
                 LevelMoments.decide(store.celebratedLevel.value, state.level.level).remember?.let(store::setCelebratedLevel)
             }

@@ -34,7 +34,6 @@ import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -46,7 +45,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -145,14 +143,8 @@ class StatisticsViewModel(
 
     private val dayClock = DayClock(zone, startHour, { now().toEpochMilli() })
 
-    /** Today's date, again when the next day starts, so a screen left open moves on to the new day. */
-    private val day: Flow<LocalDate> = flow {
-        while (true) {
-            emit(today())
-            val next = dayClock.startOfDay(now().toEpochMilli(), 1)
-            delay((next - now().toEpochMilli()).coerceAtLeast(1_000L))
-        }
-    }.distinctUntilChanged()
+    /** Today's date, again when the day changes, so a screen left open moves on to the new day. */
+    private val day: Flow<LocalDate> = dayClock.days(today)
 
     /** The period and the day it is counted on, with the period's lookups, counted in the database. */
     private val periodLookups: Flow<Triple<StatsPeriod, LocalDate, Int>> =
