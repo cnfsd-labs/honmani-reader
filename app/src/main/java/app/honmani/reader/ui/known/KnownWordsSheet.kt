@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.text.format.DateUtils
 import android.widget.Toast
+import java.io.IOException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -50,11 +51,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.ui.PullDownSheet
 import app.honmani.reader.data.dictionary.DictionaryCatalog
+import app.honmani.reader.data.dictionary.ImportStatus
 import app.honmani.reader.data.words.KnownBatchEntity
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
@@ -78,6 +81,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -101,13 +105,16 @@ internal class KnownWordsFlow(
 
         data object Paste : Step
 
-        /** Asks for the WaniKani token (kept only in the dialog, never saved). */
+        /** Asks for the WaniKani token (kept only in [waniKaniToken], never saved). */
         data object WaniKani : Step
 
         data class Review(val plan: KnownPlan, val dictionary: String? = null) : Step
 
-        /** [offerFrequency]: the problem is a missing frequency dictionary, which one tap can download. */
-        data class Problem(val message: String, val offerFrequency: Boolean = false) : Step
+        /**
+         * [offerFrequency]: the problem is a missing frequency dictionary, which one tap can download.
+         * [retryWaniKani]: WaniKani could not be read; "Try again" returns to the token, still filled in.
+         */
+        data class Problem(val message: String, val offerFrequency: Boolean = false, val retryWaniKani: Boolean = false) : Step
 
         /** The quiz is asking word number `answers.size + 1`; [answers] are the answers so far (true = known). */
         data class Quiz(val setup: QuizSetup, val answers: List<Boolean> = emptyList()) : Step
@@ -123,17 +130,26 @@ internal class KnownWordsFlow(
 
     private var frequencyRequested = false
 
-    private fun noFrequency() = if (frequencyRequested) {
-        Step.Problem(context.getString(R.string.known_frequency_downloading))
-    } else {
-        Step.Problem(context.getString(R.string.known_no_frequency), offerFrequency = true)
+    /** The WaniKani token while the steps are open, so "Try again" keeps it; in memory only, cleared on [cancel]. */
+    var waniKaniToken by mutableStateOf("")
+    var waniKaniKanji by mutableStateOf(false)
+
+    /**
+     * "Downloading" only while the requested download is still queued or running; once it failed or
+     * was cancelled, the download is offered again.
+     */
+    private suspend fun noFrequency(): Step {
+        if (frequencyRequested && !frequencyPending(container.dictionaryImportScheduler.imports.first())) frequencyRequested = false
+        return if (frequencyRequested) frequencyDownloading() else Step.Problem(context.getString(R.string.known_no_frequency), offerFrequency = true)
     }
+
+    private fun frequencyDownloading() = Step.Problem(context.getString(R.string.known_frequency_downloading))
 
     /** Starts the same download as the Dictionaries screen's (once); the reader tries again once it is in. */
     fun downloadFrequency() {
         if (!frequencyRequested) container.dictionaryImportScheduler.download(DictionaryCatalog.frequency)
         frequencyRequested = true
-        step = noFrequency()
+        step = frequencyDownloading()
     }
 
     fun showPaste() {
@@ -144,10 +160,11 @@ internal class KnownWordsFlow(
         step = Step.WaniKani
     }
 
-    /** Reads the reader's WaniKani items at Guru and above with [token], which is not kept anywhere. */
-    fun waniKani(token: String, includeKanji: Boolean) = work {
+    /** Reads the reader's WaniKani items at Guru and above with [waniKaniToken], which is not saved anywhere. */
+    fun waniKani() = work {
+        val token = waniKaniToken
         try {
-            container.knownWords.planWaniKani(token, includeKanji)?.let { Step.Review(it) }
+            container.knownWords.planWaniKani(token, waniKaniKanji)?.let { Step.Review(it) }
                 ?: Step.Problem(context.getString(R.string.known_wanikani_empty))
         } catch (e: WaniKaniException) {
             Step.Problem(
@@ -160,6 +177,7 @@ internal class KnownWordsFlow(
                         WaniKaniProblem.FAILED -> R.string.known_wanikani_failed
                     },
                 ),
+                retryWaniKani = true,
             )
         }
     }
@@ -197,6 +215,13 @@ internal class KnownWordsFlow(
         step = quiz.copy(answers = quiz.answers.dropLast(1))
     }
 
+    /** Back in the quiz: undoes the last answer while there is one, else leaves. */
+    fun quizBack() {
+        val current = step ?: return
+        step = quizStepBack(current)
+        if (step == null) cancel()
+    }
+
     /** From the slider to the usual review of what would be marked. */
     fun quizReview(result: Step.QuizResult, n: Int) = work {
         val answers = result.setup.questions.zip(result.answers)
@@ -215,8 +240,12 @@ internal class KnownWordsFlow(
             withContext(Dispatchers.IO) {
                 context.contentResolver.openInputStream(uri)?.use(WordListParser::read)
             } ?: return@work Step.Problem(context.getString(R.string.known_file_unreadable))
-        } catch (e: WordListTooLargeException) {
-            return@work Step.Problem(context.getString(R.string.known_file_too_large))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val problem = fileProblem(e) ?: throw e
+            logWarning("Honmani.known", "Reading a word list failed", e)
+            return@work Step.Problem(context.getString(problem))
         }
         review(fileName(uri), list)
     }
@@ -243,6 +272,7 @@ internal class KnownWordsFlow(
 
     fun confirm(plan: KnownPlan) {
         step = null
+        waniKaniToken = ""
         scope.launch {
             val (_, change) = withContext(NonCancellable) { container.knownWords.confirm(plan) }
             toast(context.resources.getQuantityString(R.plurals.known_done, change.changed, change.changed))
@@ -253,6 +283,8 @@ internal class KnownWordsFlow(
         job?.cancel()
         job = null
         step = null
+        waniKaniToken = ""
+        waniKaniKanji = false
     }
 
     fun undo(batch: KnownBatchEntity) {
@@ -272,6 +304,25 @@ internal class KnownWordsFlow(
     private fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
+}
+
+/** Whether a dictionary download or import is still queued or running (failed and cancelled ones are not). */
+internal fun frequencyPending(imports: List<ImportStatus>): Boolean =
+    imports.any { it.replaces == null && it !is ImportStatus.Failed }
+
+/** The quiz step Back leads to: the previous question (its answer undone), or null to leave. */
+internal fun quizStepBack(step: KnownWordsFlow.Step): KnownWordsFlow.Step? = when (step) {
+    is KnownWordsFlow.Step.Quiz -> if (step.answers.isEmpty()) null else step.copy(answers = step.answers.dropLast(1))
+    is KnownWordsFlow.Step.QuizResult -> KnownWordsFlow.Step.Quiz(step.setup, step.answers.dropLast(1))
+    else -> null
+}
+
+/** The message for a word list file that could not be opened or read; null for other errors. */
+internal fun fileProblem(e: Exception): Int? = when (e) {
+    is WordListTooLargeException -> R.string.known_file_too_large
+    // A revoked grant, a moved or deleted file, a cloud file that is offline.
+    is SecurityException, is IOException -> R.string.known_file_unreadable
+    else -> null
 }
 
 /**
@@ -390,7 +441,9 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
         KnownWordsFlow.Step.Paste -> {
             var text by rememberSaveable { mutableStateOf("") }
             AlertDialog(
-                onDismissRequest = flow::cancel,
+                // Back or a stray tap must not throw away pasted text; Cancel does.
+                onDismissRequest = { if (text.isBlank()) flow.cancel() },
+                properties = DialogProperties(dismissOnClickOutside = false),
                 title = { Text(stringResource(R.string.known_paste)) },
                 text = {
                     OutlinedTextField(
@@ -407,9 +460,9 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
             )
         }
         KnownWordsFlow.Step.WaniKani -> {
-            // Not rememberSaveable: the token must not be written to the saved instance state.
-            var token by remember { mutableStateOf("") }
-            var kanji by remember { mutableStateOf(false) }
+            // Kept in the flow, not rememberSaveable: the token must not be written to the saved instance state.
+            val token = flow.waniKaniToken
+            val kanji = flow.waniKaniKanji
             AlertDialog(
                 onDismissRequest = flow::cancel,
                 title = { Text(stringResource(R.string.known_wanikani)) },
@@ -418,7 +471,7 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                         Text(stringResource(R.string.known_wanikani_intro))
                         OutlinedTextField(
                             value = token,
-                            onValueChange = { token = it },
+                            onValueChange = { flow.waniKaniToken = it },
                             label = { Text(stringResource(R.string.known_wanikani_token)) },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
@@ -428,7 +481,7 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().toggleable(kanji, role = Role.Checkbox) { kanji = it },
+                            modifier = Modifier.fillMaxWidth().toggleable(kanji, role = Role.Checkbox) { flow.waniKaniKanji = it },
                         ) {
                             Checkbox(checked = kanji, onCheckedChange = null)
                             Text(stringResource(R.string.known_wanikani_kanji), modifier = Modifier.padding(start = 8.dp))
@@ -437,7 +490,7 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { flow.waniKani(token, kanji) }, enabled = token.isNotBlank()) { Text(stringResource(R.string.known_check)) }
+                    TextButton(onClick = flow::waniKani, enabled = token.isNotBlank()) { Text(stringResource(R.string.known_check)) }
                 },
                 dismissButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_cancel)) } },
             )
@@ -447,7 +500,9 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
             val question = questions[step.answers.size]
             val word = question.word
             AlertDialog(
-                onDismissRequest = flow::cancel,
+                // Back undoes the last answer (leaves at the first question); a stray tap outside does nothing.
+                onDismissRequest = flow::quizBack,
+                properties = DialogProperties(dismissOnClickOutside = false),
                 title = { Text(stringResource(R.string.known_quiz_title, step.answers.size + 1, questions.size)) },
                 text = {
                     Column(
@@ -471,7 +526,8 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
             var position by rememberSaveable { mutableFloatStateOf(ln(step.estimate.coerceAtLeast(10).toFloat())) }
             val n = PlacementQuiz.tidy(exp(position).toInt()).coerceAtMost(step.setup.size)
             AlertDialog(
-                onDismissRequest = flow::cancel,
+                onDismissRequest = flow::quizBack,
+                properties = DialogProperties(dismissOnClickOutside = false),
                 title = { Text(stringResource(R.string.known_quiz_result, "%,d".format(n))) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -491,11 +547,13 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                     TextButton(onClick = { withNotifications(flow::downloadFrequency) }) {
                         Text(stringResource(R.string.known_frequency_download, DictionaryCatalog.frequency.sizeMb))
                     }
+                } else if (step.retryWaniKani) {
+                    TextButton(onClick = flow::showWaniKani) { Text(stringResource(R.string.action_retry)) }
                 } else {
                     TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) }
                 }
             },
-            dismissButton = if (step.offerFrequency) {
+            dismissButton = if (step.offerFrequency || step.retryWaniKani) {
                 { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) } }
             } else {
                 null
