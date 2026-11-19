@@ -1,5 +1,10 @@
 package app.honmani.reader.ui.reader
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,5 +88,14 @@ class SelectionBubbleTest {
         assertEquals("食べ", copyableWord(results()))
         assertEquals("食べました", copyableWord(LookupPanelState.NothingFound(tap)))
         assertEquals(selection.text, copyableWord(LookupPanelState.NothingFound(selection)))
+    }
+
+    @Test
+    fun arrowsFollowTheWritingMode() {
+        assertEquals(Icons.Filled.KeyboardArrowUp to Icons.Filled.KeyboardArrowDown, matchArrows(verticalText = true))
+        assertEquals(
+            Icons.AutoMirrored.Filled.KeyboardArrowLeft to Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            matchArrows(verticalText = false),
+        )
     }
 }

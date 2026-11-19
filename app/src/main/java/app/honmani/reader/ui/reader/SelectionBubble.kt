@@ -1,5 +1,12 @@
 package app.honmani.reader.ui.reader
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.ui.graphics.vector.ImageVector
+
 /**
  * What the pill above the lookup panel holds: the matched or selected text, its arrows and copy.
  * Shown only when there is something to do with it, so an ordinary tap leaves the panel plain.
@@ -51,3 +58,14 @@ internal fun copyableWord(state: LookupPanelState): String? = when (state) {
     is LookupPanelState.NothingFound, is LookupPanelState.NoDictionaries ->
         if (state.tap.bySelection) state.tap.text else nothingFoundText(state.tap.text)
 }
+
+/**
+ * The bubble's shorter and longer arrows: along the text, so up and down in a vertical book
+ * (its lines run top to bottom), else left and right.
+ */
+internal fun matchArrows(verticalText: Boolean): Pair<ImageVector, ImageVector> =
+    if (verticalText) {
+        Icons.Filled.KeyboardArrowUp to Icons.Filled.KeyboardArrowDown
+    } else {
+        Icons.AutoMirrored.Filled.KeyboardArrowLeft to Icons.AutoMirrored.Filled.KeyboardArrowRight
+    }

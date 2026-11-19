@@ -39,13 +39,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -186,6 +186,8 @@ fun LookupPanel(
     onShorterMatch: () -> Unit = {},
     /** The matched text of a tap made one character longer. */
     onLongerMatch: () -> Unit = {},
+    /** The book runs top to bottom: the shorter/longer arrows point up and down. */
+    verticalText: Boolean = false,
     /** The sentence before the tapped one, shown dimmed above the results; blank to show none. */
     previousSentence: String = "",
     /** The read-aloud button: say the tapped sentence. */
@@ -340,6 +342,7 @@ fun LookupPanel(
             onShorter = onShorterMatch,
             onLonger = onLongerMatch,
             onCopy = { copy(bubble.text) },
+            verticalText = verticalText,
             modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = BUBBLE_GAP - BUBBLE_INSET),
         )
     }
@@ -696,6 +699,7 @@ private fun SelectionBubbleRow(
     onLonger: () -> Unit,
     onCopy: () -> Unit,
     modifier: Modifier = Modifier,
+    verticalText: Boolean = false,
 ) {
     // The pill is BUBBLE_HEIGHT tall; its buttons take touches over the full BUBBLE_TOUCH_HEIGHT.
     Box(modifier = modifier.height(BUBBLE_TOUCH_HEIGHT)) {
@@ -716,7 +720,7 @@ private fun SelectionBubbleRow(
                         label = stringResource(R.string.lookup_match_shorter),
                         enabled = bubble.canShorten,
                         onClick = onShorter,
-                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null) }
+                    ) { Icon(matchArrows(verticalText).first, contentDescription = null) }
                 }
                 Text(
                     text = bubble.text,
@@ -734,7 +738,7 @@ private fun SelectionBubbleRow(
                         label = stringResource(R.string.lookup_match_longer),
                         enabled = bubble.canLengthen,
                         onClick = onLonger,
-                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) }
+                    ) { Icon(matchArrows(verticalText).second, contentDescription = null) }
                 }
                 if (bubble.canCopy) {
                     BubbleButton(label = stringResource(R.string.lookup_copy_word), onClick = onCopy) {
@@ -872,11 +876,17 @@ private fun LookupGroupItem(
 ) {
     val folded = detail == Detail.FOLDED
     val expandLabel = stringResource(R.string.lookup_expand)
+    val foldLabel = stringResource(R.string.lookup_fold)
+    val collapsedState = stringResource(R.string.lookup_examples_collapsed)
+    val expandedState = stringResource(R.string.lookup_examples_expanded)
     Column(
         // A folded entry opens from a tap anywhere on its row, not only on its text. It has no
         // other targets: its kanji, star and menu come when it is opened.
         modifier = if (folded) {
-            Modifier.fillMaxWidth().clickable(onClickLabel = expandLabel) { onDetail(Detail.BRIEF) }
+            Modifier
+                .fillMaxWidth()
+                .semantics { stateDescription = collapsedState }
+                .clickable(onClickLabel = expandLabel) { onDetail(Detail.BRIEF) }
         } else {
             Modifier
         },
@@ -888,7 +898,9 @@ private fun LookupGroupItem(
         } else {
             Row(
                 // Tapping the word of an open result folds it again.
-                modifier = Modifier.clickable { onDetail(Detail.FOLDED) },
+                modifier = Modifier
+                    .semantics { stateDescription = expandedState }
+                    .clickable(onClickLabel = foldLabel) { onDetail(Detail.FOLDED) },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1332,6 +1344,7 @@ private fun FoldedMeaning(group: LookupGroup) {
 internal fun FrequencyBadge(frequency: Frequency, quiet: Boolean = false) {
     val tooltip = rememberTooltipState(isPersistent = true)
     val scope = rememberCoroutineScope()
+    val description = stringResource(R.string.lookup_frequency_badge, frequency.badge)
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
         tooltip = {
@@ -1353,12 +1366,14 @@ internal fun FrequencyBadge(frequency: Frequency, quiet: Boolean = false) {
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
+                    .semantics { contentDescription = description }
                     .clickable(role = Role.Button) { scope.launch { tooltip.show() } }
                     .padding(end = 8.dp, top = 2.dp, bottom = 2.dp),
             )
         } else {
             Surface(
                 onClick = { scope.launch { tooltip.show() } },
+                modifier = Modifier.semantics { contentDescription = description },
                 shape = RoundedCornerShape(8.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer,
             ) {

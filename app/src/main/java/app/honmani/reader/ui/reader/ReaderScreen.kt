@@ -564,6 +564,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onDontCount = if (countedTap == state.tap) viewModel::dontCount else null,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },
+                    verticalText = appSettings.vertical,
                     onOpenDictionaries = {
                         // Leave the book for the Dictionaries screen.
                         tab = HomeTab.SETTINGS
