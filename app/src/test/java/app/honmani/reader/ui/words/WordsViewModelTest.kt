@@ -19,6 +19,8 @@ import app.honmani.reader.lookup.DictionaryLookup
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -87,6 +89,7 @@ class WordsViewModelTest {
         addCardDeferred: suspend (WordEntity, MutableMap<Long, Long>, Boolean) -> AnkiResult = { _, _, _ -> AnkiResult.Refused },
         markInAnki: suspend (Map<Long, Long>) -> Unit = {},
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
+        libraryBookIds: Flow<Set<Long>?> = flowOf(null),
     ): WordsViewModel {
         val lookup = DictionaryLookup(
             database.dictionaryDao(),
@@ -102,6 +105,7 @@ class WordsViewModelTest {
             zone = { ZoneId.of("UTC") },
             showFrequency = showFrequency,
             frequencyOf = { words -> lookup.frequencies(words) },
+            libraryBookIds = libraryBookIds,
         )
         owned += model
         val factory = object : ViewModelProvider.Factory {
@@ -134,6 +138,26 @@ class WordsViewModelTest {
 
         viewModel.setBook(null)
         assertEquals(setOf("猫", "犬", "鳥", "魚"), shown(viewModel.uiState.first { it.book == null }))
+    }
+
+    @Test
+    fun aChosenBookRemovedFromTheLibrary_leavesTheBookFilter() = runTest {
+        repository.record(lookedUp("猫").copy(bookId = 1, bookTitle = "A"))
+        repository.record(lookedUp("犬"))
+        val library = MutableStateFlow<Set<Long>?>(setOf(1L))
+        val viewModel = viewModel(libraryBookIds = library)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        viewModel.uiState.first { it.learning?.size == 2 }
+
+        viewModel.setBook(WordsBook(1, "A"))
+        viewModel.uiState.first { it.book?.id == 1L && it.bookWords != null }
+
+        library.value = emptySet()
+        val after = viewModel.uiState.first { it.book == null }
+        assertEquals(null, after.bookWords)
+        // Back in the library (a restore): the filter stays off until chosen again.
+        library.value = setOf(1L)
+        assertEquals(null, viewModel.uiState.first().book)
     }
 
     @Test

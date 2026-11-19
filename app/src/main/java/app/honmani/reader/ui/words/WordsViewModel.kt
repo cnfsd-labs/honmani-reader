@@ -190,13 +190,23 @@ class WordsViewModel(
     private val session: Flow<SessionWords> = flowOf(SessionWords(null, emptyList())),
     /** The time zone the CSV export writes times in. */
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    /** Ids of the books in the library; null: not known (keeps any chosen book). */
+    private val libraryBookIds: Flow<Set<Long>?> = flowOf(null),
 ) : ViewModel() {
     private val filter = MutableStateFlow(WordFilter.LEARNING)
     private val expanded = MutableStateFlow<Long?>(null)
     private val query = MutableStateFlow("")
     private val book = MutableStateFlow<WordsBook?>(null)
     /** The chosen book with its words, together so a new choice never shows the old book's words. */
-    private val bookWords: Flow<Pair<WordsBook?, Set<Long>?>> = book.flatMapLatest { chosen ->
+    private val bookWords: Flow<Pair<WordsBook?, Set<Long>?>> = combine(book, libraryBookIds) { chosen, ids ->
+        // A book removed from the library drops out of the filter (its chip would stay with no way back).
+        if (chosen != null && ids != null && chosen.id !in ids) {
+            book.compareAndSet(chosen, null)
+            null
+        } else {
+            chosen
+        }
+    }.distinctUntilChanged().flatMapLatest { chosen ->
         if (chosen == null) flowOf(null to null) else repository.bookWordIds(chosen.id).map { chosen to it }
     }
     private val _changes = Channel<WordChange>(Channel.BUFFERED)
@@ -567,6 +577,7 @@ class WordsViewModel(
                     showFrequency = container.appearanceSettings.showWordFrequency,
                     frequencyOf = { words -> container.dictionaryLookup.frequencies(words) },
                     session = container.wordRepository.session,
+                    libraryBookIds = container.bookDao.observeAll().map { books -> books.mapTo(HashSet()) { it.id } },
                 )
             }
         }
