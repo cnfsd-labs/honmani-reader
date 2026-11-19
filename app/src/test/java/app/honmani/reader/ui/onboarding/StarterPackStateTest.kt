@@ -34,8 +34,19 @@ class StarterPackStateTest {
         assertEquals(StarterPackState.Ready, StarterPackState.of(pack, state(4), started = true))
         // Installed before (from the Dictionaries tab, say): ready without a download.
         assertEquals(StarterPackState.Ready, StarterPackState.of(pack, state(4), started = false))
-        val failed = ImportStatus.Failed("x", ImportError.entries.first(), null)
+        val failed = ImportStatus.Failed("x", ImportError.entries.first(), null, pack[2].id)
         assertEquals(StarterPackState.Failed(), StarterPackState.of(pack, state(2, listOf(failed)), started = true))
+    }
+
+    @Test
+    fun anotherImportsFailureIsNotThePacks() {
+        // A dictionary file the user picked, or an update, failed while the pack is still queued.
+        val fileImport = ImportStatus.Failed("f", ImportError.entries.first(), null)
+        val queued = ImportStatus.Queued("q")
+        assertEquals(
+            StarterPackState.Downloading(2, 4),
+            StarterPackState.of(pack, state(2, listOf(fileImport, queued)), started = true),
+        )
     }
 
     @Test

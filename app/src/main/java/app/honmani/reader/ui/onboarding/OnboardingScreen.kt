@@ -104,13 +104,15 @@ sealed interface StarterPackState {
             val items = loaded.catalog.filter { it.dictionary in pack }
             val installed = items.count { it.state == CatalogItem.State.INSTALLED }
             val downloading = Downloading(installed, pack.size, fractionOf(installed, pack.size, loaded.imports))
+            val packIds = pack.map { it.id }.toSet()
+            val packFailure = loaded.imports.filterIsInstance<ImportStatus.Failed>().firstOrNull { it.dictionaryId in packIds }
             return when {
                 installed == pack.size -> Ready
                 !started -> NotStarted
                 // Failed only once nothing is left running; a failure beside running downloads waits.
                 items.any { it.state == CatalogItem.State.IN_PROGRESS } -> downloading
-                loaded.imports.any { it is ImportStatus.Failed } ->
-                    Failed(loaded.imports.filterIsInstance<ImportStatus.Failed>().first().reason)
+                // Only the pack's own downloads: a failed import of a file or an update is not the pack's.
+                packFailure != null -> Failed(packFailure.reason)
                 // Requested before the process was stopped: still on its way only while queued or running.
                 loaded.imports.any { it is ImportStatus.Queued || it is ImportStatus.Running } -> downloading
                 else -> NotStarted
