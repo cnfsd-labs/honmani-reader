@@ -173,3 +173,12 @@ test('seek back to the rest of a sentence begun on an earlier page gives the res
   const back = await ask(page, 'seek', { index: 0, count: 2 });
   expect(back.items).toEqual([first, second]);
 });
+
+test('a page that begins inside a ruby base starts with the whole base, so its reading is spoken', async ({ page }) => {
+  // One sentence whose long ruby base runs over several screens; scrolled into the middle of the base.
+  await page.setViewportSize({ width: 300, height: 300 });
+  await openBook(page, `<p>${'あ'.repeat(200)}<ruby>${'漢'.repeat(600)}<rt>よみ</rt></ruby>おわり。</p>`, { storage: { viewMode: 'continuous' } });
+  await page.evaluate(() => window.scrollTo(0, 1_600));
+  const reply = await ask(page, 'begin', { count: 2 });
+  expect(texts(reply)).toEqual(['よみおわり。']);
+});

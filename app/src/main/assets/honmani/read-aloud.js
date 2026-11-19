@@ -343,6 +343,9 @@
     }
     let s = c;
     while (s < cand.e && BLANK.test(run.text[s])) s++;
+    // Inside a ruby base its reading (spoken on the base's first character) would be cut off: start with the base.
+    const rt = s < cand.e && run.startNode[s].nodeType === 3 ? readingOf(run.startNode[s]) : null;
+    if (rt) while (s > cand.s && run.startNode[s - 1].nodeType === 3 && readingOf(run.startNode[s - 1]) === rt) s--;
     const rest = { s, e: cand.e, speech: run.speech.slice(s, cand.e).join('') };
     if (!LETTER.test(rest.speech)) {
       reply(message.count);
@@ -532,4 +535,7 @@
 
   window.honmaniReadAloud = Object.freeze({ stop });
   listen();
+  // The bridge object may not exist yet at document start: try again once the page is there.
+  document.addEventListener('DOMContentLoaded', listen);
+  window.addEventListener('load', listen);
 })();
