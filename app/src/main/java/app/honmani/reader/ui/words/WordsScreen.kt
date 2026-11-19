@@ -26,6 +26,7 @@ import app.honmani.reader.ui.search.SearchViewModel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -648,19 +649,24 @@ private fun WordsContent(
         // The book the lists are narrowed to: a tap picks another, the cross shows all books.
         val book = uiState.book
         if (book != null) {
-            InputChip(
-                selected = true,
-                onClick = { pickBook = true },
-                label = { Text(book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                trailingIcon = {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.words_all_books_description),
-                        modifier = Modifier.size(18.dp).clickable { onBook(null) },
-                    )
-                },
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+            // The cross is drawn inside the chip; a 48dp button laid over it takes the taps, so the
+            // chip keeps its 32dp look. The offset centres the button on the cross (8dp end padding).
+            Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                InputChip(
+                    selected = true,
+                    onClick = { pickBook = true },
+                    label = { Text(book.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    trailingIcon = { Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                val allBooks = stringResource(R.string.words_all_books_description)
+                IconButton(
+                    onClick = { onBook(null) },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(x = 7.dp)
+                        .semantics { contentDescription = allBooks },
+                ) {}
+            }
         }
         if (pickBook) {
             BookPickerDialog(

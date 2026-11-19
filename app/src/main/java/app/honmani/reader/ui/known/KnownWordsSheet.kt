@@ -189,7 +189,7 @@ internal class KnownWordsFlow(
     }
 
     fun pasted(text: String) = work {
-        review(context.getString(R.string.known_pasted_name), WordListParser.parse(text))
+        review(context.getString(R.string.known_pasted_name), withContext(Dispatchers.Default) { WordListParser.parse(text) })
     }
 
     fun file(uri: Uri) = work {
@@ -245,10 +245,11 @@ internal class KnownWordsFlow(
         }
     }
 
-    private fun fileName(uri: Uri): String =
+    private suspend fun fileName(uri: Uri): String = withContext(Dispatchers.IO) {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
             if (it.moveToFirst()) it.getString(0) else null
-        } ?: context.getString(R.string.known_file_name)
+        }
+    } ?: context.getString(R.string.known_file_name)
 
     private fun toast(message: String) {
         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
