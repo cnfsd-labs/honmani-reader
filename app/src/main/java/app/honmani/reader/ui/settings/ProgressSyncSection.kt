@@ -80,6 +80,7 @@ fun ProgressSyncSection() {
                         Text(stringResource(R.string.sync_status_never))
                     }
                 }
+                Text(stringResource(R.string.sync_summary))
             }
         },
         modifier = Modifier.clickable { editing = true },

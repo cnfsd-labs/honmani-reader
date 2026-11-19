@@ -304,7 +304,7 @@
     <string name="download_over_mobile_data">Download books over mobile data</string>
     <string name="download_over_mobile_data_details">Off: books from your servers download only on Wi-Fi.</string>
     <string name="catalog_sync">Sync reading progress here</string>
-    <string name="catalog_sync_details">For Calibre-Web Automated: your position in EPUBs is kept on this server with this login, as in KOReader.</string>
+    <string name="catalog_sync_details">For Calibre-Web Automated: your position in EPUBs is kept on this server with this login, as in KOReader. This is the account of Settings → Books and sync → Reading progress sync.</string>
     <string name="catalog_sync_replaces">For Calibre-Web Automated, with this login. Replaces the sync on %1$s.</string>
     <string name="catalog_sync_error_none">This server has no reading progress sync. In Calibre-Web Automated it can be turned on in its settings; or switch sync off here.</string>
     <string name="catalog_sync_error_unauthorized">The server did not accept this login for reading progress sync. Enter the password to turn sync on.</string>
@@ -1545,7 +1545,8 @@
     <string name="reader_settings_all_details">Margins, more themes and fonts, page layout, everything else</string>
     <string name="reader_settings_applied">Changes apply when you go back.</string>
     <string name="sync_title">Reading progress sync</string>
-    <string name="sync_off">Off. Share reading positions with KOReader or another phone.</string>
+    <string name="sync_off">Off</string>
+    <string name="sync_summary">Your place in EPUBs, shared with KOReader and other phones through a KOReader sync server or Calibre-Web Automated. Words and statistics: Settings → Backup → Sync folder.</string>
     <string name="sync_signed_in">%1$s on %2$s</string>
     <string name="sync_needs_password">%1$s on %2$s: this phone can no longer read the saved password. Tap to enter it again; positions not yet sent are kept.</string>
     <string name="sync_signed_in_details">Signed in as %1$s on %2$s. Your reading position in EPUBs is saved there and taken from there when you open a book. Books match when every device has the same file.</string>
@@ -1641,7 +1642,7 @@
     <string name="backup_folder_unavailable">Folder not available, choose it again</string>
     <string name="backup_folder_switch_off">Switch off</string>
     <string name="sync_folder_title">Sync folder</string>
-    <string name="sync_folder_summary">Keep your phones in step through a shared folder (files not encrypted).</string>
+    <string name="sync_folder_summary">Your progress, words, reading time, bookmarks and highlights, kept in step between your phones through a shared folder (not the books; files not encrypted).</string>
     <string name="sync_folder_details">Keeps your phones in step through a folder you choose: progress, words, reviews, reading time, bookmarks and highlights. Each phone writes one file there and reads the others\' when the app opens, so it works with a Syncthing, Nextcloud or Drive folder. The files are readable (not encrypted). Honmani itself makes no network calls.</string>
     <string name="sync_folder_folder">Folder: %1$s</string>
     <string name="sync_folder_waiting">Waiting for the first write.</string>
