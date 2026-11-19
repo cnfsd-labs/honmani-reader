@@ -119,10 +119,17 @@ class AutoBackup(
         val backup = if (made.readerSettings != null) made else {
             val earlier = withContext(Dispatchers.IO) {
                 try {
-                    listOf(file, largeFile).filter { it.isFile }.maxByOrNull { it.lastModified() }?.inputStream()?.buffered()?.use(BackupCodec::read)?.readerSettings
+                    // The newer by its own date: a restored file's date can be wrong (1970).
+                    listOf(file, largeFile).filter { it.isFile }.mapNotNull { stored ->
+                        try {
+                            stored.inputStream().buffered().use(BackupCodec::read)
+                        } catch (_: IOException) {
+                            null
+                        } catch (_: BackupFormatException) {
+                            null
+                        }
+                    }.maxByOrNull { it.exportedAt }?.readerSettings
                 } catch (_: IOException) {
-                    null
-                } catch (_: BackupFormatException) {
                     null
                 }
             }
@@ -134,13 +141,15 @@ class AutoBackup(
         val outcome = withContext(Dispatchers.IO) {
             // A full storage must not take the app down as it goes to the background: the last
             // backup stays, and the next one is tried next time.
-            val partial = File(dir, "$FILE_NAME.part")
+            // Written outside dir (which Android backs up): a kill mid-write leaves nothing there.
+            val partial = File(largeDir, "$FILE_NAME.part")
             try {
                 dir.mkdirs()
+                largeDir.mkdirs()
+                File(dir, "$FILE_NAME.part").delete()
                 partial.outputStream().use { BackupCodec.write(backup, it) }
                 if (partial.length() > MAX_BYTES) {
                     // The last good backup stays in dir; the big one is kept for the backup folder.
-                    largeDir.mkdirs()
                     if (partial.renameTo(largeFile)) {
                         largeFile.setLastModified(now())
                         _tooLarge.value = true

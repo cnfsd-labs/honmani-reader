@@ -142,7 +142,7 @@ class AutoBackupTest {
         auto.checkOffer()
 
         assertFalse(auto.saveIfChanged { backup() })
-        assertFalse(File(blocked, "${AutoBackup.FILE_NAME}.part").exists())
+        assertFalse(File(File(dir, "not-a-directory-large"), "${AutoBackup.FILE_NAME}.part").exists())
     }
 
     @Test
@@ -153,7 +153,7 @@ class AutoBackupTest {
         val stamp = auto.file.lastModified()
 
         // The temporary file can't be opened: its name is taken by a directory.
-        val partial = File(dir, "${AutoBackup.FILE_NAME}.part").apply { mkdirs() }
+        val partial = File(auto.largeFile.parentFile, "${AutoBackup.FILE_NAME}.part").apply { mkdirs() }
         clock += 60_000
         assertFalse(auto.saveIfChanged { changed() })
 
@@ -176,8 +176,35 @@ class AutoBackupTest {
 
         assertFalse(auto.saveIfChanged { backup() })
 
-        assertFalse(File(dir, "${AutoBackup.FILE_NAME}.part").exists())
+        assertFalse(File(auto.largeFile.parentFile, "${AutoBackup.FILE_NAME}.part").exists())
         assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+    }
+
+    @Test
+    fun theTemporaryFileIsWrittenOutsideTheBackedUpDirectory() = runBlocking {
+        auto.checkOffer()
+        // What a kill mid-write left behind under an older version.
+        val stale = File(dir.apply { mkdirs() }, "${AutoBackup.FILE_NAME}.part").apply { writeText("half") }
+        assertTrue(auto.saveIfChanged { backup() })
+
+        assertFalse(stale.exists())
+        assertEquals(listOf(AutoBackup.FILE_NAME), dir.list()?.toList().orEmpty())
+        assertFalse(File(auto.largeFile.parentFile, "${AutoBackup.FILE_NAME}.part").exists())
+    }
+
+    @Test
+    fun readerSettingsComeFromTheNewerBackupByItsOwnDate() = runBlocking {
+        auto.checkOffer()
+        auto.largeFile.parentFile!!.mkdirs()
+        // The restored small file is the newer one, but Android gave it a 1970 date.
+        auto.file.outputStream().use { BackupCodec.write(BackupFile(exportedAt = clock, readerSettings = mapOf("fontSize" to "new")), it) }
+        auto.file.setLastModified(0)
+        auto.largeFile.outputStream().use { BackupCodec.write(BackupFile(exportedAt = clock - 60_000, readerSettings = mapOf("fontSize" to "old")), it) }
+
+        clock += 60_000
+        assertTrue(auto.saveIfChanged(force = true) { BackupFile(exportedAt = clock, readerSettings = null) })
+
+        assertEquals("new", auto.read().readerSettings?.get("fontSize"))
     }
 
     /** A backup that zip can't shrink: random text, about three quarters of its size after zip. */

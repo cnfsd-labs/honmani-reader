@@ -225,18 +225,23 @@ class FolderBackup(
         // folder), and a folder that couldn't be read for sure fails here instead of being taken
         // as empty.
         keepExisting(folder)
+        val hash = source.inputStream().use(::sha256)
+        // Noted before the copy (and stored at once): killed before it is confirmed as written,
+        // the next copy still knows the file in the folder as this install's own.
+        device.edit().putString(KEY_WRITING, hash).commit()
         target.replaceFile(folder, FILE_NAME, TEMP_NAME) { out -> source.inputStream().use { it.copyTo(out) } }
-        device.edit().putString(KEY_WRITTEN, source.inputStream().use(::sha256)).apply()
+        device.edit().putString(KEY_WRITTEN, hash).remove(KEY_WRITING).apply()
     }
 
     /**
      * A backup file already in [folder] that this install didn't write last (its content differs
-     * from the last copy's, [KEY_WRITTEN]) is renamed to a dated name, or copied there if the provider can't rename,
+     * from the last copy's, [KEY_WRITTEN], and from one under way, [KEY_WRITING]) is renamed to a dated name, or copied there if the provider can't rename,
      * before anything overwrites it. Throws if it can't be kept: then nothing is written.
      */
     private fun keepExisting(folder: String) {
         val existing = target.find(folder, FILE_NAME) ?: return
-        if (target.read(existing).use(::sha256) == device.getString(KEY_WRITTEN, null)) return
+        val hash = target.read(existing).use(::sha256)
+        if (hash == device.getString(KEY_WRITTEN, null) || hash == device.getString(KEY_WRITING, null)) return
         val made = try {
             target.read(existing).buffered().use(BackupCodec::read).exportedAt
         } catch (_: IOException) {
@@ -313,6 +318,9 @@ class FolderBackup(
          * there with other content is another install's and is kept, never overwritten.
          */
         private const val KEY_WRITTEN = "folder_backup_written"
+
+        /** The hash of a copy started but not confirmed (the process may have been killed meanwhile). */
+        private const val KEY_WRITING = "folder_backup_writing"
         private const val KEY_FOUND_FILE = "folder_backup_found_file"
         private const val KEY_FOUND_NAME = "folder_backup_found_name"
         private const val KEY_FOUND_AT = "folder_backup_found_at"

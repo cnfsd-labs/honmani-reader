@@ -103,10 +103,14 @@ internal class FakeFolder : FolderTarget {
 
     override fun canRename(file: String) = renamable
 
+    /** The rename happens, then the process "dies" before anything after it runs. */
+    var dieAfterRename = false
+
     override fun rename(file: String, name: String): String {
         val address = file.substringBeforeLast('/') + "/" + name
         if (address in files) throw IOException("exists")
         files[address] = files.remove(file)!!
+        if (dieAfterRename) throw IOException("killed")
         return address
     }
 }
@@ -316,6 +320,25 @@ class FolderBackupTest {
         again.dismissFound()
         assertNull(again.found.value)
         assertNull(FolderBackup(device, folder).found.value)
+    }
+
+    @Test
+    fun aCopyInterruptedRightAfterItLandedIsStillKnownAsOwn() = runBlocking {
+        backup.choose("content://tree/a")
+        backup.copy(source)
+
+        source.writeText("zip two")
+        folder.dieAfterRename = true
+        backup.copy(source)
+        assertEquals("zip two", String(folder.files[file]!!))
+
+        folder.dieAfterRename = false
+        val restarted = FolderBackup(device, folder, now = { clock })
+        source.writeText("zip three")
+        restarted.copy(source)
+
+        assertEquals(mapOf(file to "zip three"), folder.files.mapValues { String(it.value) })
+        assertNull(restarted.found.value)
     }
 
     @Test
