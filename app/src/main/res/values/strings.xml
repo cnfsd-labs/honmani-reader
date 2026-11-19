@@ -234,7 +234,7 @@
     <string name="catalog_delete_title">Remove this book server?</string>
     <string name="catalog_delete_message">Books you downloaded from it stay in your library.</string>
     <string name="catalog_search_hint">Title, author…</string>
-    <string name="catalog_feed_empty">Nothing here.</string>
+    <string name="catalog_feed_empty">Nothing here yet: this list on the server is empty.</string>
     <string name="catalog_japanese_books">Japanese books</string>
     <string name="catalog_japanese_books_details">Only the books in Japanese</string>
     <string name="catalog_japanese_none">No Japanese books found in this catalogue.</string>

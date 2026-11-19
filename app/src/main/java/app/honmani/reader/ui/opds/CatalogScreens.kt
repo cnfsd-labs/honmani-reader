@@ -146,14 +146,20 @@ fun CatalogBrowser(
             when {
                 error != null -> CatalogError(error, onRetry, onChangeLogin)
                 page == null -> Unit
-                page.entries.isEmpty() && !page.japaneseOnly -> Text(
-                    text = stringResource(R.string.catalog_feed_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
+                page.entries.isEmpty() && !page.japaneseOnly -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(32.dp),
-                )
+                ) {
+                    Text(
+                        text = stringResource(R.string.catalog_feed_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    OutlinedButton(onClick = onBack) { Text(stringResource(R.string.action_back)) }
+                }
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     if (state.pages.size == 1 && state.japaneseShortcut) {
                         item(key = "japanese") {
