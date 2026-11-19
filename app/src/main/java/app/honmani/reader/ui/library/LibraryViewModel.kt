@@ -7,8 +7,10 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -284,6 +286,8 @@ class LibraryViewModel(
     private val finishFacts: (bookId: Long) -> Flow<FinishFacts> = { flowOf(FinishFacts()) },
     /** "Export library", shared with Settings; null: no export. */
     private val exporter: LibraryExporter? = null,
+    /** Keeps a waiting or shown end card through Android killing the app in the background. */
+    private val savedState: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
     private val adding = MutableStateFlow<String?>(null)
     private val opening = MutableStateFlow<Long?>(null)
@@ -319,8 +323,9 @@ class LibraryViewModel(
     val finishCard: StateFlow<FinishCard?> = _finishCard
 
     /** A book read to its end in the reader (by id), whose end card waits until the book is closed. */
-    @Volatile
-    private var reachedEnd: Long? = null
+    private var reachedEnd: Long?
+        get() = savedState[REACHED_END]
+        set(value) { savedState[REACHED_END] = value }
 
     /** A book was closed: how many due words passed while reading it, if any; the end card of a book read to its end. */
     fun bookClosed() {
@@ -341,12 +346,14 @@ class LibraryViewModel(
             graded[it.contentHash]?.difficulty?.score?.takeIf { score -> score > 0 }
         }
         _finishCard.value = FinishCard(book.id, book.title, next, marked, previousFinishedAt)
+        savedState[SHOWN_CARD] = longArrayOf(book.id, if (marked) 1 else 0, previousFinishedAt ?: -1)
     }
 
     /** Closes the end card, opening the suggested book if [openNext]; after a "Mark as finished" without it, Undo is offered. */
     fun closeFinishCard(openNext: Boolean) {
         val card = _finishCard.value ?: return
         _finishCard.value = null
+        savedState.remove<LongArray>(SHOWN_CARD)
         val next = card.next
         if (openNext && next != null) {
             open(next.id)
@@ -435,6 +442,10 @@ class LibraryViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     init {
+        // An end card that was showing when Android killed the app comes back.
+        savedState.get<LongArray>(SHOWN_CARD)?.let { (id, marked, previous) ->
+            viewModelScope.launch { showFinishCard(id, marked == 1L, previous.takeIf { it >= 0 }) }
+        }
         // How an export started in the Library ended, once, by whichever Library shows it first.
         exporter?.let { exporter ->
             viewModelScope.launch {
@@ -1008,6 +1019,9 @@ class LibraryViewModel(
         /** Identifies one opening of a book: opening it (or another) again brings the bubble back. */
         fun continueKey(book: BookEntity): String = "${book.id}:${book.lastOpenedAt}"
 
+        private const val REACHED_END = "reachedEnd"
+        private const val SHOWN_CARD = "shownFinishCard"
+
         val Factory = viewModelFactory {
             initializer {
                 val application = this[APPLICATION_KEY] as HonmaniApplication
@@ -1061,6 +1075,7 @@ class LibraryViewModel(
                     },
                     recordFinished = container.finishedBookDao::record,
                     exporter = container.libraryExporter,
+                    savedState = createSavedStateHandle(),
                     finishFacts = { id ->
                         combine(
                             container.readingDao.observeBook(id),

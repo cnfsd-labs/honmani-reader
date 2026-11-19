@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.library
 
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import app.honmani.reader.data.library.BookDao
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
@@ -867,6 +868,39 @@ class LibraryViewModelTest {
         viewModel.bookClosed()
         delay(100)
         assertNull(viewModel.finishCard.value)
+    }
+
+    @Test
+    fun theEndCard_waitingOrShown_survivesTheProcessBeingKilled() = runBlocking {
+        val book = addAndWait("neko.epub", TestBooks.epub())
+        fun library(state: SavedStateHandle) =
+            LibraryViewModel(dao = dao, importer = importer, ttu = ttu, openFile = { null }, now = { 42L }, savedState = state)
+        // What Android hands a new process: the saved values, not the old object.
+        fun afterKill(state: SavedStateHandle) = SavedStateHandle(state.keys().associateWith { state.get<Any>(it) })
+
+        // Read to the end, then killed in the reader: the card still comes when the book closes.
+        // (The setter is what readingABookToItsEnd... uses; seeded here, as a second library would
+        // see the book finished by the first.)
+        dao.setFinished(book.id, 42L)
+        val restarted = library(afterKill(SavedStateHandle(mapOf("reachedEnd" to book.id))))
+        restarted.bookClosed()
+        assertEquals(book.id, withTimeout(5_000) { restarted.finishCard.first { it != null } }!!.bookId)
+
+        // A "Mark as finished" card killed while showing comes back, still offering Undo when closed.
+        dao.restoreFinished(book.id, null)
+        val markingState = SavedStateHandle()
+        val marking = library(markingState)
+        marking.markFinished(book.id)
+        withTimeout(5_000) { marking.finishCard.first { it != null } }
+        val shownState = afterKill(markingState)
+        val shown = library(shownState)
+        assertTrue(withTimeout(5_000) { shown.finishCard.first { it != null } }!!.marked)
+        shown.closeFinishCard(openNext = false)
+        assertTrue(withTimeout(5_000) { shown.notices.first() } is LibraryNotice.MarkedFinished)
+        // Closed: a later restart shows nothing.
+        val closed = library(afterKill(shownState))
+        delay(100)
+        assertNull(closed.finishCard.value)
     }
 
     @Test
