@@ -348,7 +348,10 @@
         elements.set(id, element);
         observer.observe(element);
       }
+      const before = blocks.get(id);
       blocks.set(id, nodes);
+      // The paragraph's nodes were replaced: its marks point at the old ones, so ask again.
+      if (before && shown.has(id) && (before.length !== nodes.length || before.some((node, i) => node !== nodes[i]))) ask(id);
     }
   }
 
@@ -702,6 +705,8 @@
     const length = ranges.reduce((sum, range) => sum + range.endOffset - range.startOffset, 0);
     if (rgb === null) setColor(detail.color);
     const marks = shown.get(id) || new Map();
+    // A Known word stays Known when looked up again.
+    if (marks.has(`${start}:${length}:${KNOWN}`)) return;
     const asNew = marks.get(`${start}:${length}:1`);
     if (asNew) {
       for (const range of asNew.ranges) {

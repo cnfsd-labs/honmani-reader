@@ -102,3 +102,34 @@ test('with the due switch off the page neither asks for nor draws a due mark', a
   await expect.poll(() => page.evaluate(() => [...(CSS.highlights.get('honmani-learning') ?? [])].length)).toBe(1);
   expect(await dueMarked(page)).toEqual([]);
 });
+
+/** The ranges of the Learning highlight. */
+const learningMarked = (page) => page.evaluate(() => [...(CSS.highlights.get('honmani-learning') ?? [])].map((range) => range.toString()));
+
+test('a Known word looked up again stays Known instead of taking the Learning tint', async ({ page }) => {
+  await openBook(page, '<p>彼は東京に住む。</p>');
+  await answer(page, [[2, 2, 2]]);
+  await page.waitForTimeout(100);
+  await page.evaluate(() => {
+    const node = document.querySelector('p').firstChild;
+    const range = document.createRange();
+    range.setStart(node, 2);
+    range.setEnd(node, 4);
+    window.dispatchEvent(new CustomEvent('honmani-looked-up', { detail: { ranges: [range], color: '#336699' } }));
+  });
+  await page.waitForTimeout(100);
+  expect(await learningMarked(page)).toEqual([]);
+});
+
+test('a paragraph whose text nodes are replaced is asked about again, so its marks come back', async ({ page }) => {
+  await openBook(page, '<p>彼は東京に住む。</p>');
+  await answer(page, [[2, 2, 0]]);
+  await expect.poll(() => learningMarked(page)).toEqual(['東京']);
+  const requests = () => page.evaluate(() => window.__messages.filter((m) => m.type === 'marks.request').length);
+  expect(await requests()).toBe(1);
+  await page.evaluate(() => {
+    const p = document.querySelector('p');
+    p.replaceChildren(document.createTextNode(p.textContent));
+  });
+  await expect.poll(requests).toBe(2);
+});
