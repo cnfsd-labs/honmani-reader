@@ -3,6 +3,7 @@ package app.honmani.reader.ui.reader
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import app.honmani.reader.data.library.Around
 import app.honmani.reader.data.library.BookText
 import app.honmani.reader.data.sync.ProgressSync
 import kotlinx.coroutines.CancellationException
@@ -53,18 +54,26 @@ class PlaceJumper(
             } catch (_: Exception) {
                 return@launch
             }
-            snackbar.currentSnackbarData?.dismiss()
-            launch {
-                val result = snackbar.showSnackbar(message, backLabel, duration = SnackbarDuration.Long)
-                if (result != SnackbarResult.ActionPerformed) return@launch
-                // The place the reader came from is a place read before: it is saved like a page turn.
-                try {
-                    ttu.openHit(ttuId, from, fraction(from, total), fromSpot?.hint.orEmpty(), fromSpot?.match.orEmpty())
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (_: Exception) {
-                    // The reader is gone (the book was closed meanwhile).
-                }
+            offerBack(ttuId, from, total, fromSpot, message, backLabel)
+        }
+    }
+
+    /**
+     * Shows [message] with [backLabel], which opens the book at [from] of [total] again ([fromSpot]:
+     * the text there, if known). Also used after progress sync moved the book when it opened.
+     */
+    fun offerBack(ttuId: Long, from: Long, total: Long, fromSpot: Around?, message: String, backLabel: String) {
+        snackbar.currentSnackbarData?.dismiss()
+        scope.launch {
+            val result = snackbar.showSnackbar(message, backLabel, duration = SnackbarDuration.Long)
+            if (result != SnackbarResult.ActionPerformed) return@launch
+            // The place the reader came from is a place read before: it is saved like a page turn.
+            try {
+                ttu.openHit(ttuId, from, fraction(from, total), fromSpot?.hint.orEmpty(), fromSpot?.match.orEmpty())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // The reader is gone (the book was closed meanwhile).
             }
         }
     }

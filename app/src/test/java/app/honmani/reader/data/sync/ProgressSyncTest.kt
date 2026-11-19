@@ -1,18 +1,27 @@
 package app.honmani.reader.data.sync
 
 import android.content.Context
+import androidx.compose.material3.SnackbarHostState
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.opds.CredentialCipher
+import app.honmani.reader.ui.reader.LibraryMessage
+import app.honmani.reader.ui.reader.PlaceJumper
+import app.honmani.reader.ui.reader.TtuLibrary
+import app.honmani.reader.ui.reader.TtuPage
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
@@ -97,6 +106,58 @@ class ProgressSyncTest {
 
     private suspend fun pull(local: Long?, savedAtMs: Long, ask: suspend (SyncQuestion) -> Boolean = { error("Not asked: $it") }) =
         sync.pull(book, 5, bookmark = { local to savedAtMs }, setBookmark = { characters, progress -> written = characters to progress }, ask = ask)
+
+    @Test
+    fun aTakenPosition_keepsThePlaceBefore_onceForTheReader() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+
+        pull(local = 7, savedAtMs = 1_000_000)
+
+        assertEquals(PlaceBefore(7, 31, 23, PulledPosition(58, "Kindle")), sync.placeBefore(5))
+        assertEquals(PlaceBefore(7, 31, 23, PulledPosition(58, "Kindle")), sync.takePlaceBefore(5))
+        assertNull(sync.takePlaceBefore(5))
+    }
+
+    @Test
+    fun withoutAPlaceOfItsOwn_thereIsNoWayBack() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+
+        pull(local = null, savedAtMs = 0)
+
+        assertNull(sync.takePlaceBefore(5))
+    }
+
+    @Test
+    fun theWayBack_opensThePlaceBeforeThePull() = runBlocking {
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+        pull(local = 7, savedAtMs = 1_000_000)
+        val before = sync.takePlaceBefore(5)!!
+        val scripts = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val ttu = TtuLibrary(pageTimeoutMs = 5_000)
+        ttu.attach(object : TtuPage {
+            override fun evaluate(script: String) {
+                scripts += script
+            }
+
+            override fun load(path: String) = Unit
+        })
+        val snackbar = SnackbarHostState()
+        val jumper = PlaceJumper(ttu, sync, scope, snackbar)
+
+        jumper.offerBack(5, before.characters, before.total, null, "Continued at 58% from Kindle", "Back to 23%")
+        withTimeout(5_000) { while (snackbar.currentSnackbarData == null) delay(10) }
+        assertEquals("Back to 23%", snackbar.currentSnackbarData!!.visuals.actionLabel)
+        snackbar.currentSnackbarData!!.performAction()
+        withTimeout(5_000) { while (scripts.none { "setBookmark" in it }) delay(10) }
+
+        val arguments = kotlinx.serialization.json.Json.parseToJsonElement(
+            scripts.last().substringAfter("(").substringBeforeLast(")"),
+        ).jsonObject
+        assertEquals(5L, arguments["ttuId"]!!.jsonPrimitive.long)
+        assertEquals(7L, arguments["characters"]!!.jsonPrimitive.long)
+        ttu.onMessage(LibraryMessage.BookmarkSet(arguments["requestId"]!!.jsonPrimitive.long))
+        withTimeout(5_000) { while (scripts.none { "honmaniSearch" in it }) delay(10) }
+    }
 
     @Test
     fun aNewerPositionFromAnotherDeviceIsTaken_toTheCharacter() = runBlocking {

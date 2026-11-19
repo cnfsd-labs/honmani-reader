@@ -233,6 +233,17 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var bookShown by remember { mutableStateOf(false) }
     LaunchedEffect(atLibrary, current.ttuId, bookShown) {
         if (atLibrary || !bookShown) return@LaunchedEffect
+        // Progress sync moved the book when it opened: said here, with the way back to this phone's place.
+        current.ttuId?.let { ttuId ->
+            container.progressSync.takePlaceBefore(ttuId)?.let { before ->
+                val text = container.searchableBook(ttuId)
+                jumper.offerBack(
+                    ttuId, before.characters, before.total, text?.aroundPageStart(before.characters.toInt()),
+                    resources.getString(R.string.sync_continued, before.pulled.percent, before.pulled.device),
+                    resources.getString(R.string.sync_back_to, before.percent),
+                )
+            }
+        }
         overlays.openAt?.let { place ->
             overlays.openAt = null
             jumpToLookup(place)

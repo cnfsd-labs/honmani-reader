@@ -1098,6 +1098,8 @@ class LibraryViewModel(
                             }
                         }
                         // Sync is a bonus: the book opens where it was if the reader page can't answer.
+                        // A way back offered at an earlier opening the reader never saw is stale now.
+                        container.progressSync.takePlaceBefore(ttuId)
                         val pulled = try {
                             container.progressSync.pull(
                                 book,
@@ -1109,7 +1111,8 @@ class LibraryViewModel(
                         } catch (_: TtuLibraryException) {
                             null
                         }
-                        if (pulled != null) {
+                        // With a place before it, the reader says so itself, with the way back (ReaderScreen).
+                        if (pulled != null && container.progressSync.placeBefore(ttuId) == null) {
                             val text = application.getString(R.string.sync_continued, pulled.percent, pulled.device)
                             Toast.makeText(application, text, Toast.LENGTH_LONG).show()
                         }

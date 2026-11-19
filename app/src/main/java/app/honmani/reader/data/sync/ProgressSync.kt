@@ -28,6 +28,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** A position taken from another device when a book opened. */
 data class PulledPosition(val percent: Int, val device: String)
 
+/** Where the reader was ([characters] of [total], [percent] %) before [ProgressSync.pull] moved the book. */
+data class PlaceBefore(val characters: Long, val total: Long, val percent: Int, val pulled: PulledPosition)
+
 /**
  * [device] saved an earlier place in the book ([theirs] %) after this phone's ([ours] %): the
  * reader may have gone back on purpose there, or opened the book there before this phone's last
@@ -88,7 +91,7 @@ class ProgressSync(
         data object None : Found
 
         /** [percentage]: the server's, 0..1. */
-        class Ahead(val document: Document, val characters: Long, val device: String, val percentage: Double) : Found
+        class Ahead(val document: Document, val characters: Long, val device: String, val percentage: Double, val local: Long? = null) : Found
 
         /** [at]: when the server stored it, in milliseconds. */
         class Behind(val document: Document, val characters: Long, val device: String, val local: Long, val at: Long) : Found
@@ -109,6 +112,9 @@ class ProgressSync(
      * Only that first save is skipped.
      */
     private val pulledTo = HashMap<Long, Long>()
+
+    /** Per ttu book, this phone's place before [pull] moved it, until the reader takes it ([takePlaceBefore]). */
+    private val placesBefore = HashMap<Long, PlaceBefore>()
     private var pending: Pair<Long, Long>? = null
     private var pushJob: Job? = null
 
@@ -150,11 +156,11 @@ class ProgressSync(
                 resend()
                 null
             }
-            is Found.Ahead -> take(found.document, ttuId, found.characters, found.device, setBookmark)
+            is Found.Ahead -> take(found.document, ttuId, found.characters, found.device, setBookmark, from = found.local)
             is Found.Behind -> {
                 val question = SyncQuestion(found.device, found.document.percent(found.characters), found.document.percent(found.local))
                 if (ask(question)) {
-                    take(found.document, ttuId, found.characters, found.device, setBookmark)
+                    take(found.document, ttuId, found.characters, found.device, setBookmark, from = found.local)
                 } else {
                     // This phone's place stays, and goes to the server for the other device.
                     found.document.xpointerAt(found.local)?.let { xpointer ->
@@ -250,7 +256,7 @@ class ProgressSync(
             return Found.None
         }
         return if (local == null || characters > local || remoteAt == null) {
-            Found.Ahead(document, characters, remote.device, remote.percentage)
+            Found.Ahead(document, characters, remote.device, remote.percentage, local)
         } else {
             Found.Behind(document, characters, remote.device, local, remoteAt)
         }
@@ -262,15 +268,28 @@ class ProgressSync(
         characters: Long,
         device: String,
         setBookmark: suspend (Long, Double) -> Unit,
+        from: Long? = null,
     ): PulledPosition {
+        val pulled = PulledPosition(document.percent(characters), device)
         setBookmark(characters, characters.toDouble() / document.total)
         synchronized(synced) {
             synced[ttuId] = characters
             pulledTo[ttuId] = characters
+            if (from != null) placesBefore[ttuId] = PlaceBefore(from, document.total.toLong(), document.percent(from), pulled)
+            else placesBefore.remove(ttuId)
         }
         unsent.forget(document.id)
-        return PulledPosition(document.percent(characters), device)
+        return pulled
     }
+
+    /**
+     * This phone's place in book [ttuId] before the last [pull] moved it (null if it had none, or
+     * it was taken already): the reader offers the way back to it.
+     */
+    fun takePlaceBefore(ttuId: Long): PlaceBefore? = synchronized(synced) { placesBefore.remove(ttuId) }
+
+    /** Like [takePlaceBefore], but leaves it for the reader. */
+    fun placeBefore(ttuId: Long): PlaceBefore? = synchronized(synced) { placesBefore[ttuId] }
 
     /**
      * The reader jumped to [characters] of book [ttuId] (slider, bookmark, search hit, the way

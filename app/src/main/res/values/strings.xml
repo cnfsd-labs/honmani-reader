@@ -1569,6 +1569,7 @@
     <string name="sync_fail_other">unexpected error</string>
     <string name="reader_menu_sync_failed">Progress sync failed: %1$s</string>
     <string name="sync_continued">Continued at %1$d%% from %2$s</string>
+    <string name="sync_back_to">Back to %1$d%%</string>
     <string name="sync_question_title">Where to continue?</string>
     <string name="sync_question_message">%1$s was last at %2$d%%, an earlier place than this phone (%3$d%%).</string>
     <string name="sync_question_stay">Stay at %1$d%%</string>
