@@ -49,6 +49,8 @@
   const IMPORT_INPUT = 'input[type="file"][accept^="application/epub+zip"]';
   const INPUT_WAIT_MS = 15000;
   const IMPORT_TIMEOUT_MS = 180000;
+  /** Reading a book file from app storage; a hung read would hold up every later command. */
+  const FETCH_TIMEOUT_MS = 60000;
 
   function post(message) {
     if (window.honmani) window.honmani.postMessage(JSON.stringify(message));
@@ -187,9 +189,19 @@
   }
 
   async function importBook(url, fileName, keepIds, titleSuffix) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`The book file is missing (${response.status})`);
-    const file = new File([await response.blob()], fileName);
+    const abort = new AbortController();
+    const fetchTimer = setTimeout(() => abort.abort(), FETCH_TIMEOUT_MS);
+    let file;
+    try {
+      const response = await fetch(url, { signal: abort.signal });
+      if (!response.ok) throw new Error(`The book file is missing (${response.status})`);
+      file = new File([await response.blob()], fileName);
+    } catch (error) {
+      if (abort.signal.aborted) throw new Error('The book file could not be read in time');
+      throw error;
+    } finally {
+      clearTimeout(fetchTimer);
+    }
     const input = await waitForElement(IMPORT_INPUT, INPUT_WAIT_MS);
 
     return new Promise((resolve, reject) => {
@@ -306,12 +318,13 @@
     enqueue(async () => {
       try {
         await withDb(async (db) => {
-          if (!db.objectStoreNames.contains('bookmark')) return;
+          // A position that is not a number would make ttu open the book nowhere: keep the old one.
+          if (!Number.isFinite(characters) || !db.objectStoreNames.contains('bookmark')) return;
           const transaction = db.transaction('bookmark', 'readwrite');
           transaction.objectStore('bookmark').put({
             dataId: ttuId,
             exploredCharCount: Math.max(0, Math.floor(characters)),
-            progress: Math.min(1, Math.max(0, progress)),
+            progress: Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0,
             lastBookmarkModified: Number.isFinite(modified) && modified > 0 ? modified : Date.now(),
           });
           await committed(transaction);

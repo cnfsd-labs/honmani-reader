@@ -519,6 +519,36 @@ test('a position set from a backup keeps the time it was read, for progress sync
   expect(synced.modified).toBeGreaterThanOrEqual(before);
 });
 
+test('a position that is not a number keeps the stored one', async ({ page }) => {
+  await setUp(page);
+  await page.goto(`${server.url}/manage`);
+  const book = await ensure(page, 'long.epub');
+  await call(page, 'setBookmark', { ttuId: book.id, characters: 1234, progress: 0.1, modified: 1_700_000_000_000 });
+
+  expect(await call(page, 'setBookmark', { ttuId: book.id, characters: Number.NaN, progress: Number.NaN })).toMatchObject({
+    type: 'library.bookmarkSet',
+  });
+  expect(await call(page, 'bookmark', { ttuId: book.id })).toMatchObject({ characters: 1234, modified: 1_700_000_000_000 });
+});
+
+test('a book file that never arrives fails after a while and lets later commands run', async ({ page }) => {
+  // The read's one-minute limit, shortened.
+  await page.addInitScript(() => {
+    const setTimeoutOriginal = window.setTimeout;
+    window.setTimeout = (handler, ms, ...rest) => setTimeoutOriginal(handler, ms === 60000 ? 200 : ms, ...rest);
+  });
+  await setUp(page);
+  await page.route('**/honmani-books/hangs.epub', () => {});
+  await page.goto(`${server.url}/manage`);
+  const book = await ensure(page, 'long.epub');
+
+  const hung = ensure(page, 'hangs.epub');
+  const after = call(page, 'bookmark', { ttuId: book.id });
+
+  expect(await hung).toMatchObject({ type: 'library.failed', message: 'The book file could not be read in time' });
+  expect(await after).toMatchObject({ type: 'library.bookmark' });
+});
+
 test('removing a book deletes it from ttu', async ({ page }) => {
   await setUp(page);
   await page.goto(`${server.url}/manage`);
