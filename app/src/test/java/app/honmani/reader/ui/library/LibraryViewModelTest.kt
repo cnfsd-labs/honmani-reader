@@ -330,6 +330,13 @@ class LibraryViewModelTest {
         written: MutableMap<String, ByteArray> = HashMap(),
         onOpen: () -> Unit = {},
         watched: WatchedFolder? = null,
+        exporter: LibraryExporter = LibraryExporter(
+            scope = CoroutineScope(Dispatchers.Default),
+            books = { dao.books.value },
+            bookFile = importer::bookFile,
+            openTree = { tree },
+            writeDocument = { file, uri -> written[uri.toString()] = file.readBytes() },
+        ),
     ) = LibraryViewModel(
         dao = dao,
         importer = importer,
@@ -345,13 +352,7 @@ class LibraryViewModelTest {
         },
         openTree = { tree },
         watchedFolder = watched,
-        exporter = LibraryExporter(
-            scope = CoroutineScope(Dispatchers.Default),
-            books = { dao.books.value },
-            bookFile = importer::bookFile,
-            openTree = { tree },
-            writeDocument = { file, uri -> written[uri.toString()] = file.readBytes() },
-        ),
+        exporter = exporter,
     )
 
     @Test
@@ -563,6 +564,76 @@ class LibraryViewModelTest {
             written.keys,
         )
         assertTrue(first.contentEquals(written.getValue("content://tree/root/Neko (2).epub")))
+    }
+
+    @Test
+    fun cancellingTheFolderImportLeavesAnExportFromSettingsRunning() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to listOf(file("root/a.epub"), file("root/b.epub"))))
+        files["root/a.epub"] = TestBooks.epub(title = "A")
+        files["root/b.epub"] = TestBooks.epub(title = "B")
+        addAndWait("neko.epub", TestBooks.epub(title = "Neko"))
+        val importing = java.util.concurrent.CountDownLatch(1)
+        val goOn = java.util.concurrent.CountDownLatch(1)
+        val writing = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val written = HashMap<String, ByteArray>()
+        val exporter = LibraryExporter(
+            scope = CoroutineScope(Dispatchers.Default),
+            books = { dao.books.value },
+            bookFile = importer::bookFile,
+            openTree = { FakeDocumentTree(mapOf("root" to emptyList())) },
+            writeDocument = { file, uri ->
+                writing.complete(Unit)
+                release.await()
+                written[uri.toString()] = file.readBytes()
+            },
+        )
+        viewModel = viewModelOn(tree, onOpen = { importing.countDown(); goOn.await() }, exporter = exporter)
+
+        viewModel.importFolder(Uri.parse("content://tree/root"))
+        eventually { importing.takeIf { it.count == 0L } }
+        // Settings starts an export meanwhile; the Library's bar still shows the import.
+        assertTrue(exporter.start(Uri.parse("content://tree/out")))
+        withTimeout(5_000) { writing.await() }
+        assertEquals(false, withTimeout(5_000) { viewModel.uiState.first { it.batch != null } }.batch?.exporting)
+
+        viewModel.cancelBatch()
+        goOn.countDown()
+
+        assertTrue((nextNotice() as LibraryNotice.FolderImported).stopped)
+        assertTrue(exporter.running)
+        release.complete(Unit)
+        assertEquals(
+            LibraryExporter.Result.Exported(1, 0, stopped = false),
+            withTimeout(5_000) { exporter.lastResult.first { it != null } },
+        )
+    }
+
+    @Test
+    fun anExportsResultIsShownOnceEvenIfTheLibraryThatStartedItIsGone() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to emptyList()))
+        addAndWait("neko.epub", TestBooks.epub(title = "Neko"))
+        val release = CompletableDeferred<Unit>()
+        val exporter = LibraryExporter(
+            scope = CoroutineScope(Dispatchers.Default),
+            books = { dao.books.value },
+            bookFile = importer::bookFile,
+            openTree = { tree },
+            writeDocument = { _, _ -> release.await() },
+        )
+        val store = ViewModelStore()
+        val leaving = ViewModelProvider(store, viewModelFactory { initializer { viewModelOn(tree, exporter = exporter) } })[LibraryViewModel::class.java]
+        leaving.exportLibrary(Uri.parse("content://tree/root"))
+        eventually { exporter.progress.value?.takeIf { it.total != null } }
+
+        store.clear()
+        release.complete(Unit)
+        eventually { exporter.lastResult.value }
+
+        viewModel = viewModelOn(tree, exporter = exporter)
+        assertEquals(LibraryNotice.LibraryExported(1, 0, stopped = false), nextNotice())
+        viewModel = viewModelOn(tree, exporter = exporter)
+        assertNull(withTimeoutOrNull(300) { viewModel.notices.first() })
     }
 
     @Test

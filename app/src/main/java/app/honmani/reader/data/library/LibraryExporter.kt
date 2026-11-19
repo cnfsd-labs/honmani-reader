@@ -5,12 +5,14 @@ import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -47,29 +49,47 @@ class LibraryExporter(
     /** How the last export ended, for as long as the app runs; null: none yet, or one is running. */
     val lastResult: StateFlow<Result?> = _lastResult.asStateFlow()
 
+    private val _notice = MutableStateFlow<Result?>(null)
+
+    /**
+     * The result of an export started with `announce`, until a screen takes it ([takeNotice]):
+     * it survives the screen that started the export.
+     */
+    val notice: StateFlow<Result?> = _notice.asStateFlow()
+
+    /** The waiting [notice], once: the next call returns null. */
+    fun takeNotice(): Result? = _notice.getAndUpdate { null }
+
+    @Volatile
     private var job: Job? = null
 
     val running: Boolean get() = job?.isActive == true
 
     /**
      * Starts exporting into [tree]; false (and nothing happens) while an export runs. [onDone]
-     * gets the result, or null for an export stopped before it began.
+     * gets the result, or null for an export stopped before it began. [announce]: the result also
+     * waits as [notice] until a screen shows it.
      */
     @Synchronized
-    fun start(tree: Uri, onDone: (Result?) -> Unit = {}): Boolean {
+    fun start(tree: Uri, announce: Boolean = false, onDone: (Result?) -> Unit = {}): Boolean {
         if (running) return false
         _lastResult.value = null
+        _notice.value = null
         _progress.value = Progress()
-        job = scope.launch {
+        // Started only once assigned, so a cancel() right away (even from the export itself) finds it.
+        val launched = scope.launch(start = CoroutineStart.LAZY) {
             var result: Result? = null
             try {
                 result = export(tree) { result = it }
             } finally {
                 _progress.value = null
                 _lastResult.value = result
+                if (announce && result != null) _notice.value = result
                 onDone(result)
             }
         }
+        job = launched
+        launched.start()
         return true
     }
 

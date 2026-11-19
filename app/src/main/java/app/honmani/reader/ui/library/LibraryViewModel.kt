@@ -435,6 +435,21 @@ class LibraryViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     init {
+        // How an export started in the Library ended, once, by whichever Library shows it first.
+        exporter?.let { exporter ->
+            viewModelScope.launch {
+                exporter.notice.collect {
+                    val notice = when (val result = exporter.takeNotice()) {
+                        is LibraryExporter.Result.Exported ->
+                            LibraryNotice.LibraryExported(result.exported, result.failed, result.stopped)
+                        LibraryExporter.Result.NothingToExport -> LibraryNotice.NothingToExport
+                        LibraryExporter.Result.FolderUnusable -> LibraryNotice.FolderUnusable
+                        null -> null
+                    }
+                    notice?.let { _notices.send(it) }
+                }
+            }
+        }
         // The hidden shelf closes when its last book is unhidden or removed.
         viewModelScope.launch {
             dao.observeAll().collect { books ->
@@ -688,21 +703,17 @@ class LibraryViewModel(
     /** Writes every library book's own file into the folder [tree], named by title (see [LibraryExporter]). */
     fun exportLibrary(tree: Uri) {
         if (batchJob?.isActive == true) return
-        exporter?.start(tree) { result ->
-            when (result) {
-                is LibraryExporter.Result.Exported ->
-                    _notices.trySend(LibraryNotice.LibraryExported(result.exported, result.failed, result.stopped))
-                LibraryExporter.Result.NothingToExport -> _notices.trySend(LibraryNotice.NothingToExport)
-                LibraryExporter.Result.FolderUnusable -> _notices.trySend(LibraryNotice.FolderUnusable)
-                null -> Unit
-            }
-        }
+        // Its result waits in the exporter (see init), so it is shown even if this screen is gone by then.
+        exporter?.start(tree, announce = true)
     }
 
-    /** Stops the running folder import or export; what was done stays. */
+    /**
+     * Stops what the progress bar shows: the folder import, or else the export. An export started
+     * in Settings while the folder import runs keeps running (Settings has its own Cancel).
+     */
     fun cancelBatch() {
-        batchJob?.cancel()
-        exporter?.cancel()
+        val import = batchJob
+        if (import?.isActive == true) import.cancel() else exporter?.cancel()
     }
 
     /** Opens the book once the book being opened (perhaps asking "Where to continue?") is open. */

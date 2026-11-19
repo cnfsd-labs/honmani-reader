@@ -122,6 +122,23 @@ class LibraryExporterTest {
     }
 
     @Test
+    fun anAnnouncedResultWaitsUntilTakenOnce() = runBlocking {
+        val tree = FakeDocumentTree(mapOf("root" to emptyList()))
+        book("Neko", byteArrayOf(1))
+        val exporter = exporter(tree)
+
+        exporter.run()
+        assertNull("an export from Settings announces nothing", exporter.takeNotice())
+
+        val done = CompletableDeferred<LibraryExporter.Result?>()
+        assertTrue(exporter.start(Uri.parse("content://tree/root"), announce = true) { done.complete(it) })
+        withTimeout(5_000) { done.await() }
+        assertEquals(LibraryExporter.Result.Exported(1, 0, stopped = false), exporter.takeNotice())
+        assertNull(exporter.takeNotice())
+        assertEquals(LibraryExporter.Result.Exported(1, 0, stopped = false), exporter.lastResult.value)
+    }
+
+    @Test
     fun aSecondStartWhileOneRunsIsIgnored() = runBlocking {
         val tree = FakeDocumentTree(mapOf("root" to emptyList()))
         book("Neko", byteArrayOf(1))
