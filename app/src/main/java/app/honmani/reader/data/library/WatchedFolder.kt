@@ -173,11 +173,18 @@ object WatchedFolderScan {
     const val RECHECK_MILLIS = 1_500L
 
     /**
+     * A modified time further than this in the future (a wrong clock where the file was made) never
+     * settles: such a file counts as settled at once, the recheck still catches a copy in progress.
+     */
+    const val FUTURE_MILLIS = 60_000L
+
+    /**
      * Walks [tree] (same limits as the folder import) and returns the book files that are new or
      * changed since [seen]. Those are hashed with [hashOf] (null: could not be read, tried again
      * next time); one whose hash is in [removedHashes] is marked seen and left out. Unchanged
      * files are not read at all. A file modified at or after [modifiedBefore] may still be being
-     * copied into the folder: it is left alone (not hashed, not marked) until a later scan. A file
+     * copied into the folder: it is left alone (not hashed, not marked) until a later scan, unless its
+     * time lies more than [FUTURE_MILLIS] ahead. A file
      * larger than [BookImporter.MAX_BOOK_BYTES] is marked seen without being read. The folder is
      * listed again [recheckMillis] after the first look; a file whose size or modified time
      * changed meanwhile is still being copied and is left for a later scan too.
@@ -200,7 +207,7 @@ object WatchedFolderScan {
         for (entry in scan.files) {
             coroutineContext.ensureActive()
             if (seen.isUnchanged(entry)) continue
-            if (entry.modified >= modifiedBefore) continue
+            if (entry.modified >= modifiedBefore && entry.modified <= listedAt + FUTURE_MILLIS) continue
             if (entry.size > BookImporter.MAX_BOOK_BYTES) {
                 // The import would refuse it: don't read it at every scan.
                 seen.mark(entry)

@@ -623,6 +623,8 @@ class LibraryViewModel(
                 }
             }
             if (scan.files.isEmpty() && scan.unreadableFolders > 0) {
+                // Keep what the scan marked (removed or oversized files), or it reads them again.
+                watched.seen.save()
                 watched.setProblem(true)
                 return@launch
             }
@@ -649,8 +651,11 @@ class LibraryViewModel(
                         is BookAdder.Result.AlreadyInLibrary -> Unit
                         else -> failed++
                     }
-                    // A file that could not be opened or handed to the reader is tried again next time.
-                    if (result != null && result !is BookAdder.Result.ReaderFailed) watched.seen.mark(file)
+                    // A file that could not be opened, handed to the reader or stored (storage full)
+                    // is tried again next time.
+                    if (result != null && result !is BookAdder.Result.ReaderFailed && result !is BookAdder.Result.NoSpace) {
+                        watched.seen.mark(file)
+                    }
                 }
             } finally {
                 watched.seen.save()

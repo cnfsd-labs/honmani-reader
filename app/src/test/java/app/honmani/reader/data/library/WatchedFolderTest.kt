@@ -105,6 +105,20 @@ class WatchedFolderTest {
     }
 
     @Test
+    fun aFileModifiedFarInTheFutureCountsAsSettled() {
+        val seen = SeenFiles(seenFile)
+        val now = System.currentTimeMillis()
+        val future = file("root/s/a.epub").copy(size = 10, modified = now + WatchedFolderScan.FUTURE_MILLIS + 3_600_000)
+        val soon = file("root/s/b.epub").copy(size = 10, modified = now + 1_000)
+
+        val result = runBlocking {
+            WatchedFolderScan.find(tree(future, soon), seen, emptySet(), modifiedBefore = now - 15_000, recheckMillis = 0) { hash(it) }
+        }
+
+        assertEquals(listOf("root/s/a.epub"), result.files.map { it.id })
+    }
+
+    @Test
     fun aFileGrowingDuringTheScanIsLeftForALaterScan_evenWithAnOldModifiedTime() {
         val seen = SeenFiles(seenFile)
         val settled = file("root/s/b.epub").copy(size = 10, modified = 5)

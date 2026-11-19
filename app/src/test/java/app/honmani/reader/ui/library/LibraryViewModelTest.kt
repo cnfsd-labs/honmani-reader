@@ -11,6 +11,7 @@ import app.honmani.reader.data.library.LibraryExporter
 import app.honmani.reader.data.library.FakeDocumentTree
 import app.honmani.reader.data.library.FakeFolderTarget
 import app.honmani.reader.data.library.WatchedFolder
+import app.honmani.reader.data.library.SeenFiles
 import app.honmani.reader.data.library.WatchedFolderScan
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.file
 import app.honmani.reader.data.library.FakeDocumentTree.Companion.folder
@@ -331,6 +332,7 @@ class LibraryViewModelTest {
         written: MutableMap<String, ByteArray> = HashMap(),
         onOpen: () -> Unit = {},
         watched: WatchedFolder? = null,
+        stream: (String) -> java.io.InputStream? = { files[it]?.inputStream() },
         exporter: LibraryExporter = LibraryExporter(
             scope = CoroutineScope(Dispatchers.Default),
             books = { dao.books.value },
@@ -344,7 +346,7 @@ class LibraryViewModelTest {
         ttu = ttu,
         openFile = { uri ->
             onOpen()
-            files[uri.path!!.removePrefix("/")]?.let { PickedFile(uri.lastPathSegment!!, it.inputStream()) }
+            stream(uri.path!!.removePrefix("/"))?.let { PickedFile(uri.lastPathSegment!!, it) }
         },
         now = { 42L },
         writeDocument = { file, uri ->
@@ -436,6 +438,41 @@ class LibraryViewModelTest {
 
         assertEquals(LibraryNotice.WatchedFolderAdded(1, 0), withTimeout(5_000) { viewModel.notices.first() })
         assertEquals(listOf("A", "B"), dao.books.value.map { it.title })
+    }
+
+    @Test
+    fun aWatchedFileThatMetAFullStorageIsTriedAgain() = runBlocking {
+        val entry = file("root/a.epub").copy(size = 1, modified = 1)
+        val tree = FakeDocumentTree(mapOf("root" to listOf(entry)))
+        val bytes = TestBooks.epub(title = "A")
+        var opens = 0
+        val watched = watchedFolder()
+        // The scan's hashing reads the file, the import then finds the storage full.
+        viewModel = viewModelOn(tree, watched = watched, stream = {
+            if (opens++ == 0) bytes.inputStream()
+            else object : java.io.InputStream() {
+                override fun read(): Int = throw java.io.IOException("write failed: ENOSPC (No space left on device)")
+            }
+        })
+
+        viewModel.scanWatchedFolder()
+
+        assertEquals(LibraryNotice.WatchedFolderAdded(0, 1), nextNotice())
+        assertTrue(dao.books.value.isEmpty())
+        assertTrue("a file that met a full storage must be tried again", !watched.seen.isUnchanged(entry))
+    }
+
+    @Test
+    fun aScanThatMetOnlyUnreadableFoldersStillKeepsWhatItMarked() = runBlocking {
+        val huge = file("root/film.epub").copy(size = BookImporter.MAX_BOOK_BYTES + 1, modified = 1)
+        val tree = FakeDocumentTree(mapOf("root" to listOf(huge, folder("root/locked"))))
+        val watched = watchedFolder()
+        viewModel = viewModelOn(tree, watched = watched)
+
+        viewModel.scanWatchedFolder()
+        eventually { watched.state().takeIf { it is WatchedFolder.State.Unavailable } }
+
+        assertTrue(SeenFiles(File(folder.root, "seen.tsv")).isUnchanged(huge))
     }
 
     @Test
