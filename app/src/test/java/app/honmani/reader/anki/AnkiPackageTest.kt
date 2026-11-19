@@ -104,6 +104,36 @@ class AnkiPackageTest {
     }
 
     @Test
+    fun aDeckNamedDefaultIsAnkisOwnDeck_notASecondOne() {
+        val entries = write(listOf(AnkiPackage.Note(fields("名前"))), deck = "default")
+
+        assertEquals(1L, AnkiPackage.deckId("Default"))
+        entries.collection { db ->
+            db.rawQuery("SELECT decks FROM col", null).use {
+                it.moveToFirst()
+                val decks = Json.parseToJsonElement(it.getString(0)).jsonObject
+                assertEquals(setOf("1"), decks.keys)
+            }
+            db.rawQuery("SELECT did FROM cards", null).use {
+                it.moveToFirst()
+                assertEquals(1L, it.getLong(0))
+            }
+        }
+    }
+
+    @Test
+    fun theSortFieldIsThePlainTextTheChecksumIsTakenFrom() {
+        val entries = write(listOf(AnkiPackage.Note(fields("<b>A&amp;B</b> &lt;x&gt;"))))
+
+        entries.collection { db ->
+            db.rawQuery("SELECT sfld FROM notes", null).use {
+                it.moveToFirst()
+                assertEquals("A&B <x>", it.getString(0))
+            }
+        }
+    }
+
+    @Test
     fun aNotesGuidComesFromItsWordAndReadingOnly() {
         val first = fields("名前", "なまえ")
         val sameWord = fields("名前", "なまえ").also { it[3] = "another meaning" }

@@ -2,6 +2,7 @@ package app.honmani.reader.ui.words
 
 import android.content.Intent
 import android.text.format.DateUtils
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -249,15 +250,7 @@ fun WordsScreen(
                         if (stopped != null) showAnkiResult(context, "", stopped)
                     }
                 }
-                is AnkiOutcome.Exported -> {
-                    val saved = resources.getQuantityString(
-                        if (outcome.packaged) R.plurals.anki_exported_package else R.plurals.anki_exported,
-                        outcome.count,
-                        outcome.count,
-                    )
-                    val audio = outcome.audioProblem?.let { " – " + resources.getString(it.label()) }.orEmpty()
-                    Toast.makeText(context, saved + audio, Toast.LENGTH_LONG).show()
-                }
+                is AnkiOutcome.Exported -> Toast.makeText(context, exportedMessage(resources, outcome), Toast.LENGTH_LONG).show()
                 is AnkiOutcome.CsvExported -> Toast.makeText(
                     context,
                     resources.getQuantityString(R.plurals.csv_words_exported, outcome.count, outcome.count),
@@ -1423,5 +1416,27 @@ private fun WordsPreview() {
             onExport = {},
             onExportPackage = {},
         )
+    }
+}
+
+/** What an export saved, with why cards have no audio, if so. */
+private fun exportedMessage(resources: android.content.res.Resources, outcome: AnkiOutcome.Exported): String {
+    val saved = resources.getQuantityString(
+        if (outcome.packaged) R.plurals.anki_exported_package else R.plurals.anki_exported,
+        outcome.count,
+        outcome.count,
+    )
+    return saved + outcome.audioProblem?.let { " – " + resources.getString(it.label()) }.orEmpty()
+}
+
+/** Tells the result of an export that finished after the Words screen was left (from any thread). */
+internal fun showAwayOutcome(context: Context, outcome: AnkiOutcome) {
+    val text = when (outcome) {
+        is AnkiOutcome.Exported -> exportedMessage(context.resources, outcome)
+        AnkiOutcome.ExportFailed -> context.getString(R.string.anki_export_failed)
+        else -> return
+    }
+    android.os.Handler(android.os.Looper.getMainLooper()).post {
+        Toast.makeText(context, text, Toast.LENGTH_LONG).show()
     }
 }

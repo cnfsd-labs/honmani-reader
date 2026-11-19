@@ -126,6 +126,12 @@ class AnkiExporter(
                                 }
                             } catch (e: VoiceException) {
                                 problem = e.problem
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                // Any other voice error costs this card its audio, not the whole package.
+                                logWarning("Honmani.anki", "The voice failed for a package card", e)
+                                problem = VoiceProblem.FAILED
                             }
                         }
                         onProgress(i + 1)

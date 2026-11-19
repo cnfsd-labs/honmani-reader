@@ -211,10 +211,13 @@ object AnkiCard {
      * without reading every note.
      */
     fun checksum(field: String): Long {
-        val text = decodeEntities(field.replace(Regex("<[^>]*>"), ""))
+        val text = plainText(field)
         val digest = MessageDigest.getInstance("SHA-1").digest(text.toByteArray(Charsets.UTF_8))
         return digest.take(4).fold(0L) { value, byte -> (value shl 8) or (byte.toLong() and 0xFF) }
     }
+
+    /** [field] as Anki sees it for sorting and duplicates: tags removed, then entities decoded. */
+    fun plainText(field: String): String = decodeEntities(field.replace(Regex("<[^>]*>"), ""))
 
     private val entity = Regex("&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);")
 

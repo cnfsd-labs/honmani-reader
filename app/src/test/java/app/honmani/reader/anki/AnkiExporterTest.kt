@@ -524,6 +524,15 @@ class AnkiExporterTest {
     }
 
     @Test
+    fun anyOtherVoiceErrorStillSavesThePackage_withoutAudio_asFailed() = runBlocking {
+        voice.crash = IllegalStateException("engine broke")
+        val out = java.io.ByteArrayOutputStream()
+
+        assertEquals(VoiceProblem.FAILED, exporter.ankiPackage(listOf(savedWord()), out))
+        assertTrue(out.size() > 0)
+    }
+
+    @Test
     fun aVoiceProblemStillSavesThePackage_withoutAudio() = runBlocking {
         voice.problem = VoiceProblem.NO_JAPANESE
         val out = java.io.ByteArrayOutputStream()
@@ -649,12 +658,14 @@ class AnkiExporterTest {
         val spoken = mutableListOf<String>()
         val rates = mutableListOf<Double>()
         var problem: VoiceProblem? = null
+        var crash: Exception? = null
 
         override val extension = "wav"
         override var maxInputLength = Int.MAX_VALUE
 
         override suspend fun speak(text: String, out: File, rate: Double) {
             problem?.let { throw VoiceException(it) }
+            crash?.let { throw it }
             spoken += text
             rates += rate
             out.writeText(text)

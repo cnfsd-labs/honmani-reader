@@ -2,6 +2,7 @@ package app.honmani.reader.ui.words
 
 import app.honmani.reader.diagnostics.logWarning
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
@@ -174,6 +175,10 @@ class WordsViewModel(
      */
     private val writePackage: suspend (uri: String, List<WordEntity>, onProgress: (Int) -> Unit) -> VoiceProblem? =
         { _, _, _ -> null },
+    /** Deletes a document the reader picked (a package that failed half way); failures are swallowed. */
+    private val deleteDocument: suspend (uri: String) -> Unit = {},
+    /** Tells the result of a package export that finished after the screen was left. */
+    private val reportAway: (AnkiOutcome) -> Unit = {},
     /** Compares the "in Anki" marks with AnkiDroid's notes. */
     private val checkAnki: suspend () -> AnkiCheck = { AnkiCheck.NotInstalled },
     /** What was read and how well each word is known; null while it is worked out. */
@@ -211,6 +216,14 @@ class WordsViewModel(
     }
     private val _changes = Channel<WordChange>(Channel.BUFFERED)
     private val _ankiOutcomes = Channel<AnkiOutcome>(Channel.BUFFERED)
+
+    /** Set once the screen is gone; results of work that outlives it go to [reportAway]. */
+    @Volatile
+    private var cleared = false
+
+    override fun onCleared() {
+        cleared = true
+    }
     private val ankiProgress = MutableStateFlow<Pair<Int, Int>?>(null)
     private val savingPackage = MutableStateFlow(false)
     private val addingToAnki = MutableStateFlow<Set<Long>>(emptySet())
@@ -509,13 +522,16 @@ class WordsViewModel(
         if (ankiProgress.value != null) return
         savingPackage.value = true
         ankiProgress.value = 0 to 1
-        viewModelScope.launch {
+        // Not with the screen: leaving it half way would leave an empty file and no word on it.
+        (longRunning ?: viewModelScope).launch {
+            var written = false
             val outcome = try {
                 val list = words.first()
                 ankiProgress.value = 0 to list.size
                 val problem = writePackage(uri, list) { done ->
                     ankiProgress.value = done.coerceAtMost(list.size - 1) to list.size
                 }
+                written = true
                 AnkiOutcome.Exported(list.size, packaged = true, audioProblem = problem)
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
@@ -523,10 +539,12 @@ class WordsViewModel(
                 logWarning("Honmani.words", "Anki package export failed", e)
                 AnkiOutcome.ExportFailed
             } finally {
+                // A failed or stopped export leaves no empty or broken file behind.
+                if (!written) withContext(NonCancellable) { deleteDocument(uri) }
                 ankiProgress.value = null
                 savingPackage.value = false
             }
-            _ankiOutcomes.send(outcome)
+            if (cleared) reportAway(outcome) else _ankiOutcomes.send(outcome)
         }
     }
 
@@ -569,6 +587,16 @@ class WordsViewModel(
                         } ?: throw IOException("Cannot write $uri")
                         out.use { container.ankiExporter.ankiPackage(list, it, onProgress) }
                     },
+                    deleteDocument = { uri ->
+                        withContext(Dispatchers.IO) {
+                            try {
+                                DocumentsContract.deleteDocument(application.contentResolver, Uri.parse(uri))
+                            } catch (e: Exception) {
+                                logWarning("Honmani.words", "Deleting the unfinished package failed", e)
+                            }
+                        }
+                    },
+                    reportAway = { outcome -> showAwayOutcome(application, outcome) },
                     knowledge = container.wordKnowledge,
                     memory = combine(container.reviewRepository.observeCards(), container.reviewSettings.knownAfterDays) { cards, knownAfter ->
                         cards.filter { it.state == ReviewState.REVIEW }.associate { it.wordId to ReviewRules.memory(it, knownAfter) }

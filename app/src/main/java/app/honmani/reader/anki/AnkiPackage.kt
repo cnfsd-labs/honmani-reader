@@ -75,9 +75,13 @@ object AnkiPackage {
         }
     }
 
-    /** The deck's id: from its name, so a package for the same deck finds it again. */
+    /**
+     * The deck's id: from its name, so a package for the same deck finds it again. Anki's own
+     * "Default" deck (names compare without case) is always id 1, or the import makes a second one.
+     */
     fun deckId(deck: String): Long =
-        1_000_000_000L + (positiveHash("deck\u0000$deck") % 1_000_000_000_000L)
+        if (deck.equals(DEFAULT_DECK, ignoreCase = true)) 1L
+        else 1_000_000_000L + (positiveHash("deck\u0000$deck") % 1_000_000_000_000L)
 
     /**
      * A note's guid in Anki: from the word, so it stays the same between packages. Each note type
@@ -117,7 +121,8 @@ object AnkiPackage {
                         seconds,
                         " ${AnkiCard.TAG} ",
                         note.fields.joinToString(FIELD_SEPARATOR),
-                        note.fields[0].replace(TAG, ""),
+                        // Anki's sort field: the same plain text the checksum is taken from.
+                        AnkiCard.plainText(note.fields[0]),
                         AnkiCard.checksum(note.fields[0]),
                     ),
                 )
@@ -198,8 +203,8 @@ object AnkiPackage {
     }
 
     private fun decks(deckId: Long, deck: String, seconds: Long) = buildJsonObject {
-        put("1", deck(1, "Default", seconds))
-        put(deckId.toString(), deck(deckId, deck, seconds))
+        put("1", deck(1, if (deckId == 1L) deck else DEFAULT_DECK, seconds))
+        if (deckId != 1L) put(deckId.toString(), deck(deckId, deck, seconds))
     }
 
     private fun deck(id: Long, name: String, seconds: Long): JsonObject = buildJsonObject {
@@ -228,7 +233,7 @@ object AnkiPackage {
 
     /** Anki separates a note's fields with the unit separator. */
     private const val FIELD_SEPARATOR = "\u001f"
-    private val TAG = Regex("<[^>]*>")
+    private const val DEFAULT_DECK = "Default"
 
     private const val LATEX_PRE = "\\documentclass[12pt]{article}\n\\special{papersize=3in,5in}\n" +
         "\\usepackage[utf8]{inputenc}\n\\usepackage{amssymb,amsmath}\n\\pagestyle{empty}\n" +

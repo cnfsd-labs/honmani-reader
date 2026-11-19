@@ -16,7 +16,13 @@ import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordRepository
 import app.honmani.reader.lookup.DictionaryLookup
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
@@ -90,6 +96,10 @@ class WordsViewModelTest {
         markInAnki: suspend (Map<Long, Long>) -> Unit = {},
         writeDocument: suspend (String, String) -> Unit = { _, _ -> },
         libraryBookIds: Flow<Set<Long>?> = flowOf(null),
+        writePackage: suspend (String, List<WordEntity>, (Int) -> Unit) -> VoiceProblem? = { _, _, _ -> null },
+        deleteDocument: suspend (String) -> Unit = {},
+        reportAway: (AnkiOutcome) -> Unit = {},
+        longRunning: CoroutineScope? = null,
     ): WordsViewModel {
         val lookup = DictionaryLookup(
             database.dictionaryDao(),
@@ -106,6 +116,10 @@ class WordsViewModelTest {
             showFrequency = showFrequency,
             frequencyOf = { words -> lookup.frequencies(words) },
             libraryBookIds = libraryBookIds,
+            writePackage = writePackage,
+            deleteDocument = deleteDocument,
+            reportAway = reportAway,
+            longRunning = longRunning,
         )
         owned += model
         val factory = object : ViewModelProvider.Factory {
@@ -239,5 +253,60 @@ class WordsViewModelTest {
 
         assertEquals(AnkiOutcome.Many(3, null, VoiceProblem.NETWORK, 0), viewModel.ankiOutcomes.first())
         assertEquals(listOf(true, false, false), asked)
+    }
+
+    @Test
+    fun aFailedPackageExportDeletesTheDocument_andSaysSo() = runTest {
+        repository.record(lookedUp("猫"))
+        val deleted = mutableListOf<String>()
+        val viewModel = viewModel(
+            writePackage = { _, _, _ -> throw java.io.IOException("disk full") },
+            deleteDocument = { deleted += it },
+        )
+
+        viewModel.exportPackage("content://x/p")
+
+        assertEquals(AnkiOutcome.ExportFailed, viewModel.ankiOutcomes.first())
+        assertEquals(listOf("content://x/p"), deleted)
+    }
+
+    @Test
+    fun aPackageExportGoesOnAfterTheScreenIsLeft_andTellsItsResult() = runTest {
+        repository.record(lookedUp("猫"))
+        val scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val gate = CompletableDeferred<Unit>()
+        val deleted = mutableListOf<String>()
+        val reported = CompletableDeferred<AnkiOutcome>()
+        val viewModel = viewModel(
+            writePackage = { _, list, _ -> gate.await(); assertEquals(1, list.size); null },
+            deleteDocument = { deleted += it },
+            reportAway = { reported.complete(it) },
+            longRunning = scope,
+        )
+
+        viewModel.exportPackage("content://x/p")
+        store.clear()
+        gate.complete(Unit)
+
+        assertEquals(AnkiOutcome.Exported(1, packaged = true, audioProblem = null), reported.await())
+        assertEquals(emptyList<String>(), deleted)
+        scope.cancel()
+    }
+
+    @Test
+    fun aStoppedPackageExportDeletesTheDocument() = runTest {
+        repository.record(lookedUp("猫"))
+        val scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher(testScheduler))
+        val deleted = mutableListOf<String>()
+        val viewModel = viewModel(
+            writePackage = { _, _, _ -> awaitCancellation() },
+            deleteDocument = { deleted += it },
+            longRunning = scope,
+        )
+
+        viewModel.exportPackage("content://x/p")
+        scope.coroutineContext.job.cancelAndJoin()
+
+        assertEquals(listOf("content://x/p"), deleted)
     }
 }
