@@ -165,6 +165,22 @@ class DictionariesViewModelTest {
     }
 
     @Test
+    fun aCancelledDownloadLeavesNoRowAndIsOfferedAgain() = runTest {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
+        fun state() = viewModel.uiState.value as DictionariesUiState.Loaded
+        val jmdict = DictionaryCatalog.dictionaries.single { it.id == "jmdict-english" }
+
+        viewModel.download(jmdict)
+        // The scheduler names the dictionary of a cancelled download, as WorkManager's tag does.
+        scheduler.imports.value = listOf(ImportStatus.Failed("1", ImportError.CANCELLED, null, jmdict.id))
+
+        assertTrue(state().imports.isEmpty())
+        assertEquals(CatalogItem.State.AVAILABLE, state().catalog.single { it.dictionary == jmdict }.state)
+        viewModel.download(jmdict)
+        assertEquals(listOf(jmdict, jmdict), scheduler.downloads)
+    }
+
+    @Test
     fun retryingRequestsOnlyTheFailedDownloadsAndKeepsTheRunningOnesTracked() = runTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
         fun state(id: String) = (viewModel.uiState.value as DictionariesUiState.Loaded).catalog
@@ -277,6 +293,12 @@ private class FakeImportScheduler : DictionaryImportScheduler {
 
     override fun clearFailures() {
         imports.update { list -> list.filterNot { it is ImportStatus.Failed } }
+    }
+
+    override fun cancel(id: String) {
+        imports.update { list ->
+            list.map { if (it.id == id) ImportStatus.Failed(id, ImportError.CANCELLED, null, replaces = it.replaces) else it }
+        }
     }
 }
 

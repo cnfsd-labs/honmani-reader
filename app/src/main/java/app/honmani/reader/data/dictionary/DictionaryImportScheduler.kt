@@ -16,6 +16,9 @@ enum class ImportError {
     /** A download from the publisher had no content, nor had its fallback; the detail is the name. */
     INCOMPLETE_RELEASE,
 
+    /** The user cancelled it; never shown as a failure. */
+    CANCELLED,
+
     /** Downloading failed (no connection, server error); the detail says why. */
     DOWNLOAD_FAILED,
 
@@ -110,7 +113,10 @@ sealed interface ImportStatus {
         val dictionaryId: String? = null,
         val reason: FailureReason = FailureReason.OTHER,
         override val replaces: Long? = null,
-    ) : ImportStatus
+    ) : ImportStatus {
+        /** Cancelled by the user rather than failed: not shown, only offered again. */
+        val cancelled: Boolean get() = error == ImportError.CANCELLED
+    }
 }
 
 data class DownloadProgress(
@@ -131,7 +137,10 @@ interface DictionaryImportScheduler {
     /** Queues a download of [update] that replaces the installed version once imported. */
     fun update(update: DictionaryUpdate)
 
-    /** Imports that are queued, running or failed; successful imports are not included. */
+    /** Stops the queued or running import [id]; it ends as failed with [ImportError.CANCELLED]. */
+    fun cancel(id: String)
+
+    /** Imports that are queued, running, failed or cancelled; successful imports are not included. */
     val imports: Flow<List<ImportStatus>>
 
     /** Forgets failed imports, once the user has seen them. */

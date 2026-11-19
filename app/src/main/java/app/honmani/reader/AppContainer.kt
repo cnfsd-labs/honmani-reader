@@ -258,7 +258,7 @@ class AppContainer(context: Context) {
     val fontsDir = File(appContext.filesDir, "fonts")
 
     val fontStore: FontStore by lazy { FontStore(fontsDir, applicationScope, { url, destination, onProgress ->
-            dictionaryDownloader.download(url, destination, NetworkPurpose.FONT, onProgress)
+            dictionaryDownloader.download(url, destination, NetworkPurpose.FONT, onProgress = onProgress)
         })
     }
 

@@ -5,11 +5,13 @@ import app.honmani.reader.diagnostics.NetworkLog
 import app.honmani.reader.diagnostics.NetworkPurpose
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URISyntaxException
 import java.net.URL
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -39,29 +41,54 @@ class DictionaryDownloader(
     /**
      * Downloads [url] into [destination], reporting bytes received and the total (-1 if the
      * server does not say). Cancelling the coroutine stops the download.
+     *
+     * With a [partial] file (see [partialFile]) the bytes go there first and an interrupted
+     * download is kept: the next call asks only for the rest (`Range`, with `If-Range` so a
+     * changed file comes whole) and appends it when the server answers 206; a 200 starts over.
+     * The finished file is moved to [destination].
      */
     suspend fun download(
         url: String,
         destination: File,
         purpose: NetworkPurpose = NetworkPurpose.DICTIONARY,
+        partial: File? = null,
         onProgress: suspend (bytesDone: Long, bytesTotal: Long) -> Unit = { _, _ -> },
     ) = withContext(Dispatchers.IO) {
-        val connection = connect(url, purpose)
+        val target = partial ?: destination
+        val validatorFile = partial?.let(::validatorFileOf)
+        val validator = validatorFile?.takeIf { target.length() > 0 && it.isFile }
+            ?.let { runCatching { it.readText() }.getOrNull() }?.takeIf { it.isNotBlank() }
+        val offset = if (validator != null) target.length() else 0L
+        var connection = connect(url, purpose, validator?.let { Resume(offset, it) })
         try {
-            val total = connection.contentLengthLong
-            if (total > maxDownloadBytes) throw tooLarge()
-            var done = 0L
+            val status = connection.responseCode
+            var resumed = status == HTTP_PARTIAL && contentRangeStart(connection) == offset
+            if (validator != null && status != HttpURLConnection.HTTP_OK && !resumed) {
+                // 416, or a range that does not continue the file: start over.
+                connection.disconnect()
+                connection = connect(url, purpose)
+                resumed = false
+            }
+            val start = if (resumed) offset else 0L
+            if (validatorFile != null) {
+                val next = if (resumed) validator else validatorOf(connection)
+                if (next != null) validatorFile.writeText(next) else validatorFile.delete()
+            }
+            val length = connection.contentLengthLong
+            val total = if (length >= 0) start + length else -1L
+            if (total > maxDownloadBytes) throw tooLarge(partial)
+            var done = start
             var reported = -1L
             try {
                 connection.inputStream.use { input ->
-                    destination.outputStream().use { output ->
+                    FileOutputStream(target, resumed).use { output ->
                         val buffer = ByteArray(BUFFER_SIZE)
                         while (true) {
                             ensureActive()
                             val read = input.read(buffer)
                             if (read < 0) break
                             done += read
-                            if (done > maxDownloadBytes) throw tooLarge()
+                            if (done > maxDownloadBytes) throw tooLarge(partial)
                             output.write(buffer, 0, read)
                             // Report about every 1% (or every MB when the size is unknown).
                             val step = if (total > 0) total / 100 else 1L shl 20
@@ -82,13 +109,24 @@ class DictionaryDownloader(
                 )
             }
             if (total > 0 && done != total) {
+                // A shorter file is resumed next time; a longer one is wrong and goes.
+                if (done > total && partial != null) discardPartial(partial)
                 throw DownloadException("The download was incomplete ($done of $total bytes)", reason = FailureReason.OFFLINE)
+            }
+            if (partial != null) {
+                if (!partial.renameTo(destination)) {
+                    partial.copyTo(destination, overwrite = true)
+                }
+                discardPartial(partial)
             }
             onProgress(done, total)
         } finally {
             connection.disconnect()
         }
     }
+
+    /** Where an interrupted download stops and resumes from: the start, or [offset] if [validator] still matches. */
+    private class Resume(val offset: Long, val validator: String)
 
     /**
      * The text at [url], such as a dictionary's `index.json` for an update check; at most
@@ -122,10 +160,14 @@ class DictionaryDownloader(
     }
 
     /**
-     * Opens [url], following redirects by hand, and checks the answer is 200 OK; the caller
-     * disconnects.
+     * Opens [url], following redirects by hand, and checks the answer is 200 OK (or, when
+     * resuming, 206 or 416); the caller disconnects.
      */
-    private fun connect(url: String, purpose: NetworkPurpose = NetworkPurpose.DICTIONARY): HttpURLConnection {
+    private fun connect(
+        url: String,
+        purpose: NetworkPurpose = NetworkPurpose.DICTIONARY,
+        resume: Resume? = null,
+    ): HttpURLConnection {
         val first = parse(url)
         var current = first
         var redirects = 0
@@ -140,6 +182,10 @@ class DictionaryDownloader(
                     readTimeout = readTimeoutMs
                     instanceFollowRedirects = false
                     setRequestProperty("User-Agent", USER_AGENT)
+                    if (resume != null) {
+                        setRequestProperty("Range", "bytes=${resume.offset}-")
+                        setRequestProperty("If-Range", resume.validator)
+                    }
                 }
             } catch (e: IOException) {
                 throw DownloadException("Could not connect: ${e.message}", e, FailureReason.OFFLINE)
@@ -154,6 +200,7 @@ class DictionaryDownloader(
             NetworkLog.shared.answered(purpose, current.toString(), status, connection.contentLengthLong)
             when {
                 status == HttpURLConnection.HTTP_OK -> return connection
+                resume != null && (status == HTTP_PARTIAL || status == HTTP_RANGE_NOT_SATISFIABLE) -> return connection
                 status in REDIRECTS -> {
                     val location = connection.getHeaderField("Location")
                     connection.disconnect()
@@ -192,11 +239,44 @@ class DictionaryDownloader(
 
     private fun URI.toURL(): URL = URL(toString())
 
-    private fun tooLarge() = DownloadException(
-        "The file is larger than ${(maxDownloadBytes + MB - 1) / MB} MB, which is more than Honmani will download.",
-    )
+    private fun tooLarge(partial: File? = null): DownloadException {
+        if (partial != null) discardPartial(partial)
+        return DownloadException(
+            "The file is larger than ${(maxDownloadBytes + MB - 1) / MB} MB, which is more than Honmani will download.",
+        )
+    }
+
+    /** Where the range of a 206 answer starts (`Content-Range: bytes 100-299/300`), or -1. */
+    private fun contentRangeStart(connection: HttpURLConnection): Long =
+        connection.getHeaderField("Content-Range")?.trim()
+            ?.removePrefix("bytes")?.trim()?.substringBefore('-')?.toLongOrNull() ?: -1L
+
+    /** What tells a later request whether the file is still the same: a strong ETag, else Last-Modified. */
+    private fun validatorOf(connection: HttpURLConnection): String? {
+        val etag = connection.getHeaderField("ETag")?.trim()
+        if (!etag.isNullOrEmpty() && !etag.startsWith("W/")) return etag
+        return connection.getHeaderField("Last-Modified")?.trim()?.takeIf { it.isNotEmpty() }
+    }
 
     companion object {
+        /** The file an interrupted download of [url] is kept in until it resumes, in [directory]. */
+        fun partialFile(directory: File, url: String): File {
+            val hash = MessageDigest.getInstance("SHA-256").digest(url.toByteArray())
+                .take(12).joinToString("") { "%02x".format(it) }
+            return File(directory, "dictionary-download-$hash.part")
+        }
+
+        /** Deletes an interrupted download and what it was resumed against. */
+        fun discardPartial(partial: File) {
+            partial.delete()
+            validatorFileOf(partial).delete()
+        }
+
+        private fun validatorFileOf(partial: File) = File(partial.path + ".validator")
+
+        private const val HTTP_PARTIAL = 206
+        private const val HTTP_RANGE_NOT_SATISFIABLE = 416
+
         /** The biggest dictionary is some 100 MB; a font or the example sentences are smaller. */
         const val MAX_DOWNLOAD_BYTES = 500L * 1024 * 1024
 

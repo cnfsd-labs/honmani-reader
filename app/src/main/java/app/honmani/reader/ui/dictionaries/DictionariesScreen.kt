@@ -90,6 +90,7 @@ fun DictionariesScreen(
         onImport = { withNotifications { picker.launch(DICTIONARY_MIME_TYPES) } },
         onDownload = { dictionary -> withNotifications { viewModel.download(dictionary) } },
         onDismissFailures = viewModel::dismissFailures,
+        onCancel = viewModel::cancel,
         onSetEnabled = viewModel::setEnabled,
         onDelete = viewModel::delete,
         onMove = viewModel::move,
@@ -105,6 +106,7 @@ private fun DictionariesContent(
     onImport: () -> Unit,
     onDownload: (CatalogDictionary) -> Unit,
     onDismissFailures: () -> Unit,
+    onCancel: (id: String) -> Unit,
     onSetEnabled: (id: Long, enabled: Boolean) -> Unit,
     onDelete: (id: Long) -> Unit,
     onMove: (id: Long, up: Boolean) -> Unit,
@@ -145,7 +147,7 @@ private fun DictionariesContent(
                 contentPadding = PaddingValues(bottom = 88.dp),
             ) {
                 items(uiState.imports, key = { "import-${it.id}" }) { status ->
-                    ImportStatusCard(status, onDismissFailures)
+                    ImportStatusCard(status, onDismissFailures, onCancel)
                 }
                 if (uiState.imports.any { it !is ImportStatus.Failed }) {
                     // Some phones (OnePlus, OPPO) freeze apps in the background despite the
@@ -317,7 +319,7 @@ private fun catalogDescription(dictionary: CatalogDictionary): Int? = when (dict
 }
 
 @Composable
-private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit) {
+private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit, onCancel: (id: String) -> Unit) {
     val failed = status is ImportStatus.Failed
     Card(
         modifier = Modifier
@@ -337,6 +339,7 @@ private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit
                 is ImportStatus.Queued -> {
                     Text(stringResource(R.string.import_queued))
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    CancelButton { onCancel(status.id) }
                 }
                 is ImportStatus.Running -> {
                     val progress = status.progress
@@ -353,6 +356,7 @@ private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                    CancelButton { onCancel(status.id) }
                 }
                 is ImportStatus.Failed -> {
                     Text(importErrorMessage(status))
@@ -363,6 +367,16 @@ private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit
                     }
                 }
             }
+        }
+    }
+}
+
+/** Stops a queued or running import; a download stopped this way starts from zero next time. */
+@Composable
+private fun CancelButton(onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        TextButton(onClick = onClick) {
+            Text(stringResource(R.string.action_cancel))
         }
     }
 }
@@ -401,6 +415,8 @@ private fun importErrorMessage(failure: ImportStatus.Failed): String {
         // The exception's text is for the log, not a sentence for the reader.
         ImportError.DOWNLOAD_FAILED -> stringResource(failure.reason.messageRes())
         ImportError.FAILED -> stringResource(R.string.import_failed)
+        // Not shown: cancelled imports are filtered out of the list.
+        ImportError.CANCELLED -> stringResource(R.string.action_cancel)
     }
 }
 
@@ -545,6 +561,7 @@ private fun DictionariesContentPreview() {
             onImport = {},
             onDownload = {},
             onDismissFailures = {},
+            onCancel = {},
             onSetEnabled = { _, _ -> },
             onDelete = {},
             onMove = { _, _ -> },

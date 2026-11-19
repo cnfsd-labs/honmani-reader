@@ -99,7 +99,7 @@ class DictionariesViewModel(
                     (id in updateRequests && imports.none { it is ImportStatus.Failed && it.replaces == id })
             DictionariesUiState.Loaded(
                 dictionaries = dictionaries,
-                imports = imports,
+                imports = imports.filterNot { it is ImportStatus.Failed && it.cancelled },
                 deleting = deleting,
                 catalog = catalog,
                 updates = updates,
@@ -131,6 +131,9 @@ class DictionariesViewModel(
         requestedUpdates.update { it + update.dictionaryId }
         importScheduler.update(update)
     }
+
+    /** Stops the queued or running import [id]; its dictionary or update is offered again. */
+    fun cancel(id: String) = importScheduler.cancel(id)
 
     fun checkForUpdates() = updateChecker.start(all = true)
 

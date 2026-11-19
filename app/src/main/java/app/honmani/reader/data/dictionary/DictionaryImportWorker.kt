@@ -1,5 +1,6 @@
 package app.honmani.reader.data.dictionary
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -11,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.net.toUri
 import androidx.work.CoroutineWorker
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -24,6 +26,7 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -33,6 +36,9 @@ class DictionaryImportWorker(
     parameters: WorkerParameters,
 ) : CoroutineWorker(context, parameters) {
 
+    // stopReason is WorkManager's own record, set on every Android version; only the system's
+    // reasons need API 31, and a cancel from the app is not one of them.
+    @SuppressLint("NewApi")
     override suspend fun doWork(): Result {
         val uri = inputData.getString(KEY_URI)?.toUri()
         val url = inputData.getString(KEY_URL)
@@ -41,9 +47,10 @@ class DictionaryImportWorker(
         val container = (applicationContext as HonmaniApplication).container
         val copy = File(applicationContext.cacheDir, "dictionary-import-$id.zip")
         val throttle = ProgressThrottle()
-        // True when the system stopped the worker and WorkManager will run it again: the retry
-        // needs the picked document's access, so it is only released at a final outcome.
-        var willRetry = false
+        // Interrupted downloads of this import, kept for a resume unless the user cancels.
+        val partials = listOfNotNull(url, inputData.getString(KEY_FALLBACK_URL))
+            .map { DictionaryDownloader.partialFile(applicationContext.cacheDir, it) }
+        var ending = Ending.FINISHED
         try {
             runInForeground(null)
             val importer = container.dictionaryImporter
@@ -61,7 +68,8 @@ class DictionaryImportWorker(
                 val name = inputData.getString(KEY_NAME) ?: url.substringAfterLast('/')
                 // The publisher's latest release is sometimes incomplete: then the pinned one.
                 withReleaseFallback(name, url, inputData.getString(KEY_FALLBACK_URL)) { from ->
-                    container.dictionaryDownloader.download(from, copy) { done, total ->
+                    val partial = DictionaryDownloader.partialFile(applicationContext.cacheDir, from)
+                    container.dictionaryDownloader.download(from, copy, partial = partial) { done, total ->
                         val download = DownloadProgress(name, done, total)
                         setProgress(download.toData())
                         val percent = if (total > 0) (done * 100 / total).toInt() else -1
@@ -81,9 +89,9 @@ class DictionaryImportWorker(
             }
             return Result.success()
         } catch (e: CancellationException) {
-            // Stopped by the system (constraints, timeout): WorkManager runs it again. Nothing in
-            // the app cancels imports.
-            willRetry = true
+            // Cancelled by the user (the row's or the notification's Cancel): no retry. Otherwise
+            // stopped by the system (constraints, timeout): WorkManager runs it again.
+            ending = if (stopReason == WorkInfo.STOP_REASON_CANCELLED_BY_APP) Ending.CANCELLED else Ending.STOPPED
             throw e
         } catch (e: DownloadException) {
             return failure(ImportError.DOWNLOAD_FAILED, e.message, e.reason)
@@ -107,10 +115,11 @@ class DictionaryImportWorker(
             // Typically a full disk.
             return failure(ImportError.FAILED, e.message, FailureReason.ofStorage(e))
         } finally {
-            copy.delete()
-            if (uri != null && !willRetry) {
-                runCatching {
-                    resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            cleanUp(ending, copy, partials) {
+                if (uri != null) {
+                    runCatching {
+                        resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
                 }
             }
         }
@@ -155,6 +164,11 @@ class DictionaryImportWorker(
             .setProgress(max, value, max == 0)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.action_cancel),
+                WorkManager.getInstance(context).createCancelPendingIntent(id),
+            )
             .build()
         // One notification per import; imports waiting for another one show "Preparing".
         val notificationId = id.hashCode()
@@ -168,7 +182,30 @@ class DictionaryImportWorker(
     private fun failure(error: ImportError, detail: String?, reason: FailureReason = FailureReason.OTHER) =
         Result.failure(workDataOf(KEY_ERROR to error.name, KEY_DETAIL to detail, KEY_REASON to reason.name))
 
+    /** How a run ended, for [cleanUp]. */
+    internal enum class Ending {
+        /** Done, successfully or not: nothing runs it again. */
+        FINISHED,
+
+        /** Stopped by the system: WorkManager runs it again. */
+        STOPPED,
+
+        /** Cancelled by the user. */
+        CANCELLED,
+    }
+
     companion object {
+        /**
+         * Tidies up after a run: the copy always goes; the picked document's access is released
+         * ([releaseAccess]) unless WorkManager retries, which needs it; interrupted downloads
+         * ([partials]) stay for a resume unless the user cancelled.
+         */
+        internal fun cleanUp(ending: Ending, copy: File, partials: List<File>, releaseAccess: () -> Unit) {
+            copy.delete()
+            if (ending != Ending.STOPPED) releaseAccess()
+            if (ending == Ending.CANCELLED) partials.forEach(DictionaryDownloader::discardPartial)
+        }
+
         private const val KEY_URI = "uri"
         private const val KEY_URL = "url"
         private const val KEY_FALLBACK_URL = "fallbackUrl"
@@ -260,6 +297,11 @@ class DictionaryImportWorker(
 class WorkManagerDictionaryImportScheduler(private val context: Context) : DictionaryImportScheduler {
     private val workManager = WorkManager.getInstance(context)
 
+    override fun cancel(id: String) {
+        val uuid = runCatching { UUID.fromString(id) }.getOrNull() ?: return
+        workManager.cancelWorkById(uuid)
+    }
+
     override fun enqueue(uri: String) {
         // The picker's grant ends with this process; keep access until the worker is done.
         runCatching {
@@ -294,7 +336,15 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
                             ?.removePrefix(DICTIONARY_TAG)
                         ImportStatus.Failed(id, error, detail, dictionaryId, DictionaryImportWorker.reasonOf(info.outputData), replaces)
                     }
-                    WorkInfo.State.SUCCEEDED, WorkInfo.State.CANCELLED -> null
+                    // Kept (not shown) so a cancelled catalog download is offered again.
+                    WorkInfo.State.CANCELLED -> ImportStatus.Failed(
+                        id,
+                        ImportError.CANCELLED,
+                        null,
+                        info.tags.firstOrNull { it.startsWith(DICTIONARY_TAG) }?.removePrefix(DICTIONARY_TAG),
+                        replaces = replaces,
+                    )
+                    WorkInfo.State.SUCCEEDED -> null
                 }
             }
         }
@@ -305,7 +355,8 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
             .addTag(TAG)
             .addTag(DICTIONARY_TAG + dictionary.id)
             .build()
-        workManager.enqueue(request)
+        // A second tap while it is on its way changes nothing.
+        workManager.enqueueUniqueWork(DICTIONARY_TAG + dictionary.id, ExistingWorkPolicy.KEEP, request)
     }
 
     override fun update(update: DictionaryUpdate) {
@@ -314,14 +365,14 @@ class WorkManagerDictionaryImportScheduler(private val context: Context) : Dicti
             .addTag(TAG)
             .addTag(UPDATE_TAG + update.dictionaryId)
             .build()
-        workManager.enqueue(request)
+        workManager.enqueueUniqueWork(UPDATE_TAG + update.dictionaryId, ExistingWorkPolicy.KEEP, request)
     }
 
     override fun clearFailures() {
         workManager.pruneWork()
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "dictionary-import"
 
         /** Prefix of the tag that names the catalog dictionary a download is for. */
