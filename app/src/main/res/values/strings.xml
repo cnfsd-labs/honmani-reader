@@ -200,7 +200,7 @@
     <string name="aozora_search">Search by title or author</string>
     <string name="aozora_include_old">Include old spelling (旧仮名・旧字)</string>
     <string name="aozora_count">%1$,d works · list of %2$s</string>
-    <string name="aozora_no_results">No work matches.</string>
+    <string name="aozora_no_results">No works match.</string>
     <string name="aozora_old_kana">旧仮名</string>
     <string name="aozora_old_kana_details">Old kana usage (旧仮名遣い)</string>
     <string name="aozora_old_kanji_details">Old kanji forms (旧字体)</string>
@@ -538,7 +538,7 @@
     <string name="audiobook_problem_book">only EPUB books can follow an audiobook</string>
     <string name="audiobook_doubtful">Only %1$d of %2$d subtitles were found in this book. Are the files for this book?</string>
     <string name="book_search_hint">Search in this book</string>
-    <string name="book_search_none">Nothing found.</string>
+    <string name="book_search_none">No passages match.</string>
     <string name="book_search_unavailable">This book can\'t be searched.</string>
     <string name="book_search_more">Showing the first %1$d matches. Type more to narrow it down.</string>
     <string name="book_search_position">%1$d%%</string>

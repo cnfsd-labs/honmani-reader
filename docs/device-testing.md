@@ -403,7 +403,7 @@ adb shell bmgr enable false
 - Internet back, Load the list: about 17,000 works ("17,xxx works · list of <date>"), Network activity lists
   one request to cnfsd-labs.github.io. Close the screen and open it again offline: the list is still there.
 - Search 吾輩: 吾輩は猫である. Search 夏目 (author) and なつめ / ナツメ (readings, hiragana or katakana alike):
-  Natsume's works. Two words (夏目 こころ) both must match. A search with no hit: "No work matches".
+  Natsume's works. Two words (夏目 こころ) both must match. A search with no hit: "No works match".
 - The old-spelling switch: with it off, a work in 旧仮名 (e.g. こゝろ) is missing and works marked 旧仮名
   never show; switch on: they appear with a 旧仮名 label.
 - Tap a work -> details (author, 旧仮名/旧字 notes, date) -> **Add to library**: progress shows, the
