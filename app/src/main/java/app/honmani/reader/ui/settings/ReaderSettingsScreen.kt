@@ -47,6 +47,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.Font
@@ -149,16 +150,23 @@ private fun ReaderSettingsContent(
                 onChange(settings.copy(bookGothic = it))
             }
         }
-        Section(stringResource(R.string.reader_settings_text_size, settings.fontSize)) {
+        val textSizeTitle = stringResource(R.string.reader_settings_text_size, settings.fontSize)
+        Section(textSizeTitle) {
             Slider(
+                modifier = Modifier.semantics { contentDescription = textSizeTitle },
                 value = settings.fontSize.toFloat(),
                 onValueChange = { onChange(settings.copy(fontSize = it.roundToInt())) },
                 valueRange = ReaderSettings.FONT_SIZES.first.toFloat()..ReaderSettings.FONT_SIZES.last.toFloat(),
                 steps = (ReaderSettings.FONT_SIZES.last - ReaderSettings.FONT_SIZES.first) / 2 - 1,
             )
         }
-        Section(stringResource(R.string.reader_settings_line_spacing, String.format(LocalConfiguration.current.locales[0], "%.1f", settings.lineHeight))) {
+        val lineSpacingTitle = stringResource(
+            R.string.reader_settings_line_spacing,
+            String.format(LocalConfiguration.current.locales[0], "%.1f", settings.lineHeight),
+        )
+        Section(lineSpacingTitle) {
             Slider(
+                modifier = Modifier.semantics { contentDescription = lineSpacingTitle },
                 value = settings.lineHeight,
                 onValueChange = { onChange(settings.copy(lineHeight = (it * 10).roundToInt() / 10f)) },
                 valueRange = ReaderSettings.MIN_LINE_HEIGHT..ReaderSettings.MAX_LINE_HEIGHT,

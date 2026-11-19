@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -222,22 +223,28 @@ private fun DeckPicker(
     var decks by remember { mutableStateOf<List<String>?>(null) }
     ListItem(
         headlineContent = { Text(stringResource(R.string.anki_deck)) },
-        supportingContent = { Text(stringResource(R.string.anki_deck_details)) },
-        trailingContent = {
-            Box {
-                OutlinedButton(onClick = { onOpen { names -> decks = names } }) { Text(deck) }
-                DropdownMenu(expanded = decks != null, onDismissRequest = { decks = null }) {
-                    val others = (decks.orEmpty() + deck).filter { it != AnkiCard.DECK }.distinct().sorted()
-                    for (name in listOf(AnkiCard.DECK) + others) {
-                        DropdownMenuItem(
-                            text = {
-                                Text(if (name == AnkiCard.DECK) stringResource(R.string.anki_deck_honmani, name) else name)
-                            },
-                            onClick = {
-                                onSelect(name)
-                                decks = null
-                            },
-                        )
+        // The deck sits under the text: a long name ("Japanese::Core2k::Vocab") beside it squeezes
+        // the text at large font sizes.
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.anki_deck_details))
+                Box(modifier = Modifier.padding(top = 8.dp)) {
+                    OutlinedButton(onClick = { onOpen { names -> decks = names } }) {
+                        Text(deck, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    DropdownMenu(expanded = decks != null, onDismissRequest = { decks = null }) {
+                        val others = (decks.orEmpty() + deck).filter { it != AnkiCard.DECK }.distinct().sorted()
+                        for (name in listOf(AnkiCard.DECK) + others) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(if (name == AnkiCard.DECK) stringResource(R.string.anki_deck_honmani, name) else name)
+                                },
+                                onClick = {
+                                    onSelect(name)
+                                    decks = null
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -270,7 +277,7 @@ private fun CardStylePicker(selected: CardStyle, onSelect: (CardStyle) -> Unit) 
                             CardStyle.SENTENCE -> R.string.card_style_sentence
                             CardStyle.CUSTOM -> R.string.card_style_custom
                         }
-                        Text(stringResource(label), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(label), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     },
                 )
             }
