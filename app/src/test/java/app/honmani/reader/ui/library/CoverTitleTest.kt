@@ -43,6 +43,17 @@ class CoverTitleTest {
     }
 
     @Test
+    fun charactersOutsideTheBmpAndTheirMarksStayWhole() {
+        // 𠮟 is two UTF-16 units; 葛 + VS17 and か + combining dakuten are one character each.
+        val title = "\uD842\uDF9F\u845B\uDB40\uDD00\u304B\u3099".repeat(4)
+        val columns = CoverTitle.columns(title, maxColumns = 3)
+        val glyphs = columns.flatMap(CoverTitle::glyphs)
+        assertEquals(12, glyphs.size)
+        assertEquals(listOf("\uD842\uDF9F", "\u845B\uDB40\uDD00", "\u304B\u3099"), glyphs.take(3))
+        assertEquals(title, columns.joinToString(""))
+    }
+
+    @Test
     fun theSameTitleKeepsItsColour() {
         assertEquals(CoverTitle.bindingIndex("こころ"), CoverTitle.bindingIndex("こころ"))
     }

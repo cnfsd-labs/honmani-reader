@@ -69,7 +69,7 @@ internal fun PlaceholderCover(title: String, modifier: Modifier = Modifier) {
                     Row(horizontalArrangement = Arrangement.spacedBy(glyph * 0.12f)) {
                         for (column in columns.asReversed()) {
                             Text(
-                                text = column.toList().joinToString("\n"),
+                                text = CoverTitle.glyphs(column).joinToString("\n"),
                                 style = slipTextStyle(glyph),
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.width(glyph * 1.05f),
@@ -186,14 +186,41 @@ internal object CoverTitle {
      * the title is longer than [MAX_PER_COLUMN] per column).
      */
     fun columns(title: String, maxColumns: Int): List<String> {
-        val text = title.filterNot { it.isWhitespace() }.map { VERTICAL_FORMS[it] ?: it }.joinToString("")
+        val text = glyphs(title.filterNot { it.isWhitespace() }.map { VERTICAL_FORMS[it] ?: it }.joinToString(""))
         if (text.isEmpty()) return listOf("")
-        val count = ((text.length + SHORT_COLUMN - 1) / SHORT_COLUMN).coerceIn(1, maxColumns)
-        val perColumn = ((text.length + count - 1) / count).coerceAtMost(MAX_PER_COLUMN)
+        val count = ((text.size + SHORT_COLUMN - 1) / SHORT_COLUMN).coerceIn(1, maxColumns)
+        val perColumn = ((text.size + count - 1) / count).coerceAtMost(MAX_PER_COLUMN)
         val columns = text.chunked(perColumn).take(count)
-        val shown = columns.sumOf { it.length }
-        return if (shown < text.length) columns.dropLast(1) + (columns.last().dropLast(1) + "︙") else columns
+        val shown = columns.sumOf { it.size }
+        val kept = if (shown < text.size) columns.dropLast(1) + listOf(columns.last().dropLast(1) + "︙") else columns
+        return kept.map { it.joinToString("") }
     }
+
+    /**
+     * The characters as they are set, one per line in a column: a character outside the BMP (𠮟)
+     * stays whole, and combining marks, variation selectors and joined characters stay with
+     * the one before.
+     */
+    fun glyphs(text: String): List<String> {
+        val glyphs = mutableListOf<StringBuilder>()
+        var joinNext = false
+        var i = 0
+        while (i < text.length) {
+            val codePoint = text.codePointAt(i)
+            val attaches = glyphs.isNotEmpty() && (joinNext || attachesToPrevious(codePoint))
+            if (attaches) glyphs.last().appendCodePoint(codePoint) else glyphs.add(StringBuilder().appendCodePoint(codePoint))
+            joinNext = codePoint == ZERO_WIDTH_JOINER
+            i += Character.charCount(codePoint)
+        }
+        return glyphs.map { it.toString() }
+    }
+
+    private fun attachesToPrevious(codePoint: Int): Boolean = when (Character.getType(codePoint)) {
+        Character.NON_SPACING_MARK.toInt(), Character.ENCLOSING_MARK.toInt(), Character.COMBINING_SPACING_MARK.toInt() -> true
+        else -> codePoint in 0xFE00..0xFE0F || codePoint in 0xE0100..0xE01EF || codePoint == ZERO_WIDTH_JOINER
+    }
+
+    private const val ZERO_WIDTH_JOINER = 0x200D
 
     /** Up to this many characters stay in one column. */
     private const val SHORT_COLUMN = 8
