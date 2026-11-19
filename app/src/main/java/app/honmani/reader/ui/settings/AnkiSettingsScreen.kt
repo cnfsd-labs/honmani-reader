@@ -1,6 +1,7 @@
 package app.honmani.reader.ui.settings
 
 import app.honmani.reader.diagnostics.logWarning
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
@@ -118,10 +119,14 @@ private fun AnkiSettingsContent() {
     val knownFromAnki = rememberKnownFromAnki()
     val scope = rememberCoroutineScope()
 
+    fun showListFailed() {
+        Toast.makeText(context, resources.getString(R.string.anki_list_failed), Toast.LENGTH_LONG).show()
+    }
+
     fun openCustomNoteType() {
         anki.whenReady {
             scope.launch {
-                customTypes = withContext(Dispatchers.IO) {
+                val types = withContext(Dispatchers.IO) {
                     try {
                         container.ankiDroid.noteTypes()
                     } catch (e: kotlin.coroutines.cancellation.CancellationException) {
@@ -129,9 +134,11 @@ private fun AnkiSettingsContent() {
                     } catch (e: Exception) {
                         logWarning("Honmani.anki", "Could not list the AnkiDroid note types", e)
                         // Another app's provider: its problems must not close Honmani.
-                        emptyList()
+                        null
                     }
                 }
+                // A collection always has note types: none means AnkiDroid gave no answer.
+                if (types.isNullOrEmpty()) showListFailed() else customTypes = types
             }
         }
     }
@@ -157,10 +164,11 @@ private fun AnkiSettingsContent() {
                             } catch (e: Exception) {
                                 logWarning("Honmani.anki", "Could not list the AnkiDroid decks", e)
                                 // Another app's provider: its problems must not close Honmani.
-                                emptyList()
+                                null
                             }
                         }
-                        show(names)
+                        // A collection always has a deck: none means AnkiDroid gave no answer.
+                        if (names.isNullOrEmpty()) showListFailed() else show(names)
                     }
                 }
             },

@@ -13,12 +13,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.anki.AnkiCheck
@@ -56,14 +58,22 @@ fun rememberAnkiAccess(): AnkiAccess {
     val resources = LocalResources.current
     val anki = remember { (context.applicationContext as HonmaniApplication).container.ankiDroid }
     val pending = remember { arrayOfNulls<() -> Unit>(1) }
+    // Saved, like the launcher's result, across a recreation while the dialog is open.
+    var rationaleBefore by rememberSaveable { mutableStateOf(false) }
     val activity = LocalActivity.current
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         val action = pending[0]
         pending[0] = null
+        val devicePreferences = context.getSharedPreferences(AppContainer.DEVICE_SETTINGS, Context.MODE_PRIVATE)
+        val rationaleAfter = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(activity, AnkiDroid.PERMISSION)
+        val refusedBefore = devicePreferences.getBoolean(KEY_REFUSED_WITHOUT_RATIONALE, false)
+        if (!granted && activity != null) {
+            devicePreferences.edit().putBoolean(KEY_REFUSED_WITHOUT_RATIONALE, !rationaleAfter).apply()
+        }
         when {
-            granted -> action?.invoke()
-            // "Don't ask again": Android shows no dialog any more, only the app's settings can allow it.
-            activity != null && !ActivityCompat.shouldShowRequestPermissionRationale(activity, AnkiDroid.PERMISSION) -> {
+            // The screen was recreated while the dialog was open: the tapped action is gone.
+            granted -> action?.invoke() ?: toast(context, resources.getString(R.string.anki_permission_granted_tap_again))
+            activity != null && deniedForGood(rationaleBefore, rationaleAfter, refusedBefore) -> {
                 toast(context, resources.getString(R.string.anki_no_permission_settings))
                 openAppSettings(context)
             }
@@ -73,10 +83,26 @@ fun rememberAnkiAccess(): AnkiAccess {
     return remember(launcher) {
         AnkiAccess(context, anki) { onGranted ->
             pending[0] = onGranted
+            rationaleBefore = activity != null && ActivityCompat.shouldShowRequestPermissionRationale(activity, AnkiDroid.PERMISSION)
             launcher.launch(AnkiDroid.PERMISSION)
         }
     }
 }
+
+/** Device preference: the last refusal left Android without a rationale to show. */
+private const val KEY_REFUSED_WITHOUT_RATIONALE = "anki_permission_refused_without_rationale"
+
+/**
+ * Whether a refused permission request means Android shows no dialog any more ("Don't ask again",
+ * or a second Deny on Android 11+), so only the app's settings can allow it. Android gives no
+ * rationale both then and when the dialog was only dismissed (Back, outside tap) before any Deny:
+ * - a rationale now: the reader denied once, the dialog still comes next time;
+ * - a rationale before but none now: this refusal was the final one;
+ * - none before or now: final only if the previous refusal also ended without one (a first
+ *   dismissal doesn't send the reader to the settings; a refusal with no dialog shown does).
+ */
+internal fun deniedForGood(rationaleBefore: Boolean, rationaleAfter: Boolean, refusedWithoutRationaleBefore: Boolean): Boolean =
+    !rationaleAfter && (rationaleBefore || refusedWithoutRationaleBefore)
 
 /**
  * Whether Add-to-Anki shows: the reader's choice in the settings, or until they chose, whether

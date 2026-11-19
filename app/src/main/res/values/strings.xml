@@ -670,6 +670,8 @@
     <string name="anki_not_installed">Adding cards needs AnkiDroid. Install it from Google Play, open it once, then try again.</string>
     <string name="anki_no_permission">Honmani needs permission to add cards to AnkiDroid.</string>
     <string name="anki_no_permission_settings">Honmani needs permission to add cards to AnkiDroid. Allow it under Permissions in Honmani\'s app settings.</string>
+    <string name="anki_permission_granted_tap_again">Allowed. Tap again to continue.</string>
+    <string name="anki_list_failed">AnkiDroid didn\'t answer. Open it once, then try again.</string>
     <string name="anki_refused">AnkiDroid didn\'t take the card. Open AnkiDroid once (so it has a collection), then try again.</string>
     <string name="action_check_against_anki">Check against Anki</string>
     <string name="anki_check_nothing">The Anki marks match AnkiDroid.</string>

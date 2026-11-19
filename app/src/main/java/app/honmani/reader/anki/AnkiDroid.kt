@@ -9,6 +9,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Process
 import androidx.core.content.FileProvider
+import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 
 /** A note as AnkiDroid stores it: its [fields] are in the note type's order, as raw HTML or text. */
@@ -234,12 +235,18 @@ class AnkiDroid(context: Context) : AnkiApi {
         }
         val note = resolver.insert(NOTES, values) ?: return null
         val cards = Uri.withAppendedPath(note, "cards")
-        resolver.query(cards, null, null, null, null)?.use { cursor ->
-            while (cursor.moveToNext()) {
-                val ord = cursor.string(CARD_ORD) ?: continue
-                val deckValues = ContentValues().apply { put(DECK_ID, deck) }
-                resolver.update(Uri.withAppendedPath(cards, ord), deckValues, null, null)
+        try {
+            resolver.query(cards, null, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    val ord = cursor.string(CARD_ORD) ?: continue
+                    val deckValues = ContentValues().apply { put(DECK_ID, deck) }
+                    resolver.update(Uri.withAppendedPath(cards, ord), deckValues, null, null)
+                }
             }
+        } catch (e: RuntimeException) {
+            // The note exists now: report it as added (cards in another deck), or later taps
+            // would say "already in Anki" for a card reported as failed.
+            logWarning("Honmani.anki", "Could not move the new cards to their deck", e)
         }
         return note.lastPathSegment?.toLongOrNull()
     }
