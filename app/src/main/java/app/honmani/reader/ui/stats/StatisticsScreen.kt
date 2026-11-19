@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
@@ -59,6 +60,8 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.R
@@ -85,6 +88,7 @@ import kotlin.math.roundToInt
 @Composable
 fun StatisticsContent(
     modifier: Modifier = Modifier,
+    onOpenLibrary: () -> Unit = {},
     viewModel: StatisticsViewModel = viewModel(factory = StatisticsViewModel.Factory),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -147,6 +151,7 @@ fun StatisticsContent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Button(onClick = onOpenLibrary) { Text(stringResource(R.string.stats_open_library)) }
             }
             Headline(summary, onInfo = { explaining = true })
             Tiles(current)
@@ -288,7 +293,7 @@ private fun Headline(summary: PeriodSummary, onInfo: () -> Unit) {
     }
 }
 
-/** "Export": two equal cards, reading per day as a CSV file and the Refold export. */
+/** "Export": two equal cards, reading per day as a spreadsheet file and the Refold export. */
 @Composable
 private fun ExportSection(onCsv: () -> Unit, onRefold: () -> Unit) {
     Text(
@@ -297,13 +302,25 @@ private fun ExportSection(onCsv: () -> Unit, onRefold: () -> Unit) {
         modifier = Modifier.padding(top = 8.dp),
     )
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
-        ExportCard(R.drawable.ic_table, stringResource(R.string.csv_stats_export_card), onCsv, Modifier.weight(1f).fillMaxHeight())
-        ExportCard(R.drawable.ic_refold, stringResource(R.string.refold_export_card), onRefold, Modifier.weight(1f).fillMaxHeight())
+        ExportCard(
+            R.drawable.ic_table,
+            stringResource(R.string.csv_stats_export_card),
+            stringResource(R.string.stats_export_csv_note),
+            onCsv,
+            Modifier.weight(1f).fillMaxHeight(),
+        )
+        ExportCard(
+            R.drawable.ic_refold,
+            stringResource(R.string.refold_export_card),
+            stringResource(R.string.stats_export_refold_note),
+            onRefold,
+            Modifier.weight(1f).fillMaxHeight(),
+        )
     }
 }
 
 @Composable
-private fun ExportCard(icon: Int, title: String, onClick: () -> Unit, modifier: Modifier) {
+private fun ExportCard(icon: Int, title: String, note: String, onClick: () -> Unit, modifier: Modifier) {
     Card(
         onClick = onClick,
         modifier = modifier,
@@ -313,7 +330,7 @@ private fun ExportCard(icon: Int, title: String, onClick: () -> Unit, modifier: 
             Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
-                stringResource(R.string.stats_export_csv_note),
+                note,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -407,11 +424,13 @@ internal fun StatTile(label: String, value: String, modifier: Modifier = Modifie
                 style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            // One line that shrinks at a large font rather than cutting the number.
+            val valueStyle = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge
             Text(
                 value,
-                style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                style = valueStyle,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = valueStyle.fontSize),
             )
             if (detail != null && !compact) {
                 Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

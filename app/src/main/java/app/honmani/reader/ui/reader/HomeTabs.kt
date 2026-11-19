@@ -189,7 +189,12 @@ internal fun HomeTabs(
                             library.open(id)
                         },
                     )
-                    HomeTab.PROGRESS -> ProgressTab(bottomBar = tabBar, onOpenBook = library::open, pageCycle = progressTaps)
+                    HomeTab.PROGRESS -> ProgressTab(
+                        bottomBar = tabBar,
+                        onOpenBook = library::open,
+                        pageCycle = progressTaps,
+                        onOpenLibrary = { tab = HomeTab.LIBRARY },
+                    )
                     HomeTab.SETTINGS -> SettingsScreen(
                         bottomBar = tabBar,
                         showingDictionaries = overlays.dictionariesShown,

@@ -722,7 +722,7 @@ private fun SpeakerButton(
     TextButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = spoken }) {
         Icon(painterResource(R.drawable.ic_listen), contentDescription = null, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(8.dp))
-        Text(stringResource(label), maxLines = 1)
+        Text(stringResource(label), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 
@@ -743,13 +743,13 @@ private fun AnswerButtons(revealed: Boolean, swipeHint: Boolean, onReveal: () ->
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = BUTTON_HEIGHT),
-            ) { Text(stringResource(R.string.review_forgot), maxLines = 1) }
+            ) { Text(stringResource(R.string.review_forgot), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) }
             Button(
                 onClick = onGotIt,
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = BUTTON_HEIGHT),
-            ) { Text(stringResource(R.string.review_got_it), maxLines = 1) }
+            ) { Text(stringResource(R.string.review_got_it), maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) }
         }
         if (swipeHint) Text(
             stringResource(R.string.review_swipe_hint),

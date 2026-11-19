@@ -76,7 +76,8 @@
     <string name="stats_export">Export</string>
     <string name="csv_stats_export_card">Reading per day</string>
     <string name="refold_export_card">Refold</string>
-    <string name="stats_export_csv_note">CSV file</string>
+    <string name="stats_export_csv_note">Your reading time and characters for each day, as a spreadsheet file.</string>
+    <string name="stats_export_refold_note">Your reading time as a file to import into the Refold language-learning app.</string>
     <string name="settings_word_frequency">Show frequency in Words</string>
     <string name="settings_word_frequency_details">How common each saved word is; needs a frequency dictionary.</string>
     <string name="settings_examples">Example sentences</string>
@@ -1337,6 +1338,7 @@
     <!-- Reading statistics -->
     <string name="stats_title">Statistics</string>
     <string name="stats_empty">Nothing counted yet. Reading time and characters are counted from now on while you read.</string>
+    <string name="stats_open_library">Open library</string>
     <string name="stats_today">Today</string>
     <string name="stats_week">Last 7 days</string>
     <string name="stats_total">All time</string>
