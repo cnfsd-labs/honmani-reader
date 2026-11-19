@@ -146,6 +146,9 @@ object DictionaryCatalog {
         return ids.map { id -> dictionaries.first { it.id == id } }
     }
 
+    /** The frequency list the one-tap offers download when a feature needs one (the starter pack's). */
+    val frequency: CatalogDictionary get() = dictionaries.first { it.id == "jiten-frequency" }
+
     /** "Jitendex.org [date]" is Jitendex, but not Jiten: the prefix must end at a non-letter. */
     fun isInstalled(dictionary: CatalogDictionary, installedTitles: Collection<String>): Boolean =
         installedTitles.any { title ->

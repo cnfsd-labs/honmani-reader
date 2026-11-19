@@ -742,7 +742,9 @@
     <string name="known_working">Looking up the words</string>
     <string name="known_pasted_name">pasted text</string>
     <string name="known_file_name">word list</string>
-    <string name="known_no_frequency">The most common words need a frequency dictionary, for example Jiten. Install one in Settings under Dictionaries.</string>
+    <string name="known_no_frequency">The most common words need a frequency dictionary. Honmani can download Jiten\'s word frequency list now.</string>
+    <string name="known_frequency_download">Download (%1$d MB)</string>
+    <string name="known_frequency_downloading">Downloading the frequency dictionary. Try again once it is installed; Settings, Dictionaries shows its progress.</string>
     <string name="known_file_unreadable">That file could not be read.</string>
     <string name="known_file_too_large">That file is larger than 5 MB, which is too large for a word list.</string>
     <string name="known_list_empty">That list holds no words.</string>

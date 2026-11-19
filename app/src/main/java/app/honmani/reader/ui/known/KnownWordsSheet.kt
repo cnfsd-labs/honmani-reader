@@ -54,6 +54,7 @@ import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.ui.PullDownSheet
+import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.words.KnownBatchEntity
 import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
@@ -69,6 +70,7 @@ import app.honmani.reader.known.WordListTooLargeException
 import app.honmani.reader.known.WordListParser
 import app.honmani.reader.ui.anki.KnownFromAnkiDialogs
 import app.honmani.reader.ui.anki.rememberKnownFromAnki
+import app.honmani.reader.ui.rememberWithNotifications
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.exp
 import kotlin.math.ln
@@ -104,7 +106,8 @@ internal class KnownWordsFlow(
 
         data class Review(val plan: KnownPlan, val dictionary: String? = null) : Step
 
-        data class Problem(val message: String) : Step
+        /** [offerFrequency]: the problem is a missing frequency dictionary, which one tap can download. */
+        data class Problem(val message: String, val offerFrequency: Boolean = false) : Step
 
         /** The quiz is asking word number `answers.size + 1`; [answers] are the answers so far (true = known). */
         data class Quiz(val setup: QuizSetup, val answers: List<Boolean> = emptyList()) : Step
@@ -117,6 +120,21 @@ internal class KnownWordsFlow(
         private set
 
     private var job: Job? = null
+
+    private var frequencyRequested = false
+
+    private fun noFrequency() = if (frequencyRequested) {
+        Step.Problem(context.getString(R.string.known_frequency_downloading))
+    } else {
+        Step.Problem(context.getString(R.string.known_no_frequency), offerFrequency = true)
+    }
+
+    /** Starts the same download as the Dictionaries screen's (once); the reader tries again once it is in. */
+    fun downloadFrequency() {
+        if (!frequencyRequested) container.dictionaryImportScheduler.download(DictionaryCatalog.frequency)
+        frequencyRequested = true
+        step = noFrequency()
+    }
 
     fun showPaste() {
         step = Step.Paste
@@ -148,7 +166,7 @@ internal class KnownWordsFlow(
 
     fun topN(n: Int) = work {
         when (val result = container.knownWords.planTopN(n)) {
-            TopNResult.NoFrequencyDictionary -> Step.Problem(context.getString(R.string.known_no_frequency))
+            TopNResult.NoFrequencyDictionary -> noFrequency()
             is TopNResult.Ready -> Step.Review(result.plan, result.dictionary)
         }
     }
@@ -156,7 +174,7 @@ internal class KnownWordsFlow(
     fun startQuiz() = work {
         val setup = container.knownWords.prepareQuiz()
         when {
-            setup == null -> Step.Problem(context.getString(R.string.known_no_frequency))
+            setup == null -> noFrequency()
             setup.questions.isEmpty() -> Step.Problem(context.getString(R.string.known_list_empty))
             else -> Step.Quiz(setup)
         }
@@ -183,7 +201,7 @@ internal class KnownWordsFlow(
     fun quizReview(result: Step.QuizResult, n: Int) = work {
         val answers = result.setup.questions.zip(result.answers)
         when (val planned = container.knownWords.planQuiz(n, answers)) {
-            TopNResult.NoFrequencyDictionary -> Step.Problem(context.getString(R.string.known_no_frequency))
+            TopNResult.NoFrequencyDictionary -> noFrequency()
             is TopNResult.Ready -> Step.Review(planned.plan, planned.dictionary)
         }
     }
@@ -359,6 +377,7 @@ private fun batchTitle(batch: KnownBatchEntity): String = when (batch.source) {
 
 @Composable
 private fun KnownWordsDialogs(flow: KnownWordsFlow) {
+    val withNotifications = rememberWithNotifications()
     when (val step = flow.step) {
         null -> Unit
         KnownWordsFlow.Step.Working -> AlertDialog(
@@ -467,7 +486,20 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
         is KnownWordsFlow.Step.Problem -> AlertDialog(
             onDismissRequest = flow::cancel,
             text = { Text(step.message) },
-            confirmButton = { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) } },
+            confirmButton = {
+                if (step.offerFrequency) {
+                    TextButton(onClick = { withNotifications(flow::downloadFrequency) }) {
+                        Text(stringResource(R.string.known_frequency_download, DictionaryCatalog.frequency.sizeMb))
+                    }
+                } else {
+                    TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) }
+                }
+            },
+            dismissButton = if (step.offerFrequency) {
+                { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) } }
+            } else {
+                null
+            },
         )
         is KnownWordsFlow.Step.Review -> {
             val plan = step.plan

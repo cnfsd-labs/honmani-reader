@@ -66,4 +66,10 @@ class DictionaryCatalogTest {
             DictionaryCatalog.starterPack(japanese = true).map { it.id },
         )
     }
+
+    @Test
+    fun theOneTapFrequencyList_isTheStarterPacksFrequencyDictionary() {
+        assertEquals(CatalogDictionary.Kind.FREQUENCY, DictionaryCatalog.frequency.kind)
+        assertEquals(DictionaryCatalog.starterPack(japanese = false).single { it.kind == CatalogDictionary.Kind.FREQUENCY }, DictionaryCatalog.frequency)
+    }
 }
