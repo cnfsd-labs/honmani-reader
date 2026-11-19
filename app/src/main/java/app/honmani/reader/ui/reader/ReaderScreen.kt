@@ -392,11 +392,16 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     // The words with a review card due today, for their tint in the book (word-marks.js).
     val dueWords = remember(dueToday) { dueToday.mapTo(HashSet()) { it.expression } as Set<String> }
 
-    // While a book is open: the words being learned and how they were written, so marks follow
-    // lookups (word-marks.js).
-    val learning by produceState<Pair<Set<String>, Set<String>>?>(null, atLibrary) {
+    // While a book is open: the words being learned, how they were written, and the known and
+    // ignored words, so marks follow lookups and "Mark as learned" (word-marks.js).
+    val learning by produceState<List<Set<String>>?>(null, atLibrary) {
         value = null
-        if (!atLibrary) container.wordKnowledge.map { it.learning to it.learningForms }.distinctUntilChanged().collect { value = it }
+        if (!atLibrary) {
+            container.wordKnowledge
+                .map { listOf(it.learning, it.learningForms, it.known, it.ignored) }
+                .distinctUntilChanged()
+                .collect { value = it }
+        }
     }
 
     // Reader settings the app itself acts on (volume buttons, long-press lookup), kept in ttu's
