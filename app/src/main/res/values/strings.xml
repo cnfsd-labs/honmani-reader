@@ -241,6 +241,7 @@
     <string name="catalog_japanese_none_yet">No Japanese books among the newest books so far.</string>
     <string name="catalog_japanese_keep_looking">Keep looking</string>
     <string name="catalog_change_login">Change login</string>
+    <string name="catalog_edit_server">Edit server</string>
     <string name="catalog_in_library">In your library</string>
     <string name="catalog_no_epub">No EPUB or text file on the server</string>
     <string name="catalog_error_unauthorized">The server did not accept the user name or password.</string>

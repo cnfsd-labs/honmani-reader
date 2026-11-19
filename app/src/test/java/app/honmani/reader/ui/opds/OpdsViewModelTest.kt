@@ -119,6 +119,24 @@ class OpdsViewModelTest {
     }
 
     @Test
+    fun editingTheServerFromABrowsingError_browsesTheNewAddress() = runBlocking {
+        val id = repository.save(null, "Calibre", "http://127.0.0.1:${server.port}/wrong", null, null, autoImport = false)
+        val catalog = repository.catalogs.first().single { it.id == id }
+        val collecting = launch(Dispatchers.Unconfined) { viewModel.uiState.collect {} }
+        val browsing = { viewModel.uiState.value.browsing }
+
+        viewModel.openCatalog(catalog)
+        eventually { browsing()?.error != null }
+        viewModel.startEditing(catalog)
+        viewModel.saveCatalog(address, "", "", autoImport = false)
+        eventually { viewModel.uiState.value.editor == null && browsing()?.page != null }
+
+        assertEquals(null, browsing()!!.error)
+        assertEquals(address, browsing()!!.page!!.url)
+        collecting.cancel()
+    }
+
+    @Test
     fun addingAListedServerAgain_keepsItsPassword_andStopsItsImportWhenTurnedOff() = runBlocking {
         val id = repository.save(null, "Calibre", address, "reader", "pw", autoImport = true)
 

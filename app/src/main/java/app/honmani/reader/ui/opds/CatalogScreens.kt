@@ -292,12 +292,22 @@ private fun CatalogError(reason: OpdsException.Reason, onRetry: () -> Unit, onCh
             textAlign = TextAlign.Center,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (reason == OpdsException.Reason.UNAUTHORIZED) {
-                OutlinedButton(onClick = onChangeLogin) { Text(stringResource(R.string.catalog_change_login)) }
+            catalogErrorEditAction(reason)?.let { label ->
+                OutlinedButton(onClick = onChangeLogin) { Text(stringResource(label)) }
             }
             Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
         }
     }
+}
+
+/** The button that opens the server's settings next to Retry, for errors a changed address or login can fix. */
+fun catalogErrorEditAction(reason: OpdsException.Reason): Int? = when (reason) {
+    OpdsException.Reason.UNAUTHORIZED -> R.string.catalog_change_login
+    OpdsException.Reason.NOT_A_CATALOGUE,
+    OpdsException.Reason.CERTIFICATE,
+    OpdsException.Reason.HTTP_ONLY,
+    -> R.string.catalog_edit_server
+    else -> null
 }
 
 fun catalogErrorText(reason: OpdsException.Reason): Int = when (reason) {

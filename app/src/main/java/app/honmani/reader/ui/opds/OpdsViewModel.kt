@@ -485,6 +485,9 @@ class OpdsViewModel(
                 // which shows them arriving. Without it, open the catalogue to pick books.
                 if (current.id == null && !autoImport) {
                     openCatalog(OpdsCatalog(id, title, url, user, user != null, autoImport))
+                } else if (current.id != null && browsing.value?.catalog?.id == id) {
+                    // Edited from the catalogue's error: browse again with the new address and login.
+                    openCatalog(OpdsCatalog(id, title, url, user, user != null, autoImport))
                 }
             } catch (e: OpdsException) {
                 editor.update { it?.copy(checking = false, error = e.reason) }
