@@ -23,14 +23,20 @@ data class LexiconSources(val terms: List<DictionaryEntity>, val frequency: Dict
          */
         suspend fun of(enabled: List<DictionaryEntity>, hasFrequencies: suspend (DictionaryEntity) -> Boolean): LexiconSources? {
             val terms = enabled.filter { it.termCount > 0 }
+            val frequency = frequencyOf(enabled, hasFrequencies) ?: return null
+            if (terms.isEmpty()) return null
+            return LexiconSources(terms, frequency)
+        }
+
+        /**
+         * The frequency list among [enabled] that ranks words, whether or not a word dictionary is
+         * installed (the most common words ask for one separately).
+         */
+        suspend fun frequencyOf(enabled: List<DictionaryEntity>, hasFrequencies: suspend (DictionaryEntity) -> Boolean): DictionaryEntity? {
             val frequencies = enabled
                 .filter { it.metaCount > 0 && it.frequencyMode != DictionaryEntity.OCCURRENCE_BASED }
                 .filter { hasFrequencies(it) }
-            val frequency = frequencies.firstOrNull { it.title == CALIBRATED_ON }
-                ?: frequencies.minByOrNull { it.priority }
-                ?: return null
-            if (terms.isEmpty()) return null
-            return LexiconSources(terms, frequency)
+            return frequencies.firstOrNull { it.title == CALIBRATED_ON } ?: frequencies.minByOrNull { it.priority }
         }
 
         /** The frequency list [Difficulty]'s scale was calibrated with. */

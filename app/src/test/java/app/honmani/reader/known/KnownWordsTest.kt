@@ -46,9 +46,10 @@ class KnownWordsTest {
             resolver = KnownWordResolver(lookup),
             batches = KnownBatchRepository(database),
             frequencyDictionary = {
-                LexiconSources.of(database.dictionaryDao().enabledReady()) { database.difficultyDao().hasFrequencies(it.id) }
-                    ?.frequency?.let { it.id to it.title }
+                LexiconSources.frequencyOf(database.dictionaryDao().enabledReady()) { database.difficultyDao().hasFrequencies(it.id) }
+                    ?.let { it.id to it.title }
             },
+            hasWordDictionary = { database.dictionaryDao().enabledReady().any { it.termCount > 0 } },
             topWords = { dictionary, maxRank ->
                 database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { RankedWord(it.expression, it.reading, LexiconLoader.isKanaRank(it.display)) }
             },
@@ -154,7 +155,21 @@ class KnownWordsTest {
     fun topNWithoutAFrequencyDictionaryAsksForOne() = runTest {
         jmdict()
 
-        assertEquals(TopNResult.NoFrequencyDictionary, known.planTopN(500))
+        assertEquals(TopNResult.Missing(MissingDictionary.FREQUENCY), known.planTopN(500))
+        assertEquals(MissingDictionary.FREQUENCY, known.missingDictionary())
+    }
+
+    @Test
+    fun aFrequencyListWithoutAWordDictionaryAsksForWords_notForTheListAgain() = runTest {
+        jiten(Triple("の", "の", 1), Triple("猫", "ねこ", 2))
+
+        assertEquals(MissingDictionary.WORDS, known.missingDictionary())
+        assertEquals(TopNResult.Missing(MissingDictionary.WORDS), known.planTopN(500))
+        assertNull(known.prepareQuiz())
+
+        jmdict()
+        assertNull(known.missingDictionary())
+        assertTrue(known.planTopN(500) is TopNResult.Ready)
     }
 
     @Test

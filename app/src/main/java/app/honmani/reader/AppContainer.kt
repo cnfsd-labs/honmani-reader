@@ -386,7 +386,12 @@ class AppContainer(context: Context) {
         KnownWords(
             resolver = KnownWordResolver(dictionaryLookup),
             batches = KnownBatchRepository(database),
-            frequencyDictionary = { lexiconSources()?.frequency?.let { it.id to it.title } },
+            // The list alone counts here: without a word dictionary the reader is asked for one, not for the list again.
+            frequencyDictionary = {
+                LexiconSources.frequencyOf(database.dictionaryDao().enabledReady()) { database.difficultyDao().hasFrequencies(it.id) }
+                    ?.let { it.id to it.title }
+            },
+            hasWordDictionary = { database.dictionaryDao().enabledReady().any { it.termCount > 0 } },
             topWords = { dictionary, maxRank ->
                 database.difficultyDao().topFrequencies(dictionary, maxRank.toDouble()).map { RankedWord(it.expression, it.reading, LexiconLoader.isKanaRank(it.display)) }
             },

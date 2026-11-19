@@ -229,6 +229,9 @@ class DifficultyTest {
         assertEquals(listOf(jitendex), of(jitendex, jiten)!!.terms)
         assertNull(of(jitendex, counts, pitch))
         assertNull(of(jiten))
+        // The frequency list alone, for the most common words: it does not need a word dictionary.
+        assertEquals(jiten, LexiconSources.frequencyOf(listOf(pitch, jiten), ranked))
+        assertNull(LexiconSources.frequencyOf(listOf(jitendex, counts, pitch), ranked))
         assertNotEquals(of(jitendex, jiten)!!.signature, of(jitendex, jiten.copy(revision = "2"))!!.signature)
     }
 }

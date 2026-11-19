@@ -21,10 +21,19 @@ class KnownPlan(
 
 /** The answer to [KnownWords.planTopN]. */
 sealed interface TopNResult {
-    /** No frequency dictionary (ranks) is installed, so "the N most common words" has no meaning. */
-    data object NoFrequencyDictionary : TopNResult
+    /** A dictionary the most common words need is not installed and turned on. */
+    data class Missing(val dictionary: MissingDictionary) : TopNResult
 
     data class Ready(val plan: KnownPlan, val dictionary: String) : TopNResult
+}
+
+/** What the most common words and the quiz lack. */
+enum class MissingDictionary {
+    /** No frequency dictionary (ranks), so "the N most common words" has no meaning. */
+    FREQUENCY,
+
+    /** Ranks, but no word dictionary to tell which ranked words are words, and what they mean. */
+    WORDS,
 }
 
 /**
@@ -70,6 +79,8 @@ class KnownWords(
     val batches: KnownBatchRepository,
     /** The frequency dictionary ranks come from, with its title; null if none is installed. */
     private val frequencyDictionary: suspend () -> Pair<Long, String>?,
+    /** Whether a word dictionary (not only frequencies or kanji) is installed and turned on. */
+    private val hasWordDictionary: suspend () -> Boolean,
     /** The words ranked [maxRank] or better in a frequency dictionary, most common first. */
     private val topWords: suspend (dictionary: Long, maxRank: Int) -> List<RankedWord>,
     private val waniKani: WaniKaniClient = WaniKaniClient(),
@@ -98,18 +109,28 @@ class KnownWords(
      * included, names left out; words the installed dictionaries lack are skipped.
      */
     suspend fun planTopN(n: Int, onProgress: (Int) -> Unit = {}): TopNResult {
-        val (id, title) = frequencyDictionary() ?: return TopNResult.NoFrequencyDictionary
+        missingDictionary()?.let { return TopNResult.Missing(it) }
+        val (id, title) = frequencyDictionary() ?: return TopNResult.Missing(MissingDictionary.FREQUENCY)
         val ranked = topWords(id, n)
         val resolved = withKanaSpellings(resolver.resolve(ranked.map { WantedWord(it.written, it.reading) }, deinflect = false, onProgress), ranked)
         return TopNResult.Ready(KnownPlan(KnownSource.TOP_N, n.toString(), resolved, batches.preview(resolved.words)), title)
     }
 
+    /** What the most common words and the quiz lack, the frequency list first; null if nothing. */
+    suspend fun missingDictionary(): MissingDictionary? = when {
+        frequencyDictionary() == null -> MissingDictionary.FREQUENCY
+        !hasWordDictionary() -> MissingDictionary.WORDS
+        else -> null
+    }
+
     /**
      * The words to ask in the quick quiz, spread over the frequency dictionary's ranks (see
-     * [PlacementQuiz]); null if no frequency dictionary with enough words is installed. A rank whose
-     * word no dictionary explains, or which is a name, is not asked.
+     * [PlacementQuiz]); null if no frequency dictionary with enough words or no word dictionary is
+     * installed ([missingDictionary] tells which). A rank whose word no dictionary explains, or which
+     * is a name, is not asked.
      */
     suspend fun prepareQuiz(random: Random = Random.Default): QuizSetup? {
+        if (!hasWordDictionary()) return null
         val (id, title) = frequencyDictionary() ?: return null
         val ranked = topWords(id, PlacementQuiz.MAX_WORDS).take(PlacementQuiz.MAX_WORDS)
         if (ranked.size < MIN_QUIZ_WORDS) return null
@@ -145,7 +166,8 @@ class KnownWords(
      * (by written form), plus every word answered "know" (also beyond [n]).
      */
     suspend fun planQuiz(n: Int, answers: List<Pair<QuizQuestion, Boolean>>, onProgress: (Int) -> Unit = {}): TopNResult {
-        val (id, title) = frequencyDictionary() ?: return TopNResult.NoFrequencyDictionary
+        missingDictionary()?.let { return TopNResult.Missing(it) }
+        val (id, title) = frequencyDictionary() ?: return TopNResult.Missing(MissingDictionary.FREQUENCY)
         val ranked = topWords(id, PlacementQuiz.MAX_WORDS).take(PlacementQuiz.MAX_WORDS).take(n)
         val resolved = withKanaSpellings(resolver.resolve(ranked.map { WantedWord(it.written, it.reading) }, deinflect = false, onProgress), ranked)
         val unknown = answers.filterNot { it.second }.flatMapTo(HashSet()) { (question, _) -> question.marked.map { it.expression } }

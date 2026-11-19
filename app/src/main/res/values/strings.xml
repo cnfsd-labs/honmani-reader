@@ -747,7 +747,10 @@
     <string name="known_file_name">word list</string>
     <string name="known_no_frequency">The most common words need a frequency dictionary. Honmani can download Jiten\'s word frequency list now.</string>
     <string name="known_frequency_download">Download (%1$d MB)</string>
-    <string name="known_frequency_downloading">Downloading the frequency dictionary. Try again once it is installed; Settings, Dictionaries shows its progress.</string>
+    <string name="known_frequency_off">The most common words need a frequency dictionary. Jiten\'s list is installed but turned off: turn it on in Settings, Dictionaries.</string>
+    <string name="known_no_words">The most common words need a word dictionary to tell what each ranked word is. Honmani can download %1$s (English definitions) now.</string>
+    <string name="known_words_off">The most common words need a word dictionary. Turn one on in Settings, Dictionaries.</string>
+    <string name="known_dictionary_downloading">Downloading the dictionary. Try again once it is installed; Settings, Dictionaries shows its progress.</string>
     <string name="known_file_unreadable">That file could not be read.</string>
     <string name="known_file_too_large">That file is larger than 5 MB, which is too large for a word list.</string>
     <string name="known_list_empty">That list holds no words.</string>

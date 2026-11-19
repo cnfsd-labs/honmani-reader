@@ -56,6 +56,7 @@ import app.honmani.reader.AppContainer
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.ui.PullDownSheet
+import app.honmani.reader.data.dictionary.CatalogDictionary
 import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.dictionary.ImportStatus
 import app.honmani.reader.data.words.KnownBatchEntity
@@ -63,6 +64,7 @@ import app.honmani.reader.data.words.KnownSource
 import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.known.KnownPlan
 import app.honmani.reader.known.KnownWords
+import app.honmani.reader.known.MissingDictionary
 import app.honmani.reader.known.PlacementQuiz
 import app.honmani.reader.known.QuizAnswer
 import app.honmani.reader.known.QuizSetup
@@ -111,10 +113,10 @@ internal class KnownWordsFlow(
         data class Review(val plan: KnownPlan, val dictionary: String? = null) : Step
 
         /**
-         * [offerFrequency]: the problem is a missing frequency dictionary, which one tap can download.
+         * [offer]: the problem is a missing dictionary, which one tap can download (never one already installed).
          * [retryWaniKani]: WaniKani could not be read; "Try again" returns to the token, still filled in.
          */
-        data class Problem(val message: String, val offerFrequency: Boolean = false, val retryWaniKani: Boolean = false) : Step
+        data class Problem(val message: String, val offer: CatalogDictionary? = null, val retryWaniKani: Boolean = false) : Step
 
         /** The quiz is asking word number `answers.size + 1`; [answers] are the answers so far (true = known). */
         data class Quiz(val setup: QuizSetup, val answers: List<Boolean> = emptyList()) : Step
@@ -128,28 +130,44 @@ internal class KnownWordsFlow(
 
     private var job: Job? = null
 
-    private var frequencyRequested = false
+    private var requested: CatalogDictionary? = null
 
     /** The WaniKani token while the steps are open, so "Try again" keeps it; in memory only, cleared on [cancel]. */
     var waniKaniToken by mutableStateOf("")
     var waniKaniKanji by mutableStateOf(false)
 
     /**
-     * "Downloading" only while the requested download is still queued or running; once it failed or
-     * was cancelled, the download is offered again.
+     * What the most common words lack. "Downloading" only while the requested download is still
+     * queued or running; once it failed or was cancelled, the download is offered again. A dictionary
+     * installed but turned off is not offered again (its download would fail as already installed).
      */
-    private suspend fun noFrequency(): Step {
-        if (frequencyRequested && !frequencyPending(container.dictionaryImportScheduler.imports.first())) frequencyRequested = false
-        return if (frequencyRequested) frequencyDownloading() else Step.Problem(context.getString(R.string.known_no_frequency), offerFrequency = true)
+    private suspend fun missing(what: MissingDictionary): Step {
+        if (requested != null && !frequencyPending(container.dictionaryImportScheduler.imports.first())) requested = null
+        if (requested != null) return downloading()
+        val installed = container.dictionaryRepository.dictionaries.first()
+        return when (what) {
+            MissingDictionary.FREQUENCY ->
+                if (DictionaryCatalog.isInstalled(DictionaryCatalog.frequency, installed.map { it.title })) {
+                    Step.Problem(context.getString(R.string.known_frequency_off))
+                } else {
+                    Step.Problem(context.getString(R.string.known_no_frequency), offer = DictionaryCatalog.frequency)
+                }
+            MissingDictionary.WORDS ->
+                if (installed.any { it.termCount > 0 }) {
+                    Step.Problem(context.getString(R.string.known_words_off))
+                } else {
+                    Step.Problem(context.getString(R.string.known_no_words, DictionaryCatalog.words.name), offer = DictionaryCatalog.words)
+                }
+        }
     }
 
-    private fun frequencyDownloading() = Step.Problem(context.getString(R.string.known_frequency_downloading))
+    private fun downloading() = Step.Problem(context.getString(R.string.known_dictionary_downloading))
 
     /** Starts the same download as the Dictionaries screen's (once); the reader tries again once it is in. */
-    fun downloadFrequency() {
-        if (!frequencyRequested) container.dictionaryImportScheduler.download(DictionaryCatalog.frequency)
-        frequencyRequested = true
-        step = frequencyDownloading()
+    fun download(dictionary: CatalogDictionary) {
+        if (requested == null) container.dictionaryImportScheduler.download(dictionary)
+        requested = dictionary
+        step = downloading()
     }
 
     fun showPaste() {
@@ -184,7 +202,7 @@ internal class KnownWordsFlow(
 
     fun topN(n: Int) = work {
         when (val result = container.knownWords.planTopN(n)) {
-            TopNResult.NoFrequencyDictionary -> noFrequency()
+            is TopNResult.Missing -> missing(result.dictionary)
             is TopNResult.Ready -> Step.Review(result.plan, result.dictionary)
         }
     }
@@ -192,7 +210,8 @@ internal class KnownWordsFlow(
     fun startQuiz() = work {
         val setup = container.knownWords.prepareQuiz()
         when {
-            setup == null -> noFrequency()
+            setup == null -> container.knownWords.missingDictionary()?.let { missing(it) }
+                ?: Step.Problem(context.getString(R.string.known_list_empty))
             setup.questions.isEmpty() -> Step.Problem(context.getString(R.string.known_list_empty))
             else -> Step.Quiz(setup)
         }
@@ -226,7 +245,7 @@ internal class KnownWordsFlow(
     fun quizReview(result: Step.QuizResult, n: Int) = work {
         val answers = result.setup.questions.zip(result.answers)
         when (val planned = container.knownWords.planQuiz(n, answers)) {
-            TopNResult.NoFrequencyDictionary -> noFrequency()
+            is TopNResult.Missing -> missing(planned.dictionary)
             is TopNResult.Ready -> Step.Review(planned.plan, planned.dictionary)
         }
     }
@@ -543,9 +562,10 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
             onDismissRequest = flow::cancel,
             text = { Text(step.message) },
             confirmButton = {
-                if (step.offerFrequency) {
-                    TextButton(onClick = { withNotifications(flow::downloadFrequency) }) {
-                        Text(stringResource(R.string.known_frequency_download, DictionaryCatalog.frequency.sizeMb))
+                val offer = step.offer
+                if (offer != null) {
+                    TextButton(onClick = { withNotifications { flow.download(offer) } }) {
+                        Text(stringResource(R.string.known_frequency_download, offer.sizeMb))
                     }
                 } else if (step.retryWaniKani) {
                     TextButton(onClick = flow::showWaniKani) { Text(stringResource(R.string.action_retry)) }
@@ -553,7 +573,7 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                     TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) }
                 }
             },
-            dismissButton = if (step.offerFrequency || step.retryWaniKani) {
+            dismissButton = if (step.offer != null || step.retryWaniKani) {
                 { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) } }
             } else {
                 null
