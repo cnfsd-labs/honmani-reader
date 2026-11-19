@@ -119,7 +119,7 @@ class OpdsViewModel(
     private val repository: OpdsRepository,
     private val client: OpdsClient,
     private val adder: BookAdder,
-    bookDao: BookDao,
+    private val bookDao: BookDao,
     private val downloadsDir: File,
     /** Starts an automatic import now (after a catalogue with it was saved). */
     private val startAutoImport: () -> Unit = {},
@@ -137,7 +137,7 @@ class OpdsViewModel(
     private val downloads = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
 
     /** Entries added in this session that matched a book already in the library. */
-    private val matched = MutableStateFlow<Set<String>>(emptySet())
+    private val matched = MutableStateFlow<Map<String, Long>>(emptyMap())
     private var server: OpdsServer? = null
 
     /** The open catalogue's start feed, for finding its Japanese books. */
@@ -161,8 +161,12 @@ class OpdsViewModel(
         bookDao.observeSourceIds(BookSource.OPDS),
         matched,
     ) { catalogs, (browsing, editor), downloads, sourceIds, matched ->
-        OpdsUiState(catalogs, browsing, editor, downloads, sourceIds.toSet() + matched)
+        OpdsUiState(catalogs, browsing, editor, downloads, sourceIds.toSet() + matched.keys)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OpdsUiState())
+
+    /** The library book a catalogue entry shown as in the library stands for (as [OpdsUiState.inLibrary] finds it). */
+    suspend fun libraryBookId(entryId: String): Long? =
+        matched.value[entryId] ?: bookDao.findBySource(BookSource.OPDS, entryId)?.id
 
     /** The reader tapped "Import older books" in the catalogue being browsed. */
     fun importOlder() {
@@ -394,7 +398,7 @@ class OpdsViewModel(
                         result.book.ttuId?.let { pullPosition(result.book, it) }
                     }
                     is BookAdder.Result.AlreadyInLibrary -> {
-                        matched.update { it + entry.id }
+                        matched.update { it + (entry.id to result.book.id) }
                         setDownload(entry.id, null)
                     }
                     BookAdder.Result.Unsupported, BookAdder.Result.Unreadable ->

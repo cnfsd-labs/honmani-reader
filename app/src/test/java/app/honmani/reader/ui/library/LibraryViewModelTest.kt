@@ -1093,6 +1093,9 @@ private class FakeBookDao : BookDao {
     override fun observeSourceIds(source: BookSource): Flow<List<String>> =
         books.map { list -> list.filter { it.source == source }.mapNotNull { it.sourceId } }
 
+    override suspend fun findBySource(source: BookSource, sourceId: String) =
+        books.value.firstOrNull { it.source == source && it.sourceId == sourceId }
+
     override suspend fun insertRow(book: BookEntity): Long {
         val id = nextId++
         books.update { it + book.copy(id = id) }

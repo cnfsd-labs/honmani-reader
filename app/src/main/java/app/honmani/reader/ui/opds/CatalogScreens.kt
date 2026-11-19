@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -60,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -84,6 +87,8 @@ fun CatalogBrowser(
     /** "Japanese books" on the start page, with the page's title. */
     onOpenJapanese: (title: String) -> Unit,
     onDownload: (OpdsEntry) -> Unit,
+    /** Opens the library book of an entry already in the library. */
+    onOpenBook: (OpdsEntry) -> Unit,
     onSearch: (String) -> Unit,
     onLoadMore: () -> Unit,
     onRetry: () -> Unit,
@@ -203,6 +208,7 @@ fun CatalogBrowser(
                                 download = downloads[entry.id],
                                 inLibrary = entry.id in inLibrary,
                                 onDownload = { onDownload(entry) },
+                                onOpen = { onOpenBook(entry) },
                                 thumbnail = thumbnail,
                             )
                         }
@@ -283,6 +289,7 @@ private fun SearchBar(onSearch: (String) -> Unit, onClose: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CatalogError(reason: OpdsException.Reason, onRetry: () -> Unit, onChangeLogin: () -> Unit) {
     Column(
@@ -297,7 +304,11 @@ private fun CatalogError(reason: OpdsException.Reason, onRetry: () -> Unit, onCh
             style = MaterialTheme.typography.bodyMedium,
             textAlign = TextAlign.Center,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Wraps the buttons with large text.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             catalogErrorEditAction(reason)?.let { label ->
                 OutlinedButton(onClick = onChangeLogin) { Text(stringResource(label)) }
             }
@@ -348,6 +359,7 @@ private fun BookRow(
     download: DownloadState?,
     inLibrary: Boolean,
     onDownload: () -> Unit,
+    onOpen: () -> Unit,
     thumbnail: suspend (String) -> ImageBitmap?,
 ) {
     val canDownload = entry.book != null && !inLibrary && download !is DownloadState.Running
@@ -382,7 +394,7 @@ private fun BookRow(
             when {
                 inLibrary -> Icon(
                     Icons.Filled.CheckCircle,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.catalog_in_library),
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 download is DownloadState.Running -> Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
@@ -393,7 +405,8 @@ private fun BookRow(
                         CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp))
                     }
                 }
-                entry.book != null -> IconButton(onClick = onDownload) {
+                // The row already offers the download to TalkBack: one focus stop, not two.
+                entry.book != null -> IconButton(onClick = onDownload, modifier = Modifier.clearAndSetSemantics {}) {
                     Icon(
                         painterResource(R.drawable.ic_download),
                         contentDescription = stringResource(R.string.action_download_book, entry.title),
@@ -401,7 +414,15 @@ private fun BookRow(
                 }
             }
         },
-        modifier = Modifier.clickable(enabled = canDownload, onClick = onDownload),
+        modifier = if (inLibrary) {
+            Modifier.clickable(onClickLabel = stringResource(R.string.catalog_open_book), onClick = onOpen)
+        } else {
+            Modifier.clickable(
+                enabled = canDownload,
+                onClickLabel = stringResource(R.string.action_download),
+                onClick = onDownload,
+            )
+        },
     )
 }
 

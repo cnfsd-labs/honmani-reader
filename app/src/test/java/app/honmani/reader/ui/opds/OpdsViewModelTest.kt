@@ -3,7 +3,10 @@ package app.honmani.reader.ui.opds
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import app.honmani.reader.data.HonmaniDatabase
+import app.honmani.reader.data.library.BookEntity
+import app.honmani.reader.data.library.BookFormat
 import app.honmani.reader.data.library.BookImporter
+import app.honmani.reader.data.library.BookSource
 import app.honmani.reader.data.opds.CredentialCipher
 import app.honmani.reader.data.opds.EPUB_TYPE
 import app.honmani.reader.data.opds.OpdsClient
@@ -28,6 +31,7 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -79,6 +83,16 @@ class OpdsViewModelTest {
 
     private suspend fun eventually(condition: () -> Boolean) = withTimeout(10_000) {
         while (!condition()) delay(10)
+    }
+
+    @Test
+    fun anEntryInTheLibrary_opensItsBook() = runBlocking {
+        val dao = database.bookDao()
+        val book = BookEntity(contentHash = "a", title = "猫", format = BookFormat.EPUB, fileName = "a.epub", source = BookSource.OPDS, sourceId = "urn:cat", addedAt = 0)
+        val id = dao.insertRow(book)
+        dao.insertRow(book.copy(contentHash = "b", fileName = "b.epub", source = BookSource.FILE, sourceId = "urn:dog"))
+        assertEquals(id, viewModel.libraryBookId("urn:cat"))
+        assertNull(viewModel.libraryBookId("urn:dog"))
     }
 
     @Test

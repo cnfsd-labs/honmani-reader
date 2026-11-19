@@ -32,6 +32,10 @@ interface BookDao {
     @Query("SELECT source_id FROM book WHERE source = :source AND source_id IS NOT NULL")
     fun observeSourceIds(source: BookSource): Flow<List<String>>
 
+    /** The book from [source] with [sourceId], to open a catalogue entry already in the library. */
+    @Query("SELECT * FROM book WHERE source = :source AND source_id = :sourceId LIMIT 1")
+    suspend fun findBySource(source: BookSource, sourceId: String): BookEntity?
+
     /** Returns the new row id. Throws if a book with the same content hash exists. */
     @Insert
     suspend fun insertRow(book: BookEntity): Long

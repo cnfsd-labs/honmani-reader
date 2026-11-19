@@ -402,6 +402,7 @@ fun LibraryScreen(
             onOpenFeed = opds::openFeed,
             onOpenJapanese = opds::openJapanese,
             onDownload = opds::download,
+            onOpenBook = { entry -> pasteScope.launch { opds.libraryBookId(entry.id)?.let { viewModel.open(it) } } },
             onSearch = opds::search,
             onLoadMore = opds::loadMore,
             onRetry = opds::retry,

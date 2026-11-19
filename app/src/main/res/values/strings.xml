@@ -243,6 +243,7 @@
     <string name="catalog_change_login">Change login</string>
     <string name="catalog_edit_server">Edit server</string>
     <string name="catalog_in_library">In your library</string>
+    <string name="catalog_open_book">Open in reader</string>
     <string name="catalog_no_epub">No EPUB or text file on the server</string>
     <string name="catalog_error_unauthorized">The server did not accept the user name or password.</string>
     <string name="catalog_error_not_a_catalogue">No book catalogue at this address. For Calibre-Web, enter the address you open in the browser.</string>
