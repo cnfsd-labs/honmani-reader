@@ -56,6 +56,8 @@ data class CatalogPage(
      * waits for a tap before reading further.
      */
     val foundNone: Boolean = false,
+    /** Unique per opened page: two pages can share a [url] (the start feed and "Japanese books"). */
+    val key: Long = 0,
 )
 
 data class BrowseState(
@@ -143,6 +145,9 @@ class OpdsViewModel(
     /** Where "Japanese books" leads, per catalogue address, found once per session. */
     private val japaneseSources = HashMap<String, JapaneseBooks.Source?>()
     private var loadJob: Job? = null
+
+    /** The last [CatalogPage.key] given out. */
+    private var pageKeys = 0L
 
     /** The last feed request, for retrying it. */
     private var lastRequest: (suspend () -> Unit)? = null
@@ -249,7 +254,7 @@ class OpdsViewModel(
                     JapaneseBooks.FilteredPage(feed.entries, feed.nextUrl?.takeIf { it != next }, foundNone = false)
                 }
                 // The page may no longer be on top (an entry was opened meanwhile): it still gets its entries.
-                replacePage(page.url) { top ->
+                replacePage(page.key) { top ->
                     val known = top.entries.mapTo(HashSet()) { it.id }
                     top.copy(
                         entries = top.entries + more.entries.filter { it.id !in known },
@@ -259,7 +264,7 @@ class OpdsViewModel(
                     )
                 }
             } catch (_: OpdsException) {
-                replacePage(page.url) { it.copy(loadingMore = false, loadMoreFailed = true) }
+                replacePage(page.key) { it.copy(loadingMore = false, loadMoreFailed = true) }
             }
         }
     }
@@ -331,13 +336,14 @@ class OpdsViewModel(
     }
 
     private fun addPage(page: CatalogPage) {
-        browsing.update { state -> state?.copy(pages = state.pages + page, loading = false, error = null) }
+        val keyed = page.copy(key = ++pageKeys)
+        browsing.update { state -> state?.copy(pages = state.pages + keyed, loading = false, error = null) }
     }
 
-    /** Changes the page loaded from [url], wherever it is on the stack; nothing if it was left. */
-    private fun replacePage(url: String, transform: (CatalogPage) -> CatalogPage) {
+    /** Changes the page with [key], wherever it is on the stack; nothing if it was left. */
+    private fun replacePage(key: Long, transform: (CatalogPage) -> CatalogPage) {
         browsing.update { state ->
-            val index = state?.pages?.indexOfLast { it.url == url } ?: -1
+            val index = state?.pages?.indexOfLast { it.key == key } ?: -1
             if (state == null || index < 0) return@update state
             state.copy(pages = state.pages.toMutableList().also { it[index] = transform(it[index]) })
         }
@@ -454,15 +460,19 @@ class OpdsViewModel(
             }
             try {
                 val (url, feed) = repository.connect(address, user, loginPassword)
-                if (!updateSync(syncProgress, url, user, loginPassword, password.isNotEmpty())) return@launch
+                // Adding a listed server again updates that one (OpdsRepository.save).
+                val before = (current.id ?: repository.listedId(url, user))?.let { repository.server(it) }
+                // An empty password field keeps the listed server's stored password.
+                val keepStored = keepPassword || (user != null && password.isEmpty() && before?.password != null)
+                val syncPassword = if (keepStored) before?.password ?: loginPassword else loginPassword
+                if (!updateSync(syncProgress, url, user, syncPassword, password.isNotEmpty())) return@launch
                 val title = feed.title.ifBlank { url.substringAfter("://").substringBefore('/') }
-                val before = current.id?.let { repository.server(it) }
                 val id = repository.save(
                     id = current.id,
                     title = title,
                     url = url,
                     username = user,
-                    password = if (keepPassword) null else password,
+                    password = if (keepStored) null else password,
                     autoImport = autoImport,
                 )
                 editor.value = null
@@ -471,7 +481,7 @@ class OpdsViewModel(
                 // With automatic import on, the books come by themselves: stay in the library,
                 // which shows them arriving. Without it, open the catalogue to pick books.
                 if (current.id == null && !autoImport) {
-                    openCatalog(OpdsCatalog(id, title, url, user, password.isNotEmpty(), autoImport))
+                    openCatalog(OpdsCatalog(id, title, url, user, password.isNotEmpty() || keepStored, autoImport))
                 }
             } catch (e: OpdsException) {
                 editor.update { it?.copy(checking = false, error = e.reason) }

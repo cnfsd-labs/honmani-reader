@@ -151,6 +151,12 @@ class OpdsRepository(
         }
     }
 
+    /** The listed catalogue that [save] without an id would update for [url] and [username]; null if none. */
+    suspend fun listedId(url: String, username: String?): Long? {
+        val user = username?.trim()?.ifEmpty { null }
+        return dao.observeAll().first().firstOrNull { sameServer(it, url, user) }?.id
+    }
+
     suspend fun delete(id: Long) = dao.delete(id)
 
     companion object {
