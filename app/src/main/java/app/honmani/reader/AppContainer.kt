@@ -420,7 +420,7 @@ class AppContainer(context: Context) {
     val opdsClient by lazy { OpdsClient(logins = loginGate) }
 
     val opdsRepository: OpdsRepository by lazy {
-        OpdsRepository(database.opdsCatalogDao(), credentialCipher, opdsClient)
+        OpdsRepository(database.opdsCatalogDao(), credentialCipher, opdsClient, onHotspot = networkWatch::isHotspot)
     }
 
     /** Catalogue downloads wait here before they are added to the library. */

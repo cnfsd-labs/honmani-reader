@@ -16,7 +16,10 @@ data class OpdsCatalog(
     /** The first automatic import read only the newest books: offer "Import older books". */
     val offerOlderBooks: Boolean = false,
 ) {
-    /** It has a user name but no password, as a restored backup leaves it: the login has to be typed again. */
+    /**
+     * It has a user name but no password, as a restored backup leaves it: the login has to be typed
+     * again. A deliberately empty password is stored (encrypted) and doesn't count.
+     */
     val needsPassword: Boolean get() = username != null && !hasPassword
 }
 
@@ -26,6 +29,8 @@ class OpdsRepository(
     private val cipher: CredentialCipher,
     private val client: OpdsClient,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Whether the phone is on a hotspot with a login page, which answers http in the server's place. */
+    private val onHotspot: () -> Boolean = { false },
 ) {
     val catalogs: Flow<List<OpdsCatalog>> = dao.observeAll().map { list ->
         list.map { OpdsCatalog(it.id, it.title, it.url, it.username, it.passwordCipher != null, it.autoImport, offersOlderBooks(it)) }
@@ -84,16 +89,18 @@ class OpdsRepository(
 
     /**
      * Whether the server of the https [url] answers over plain http. Asked without the login: over
-     * http it goes only once the user typed http:// and saw the warning.
+     * http it goes only once the user typed http:// and saw the warning. Only a login request or a
+     * page counts as an answer: other errors (a captive portal's 511, a redirect loop) don't, and on
+     * a hotspot with a login page the portal answers http for every server, so nothing counts.
      */
     private suspend fun speaksPlainHttp(url: String): Boolean {
+        if (onHotspot()) return false
         val http = "http://" + url.substringAfter("://")
         return try {
             client.feed(OpdsServer(http, null, null), http)
             true
         } catch (e: OpdsException) {
-            e.reason == OpdsException.Reason.UNAUTHORIZED || e.reason == OpdsException.Reason.NOT_A_CATALOGUE ||
-                e.reason == OpdsException.Reason.SERVER || e.reason == OpdsException.Reason.HOTSPOT
+            e.reason == OpdsException.Reason.UNAUTHORIZED || e.reason == OpdsException.Reason.NOT_A_CATALOGUE
         }
     }
 
@@ -101,7 +108,7 @@ class OpdsRepository(
      * Adds a catalogue, or updates catalogue [id]. A new one with the address (http or https) and
      * user name of one already listed updates that one instead: adding a restored server again
      * fills in its password rather than listing it twice. A null [password] on an update keeps the
-     * stored one; an empty one removes it. A null [autoImport] keeps the setting (on for new ones).
+     * stored one; an empty one is stored as the empty password (only a restored server has none). A null [autoImport] keeps the setting (on for new ones).
      */
     suspend fun save(
         id: Long?,
@@ -116,7 +123,6 @@ class OpdsRepository(
         val passwordCipher = when {
             user == null -> null
             password == null -> existing?.passwordCipher
-            password.isEmpty() -> null
             else -> try {
                 cipher.encrypt(password)
             } catch (e: CredentialException) {

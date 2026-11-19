@@ -481,7 +481,7 @@ class OpdsViewModel(
                 // With automatic import on, the books come by themselves: stay in the library,
                 // which shows them arriving. Without it, open the catalogue to pick books.
                 if (current.id == null && !autoImport) {
-                    openCatalog(OpdsCatalog(id, title, url, user, password.isNotEmpty() || keepStored, autoImport))
+                    openCatalog(OpdsCatalog(id, title, url, user, user != null, autoImport))
                 }
             } catch (e: OpdsException) {
                 editor.update { it?.copy(checking = false, error = e.reason) }
