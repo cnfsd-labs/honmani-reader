@@ -376,10 +376,29 @@ class ProgressSync(
         scope.launch { pushLock.withLock { settings.account.value?.let { settle(it) } } }
     }
 
-    /** "Sync now" in the reader after a failure: the current position at once, then what couldn't be sent before. */
-    fun syncNow() {
+    /**
+     * "Sync now" after a failure: the current position at once, then what couldn't be sent before.
+     * Returns false if nothing was waiting to be sent (the failure came from a [pull]): the caller
+     * then pulls again (the reader) or [checkServer]s (Settings).
+     */
+    suspend fun syncNow(): Boolean {
         flush()
-        resend()
+        val waiting = synchronized(this) { pushJob != null } ||
+            withContext(Dispatchers.IO) { unsent.raw() != null || unsent.all().any { !it.held } }
+        if (waiting) resend()
+        return waiting
+    }
+
+    /** Checks the login with the server: a success clears the last failure, a failure replaces it. */
+    suspend fun checkServer() {
+        val account = settings.account.value ?: return
+        try {
+            client.authorize(account)
+            status?.succeeded()
+        } catch (e: IOException) {
+            Log.i(TAG, "Sync server check failed: ${e.message}")
+            status?.failed(e, status.state.value.failure?.ttuId)
+        }
     }
 
     private suspend fun push() = pushLock.withLock {

@@ -672,7 +672,40 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReaderMenuSheet(
                 showProgress = appSettings.showProgress,
                 syncFailure = syncFailure?.let { syncFailureReason(it) },
-                onSyncNow = { container.progressSync.syncNow() },
+                onSyncNow = {
+                    viewModel.closeMenu()
+                    val ttuId = current.ttuId
+                    scope.launch {
+                        val sync = container.progressSync
+                        if (sync.syncNow() || ttuId == null) return@launch
+                        // Nothing waited to be sent: the failure came from opening the book, so that pull runs again.
+                        val book = container.bookDao.findByTtuId(ttuId) ?: return@launch
+                        val ttu = viewModel.ttuLibrary
+                        var moved: Pair<Long, Double>? = null
+                        sync.takePlaceBefore(ttuId)
+                        val pulled = try {
+                            sync.pull(book, ttuId, bookmark = { ttu.bookmark(ttuId) }, setBookmark = { c, p -> moved = c to p }, ask = library::askSync)
+                        } catch (_: TtuLibraryException) {
+                            null
+                        }
+                        val (characters, progress) = moved ?: return@launch
+                        if (pulled == null) return@launch
+                        val text = container.searchableBook(ttuId)
+                        val spot = text?.around(characters.toInt())
+                        try {
+                            ttu.openHit(ttuId, characters, progress, spot?.hint.orEmpty(), spot?.match.orEmpty())
+                        } catch (_: TtuLibraryException) {
+                            return@launch
+                        }
+                        val message = resources.getString(R.string.sync_continued, pulled.percent, pulled.device)
+                        sync.takePlaceBefore(ttuId)?.let { before ->
+                            jumper.offerBack(
+                                ttuId, before.characters, before.total, text?.aroundPageStart(before.characters.toInt()),
+                                message, resources.getString(R.string.sync_back_to, before.percent),
+                            )
+                        } ?: jumpSnackbar.showSnackbar(message)
+                    }
+                },
                 place = place,
                 onJump = { characters ->
                     val id = current.ttuId

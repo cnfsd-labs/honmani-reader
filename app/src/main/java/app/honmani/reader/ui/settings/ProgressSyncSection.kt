@@ -49,6 +49,7 @@ fun ProgressSyncSection() {
     // Signed in, but this phone can no longer read the login: the password is needed again.
     val locked = settings.signedInAs.collectAsStateWithLifecycle().value.takeIf { account == null }
     val status by container.koSyncStatus.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var editing by rememberSaveable { mutableStateOf(false) }
 
     ListItem(
@@ -71,7 +72,9 @@ fun ProgressSyncSection() {
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = { container.progressSync.resend() }) { Text(stringResource(R.string.sync_now)) }
+                            TextButton(onClick = {
+                                scope.launch { if (!container.progressSync.syncNow()) container.progressSync.checkServer() }
+                            }) { Text(stringResource(R.string.sync_now)) }
                         }
                     }
                     if (ok != null) {

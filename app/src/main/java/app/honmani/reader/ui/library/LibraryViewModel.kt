@@ -737,15 +737,7 @@ class LibraryViewModel(
                     return@launch
                 }
                 if (ttuBook != known) adder.link(book, ttuBook)
-                syncPosition(book, ttuBook.id) { question ->
-                    val answer = CompletableDeferred<Boolean>()
-                    _syncQuestion.value = question to answer
-                    try {
-                        answer.await()
-                    } finally {
-                        _syncQuestion.value = null
-                    }
-                }
+                syncPosition(book, ttuBook.id, ::askSync)
                 if (listen) armAutoplay(book.contentHash)
                 ttu.open(ttuBook.id)
                 dao.setLastOpened(book.id, now())
@@ -754,6 +746,17 @@ class LibraryViewModel(
             } finally {
                 opening.value = null
             }
+        }
+    }
+
+    /** Asks [question] in the dialog of [syncQuestion]; true: go to the other device's place. */
+    suspend fun askSync(question: SyncQuestion): Boolean {
+        val answer = CompletableDeferred<Boolean>()
+        _syncQuestion.value = question to answer
+        return try {
+            answer.await()
+        } finally {
+            _syncQuestion.value = null
         }
     }
 

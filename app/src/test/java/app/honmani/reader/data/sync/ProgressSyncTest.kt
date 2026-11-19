@@ -26,6 +26,7 @@ import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -367,7 +368,7 @@ class ProgressSyncTest {
         waitFor { status.state.value.failure != null }
 
         server.down = false
-        sync.syncNow()
+        assertTrue(sync.syncNow())
         assertEquals(12.0 / 31, waitForProgress()["percentage"]!!.jsonPrimitive.double, 1e-9)
         waitFor { status.state.value.failure == null }
     }
@@ -376,8 +377,36 @@ class ProgressSyncTest {
     fun syncNow_sendsTheCurrentPositionWithoutWaiting() = runBlocking {
         sync = newSync(pushDelayMs = 60_000)
         sync.onPosition(5, 24)
-        sync.syncNow()
+        assertTrue(sync.syncNow())
         assertEquals(24.0 / 31, waitForProgress()["percentage"]!!.jsonPrimitive.double, 1e-9)
+    }
+
+    @Test
+    fun syncNowAfterAFailedPull_saysNothingWaited_andThePullAgainClearsTheFailure() = runBlocking {
+        server.down = true
+        assertNull(pull(local = 7, savedAtMs = 0))
+        assertNotNull(status.state.value.failure)
+
+        server.down = false
+        server.save(document, "/body/DocFragment[2]/body/p/text().3", 0.58, "Kindle", "K1", timestamp = 2_000)
+        assertFalse(sync.syncNow())
+        val pulls = server.requests.count { it.method == "GET" && it.path.startsWith("/syncs/progress/") }
+        assertNotNull(pull(local = 7, savedAtMs = 0))
+        assertTrue(server.requests.count { it.method == "GET" && it.path.startsWith("/syncs/progress/") } > pulls)
+        assertNull(status.state.value.failure)
+    }
+
+    @Test
+    fun checkingTheServer_clearsTheFailureOnlyWhenItAnswers() = runBlocking {
+        server.down = true
+        assertNull(pull(local = 7, savedAtMs = 0))
+        sync.checkServer()
+        assertEquals(5L, status.state.value.failure!!.ttuId)
+
+        server.down = false
+        sync.checkServer()
+        assertNull(status.state.value.failure)
+        assertNotNull(status.state.value.lastSuccessAt)
     }
 
     @Test
