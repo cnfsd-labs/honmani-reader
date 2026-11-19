@@ -209,13 +209,14 @@ private fun Entry(
 private fun LicenceTextScreen(text: LicenceText, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
     val context = LocalContext.current
+    val missing = stringResource(R.string.about_licence_missing, text.url)
     val paragraphs by produceState<List<String>?>(null, text) {
         value = withContext(Dispatchers.IO) {
             runCatching { context.assets.open(text.asset).use { it.readBytes().toString(Charsets.UTF_8) } }
                 .map(LicenceText::paragraphs)
                 .getOrNull()
                 ?.takeIf { it.isNotEmpty() }
-                ?: listOf(context.getString(R.string.about_licence_missing, text.url))
+                ?: listOf(missing)
         }
     }
     Scaffold(topBar = { HonmaniTopAppBar(title = stringResource(text.title), onBack = onBack) }) { padding ->
