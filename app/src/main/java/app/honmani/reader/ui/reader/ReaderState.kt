@@ -19,7 +19,7 @@ import app.honmani.reader.data.library.HighlightEntity
 import app.honmani.reader.data.library.PronunciationEntity
 import kotlinx.coroutines.flow.flowOf
 
-/** Which of the reader's sheets, dialogs and sub-screens are open; kept over a rotation. */
+/** Which of the reader's sheets, dialogs and sub-screens are open (see [saver] for what is kept). */
 @Stable
 internal class ReaderOverlays(bookmarkDraft: MutableState<BookmarkDraft?>) {
     /** Honmani's reader settings, from the Settings tab or the reader's top bar. */
@@ -66,28 +66,20 @@ internal class ReaderOverlays(bookmarkDraft: MutableState<BookmarkDraft?>) {
     var reviewShown by mutableStateOf(false)
 
     companion object {
+        /**
+         * Keeps only what makes sense without an open book. The activity handles configuration
+         * changes itself, so this state comes back only after process death, and then the WebView
+         * starts at ttu's library: a book's sheets and dialogs (and a bookmark being named) would
+         * show over the library or pop up over the next book, so they start closed.
+         */
         fun saver(bookmarkDraft: MutableState<BookmarkDraft?>) = listSaver<ReaderOverlays, Any?>(
-            save = {
-                listOf(
-                    it.readerSettings, it.openedFromMenu, it.contentsFromMenu, it.sessionShown, it.searchShown,
-                    it.bookmarksShown, it.highlightsShown, it.pronunciationsShown, it.audiobookStep, it.makeShown,
-                    it.dictionariesShown, it.reviewShown,
-                )
-            },
+            save = { listOf(it.readerSettings, it.dictionariesShown, it.reviewShown) },
             restore = { saved ->
+                bookmarkDraft.value = null
                 ReaderOverlays(bookmarkDraft).apply {
                     readerSettings = saved[0] as Boolean
-                    openedFromMenu = saved[1] as Boolean
-                    contentsFromMenu = saved[2] as Boolean
-                    sessionShown = saved[3] as Boolean
-                    searchShown = saved[4] as Boolean
-                    bookmarksShown = saved[5] as Boolean
-                    highlightsShown = saved[6] as Boolean
-                    pronunciationsShown = saved[7] as Boolean
-                    audiobookStep = saved[8] as AudiobookStep?
-                    makeShown = saved[9] as Boolean
-                    dictionariesShown = saved[10] as Boolean
-                    reviewShown = saved[11] as Boolean
+                    dictionariesShown = saved[1] as Boolean
+                    reviewShown = saved[2] as Boolean
                 }
             },
         )
