@@ -53,22 +53,11 @@ import app.honmani.reader.anki.CardAudio
 import app.honmani.reader.anki.CloudVoiceInfo
 import app.honmani.reader.anki.GoogleCloudVoice
 import app.honmani.reader.anki.SentenceSpeed
-import app.honmani.reader.anki.VoiceException
 import app.honmani.reader.readaloud.generate.GeneratedAudiobook
 import app.honmani.reader.ui.HonmaniTopAppBar
-import app.honmani.reader.ui.anki.label
 import app.honmani.reader.ui.VoiceSampleButton
 import app.honmani.reader.ui.rememberVoiceSamplePlayer
 
-
-/** What the Google key check says. */
-private sealed interface KeyCheck {
-    data object Checking : KeyCheck
-
-    data class Works(val voices: List<CloudVoiceInfo>) : KeyCheck
-
-    data class Failed(val message: Int) : KeyCheck
-}
 
 /** Settings' Voice row: where spoken audio comes from; a tap opens [VoiceSettingsScreen]. */
 @Composable
@@ -115,32 +104,12 @@ private fun VoiceSettingsContent() {
     val sentenceSpeed by settings.sentenceSpeed.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var keyInput by remember { mutableStateOf("") }
-    var check by remember { mutableStateOf<KeyCheck?>(null) }
-    // A new key check replaces one still running; its late result is dropped.
-    val keyChecks = remember { LatestOnly(scope) }
+    val keyCheck = remember { GoogleKeyCheck(settings, scope) }
+    val check = keyCheck.state
     val sample = rememberVoiceSamplePlayer()
 
-    fun checkKey() {
-        val key = settings.googleKey() ?: run {
-            // It was saved but can no longer be read on this phone: it has to be entered again.
-            if (hasKey) check = KeyCheck.Failed(R.string.google_key_unreadable)
-            return
-        }
-        check = KeyCheck.Checking
-        keyChecks.launch(
-            work = {
-                try {
-                    KeyCheck.Works(GoogleCloudVoice.voices(key))
-                } catch (e: VoiceException) {
-                    KeyCheck.Failed(e.problem.label())
-                }
-            },
-            onResult = { check = it },
-        )
-    }
-
     LaunchedEffect(audio, hasKey) {
-        if (audio == CardAudio.GOOGLE && hasKey && check == null) checkKey()
+        if (audio == CardAudio.GOOGLE && hasKey && keyCheck.state == null) keyCheck.check()
     }
 
     val sampleText = stringResource(R.string.voice_sample_text)
@@ -192,12 +161,7 @@ private fun VoiceSettingsContent() {
                         TextButton(
                             enabled = keyInput.isNotBlank(),
                             onClick = {
-                                if (settings.setGoogleKey(keyInput)) {
-                                    keyInput = ""
-                                    checkKey()
-                                } else {
-                                    check = KeyCheck.Failed(R.string.error_key_storage)
-                                }
+                                if (keyCheck.save(keyInput)) keyInput = ""
                             },
                         ) { Text(stringResource(R.string.action_save)) }
                     },
@@ -219,6 +183,20 @@ private fun VoiceSettingsContent() {
                             MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
+                }
+                if ((check as? KeyCheck.Failed)?.canRetry == true || hasKey) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if ((check as? KeyCheck.Failed)?.canRetry == true) {
+                            OutlinedButton(onClick = keyCheck::check) {
+                                Text(stringResource(R.string.google_key_check_again))
+                            }
+                        }
+                        if (hasKey) {
+                            TextButton(onClick = keyCheck::remove) {
+                                Text(stringResource(R.string.google_key_remove))
+                            }
+                        }
+                    }
                 }
                 (check as? KeyCheck.Works)?.voices?.takeIf { it.isNotEmpty() }?.let { voices ->
                     VoicePicker(

@@ -830,6 +830,8 @@
     <string name="google_key_summary">Stored encrypted on this phone and sent only to Google.</string>
     <string name="google_key_help_title">How to get a key</string>
     <string name="google_key_help">How to get a key: open console.cloud.google.com, create a project, enable “Cloud Text-to-Speech API”, then Credentials → Create credentials → API key. Restrict the key to the Cloud Text-to-Speech API. The key is stored encrypted on this phone and only sent to Google.</string>
+    <string name="google_key_check_again">Check again</string>
+    <string name="google_key_remove">Remove key</string>
     <string name="google_key_checking">Checking the key…</string>
     <plurals name="google_key_ok">
         <item quantity="one">Key works: %1$d Japanese voice</item>
