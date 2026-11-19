@@ -141,6 +141,7 @@ sealed interface LibraryNotice {
     data class Unreadable(val fileName: String) : LibraryNotice
 
     data class TooLarge(val fileName: String) : LibraryNotice
+    data class NoSpace(val fileName: String) : LibraryNotice
 
     /** Progress could not be reset; [bookId] lets the snackbar offer a retry. */
     data class ResetFailed(val title: String, val bookId: Long? = null) : LibraryNotice
@@ -540,6 +541,7 @@ class LibraryViewModel(
                 BookAdder.Result.Unsupported -> LibraryNotice.Unsupported(picked.name)
                 BookAdder.Result.Unreadable -> LibraryNotice.Unreadable(picked.name)
                 BookAdder.Result.TooLarge -> LibraryNotice.TooLarge(picked.name)
+                BookAdder.Result.NoSpace -> LibraryNotice.NoSpace(picked.name)
                 is BookAdder.Result.ReaderFailed -> LibraryNotice.ReaderFailed(result.title)
             }
             notice?.let { _notices.send(it) }

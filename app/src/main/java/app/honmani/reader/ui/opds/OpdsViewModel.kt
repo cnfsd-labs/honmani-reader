@@ -3,6 +3,7 @@ package app.honmani.reader.ui.opds
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import app.honmani.reader.data.dictionary.FailureReason
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
@@ -82,7 +83,7 @@ sealed interface DownloadState {
     data class Failed(val reason: DownloadFailure) : DownloadState
 }
 
-enum class DownloadFailure { NETWORK, UNAUTHORIZED, SERVER, UNREADABLE, TOO_LARGE, READER, HOTSPOT }
+enum class DownloadFailure { NETWORK, UNAUTHORIZED, SERVER, UNREADABLE, TOO_LARGE, READER, HOTSPOT, NO_SPACE }
 
 /** The catalogue dialog: adding a catalogue ([id] null) or changing one. */
 data class CatalogEditor(
@@ -400,11 +401,13 @@ class OpdsViewModel(
                         setDownload(entry.id, DownloadState.Failed(DownloadFailure.UNREADABLE))
                     BookAdder.Result.TooLarge ->
                         setDownload(entry.id, DownloadState.Failed(DownloadFailure.TOO_LARGE))
+                    BookAdder.Result.NoSpace ->
+                        setDownload(entry.id, DownloadState.Failed(DownloadFailure.NO_SPACE))
                     is BookAdder.Result.ReaderFailed ->
                         setDownload(entry.id, DownloadState.Failed(DownloadFailure.READER))
                 }
             } catch (e: OpdsException) {
-                val failure = when (e.reason) {
+                val failure = if (FailureReason.ofStorage(e) == FailureReason.NO_SPACE) DownloadFailure.NO_SPACE else when (e.reason) {
                     OpdsException.Reason.UNAUTHORIZED -> DownloadFailure.UNAUTHORIZED
                     OpdsException.Reason.NETWORK, OpdsException.Reason.CERTIFICATE -> DownloadFailure.NETWORK
                     OpdsException.Reason.HOTSPOT -> DownloadFailure.HOTSPOT

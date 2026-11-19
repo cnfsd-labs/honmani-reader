@@ -397,6 +397,7 @@ fun downloadFailureText(reason: DownloadFailure): Int = when (reason) {
     DownloadFailure.TOO_LARGE -> R.string.catalog_download_failed_too_large
     DownloadFailure.READER -> R.string.catalog_download_failed_reader
     DownloadFailure.HOTSPOT -> R.string.catalog_error_hotspot
+    DownloadFailure.NO_SPACE -> R.string.catalog_download_failed_no_space
 }
 
 @Composable

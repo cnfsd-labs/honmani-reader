@@ -1,5 +1,6 @@
 package app.honmani.reader.data.library
 
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.diagnostics.logWarning
 import android.database.sqlite.SQLiteConstraintException
 import java.io.File
@@ -44,6 +45,9 @@ class BookImporter(
 
         /** Larger than [MAX_BOOK_BYTES]: a video or archive by mistake, or a book too big to keep. */
         data object TooLarge : Result
+
+        /** The phone's storage is full: the book could not be copied. */
+        data object NoSpace : Result
     }
 
     /**
@@ -69,18 +73,18 @@ class BookImporter(
         coversDir.mkdirs()
         val temp = try {
             File.createTempFile("import", ".tmp", booksDir)
-        } catch (_: IOException) {
+        } catch (e: IOException) {
             // Storage full or not writable: the book can't be copied.
-            return Result.Unreadable
+            return unreadableOrNoSpace(e)
         }
         try {
             val (hash, head) = try {
                 copyAndHash(input, temp, maxBytes)
             } catch (_: TooLargeException) {
                 return Result.TooLarge
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // IOException, or whatever another app's content provider throws while reading.
-                return Result.Unreadable
+                return unreadableOrNoSpace(e)
             }
             var format = formatOf(displayName, head) ?: return Result.Unsupported
             dao.findByHash(hash)?.let { return Result.AlreadyInLibrary(it) }
@@ -96,8 +100,8 @@ class BookImporter(
                     // furigana show as ruby. The hash above stays that of the original file.
                     val aozora = try {
                         convertText(temp, hash, displayName)
-                    } catch (_: IOException) {
-                        return Result.Unreadable
+                    } catch (e: IOException) {
+                        return unreadableOrNoSpace(e)
                     } catch (e: OutOfMemoryError) {
                         // A huge text file: report it as unreadable instead of crashing.
                         logWarning("Honmani.library", "Not enough memory to import a text file", e)
@@ -150,6 +154,10 @@ class BookImporter(
             temp.delete()
         }
     }
+
+    /** A failed copy: [Result.NoSpace] if storage is full, else [Result.Unreadable]. */
+    private fun unreadableOrNoSpace(e: Throwable): Result =
+        if (FailureReason.ofStorage(e) == FailureReason.NO_SPACE) Result.NoSpace else Result.Unreadable
 
     /**
      * Gives [book], just added and kept (handed to the reader), what a restored backup kept for it,

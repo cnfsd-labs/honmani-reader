@@ -130,6 +130,18 @@ class BookImporterTest {
     }
 
     @Test
+    fun fullStorageWhileCopyingIsReportedAsNoSpace() = runTest {
+        // What a write to a full disk throws while the book is copied.
+        val full = object : java.io.InputStream() {
+            override fun read(): Int = throw java.io.IOException("write failed: ENOSPC (No space left on device)")
+        }
+
+        assertEquals(BookImporter.Result.NoSpace, importer.import(full, "neko.epub"))
+        assertEquals(emptyList<String>(), booksDir.list()!!.toList())
+        assertTrue(dao.observeAll().first().isEmpty())
+    }
+
+    @Test
     fun aFileOverTheLimitIsRefusedAndNotKept() = runTest {
         val epub = TestBooks.epub()
         val small = BookImporter(dao, booksDir, coversDir, now = { 1_000L }, maxBytes = epub.size - 1L)

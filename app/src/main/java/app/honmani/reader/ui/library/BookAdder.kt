@@ -31,6 +31,9 @@ class BookAdder(
         /** Larger than [BookImporter.MAX_BOOK_BYTES]. */
         data object TooLarge : Result
 
+        /** The phone's storage is full. */
+        data object NoSpace : Result
+
         /** ッツ Ebook Reader could not import the book; it was not kept. */
         data class ReaderFailed(val title: String) : Result
     }
@@ -46,6 +49,7 @@ class BookAdder(
         BookImporter.Result.Unsupported -> Result.Unsupported
         BookImporter.Result.Unreadable -> Result.Unreadable
         BookImporter.Result.TooLarge -> Result.TooLarge
+        BookImporter.Result.NoSpace -> Result.NoSpace
     }
 
     /** Imports a new book into the reader now, so problems show up at once and it opens fast. */
