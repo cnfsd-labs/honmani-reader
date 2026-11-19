@@ -13,7 +13,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   CSS. A tap on a picture opens it full screen with zoom
 - Search in the open book (reader menu): every match with its surroundings and place; a tap opens the
   book there and marks it
-- Read aloud (reader menu): the phone's Japanese voice (Settings, Text-to-speech) reads from the page on
+- Read aloud (reader menu): the phone's Japanese voice (Android's text-to-speech settings) reads from the page on
   screen, marks the sentence it says, turns the pages by itself and stops when you leave the app;
   play/pause, previous and next sentence and speed (0.5 to 1.5) are in a bar over the page.
   Pronunciations (reader menu): per book, "read this text as these kana" for names the voice gets wrong
@@ -76,7 +76,7 @@ Requires JDK 21, the Android SDK (platform 37), and Node.js 24 with pnpm 12 (for
 
 ```sh
 git clone --recurse-submodules <repo>    # or: git submodule update --init
-./gradlew lintDebug testDebugUnitTest assembleRelease
+./gradlew lintDebug testDebugUnitTest assembleRelease assembleInternal assembleDebug
 scripts/check-apk.sh app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
@@ -85,6 +85,9 @@ Browser tests for the reader's JavaScript run against the ttu build Gradle produ
 ```sh
 cd web-tests && npm ci && npx playwright install --with-deps chromium && npx playwright test
 ```
+
+Playwright has no Chromium build for Ubuntu 26.04 yet: there, set
+`PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64` for both the install and the run.
 
 `check-apk.sh` is the release gate CI runs on every push: 16 KB page alignment of native libraries, a
 complete bundled reader, and no Play-restricted permissions.

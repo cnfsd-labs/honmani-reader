@@ -49,6 +49,14 @@ class AnkiCardTest {
     }
 
     @Test
+    fun lineBreaksBecomeHtmlBreaks() {
+        val fields = AnkiCard.fields(content.copy(bookTitle = "上巻\r\n下巻\n"), wordAudio = "", sentenceAudio = "")
+
+        assertEquals("上巻<br>下巻<br>", fields[5])
+        assertEquals(emptyList<String>(), fields.filter { '\n' in it || '\r' in it })
+    }
+
+    @Test
     fun oneSenseIsPlainText_andHtmlInTextIsEscaped() {
         assertEquals("a &lt;b&gt; c", AnkiCard.meaning(listOf(listOf("a <b> c"))))
         assertEquals("", AnkiCard.meaning(emptyList()))

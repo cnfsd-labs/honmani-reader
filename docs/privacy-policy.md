@@ -49,8 +49,8 @@ name itself, see below).
 
 - **Dictionaries and reader fonts** you choose to download, and a check for dictionary
   updates when the app starts (for dictionaries you imported yourself that offer updates, the check goes to the
-  update address the dictionary names, which can be any https address): GitHub (github.com, raw.githubusercontent.com), Hugging Face
-  (huggingface.co) and Jiten (api.jiten.moe), always over an encrypted connection (https).
+  update address the dictionary names, which can be any https address): GitHub (github.com, raw.githubusercontent.com; downloads are redirected to other
+  githubusercontent.com hosts), Hugging Face (huggingface.co, redirected to hf.co) and Jiten (api.jiten.moe), always over an encrypted connection (https).
   These sites see an ordinary download request (your IP address and the app's name); Honmani
   sends no personal data. Their own privacy
   policies apply.
@@ -78,7 +78,7 @@ name itself, see below).
 - **Reading progress sync, only if you sign in** (Settings → Books and sync) to a
   KOReader sync server of your choice: for EPUB books, Honmani sends that server an identifier
   computed from the book file (not its title or text), your reading position and percentage,
-  the name of your phone model and a random id Honmani made for this phone (so the server can
+  the name of your phone model (as "Honmani (model)", also when sync uses a book server's login) and a random id Honmani made for this phone (so the server can
   tell your devices apart), and reads back the position saved by your other devices: when you
   open a book, and once when you download a book from a book server. You can
   also turn this on from a book server's settings, with that server's address and login.
@@ -137,7 +137,8 @@ the app stops.
   and Android's share menu opens. You choose who receives it, if anyone. Honmani sends it nowhere.
 - **Share diagnostics:** only when you tap it in Settings, Honmani prepares a short technical
   report (app and Android version, the reader's log, why the app last crashed or was closed by
-  Android, layout details of the last opened book, which can include short excerpts of its text)
+  Android, layout details of the last opened book, which can include short excerpts of its text, and the
+  latest network requests with server names only)
   and opens Android's share menu. You choose who receives it, if anyone. The record of the last
   crash stays in the app's storage on your phone.
 
