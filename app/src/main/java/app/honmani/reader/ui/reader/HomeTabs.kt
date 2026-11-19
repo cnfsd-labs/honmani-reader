@@ -142,6 +142,10 @@ internal fun HomeTabs(
                 when (tab) {
                     HomeTab.LIBRARY -> LibraryScreen(
                         bottomBar = tabBar,
+                        onOpenDictionaries = {
+                            tab = HomeTab.SETTINGS
+                            overlays.dictionariesShown = true
+                        },
                         viewModel = library,
                         addBookOnStart = addBookOnStart,
                         onAddBookStarted = { addBookOnStart = null },
@@ -150,6 +154,10 @@ internal fun HomeTabs(
                     )
                     HomeTab.WORDS -> WordsScreen(
                         bottomBar = tabBar,
+                        onOpenDictionaries = {
+                            tab = HomeTab.SETTINGS
+                            overlays.dictionariesShown = true
+                        },
                         pageCycle = wordsTaps,
                         focusSearch = focusSearch,
                         onSearchFocused = { focusSearch = false },

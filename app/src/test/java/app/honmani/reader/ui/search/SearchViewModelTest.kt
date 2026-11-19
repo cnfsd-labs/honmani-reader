@@ -95,6 +95,31 @@ class SearchViewModelTest {
     }
 
     @Test
+    fun tryAgainRerunsAFailedSearch() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        var broken = true
+        var calls = 0
+        val viewModel = SearchViewModel(
+            search = {
+                calls++
+                if (broken) error("damaged row") else LookupResult(listOf(entry(1, "b")))
+            },
+            compute = dispatcher,
+        )
+        viewModel.setQuery("b")
+        advanceUntilIdle()
+        assertTrue(viewModel.results.value.failed)
+
+        broken = false
+        viewModel.retry()
+        advanceUntilIdle()
+        assertEquals(2, calls)
+        assertFalse(viewModel.results.value.failed)
+        assertEquals(listOf("b"), viewModel.results.value.groups.map { it.expression })
+    }
+
+    @Test
     fun aSearchWithoutMatchesIsNotAFailure() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.setMain(dispatcher)

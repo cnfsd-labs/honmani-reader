@@ -334,6 +334,7 @@
     <string name="action_mark_finished">Mark as finished</string>
     <string name="library_search_hint">Title or author</string>
     <string name="library_search_empty">No books match.</string>
+    <string name="library_search_empty_narrowed">No books match here. The search looks only at the books shown.</string>
     <string name="library_filter_empty">No books here yet.</string>
     <string name="library_empty_not_started">No unread books.</string>
     <string name="library_empty_reading">No books being read.</string>
@@ -1049,7 +1050,7 @@
     <string name="search_history_clear">Clear</string>
     <string name="search_history_cleared">Recent searches cleared</string>
     <string name="search_history_remove">Remove %1$s from recent searches</string>
-    <string name="search_failed">Search failed. Try again.</string>
+    <string name="search_failed">The search failed.</string>
     <string name="search_nothing_found">Nothing in the dictionaries for \"%1$s\".</string>
     <string name="search_in_your_words">In your words</string>
     <string name="search_english_pending">Getting English search ready: a minute after a dictionary is installed. Searching in Japanese and romaji works already.</string>
@@ -1382,7 +1383,7 @@
     <string name="book_difficulty">Difficulty %1$d</string>
     <string name="book_difficulty_detail" tools:ignore="PluralsCandidate">Counting a word\'s first few uses: %1$d%% of its words are beyond the 10,000 most common, kanji in %2$d%% of the words. %3$d characters per sentence; %4$s different words in %5$s.</string>
     <string name="book_difficulty_grading">Working out how hard this book is…</string>
-    <string name="book_difficulty_no_dictionaries">The difficulty needs a dictionary and a frequency list, such as Jiten. Get them in Settings → Dictionaries.</string>
+    <string name="book_difficulty_no_dictionaries">The difficulty needs a dictionary and a frequency list, such as Jiten.</string>
     <string name="book_time_whole">About %1$s to read</string>
     <string name="book_time_left">About %1$s left</string>
     <string name="book_coverage_all">You know all its words, or are learning them.</string>

@@ -56,7 +56,8 @@ class SearchViewModel(
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
 
-    private val indexBuilt = MutableStateFlow(0)
+    /** Bumped to search the same text again: a gloss index got built, or [retry]. */
+    private val rerun = MutableStateFlow(0)
 
     private val _results = MutableStateFlow(SearchResults())
     val results: StateFlow<SearchResults> = _results.asStateFlow()
@@ -65,13 +66,13 @@ class SearchViewModel(
         viewModelScope.launch {
             @OptIn(FlowPreview::class)
             val debounced = _query.debounce { if (it.isBlank()) 0L else DEBOUNCE_MS }
-            combine(debounced, indexBuilt) { text, _ -> text }.collectLatest { text ->
+            combine(debounced, rerun) { text, _ -> text }.collectLatest { text ->
                 _results.value = if (text.isBlank()) SearchResults() else run(text)
             }
         }
         viewModelScope.launch {
             // Searches again once an index is built, so English results don't stay half found.
-            indexBuilding.drop(1).filter { !it }.collect { indexBuilt.value++ }
+            indexBuilding.drop(1).filter { !it }.collect { rerun.value++ }
         }
     }
 
@@ -88,6 +89,11 @@ class SearchViewModel(
 
     fun setQuery(text: String) {
         _query.value = text
+    }
+
+    /** Runs the current search again (after it failed). */
+    fun retry() {
+        rerun.value++
     }
 
     /** The current text is worth keeping: a result was opened or the keyboard's search pressed. */

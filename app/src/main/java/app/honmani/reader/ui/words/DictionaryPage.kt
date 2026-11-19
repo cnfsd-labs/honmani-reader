@@ -37,6 +37,8 @@ fun DictionaryPage(
     onHistory: (String) -> Unit,
     onForget: (String) -> Unit,
     onForgetAll: () -> Unit,
+    onRetry: () -> Unit = {},
+    onOpenDictionaries: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding()) {
         SearchContent(
@@ -49,6 +51,8 @@ fun DictionaryPage(
             onHistory = onHistory,
             onForget = onForget,
             onForgetAll = onForgetAll,
+            onRetry = onRetry,
+            onOpenDictionaries = onOpenDictionaries,
             modifier = Modifier.weight(1f).fillMaxWidth(),
         )
         SearchField(

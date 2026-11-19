@@ -118,6 +118,8 @@ fun BookSheet(
     onMoveToFolder: (Long?) -> Unit = {},
     /** Makes a folder with this name and moves the book in; the second argument gets what came of the name. */
     onCreateFolder: (String, (FolderResult) -> Unit) -> Unit = { _, _ -> },
+    /** Opens Settings → Dictionaries, when the difficulty needs one. */
+    onOpenDictionaries: () -> Unit = {},
     viewModel: StatisticsViewModel = viewModel(factory = StatisticsViewModel.Factory),
     progress: ProgressViewModel = viewModel(factory = ProgressViewModel.Factory),
 ) {
@@ -172,6 +174,7 @@ fun BookSheet(
                         book = book,
                         skill = skill,
                         onLearn = if (hasNewWords && book.contentHash.isNotEmpty()) ({ showUnknown = true }) else null,
+                        onOpenDictionaries = onOpenDictionaries,
                     )
                 }
                 stats?.let { Statistics(it) }
@@ -352,7 +355,13 @@ private fun StatusPill(book: LibraryBook) {
  * JLPT level that is, and how much of its words the reader knows. A tap shows the measures behind the score. Without a grade: that it is being worked out, or what is missing.
  */
 @Composable
-private fun DifficultyCard(stats: BookStatistics, book: LibraryBook, skill: Int?, onLearn: (() -> Unit)?) {
+private fun DifficultyCard(
+    stats: BookStatistics,
+    book: LibraryBook,
+    skill: Int?,
+    onLearn: (() -> Unit)?,
+    onOpenDictionaries: () -> Unit,
+) {
     val difficulty = stats.difficulty
     if (difficulty == null) {
         val hint = when (stats.grading) {
@@ -366,6 +375,11 @@ private fun DifficultyCard(stats: BookStatistics, book: LibraryBook, skill: Int?
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
+        if (stats.grading == GradingState.NO_DICTIONARIES) {
+            TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 12.dp)) {
+                Text(stringResource(R.string.lookup_open_dictionaries))
+            }
+        }
         return
     }
     var expanded by rememberSaveable(book.id) { mutableStateOf(false) }

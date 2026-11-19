@@ -1,5 +1,6 @@
 package app.honmani.reader.ui.library
 
+import app.honmani.reader.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,6 +8,24 @@ import org.junit.Test
 
 class LibraryFilterTest {
     private fun book(title: String, author: String? = null) = LibraryBook(1, title, author, null, 0f)
+
+    @Test
+    fun anEmptySearchSaysWhenItLooksAtOnlySomeBooks() {
+        assertEquals(R.string.library_search_empty, emptyShelfText(LibraryUiState(query = "猫")))
+        assertFalse(LibraryUiState(query = "猫").searchNarrowed)
+        for (state in listOf(
+            LibraryUiState(query = "猫", filter = ReadingStatus.READING),
+            LibraryUiState(query = "猫", folderId = 3),
+            LibraryUiState(query = "猫", showHidden = true),
+        )) {
+            assertTrue(state.searchNarrowed)
+            assertEquals(R.string.library_search_empty_narrowed, emptyShelfText(state))
+        }
+        // Without a search the shelf says why it is empty, as before.
+        assertFalse(LibraryUiState(filter = ReadingStatus.READING).searchNarrowed)
+        assertEquals(R.string.library_empty_reading, emptyShelfText(LibraryUiState(filter = ReadingStatus.READING)))
+        assertEquals(R.string.library_folder_empty, emptyShelfText(LibraryUiState(folderId = 3)))
+    }
 
     @Test
     fun statusFollowsProgressOrTheFinishedMark() {

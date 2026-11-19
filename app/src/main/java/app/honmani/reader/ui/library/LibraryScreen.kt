@@ -203,6 +203,8 @@ fun LibraryScreen(
     /** Opens the Progress tab, from a milestone's notice. */
     onShowProgress: () -> Unit = {},
     scrollToTop: Int = 0,
+    /** Opens Settings → Dictionaries, from a book's difficulty while none is installed. */
+    onOpenDictionaries: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val autoImport by viewModel.autoImport.collectAsStateWithLifecycle()
@@ -443,6 +445,7 @@ fun LibraryScreen(
             },
             onFilter = viewModel::setFilter,
             onSelectFolder = viewModel::selectFolder,
+            onOpenDictionaries = onOpenDictionaries,
             onSetFoldersOpen = viewModel::setFoldersOpen,
             onCreateFolder = viewModel::createFolder,
             onRenameFolder = viewModel::renameFolder,
@@ -649,6 +652,7 @@ private fun LibraryContent(
     onDismissContinue: () -> Unit = {},
     /** Counts taps on the Library tab while it is open: each one scrolls to the top. */
     scrollToTop: Int = 0,
+    onOpenDictionaries: () -> Unit = {},
 ) {
     var pendingRemove by remember { mutableStateOf<LibraryBook?>(null) }
     val scope = rememberCoroutineScope()
@@ -833,17 +837,13 @@ private fun LibraryContent(
                 uiState.totalBooks == 0 -> if (uiState.adding == null) {
                     Box(Modifier.padding(bottom = bottomInset)) { EmptyLibrary(onAdd, onFreeBooks, onSample) }
                 }
-                books.isEmpty() -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                books.isEmpty() -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     val statusFilter = uiState.filter
                     Text(
-                        text = stringResource(
-                            when {
-                                uiState.query.isNotBlank() -> R.string.library_search_empty
-                                statusFilter != null -> statusEmptyText(statusFilter)
-                                uiState.folderId != null && !uiState.showHidden -> R.string.library_folder_empty
-                                else -> R.string.library_filter_empty
-                            },
-                        ),
+                        text = stringResource(emptyShelfText(uiState)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -851,8 +851,13 @@ private fun LibraryContent(
                             .fillMaxWidth()
                             .padding(32.dp),
                     )
-                    if (statusFilter != null || (uiState.folderId != null && uiState.query.isBlank())) {
-                        FilledTonalButton(
+                    if (uiState.query.isNotBlank()) {
+                        FilledTonalButton(onClick = { onSearch("") }) {
+                            Text(stringResource(R.string.words_search_clear))
+                        }
+                    }
+                    if (statusFilter != null || (uiState.folderId != null && uiState.query.isBlank()) || uiState.searchNarrowed) {
+                        OutlinedButton(
                             onClick = {
                                 onFilter(null)
                                 onSelectFolder(null)
@@ -930,6 +935,10 @@ private fun LibraryContent(
                     if (result is FolderResult.Done && uiState.folderId != null) detailsFor = null
                     done(result)
                 }
+            },
+            onOpenDictionaries = {
+                detailsFor = null
+                onOpenDictionaries()
             },
         )
     }
@@ -1536,6 +1545,22 @@ internal fun statusIcon(status: ReadingStatus): Painter = when (status) {
     ReadingStatus.NOT_STARTED -> painterResource(R.drawable.ic_not_started)
     ReadingStatus.READING -> painterResource(R.drawable.ic_reading)
     ReadingStatus.FINISHED -> rememberVectorPainter(Icons.Filled.CheckCircle)
+}
+
+/** Whether a search looks at fewer books than the whole library: a status filter, a folder or the hidden shelf. */
+internal val LibraryUiState.searchNarrowed: Boolean
+    get() = query.isNotBlank() && (filter != null || folderId != null || showHidden)
+
+/** What an empty shelf says: a search that found nothing (and whether it looked at only some books), or why the shelf is empty. */
+internal fun emptyShelfText(state: LibraryUiState): Int {
+    val status = state.filter
+    return when {
+        state.searchNarrowed -> R.string.library_search_empty_narrowed
+        state.query.isNotBlank() -> R.string.library_search_empty
+        status != null -> statusEmptyText(status)
+        state.folderId != null && !state.showHidden -> R.string.library_folder_empty
+        else -> R.string.library_filter_empty
+    }
 }
 
 private fun statusEmptyText(status: ReadingStatus): Int = when (status) {

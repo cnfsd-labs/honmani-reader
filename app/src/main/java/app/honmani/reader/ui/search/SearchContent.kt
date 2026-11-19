@@ -164,6 +164,10 @@ fun SearchContent(
     onHistory: (String) -> Unit,
     onForget: (String) -> Unit,
     onForgetAll: () -> Unit,
+    /** Runs the failed search again. */
+    onRetry: () -> Unit = {},
+    /** Opens Settings → Dictionaries (shown while none is installed). */
+    onOpenDictionaries: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // Each query's results get their own list position, starting at the top: one shared state
@@ -207,8 +211,22 @@ fun SearchContent(
             return@LazyColumn
         }
         when {
-            !results.dictionariesAvailable -> item(key = "none") { Message(stringResource(R.string.lookup_no_dictionaries)) }
-            results.failed && results.query == query -> item(key = "failed") { Message(stringResource(R.string.search_failed)) }
+            !results.dictionariesAvailable -> item(key = "none") {
+                Column {
+                    Message(stringResource(R.string.lookup_no_dictionaries))
+                    TextButton(onClick = onOpenDictionaries, modifier = Modifier.padding(start = 8.dp)) {
+                        Text(stringResource(R.string.lookup_open_dictionaries))
+                    }
+                }
+            }
+            results.failed && results.query == query -> item(key = "failed") {
+                Column {
+                    Message(stringResource(R.string.search_failed))
+                    TextButton(onClick = onRetry, modifier = Modifier.padding(start = 8.dp)) {
+                        Text(stringResource(R.string.action_retry))
+                    }
+                }
+            }
             results.groups.isEmpty() && results.query == query ->
                 item(key = "empty") { Message(stringResource(R.string.search_nothing_found, query.trim())) }
         }

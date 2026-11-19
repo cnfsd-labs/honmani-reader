@@ -173,6 +173,8 @@ fun WordsScreen(
     readNext: ReadNext? = null,
     onReadNext: (ReadNext) -> Unit = {},
     reviewChoice: ReviewScopeChoice = ReviewScopeChoice(),
+    /** Opens Settings → Dictionaries, from the Dictionary page while none is installed. */
+    onOpenDictionaries: () -> Unit = {},
     /** Ids of the books in the library: a word's sentence from one of them offers "Open in book". */
     libraryBookIds: Set<Long> = emptySet(),
     onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
@@ -482,6 +484,8 @@ fun WordsScreen(
                             if (result == SnackbarResult.ActionPerformed) search.undoForgetAll()
                         }
                     },
+                    onRetry = search::retry,
+                    onOpenDictionaries = onOpenDictionaries,
                 )
             }
         }
