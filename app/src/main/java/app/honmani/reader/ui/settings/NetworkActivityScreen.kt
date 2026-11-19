@@ -23,7 +23,10 @@ import androidx.compose.ui.unit.dp
 import android.text.format.DateUtils
 import android.text.format.Formatter
 import app.honmani.reader.R
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import app.honmani.reader.diagnostics.NetworkEntry
 import app.honmani.reader.diagnostics.NetworkLog
+import app.honmani.reader.diagnostics.NetworkOutcome
 import app.honmani.reader.diagnostics.NetworkPurpose
 import app.honmani.reader.ui.HonmaniTopAppBar
 
@@ -39,6 +42,26 @@ private fun NetworkPurpose.title(): Int = when (this) {
     NetworkPurpose.FONT -> R.string.network_purpose_font
 }
 
+private fun NetworkOutcome.phrase(): Int? = when (this) {
+    NetworkOutcome.ANSWERED -> R.string.network_result_answered
+    NetworkOutcome.SIGN_IN_REFUSED -> R.string.network_result_sign_in_refused
+    NetworkOutcome.NOT_FOUND -> R.string.network_result_not_found
+    NetworkOutcome.REFUSED -> R.string.network_result_refused
+    NetworkOutcome.SERVER_ERROR -> R.string.network_result_server_error
+    NetworkOutcome.SERVER_NOT_FOUND -> R.string.network_result_server_not_found
+    NetworkOutcome.NO_CONNECTION -> R.string.network_result_no_connection
+    NetworkOutcome.TIMED_OUT -> R.string.network_result_timed_out
+    NetworkOutcome.SECURE_CONNECTION_FAILED -> R.string.network_result_secure_connection
+    NetworkOutcome.OTHER -> null
+}
+
+/** "Sign-in refused (HTTP 401)", "Server not found", or the raw result if there is no phrase for it. */
+@Composable
+private fun NetworkEntry.readableResult(): String {
+    val phrase = outcome.phrase()?.let { stringResource(it) } ?: return result
+    return if (status != null) "$phrase ($result)" else phrase
+}
+
 /**
  * The latest requests Honmani made to the network: when, what for, which server (only its
  * host), and how it went. The list lives in memory and is never sent anywhere.
@@ -48,6 +71,10 @@ fun NetworkActivityScreen(onBack: () -> Unit, log: NetworkLog = NetworkLog.share
     BackHandler(onBack = onBack)
     val context = LocalContext.current
     var entries by remember { mutableStateOf(log.entries()) }
+    LifecycleResumeEffect(log) {
+        entries = log.entries()
+        onPauseOrDispose {}
+    }
     Scaffold(
         topBar = {
             HonmaniTopAppBar(
@@ -97,7 +124,7 @@ fun NetworkActivityScreen(onBack: () -> Unit, log: NetworkLog = NetworkLog.share
                     headlineContent = { Text(stringResource(entry.purpose.title())) },
                     supportingContent = {
                         val size = entry.bytes?.let { "  ·  " + Formatter.formatShortFileSize(context, it) }.orEmpty()
-                        Text(entry.host + "  ·  " + entry.result + size)
+                        Text(entry.host + "  ·  " + entry.readableResult() + size)
                     },
                 )
                 HorizontalDivider()

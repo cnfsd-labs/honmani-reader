@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
@@ -28,6 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.R
 import app.honmani.reader.data.dictionary.DictionaryCatalog
@@ -37,14 +41,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** A licence text in the app's assets. */
-enum class LicenceText(@StringRes val title: Int, val asset: String) {
-    GPL(R.string.about_licence, "licenses/gpl-3.0.txt"),
-    TTU(R.string.about_ttu, "licenses/ttu.txt"),
+enum class LicenceText(@StringRes val title: Int, val asset: String, /** Where to read it if the asset is missing. */ val url: String) {
+    GPL(R.string.about_licence, "licenses/gpl-3.0.txt", "https://www.gnu.org/licenses/gpl-3.0.html"),
+    TTU(R.string.about_ttu, "licenses/ttu.txt", "https://github.com/ttu-ttu/ebook-reader/blob/main/LICENSE"),
 
     /** Written by the build from ttu's bundle (see `BuildTtuTask`). */
-    TTU_LIBRARIES(R.string.about_ttu_libraries, "licenses/ttu-libraries.txt"),
-    APACHE(R.string.about_android_libraries, "licenses/apache-2.0.txt"),
-    UNICODE(R.string.about_unihan, "licenses/unicode.txt"),
+    TTU_LIBRARIES(R.string.about_ttu_libraries, "licenses/ttu-libraries.txt", "https://github.com/ttu-ttu/ebook-reader"),
+    APACHE(R.string.about_android_libraries, "licenses/apache-2.0.txt", "https://www.apache.org/licenses/LICENSE-2.0"),
+    UNICODE(R.string.about_unihan, "licenses/unicode.txt", "https://www.unicode.org/license.txt"),
     ;
 
     companion object {
@@ -90,7 +94,7 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
                 )
             }
             item {
-                Entry(R.string.about_licence, stringResource(R.string.about_licence_details)) { open = LicenceText.GPL }
+                Entry(R.string.about_licence, stringResource(R.string.about_licence_details), R.string.about_read_licence) { open = LicenceText.GPL }
             }
             item {
                 Entry(R.string.about_source, SOURCE_URL.removePrefix("https://")) { openUrl(context, SOURCE_URL) }
@@ -101,19 +105,19 @@ fun AboutScreen(version: String, onBack: () -> Unit) {
                 }
             }
             item { Heading(R.string.about_built_with) }
-            item { Entry(R.string.about_ttu, stringResource(R.string.about_ttu_details)) { open = LicenceText.TTU } }
+            item { Entry(R.string.about_ttu, stringResource(R.string.about_ttu_details), R.string.about_read_licence) { open = LicenceText.TTU } }
             item {
-                Entry(R.string.about_ttu_libraries, stringResource(R.string.about_ttu_libraries_details)) {
+                Entry(R.string.about_ttu_libraries, stringResource(R.string.about_ttu_libraries_details), R.string.about_read_licence) {
                     open = LicenceText.TTU_LIBRARIES
                 }
             }
             item {
-                Entry(R.string.about_android_libraries, stringResource(R.string.about_android_libraries_details)) {
+                Entry(R.string.about_android_libraries, stringResource(R.string.about_android_libraries_details), R.string.about_read_licence) {
                     open = LicenceText.APACHE
                 }
             }
             item {
-                Entry(R.string.about_unihan, stringResource(R.string.about_unihan_details)) {
+                Entry(R.string.about_unihan, stringResource(R.string.about_unihan_details), R.string.about_read_licence) {
                     open = LicenceText.UNICODE
                 }
             }
@@ -182,16 +186,21 @@ private fun Heading(@StringRes title: Int) {
         text = stringResource(title),
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp).semantics { heading() },
     )
 }
 
 @Composable
-private fun Entry(@StringRes title: Int, details: String, onClick: () -> Unit) {
+private fun Entry(
+    @StringRes title: Int,
+    details: String,
+    @StringRes onClickLabel: Int = R.string.about_open_link,
+    onClick: () -> Unit,
+) {
     ListItem(
         headlineContent = { Text(stringResource(title)) },
         supportingContent = { Text(details) },
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier.clickable(onClickLabel = stringResource(onClickLabel), role = Role.Button, onClick = onClick),
     )
 }
 
@@ -204,7 +213,9 @@ private fun LicenceTextScreen(text: LicenceText, onBack: () -> Unit) {
         value = withContext(Dispatchers.IO) {
             runCatching { context.assets.open(text.asset).use { it.readBytes().toString(Charsets.UTF_8) } }
                 .map(LicenceText::paragraphs)
-                .getOrDefault(emptyList())
+                .getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?: listOf(context.getString(R.string.about_licence_missing, text.url))
         }
     }
     Scaffold(topBar = { HonmaniTopAppBar(title = stringResource(text.title), onBack = onBack) }) { padding ->
@@ -232,7 +243,7 @@ private fun openUrl(context: Context, url: String) {
     try {
         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
-        // No browser; the address is on screen.
+        Toast.makeText(context, context.getString(R.string.about_no_browser, url), Toast.LENGTH_LONG).show()
     }
 }
 

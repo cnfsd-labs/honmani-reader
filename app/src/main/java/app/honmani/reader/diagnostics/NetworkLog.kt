@@ -17,6 +17,54 @@ enum class NetworkPurpose {
     FONT,
 }
 
+/** How a request went, in words a reader understands (the screen names each one). */
+enum class NetworkOutcome {
+    ANSWERED,
+    SIGN_IN_REFUSED,
+    NOT_FOUND,
+    REFUSED,
+    SERVER_ERROR,
+    SERVER_NOT_FOUND,
+    NO_CONNECTION,
+    TIMED_OUT,
+    SECURE_CONNECTION_FAILED,
+
+    /** Nothing more readable than the result itself. */
+    OTHER,
+    ;
+
+    companion object {
+        /** The outcome of a [NetworkEntry.result]: "HTTP 401" or an exception class name. */
+        fun of(result: String): NetworkOutcome {
+            val status = result.removePrefix("HTTP ").takeIf { result.startsWith("HTTP ") }?.toIntOrNull()
+            if (status != null) {
+                return when (status) {
+                    in 200..399 -> ANSWERED
+                    401, 403, 407 -> SIGN_IN_REFUSED
+                    404, 410 -> NOT_FOUND
+                    in 400..499 -> REFUSED
+                    in 500..599 -> SERVER_ERROR
+                    else -> OTHER
+                }
+            }
+            return when {
+                result == "UnknownHostException" -> SERVER_NOT_FOUND
+                result == "SocketTimeoutException" -> TIMED_OUT
+                result.startsWith("SSL") || result.startsWith("Cert") -> SECURE_CONNECTION_FAILED
+                result in NO_CONNECTION_ERRORS -> NO_CONNECTION
+                else -> OTHER
+            }
+        }
+
+        private val NO_CONNECTION_ERRORS = setOf(
+            "ConnectException",
+            "NoRouteToHostException",
+            "PortUnreachableException",
+            "SocketException",
+        )
+    }
+}
+
 /**
  * One request in the [NetworkLog]. Only the host is kept, never the path, query, login or key,
  * and an error is only its class (its message could name an address).
@@ -36,6 +84,11 @@ data class NetworkEntry(
         append("  ").append(purpose.name.lowercase(Locale.ROOT)).append("  ").append(host).append("  ").append(result)
         if (bytes != null) append("  ").append(bytes).append(" bytes")
     }
+
+    val outcome: NetworkOutcome get() = NetworkOutcome.of(result)
+
+    /** The HTTP status, if the server answered. */
+    val status: Int? get() = result.removePrefix("HTTP ").takeIf { result.startsWith("HTTP ") }?.toIntOrNull()
 }
 
 /**
