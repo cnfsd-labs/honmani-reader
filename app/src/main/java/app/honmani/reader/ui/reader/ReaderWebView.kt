@@ -9,6 +9,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -340,6 +341,9 @@ fun ReaderWebView(
     // A new WebView after the page's renderer died (crashed, or killed by Android for memory):
     // the old one cannot be used again, and without this Android would close the whole app.
     var renderer by remember { mutableIntStateOf(0) }
+    // The ttu book on screen, reopened on the new WebView.
+    val openBookId = remember { arrayOfNulls<Long>(1) }
+    val rendererRestart = remember { RendererRestart() }
 
     key(renderer) {
         AndroidView(
@@ -348,6 +352,7 @@ fun ReaderWebView(
                 createReaderWebView(
                     context = context,
                     scope = scope,
+                    startUrl = if (renderer == 0) START_URL else rendererRestart.startUrl(openBookId[0], SystemClock.elapsedRealtime(), START_URL),
                     onRenderProcessGone = { renderer++ },
                     // Only over a book: ttu's own pages keep their text fields' Paste and Select all.
                     hideSelectionToolbar = { currentHideToolbar && inBook },
@@ -414,6 +419,7 @@ fun ReaderWebView(
                         val wasAtLibrary = atLibrary
                         atLibrary = path in ReaderBack.LIBRARY_PATHS
                         inBook = bookId != null
+                        openBookId[0] = bookId
                         when {
                             wasAtLibrary && !atLibrary && bookId != null -> uncoverAfter(UNCOVER_TIMEOUT_MS)
                             // ttu's settings likewise stay covered until drawn, or the book list shows.
@@ -531,6 +537,7 @@ private class WebViewRef {
 private fun createReaderWebView(
     context: Context,
     scope: CoroutineScope,
+    startUrl: String,
     onMessage: (BridgeMessage, JavaScriptReplyProxy) -> Unit,
     diagnostics: ReaderDiagnostics,
     ttuLibrary: TtuLibrary,
@@ -604,6 +611,7 @@ private fun createReaderWebView(
             }
         }
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+            val order = MessageOrder(scope)
             WebViewCompat.addWebMessageListener(
                 this,
                 BRIDGE_OBJECT,
@@ -612,17 +620,16 @@ private fun createReaderWebView(
                 val data = message.data
                 if (!isMainFrame) return@addWebMessageListener
                 if (data != null && BridgeMessage.isPicture(data)) {
-                    // A picture is up to 3 MB of text: parsed off the main thread, handed on back on it.
-                    scope.launch {
-                        withContext(Dispatchers.Default) { BridgeMessage.parse(data) }?.let { onMessage(it, replyProxy) }
-                    }
+                    // A picture is up to 3 MB of text: parsed off the main thread, handed on back on it,
+                    // in order with the messages after it.
+                    order.later({ withContext(Dispatchers.Default) { BridgeMessage.parse(data) } }) { onMessage(it, replyProxy) }
                 } else {
-                    BridgeMessage.parse(data)?.let { onMessage(it, replyProxy) }
+                    BridgeMessage.parse(data)?.let { order.now { onMessage(it, replyProxy) } }
                 }
             }
         }
 
-        loadUrl(START_URL)
+        loadUrl(startUrl)
     }
 }
 
@@ -732,7 +739,7 @@ private class ReaderWebViewClient(
         return true
     }
 
-    /** The page's renderer died: the reader starts again on a new WebView, at the book list. */
+    /** The page's renderer died: the reader starts again on a new WebView, at the open book (see [RendererRestart]). */
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
         diagnostics.log("renderer gone (crashed: ${detail.didCrash()})")
         onRenderProcessGone()
