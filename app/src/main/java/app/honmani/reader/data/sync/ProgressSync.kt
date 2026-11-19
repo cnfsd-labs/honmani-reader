@@ -376,6 +376,12 @@ class ProgressSync(
         scope.launch { pushLock.withLock { settings.account.value?.let { settle(it) } } }
     }
 
+    /** "Sync now" in the reader after a failure: the current position at once, then what couldn't be sent before. */
+    fun syncNow() {
+        flush()
+        resend()
+    }
+
     private suspend fun push() = pushLock.withLock {
         val (ttuId, characters) = synchronized(this) { pending.also { pending = null } } ?: return@withLock
         val account = settings.account.value ?: return@withLock

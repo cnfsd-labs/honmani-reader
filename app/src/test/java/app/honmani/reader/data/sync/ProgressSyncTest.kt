@@ -360,6 +360,27 @@ class ProgressSyncTest {
     }
 
     @Test
+    fun syncNowAfterAFailure_sendsWhatWasNotSentAndClearsTheFailure() = runBlocking {
+        server.down = true
+        sync.onPosition(5, 12)
+        sync.flush()
+        waitFor { status.state.value.failure != null }
+
+        server.down = false
+        sync.syncNow()
+        assertEquals(12.0 / 31, waitForProgress()["percentage"]!!.jsonPrimitive.double, 1e-9)
+        waitFor { status.state.value.failure == null }
+    }
+
+    @Test
+    fun syncNow_sendsTheCurrentPositionWithoutWaiting() = runBlocking {
+        sync = newSync(pushDelayMs = 60_000)
+        sync.onPosition(5, 24)
+        sync.syncNow()
+        assertEquals(24.0 / 31, waitForProgress()["percentage"]!!.jsonPrimitive.double, 1e-9)
+    }
+
+    @Test
     fun signingOutForgetsTheStatus() {
         status.succeeded()
         assertNotNull(status.state.value.lastSuccessAt)

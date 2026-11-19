@@ -1569,6 +1569,7 @@
     <string name="sync_fail_server_http">server problem (HTTP %1$d)</string>
     <string name="sync_fail_hotspot">hotspot with a login page, login not sent over http</string>
     <string name="sync_fail_other">unexpected error</string>
+    <string name="sync_now">Sync now</string>
     <string name="reader_menu_sync_failed">Progress sync failed: %1$s</string>
     <string name="sync_continued">Continued at %1$d%% from %2$s</string>
     <string name="sync_back_to">Back to %1$d%%</string>

@@ -672,6 +672,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
             ReaderMenuSheet(
                 showProgress = appSettings.showProgress,
                 syncFailure = syncFailure?.let { syncFailureReason(it) },
+                onSyncNow = { container.progressSync.syncNow() },
                 place = place,
                 onJump = { characters ->
                     val id = current.ttuId

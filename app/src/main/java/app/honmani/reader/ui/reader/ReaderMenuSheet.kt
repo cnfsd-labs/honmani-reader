@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
@@ -31,7 +32,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -52,6 +55,8 @@ fun ReaderMenuSheet(
     showProgress: Boolean,
     /** Why the last progress sync for this book failed ("server unreachable"); null when it did not. */
     syncFailure: String? = null,
+    /** "Sync now" next to [syncFailure]. */
+    onSyncNow: () -> Unit = {},
     /** The reading position and the book's length in characters; null while the book is read for the slider. */
     place: MenuPlace? = null,
     /** The slider was let go at this many characters. */
@@ -78,12 +83,15 @@ fun ReaderMenuSheet(
         val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
         Column(modifier = Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = 8.dp)) {
             syncFailure?.let {
-                Text(
-                    stringResource(R.string.reader_menu_sync_failed, it),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
+                Row(modifier = Modifier.padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.reader_menu_sync_failed, it),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                    )
+                    TextButton(onClick = onSyncNow) { Text(stringResource(R.string.sync_now)) }
+                }
             }
             PlaceSlider(place, onJump)
             ListItem(

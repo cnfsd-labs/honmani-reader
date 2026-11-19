@@ -65,10 +65,14 @@ fun ProgressSyncSection() {
                     val failure = status.failure
                     val ok = status.lastSuccessAt
                     if (failure != null) {
-                        Text(
-                            stringResource(R.string.sync_status_failed, syncAgo(failure.at), syncFailureReason(failure)),
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                stringResource(R.string.sync_status_failed, syncAgo(failure.at), syncFailureReason(failure)),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { container.progressSync.resend() }) { Text(stringResource(R.string.sync_now)) }
+                        }
                     }
                     if (ok != null) {
                         Text(stringResource(R.string.sync_status_ok, syncAgo(ok)))
