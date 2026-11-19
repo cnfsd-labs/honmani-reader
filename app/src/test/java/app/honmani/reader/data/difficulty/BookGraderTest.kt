@@ -41,6 +41,7 @@ class BookGraderTest {
         },
         texts = { book ->
             if (book.contentHash in broken) error("unreadable")
+            if (book.contentHash in full) throw java.io.IOException("write failed: ENOSPC (No space left on device)")
             if (book.contentHash in huge) throw OutOfMemoryError("huge")
             texts[book.contentHash]?.let { sequenceOf(RubyText(it)) }
         },
@@ -48,6 +49,7 @@ class BookGraderTest {
 
     private val broken = mutableSetOf<String>()
     private val huge = mutableSetOf<String>()
+    private val full = mutableSetOf<String>()
 
     @Test
     fun gradesEachBookOnce_andKeepsTheGradesInFiles() = runBlocking {
@@ -81,6 +83,20 @@ class BookGraderTest {
         assertEquals(0, store.grades.value.getValue("bad").difficulty.score)
         assertEquals(true, store.grades.value.getValue("a").difficulty.score > 0)
         assertEquals(0, grader(store).gradeAll())
+    }
+
+    @Test
+    fun aFullDiskKeepsTheBookUngraded_soItIsGradedOnceThereIsSpace() = runBlocking {
+        val store = DifficultyStore(folder.root)
+        library = listOf(book("a"), book("short"))
+        full += "a"
+
+        assertEquals(0, grader(store).gradeAll())
+        assertNull(store.grades.value["a"])
+
+        full.clear()
+        assertEquals(2, grader(store).gradeAll())
+        assertEquals(true, store.grades.value.getValue("a").difficulty.score > 0)
     }
 
     @Test

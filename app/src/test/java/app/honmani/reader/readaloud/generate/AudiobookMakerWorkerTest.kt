@@ -162,6 +162,21 @@ class AudiobookMakerWorkerTest {
     }
 
     @Test
+    fun aFullPhoneStopsTheJobWithItsMessageAndRemovesTheProgressNotification() {
+        val maker = maker("full")
+        maker.freeze(plan(sentences(3)))
+        useMaker(maker)
+        behave = { call, text -> if (call == 0) mp3(text) else throw java.io.IOException("write failed: ENOSPC (No space left on device)") }
+        assertTrue(runBlocking { worker().doWork() } is Result.Failure)
+        val outcome = maker.files("book").readOutcome()!!
+        assertEquals(MakerOutcome.Kind.STOPPED, outcome.kind)
+        assertEquals(context.getString(app.honmani.reader.R.string.download_failed_no_space), outcome.message)
+        // Only the result is left, not the progress.
+        val shown = org.robolectric.Shadows.shadowOf(context.getSystemService(android.app.NotificationManager::class.java)).allNotifications
+        assertEquals(listOf(outcome.message), shown.map { it.extras.getCharSequence(android.app.Notification.EXTRA_TEXT).toString() })
+    }
+
+    @Test
     fun noKeyStopsTheJobWithoutSendingAnything() {
         val maker = maker("nokey")
         maker.freeze(plan(sentences(3)))

@@ -1,5 +1,6 @@
 package app.honmani.reader.data.difficulty
 
+import app.honmani.reader.data.dictionary.FailureReason
 import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.sync.RubyText
 import app.honmani.reader.diagnostics.logWarning
@@ -69,6 +70,12 @@ class BookGrader(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                if (FailureReason.ofStorage(e) == FailureReason.NO_SPACE) {
+                    // Not the book's fault: keep it ungraded so it is graded again once there is
+                    // space, and stop (every other book would fail the same way).
+                    logWarning("Honmani.difficulty", "Grading \"${book.title}\" stopped: storage is full", e)
+                    return graded
+                }
                 logWarning("Honmani.difficulty", "Grading \"${book.title}\" failed; kept as score 0", e)
                 null
             } catch (e: OutOfMemoryError) {

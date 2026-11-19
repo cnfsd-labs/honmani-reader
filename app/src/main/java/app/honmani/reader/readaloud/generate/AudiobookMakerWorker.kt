@@ -22,7 +22,10 @@ import androidx.work.workDataOf
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
 import app.honmani.reader.anki.VoiceProblem
+import app.honmani.reader.data.dictionary.FailureReason
+import app.honmani.reader.diagnostics.logWarning
 import app.honmani.reader.ui.anki.label
+import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.Flow
@@ -78,15 +81,27 @@ class AudiobookMakerWorker(
             ?: return stopped(maker, MakerOutcome(MakerOutcome.Kind.STOPPED, applicationContext.getString(R.string.audiobook_no_key)), title)
         val cap = inputData.getDouble(KEY_CAP, -1.0).takeIf { it > 0 }
         var lastPosted = 0L
-        val result = maker.run(bookHash, voice, cap) { p ->
-            val now = clock()
-            if (now - lastPosted >= POST_EVERY_MS) {
-                lastPosted = now
-                setProgressAsync(workDataOf(KEY_DONE to p.done, KEY_TOTAL to p.total, KEY_SPENT to p.spentUsd))
-                manager.notify(notificationId, notification(title, p))
+        val result = try {
+            maker.run(bookHash, voice, cap) { p ->
+                val now = clock()
+                if (now - lastPosted >= POST_EVERY_MS) {
+                    lastPosted = now
+                    setProgressAsync(workDataOf(KEY_DONE to p.done, KEY_TOTAL to p.total, KEY_SPENT to p.spentUsd))
+                    manager.notify(notificationId, notification(title, p))
+                }
             }
+        } catch (e: IOException) {
+            // A full phone: say so instead of failing silently. Anything else stays a crash.
+            if (FailureReason.ofStorage(e) != FailureReason.NO_SPACE) throw e
+            logWarning("Honmani.audiobook", "The audiobook stopped: storage is full", e)
+            null
+        } finally {
+            manager.cancel(notificationId)
         }
-        manager.cancel(notificationId)
+        if (result == null) {
+            val message = applicationContext.getString(R.string.download_failed_no_space)
+            return stopped(maker, MakerOutcome(MakerOutcome.Kind.STOPPED, message), title)
+        }
         return when (result) {
             is MakerResult.Finished -> {
                 postResult(title, applicationContext.getString(R.string.audiobook_ready), bookHash)
@@ -119,7 +134,12 @@ class AudiobookMakerWorker(
     }
 
     private suspend fun stopped(maker: AudiobookMaker, outcome: MakerOutcome, title: String): Result {
-        maker.writeOutcome(inputData.getString(KEY_BOOK).orEmpty(), outcome)
+        try {
+            maker.writeOutcome(inputData.getString(KEY_BOOK).orEmpty(), outcome)
+        } catch (e: IOException) {
+            // A full phone may refuse even this small file: the notification below still tells.
+            logWarning("Honmani.audiobook", "Could not keep the audiobook's stop message", e)
+        }
         postResult(title, outcome.message, inputData.getString(KEY_BOOK).orEmpty())
         return Result.failure(workDataOf(KEY_MESSAGE to outcome.message))
     }
