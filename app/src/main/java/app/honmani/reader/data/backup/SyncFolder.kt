@@ -28,6 +28,8 @@ sealed interface SyncFolderState {
         val newerDevice: String? = null,
         /** A file with dates far in the future, waiting for the reader's decision ([SyncFolder.mergeHeld], [SyncFolder.skipHeld]). */
         val held: HeldFile? = null,
+        /** Another phone's file that could not be read or merged at the last sync: its phone, or "" when the file is too damaged to tell. */
+        val unreadable: String? = null,
     ) : SyncFolderState
 
     /** The last write failed: the folder is gone, or the right to write to it. */
@@ -46,7 +48,8 @@ data class HeldFile(val device: String, val latest: Long)
  *
  * Off by default. [sync] reads and writes when the app comes to the front and right after the folder
  * is chosen; [write] only writes, when it goes to the background. A file is merged once, unless it
- * changes; one that fails (still being copied, say) is tried again next time. The own file is written
+ * changes; one that fails (still being copied, say) is tried again next time and named in the state
+ * ([SyncFolderState.On.unreadable]) until it works. The own file is written
  * only if the content changed. A failure only shows as [SyncFolderState.Unavailable]. The folder is
  * tied to this phone ("device" preferences, not backed up).
  *
@@ -91,6 +94,7 @@ class SyncFolder(
                 device.getString(KEY_HELD_STAMP, null)?.let {
                     HeldFile(device.getString(KEY_HELD_NAME, null) ?: ANOTHER_PHONE, device.getLong(KEY_HELD_LATEST, 0L))
                 },
+                device.getString(KEY_UNREADABLE, null),
             )
         }
     }
@@ -114,6 +118,7 @@ class SyncFolder(
             .remove(KEY_SYNCED_WITH)
             .remove(KEY_SYNCED_AT)
             .remove(KEY_NEWER)
+            .remove(KEY_UNREADABLE)
             .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST)
             .putBoolean(KEY_FAILED, false)
             .apply()
@@ -125,7 +130,7 @@ class SyncFolder(
     fun disable() {
         device.getString(KEY_FOLDER, null)?.let(target::release)
         device.edit().remove(KEY_FOLDER).remove(KEY_NAME).remove(KEY_LAST).remove(KEY_FINGERPRINT).remove(KEY_FAILED)
-            .remove(KEY_SEEN).remove(KEY_SYNCED_WITH).remove(KEY_SYNCED_AT).remove(KEY_NEWER)
+            .remove(KEY_SEEN).remove(KEY_SYNCED_WITH).remove(KEY_SYNCED_AT).remove(KEY_NEWER).remove(KEY_UNREADABLE)
             .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST).apply()
         _state.value = SyncFolderState.Off
     }
@@ -167,6 +172,7 @@ class SyncFolder(
         val seen = device.getStringSet(KEY_SEEN, null).orEmpty()
         val nowSeen = HashSet<String>()
         var newer: String? = null
+        var unreadable: String? = null
         val heldStamp = device.getString(KEY_HELD_STAMP, null)
         var held: Held? = heldStamp?.let { Held(it, device.getString(KEY_HELD_ADDRESS, null).orEmpty(), device.getString(KEY_HELD_NAME, null) ?: ANOTHER_PHONE, device.getLong(KEY_HELD_LATEST, 0L)) }
         var heldPresent = false
@@ -181,8 +187,10 @@ class SyncFolder(
                 heldPresent = true
                 continue
             }
+            var from: String? = null
             try {
                 val backup = target.read(file.address).use { BackupCodec.read(it) }
+                from = backup.deviceName ?: ANOTHER_PHONE
                 when {
                     backup.syncFormat == null || backup.deviceId == id -> nowSeen += stamp
                     backup.syncFormat > FORMAT -> newer = backup.deviceName ?: ANOTHER_PHONE
@@ -207,11 +215,13 @@ class SyncFolder(
             } catch (e: Exception) {
                 // Half copied, or a merge that failed: not marked as seen, so it is tried again.
                 logWarning("Honmani.sync", "Merging a sync file failed", e)
+                if (unreadable == null) unreadable = from.orEmpty()
             }
         }
         // A held file that changed or went away is no longer the one the reader was asked about.
         if (!heldPresent) held = null
         val edit = device.edit().putStringSet(KEY_SEEN, nowSeen).putString(KEY_NEWER, newer)
+            .putString(KEY_UNREADABLE, unreadable)
         val keep = held
         if (keep == null) {
             edit.remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST)
@@ -312,6 +322,7 @@ class SyncFolder(
         private const val KEY_SYNCED_WITH = "sync_folder_synced_with"
         private const val KEY_SYNCED_AT = "sync_folder_synced_at"
         private const val KEY_NEWER = "sync_folder_newer"
+        private const val KEY_UNREADABLE = "sync_folder_unreadable"
         private const val KEY_HELD_STAMP = "sync_folder_held_stamp"
         private const val KEY_HELD_ADDRESS = "sync_folder_held_address"
         private const val KEY_HELD_NAME = "sync_folder_held_name"

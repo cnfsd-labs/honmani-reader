@@ -218,6 +218,12 @@ private fun SyncFolderRow() {
                             },
                         )
                         current.newerDevice?.let { Text(stringResource(R.string.sync_folder_newer, it)) }
+                        current.unreadable?.let {
+                            Text(
+                                if (it.isEmpty()) stringResource(R.string.sync_folder_unreadable_unknown)
+                                else stringResource(R.string.sync_folder_unreadable, it),
+                            )
+                        }
                         current.held?.let { held ->
                             Text(stringResource(R.string.sync_folder_held, held.device, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(held.latest))))
                             Row {

@@ -74,6 +74,7 @@ class SyncMergeTest {
         private val syncSettings = SyncSettings(settings, device) { clock }
         val address = "$folderName/${SyncFolder.fileName(id)}"
         var merges = 0
+        var failMerge = false
         val sync = SyncFolder(
             device = device,
             target = folder,
@@ -81,6 +82,7 @@ class SyncMergeTest {
             deviceName = "Phone $id",
             export = { backup.export(null, it).copy(syncSettings = syncSettings.stamped()) },
             merge = {
+                if (failMerge) error("merge failed")
                 merges++
                 merger.merge(it)
                 syncSettings.merge(it.syncSettings)
@@ -917,7 +919,7 @@ class SyncMergeTest {
             folder.files[b.address] = whole.copyOf(length)
             a.sync()
             assertNull(a.findWord())
-            assertTrue(a.sync.state.value is SyncFolderState.On)
+            assertEquals("", (a.sync.state.value as SyncFolderState.On).unreadable)
             // Even with the same size and date it is read again: it was never marked as done.
             a.sync()
             assertNull(a.findWord())
@@ -928,6 +930,25 @@ class SyncMergeTest {
         a.sync()
         assertNotNull(a.findWord())
         assertEquals("Phone b", (a.sync.state.value as SyncFolderState.On).syncedWith)
+        assertNull((a.sync.state.value as SyncFolderState.On).unreadable)
+    }
+
+    @Test
+    fun aFileThatFailsToMergeNamesItsPhoneUntilItWorks() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        b.addWord()
+        b.sync()
+
+        a.failMerge = true
+        a.sync()
+        assertEquals("Phone b", (a.sync.state.value as SyncFolderState.On).unreadable)
+        assertNull(a.findWord())
+
+        a.failMerge = false
+        a.sync()
+        assertNull((a.sync.state.value as SyncFolderState.On).unreadable)
+        assertNotNull(a.findWord())
     }
 
     @Test
