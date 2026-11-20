@@ -68,6 +68,10 @@
     </plurals>
     <string name="progress_goal_set">Set a daily goal</string>
     <string name="progress_goal_off">Turn the goal off</string>
+    <string name="progress_goal_show_choices">Show the goal choices</string>
+    <string name="progress_goal_hide_choices">Hide the goal choices</string>
+    <string name="progress_goal_choices_shown">Choices shown</string>
+    <string name="progress_goal_choices_hidden">Choices hidden</string>
     <plurals name="progress_goal_best">
         <item quantity="one">best: %1$d day</item>
         <item quantity="other">best: %1$d days</item>

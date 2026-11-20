@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
@@ -43,9 +45,14 @@ internal fun GoalCard(goal: GoalProgress?) {
     val context = LocalContext.current
     val settings = remember { (context.applicationContext as HonmaniApplication).container.readingGoalSettings }
     var open by rememberSaveable { mutableStateOf(false) }
+    val clickLabel = stringResource(if (open) R.string.progress_goal_hide_choices else R.string.progress_goal_show_choices)
+    val state = stringResource(if (open) R.string.progress_goal_choices_shown else R.string.progress_goal_choices_hidden)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().clickable { open = !open },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = clickLabel) { open = !open }
+            .semantics { stateDescription = state },
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),

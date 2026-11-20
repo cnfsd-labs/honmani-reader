@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +41,9 @@ import kotlin.math.min
 internal fun PlaceholderCover(title: String, modifier: Modifier = Modifier) {
     val binding = CoverTitle.binding(title)
     BoxWithConstraints(
-        modifier = modifier.background(
+        // Decorative, like a cover image: every place showing a cover shows the title as text too,
+        // and TalkBack would read the slip's vertical columns character by character.
+        modifier = modifier.clearAndSetSemantics {}.background(
             Brush.verticalGradient(listOf(binding, lerp(binding, Color.Black, 0.28f))),
         ),
     ) {

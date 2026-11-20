@@ -52,6 +52,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
@@ -491,6 +492,8 @@ private fun BarChart(title: String, bars: List<DayTotal>, label: @Composable (Da
             Text(
                 text = readout,
                 style = MaterialTheme.typography.bodyMedium,
+                // The chart below says it (its state); TalkBack would read it twice.
+                modifier = Modifier.clearAndSetSemantics {},
             )
             val maxMinutes = bars.maxOf { it.seconds / 60f }.coerceAtLeast(1f)
             Canvas(
@@ -544,6 +547,8 @@ private fun BarChart(title: String, bars: List<DayTotal>, label: @Composable (Da
 private fun SpeedTrend(weeks: List<WeekSpeed>) {
     val measured = weeks.withIndex().filter { it.value.charactersPerHour != null }
     var selected by rememberSaveable(weeks.size) { mutableStateOf(measured.lastOrNull()?.index ?: -1) }
+    // A saved choice that has no speed (none measured when it was saved) falls back to the latest.
+    val shown = speedSelection(weeks, selected)
     val color = MaterialTheme.colorScheme.primary
     val grid = MaterialTheme.colorScheme.outlineVariant
     val dateFormat = remember { mediumDateFormat() }
@@ -554,7 +559,7 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            val week = weeks.getOrNull(selected)
+            val week = weeks.getOrNull(shown)
             val weekSpeed = week?.charactersPerHour
             if (week == null || weekSpeed == null) {
                 Text(
@@ -576,6 +581,8 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
             Text(
                 readout,
                 style = MaterialTheme.typography.bodyMedium,
+                // The chart below says it (its state); TalkBack would read it twice.
+                modifier = Modifier.clearAndSetSemantics {},
             )
             val values = measured.map { it.value.charactersPerHour!!.toFloat() }
             // Some room above and below, so a flat line sits in the middle.
@@ -591,11 +598,11 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                         liveRegion = LiveRegionMode.Polite
                         customActions = listOf(
                             CustomAccessibilityAction(previousLabel) {
-                                measured.lastOrNull { it.index < selected }?.let { selected = it.index }
+                                measured.lastOrNull { it.index < shown }?.let { selected = it.index }
                                 true
                             },
                             CustomAccessibilityAction(nextLabel) {
-                                measured.firstOrNull { it.index > selected }?.let { selected = it.index }
+                                measured.firstOrNull { it.index > shown }?.let { selected = it.index }
                                 true
                             },
                         )
@@ -628,12 +635,16 @@ private fun SpeedTrend(weeks: List<WeekSpeed>) {
                 }
                 for ((index, value) in measured) {
                     val here = point(index, value.charactersPerHour!!.toFloat())
-                    drawCircle(color, radius = if (index == selected) 5.dp.toPx() else 3.dp.toPx(), center = here)
+                    drawCircle(color, radius = if (index == shown) 5.dp.toPx() else 3.dp.toPx(), center = here)
                 }
             }
         }
     }
 }
+
+/** The week [SpeedTrend] shows: [selected] if it has a speed, else the latest week with one; -1 if none has. */
+internal fun speedSelection(weeks: List<WeekSpeed>, selected: Int): Int =
+    if (weeks.getOrNull(selected)?.charactersPerHour != null) selected else weeks.indexOfLast { it.charactersPerHour != null }
 
 /** A bar standing on the baseline, its top corners rounded by 4 dp. */
 private fun DrawScope.roundedTopBar(left: Float, width: Float, height: Float, color: Color) {
