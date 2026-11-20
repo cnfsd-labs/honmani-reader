@@ -1066,6 +1066,7 @@
     <string name="lookup_edit">Edit and look up</string>
     <string name="lookup_copied">Copied</string>
     <string name="lookup_read_sentence">Read sentence</string>
+    <string name="lookup_read_aloud_from_here">Read aloud from here</string>
     <string name="lookup_match_shorter">Match one character less</string>
     <string name="lookup_match_longer">Match one character more</string>
     <string name="lookup_activity_label">Honmani</string>

@@ -192,6 +192,8 @@ fun LookupPanel(
     previousSentence: String = "",
     /** The read-aloud button: say the tapped sentence. */
     onReadSentence: () -> Unit = {},
+    /** "Read aloud from here": the reader reads the book on from the tapped sentence; null (outside a book) offers none. */
+    onReadAloudHere: (() -> Unit)? = null,
     /** "+ Learn" of a word found by a search: save it to Words; null (a tap in a book, which saves by itself) shows none. */
     onLearn: ((LookupGroup) -> Unit)? = null,
     /** "Remove from Words" of a saved word found by a search, from its "In Words" label; null offers none. */
@@ -403,6 +405,7 @@ fun LookupPanel(
                     Row(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 4.dp)) {
                         PanelMenu(
                             onReadSentence = onReadSentence.takeIf { state.tap.sentence.isNotBlank() },
+                            onReadAloudHere = onReadAloudHere,
                             onDontCount = onDontCount.takeIf { state is LookupPanelState.Results && state.previous == null },
                             onCopyWord = copyableWord(state)?.let { word -> { copy(word) } },
                             onCopySentence = if (state.tap.sentence.isNotBlank()) {
@@ -769,12 +772,14 @@ private fun BubbleButton(label: String, onClick: () -> Unit, enabled: Boolean = 
 @Composable
 private fun PanelMenu(
     onReadSentence: (() -> Unit)?,
+    onReadAloudHere: (() -> Unit)?,
     onDontCount: (() -> Unit)?,
     onCopyWord: (() -> Unit)?,
     onCopySentence: (() -> Unit)?,
 ) {
     val entries = listOfNotNull(
         onReadSentence?.let { R.string.lookup_read_sentence to it },
+        onReadAloudHere?.let { R.string.lookup_read_aloud_from_here to it },
         onDontCount?.let { R.string.lookup_dont_count to it },
         onCopyWord?.let { R.string.lookup_copy_word to it },
         onCopySentence?.let { R.string.lookup_copy_sentence to it },

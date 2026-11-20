@@ -17,6 +17,9 @@
  * App to page (all carry `gen`, the app's counter; the page answers only the latest one):
  *   { type: 'readAloud.begin', gen, count }            start with the first sentence that begins on
  *                                                      the page on screen (index 0)
+ *   { type: 'readAloud.beginAt', gen, count, tap }     start with the sentence that holds the
+ *                                                      lookup `tap` (the tap bridge's number); as
+ *                                                      begin when that tap is gone
  *   { type: 'readAloud.seek', gen, index, count }      start again at a sentence sent before
  *   { type: 'readAloud.more', gen, count }             the next sentences
  *   { type: 'readAloud.advance', gen, count }          paginated mode: the section's text is read
@@ -356,6 +359,27 @@
     reply(message.count, [{ i: record.i, text: record.speech }]);
   }
 
+  /** Starts at the start of the sentence that holds lookup number `message.tap`. */
+  function beginAt(message) {
+    const root = rootElement();
+    const point = window.honmaniTapPoint ? window.honmaniTapPoint(message.tap) : null;
+    if (!root || !point || !root.contains(point.node) || isSkipped(point.node)) {
+      begin(message);
+      return;
+    }
+    const fresh = newSession(message.gen);
+    openRun(paragraphStart(point.node, root), root);
+    const base = fresh.run.base.get(point.node);
+    const index = base === undefined ? -1 : fresh.cands.findIndex((cand) => cand.e > base + point.offset);
+    if (index < 0) {
+      begin(message);
+      return;
+    }
+    // The whole sentence, also when it began on an earlier page: the mark turns back to it.
+    fresh.pos = index;
+    reply(message.count);
+  }
+
   function seek(message) {
     if (!session) {
       // The page was reloaded since (a font change): the app starts again from the page.
@@ -503,6 +527,9 @@
     switch (message.type) {
       case 'readAloud.begin':
         if (known.gen && known.count) begin(message);
+        break;
+      case 'readAloud.beginAt':
+        if (known.gen && known.count && Number.isInteger(message.tap)) beginAt(message);
         break;
       case 'readAloud.seek':
         if (known.gen && known.count && Number.isInteger(message.index)) seek(message);

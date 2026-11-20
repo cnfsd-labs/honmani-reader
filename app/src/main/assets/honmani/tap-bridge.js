@@ -1114,4 +1114,13 @@
   }, true);
   window.addEventListener('scroll', redrawOverlay, true);
   window.addEventListener('resize', redrawOverlay);
+
+  /**
+   * Where lookup number `tap` started ({ node, offset }, a text node of the book), while it is the
+   * latest tap and its text is still in the page; else null. Read aloud starts there on request.
+   */
+  window.honmaniTapPoint = (tap) => {
+    if (!lastTap || tap !== tapNumber || !lastTap.node.isConnected || lastTap.node.nodeType !== Node.TEXT_NODE) return null;
+    return { node: lastTap.node, offset: lastTap.index };
+  };
 })();

@@ -11,7 +11,7 @@ const ASSETS = path.join(__dirname, '../../app/src/main/assets/honmani');
 const GIF = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 
 /** Opens a page shaped like ttu's book page with `body` inside .book-content. */
-async function openBook(page, body, { storage = {}, css = '' } = {}) {
+async function openBook(page, body, { storage = {}, css = '', tapBridge = false } = {}) {
   await page.addInitScript((storage) => {
     for (const [key, value] of Object.entries(storage)) localStorage.setItem(key, value);
     window.__messages = [];
@@ -20,7 +20,8 @@ async function openBook(page, body, { storage = {}, css = '' } = {}) {
       addEventListener: (type, listener) => (window.__listener = listener),
     };
   }, storage);
-  for (const script of ['text.js', 'sentence-follow.js', 'read-aloud.js', 'reader-style.js']) {
+  const scripts = ['text.js', 'sentence-follow.js', 'read-aloud.js', 'reader-style.js', ...(tapBridge ? ['tap-bridge.js'] : [])];
+  for (const script of scripts) {
     await page.addInitScript({ path: path.join(ASSETS, script) });
   }
   await page.route('**/*', (route) =>
@@ -181,4 +182,25 @@ test('a page that begins inside a ruby base starts with the whole base, so its r
   await page.evaluate(() => window.scrollTo(0, 1_600));
   const reply = await ask(page, 'begin', { count: 2 });
   expect(texts(reply)).toEqual(['よみおわり。']);
+});
+
+test('read aloud from here starts with the whole sentence of the tap, or from the page once that tap is gone', async ({ page }) => {
+  await openBook(page, '<p id="p1">一つ目。</p><p id="p2">二つ目の<ruby>文章<rt>ぶんしょう</rt></ruby>です。三つ目です。</p>', { tapBridge: true });
+  // A tap on 章, inside a ruby base in the middle of the second paragraph's first sentence.
+  const { x, y } = await page.evaluate(() => {
+    const text = [...document.querySelectorAll('#p2 ruby')][0].firstChild;
+    const range = document.createRange();
+    range.setStart(text, 1);
+    range.setEnd(text, 2);
+    const rect = range.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+  });
+  await page.mouse.click(x, y);
+  const lookup = await (await page.waitForFunction(() => window.__messages.find((m) => m.type === 'lookup'))).jsonValue();
+  expect(lookup.text.startsWith('章')).toBe(true);
+  const reply = await ask(page, 'beginAt', { tap: lookup.tap });
+  expect(texts(reply)).toEqual(['二つ目のぶんしょうです。', '三つ目です。']);
+  expect(reply.items[0].i).toBe(0);
+  // An older tap number: the page on screen, as begin.
+  expect(texts(await ask(page, 'beginAt', { tap: lookup.tap - 1 }))).toEqual(['一つ目。', '二つ目のぶんしょうです。', '三つ目です。']);
 });

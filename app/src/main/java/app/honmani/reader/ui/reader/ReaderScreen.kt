@@ -575,6 +575,14 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         panelSpeaking = true
                         viewModel.readSentence()
                     },
+                    onReadAloudHere = state.tap.tapNumber.takeIf { it > 0 }?.let { tap ->
+                        {
+                            viewModel.dismiss()
+                            // One voice at a time, as the menu's Read aloud.
+                            audio.audiobook.close()
+                            audio.readAloud.startAt(tap)
+                        }
+                    },
                     onDontCount = if (countedTap == state.tap) viewModel::dontCount else null,
                     onShorterMatch = { viewModel.changeMatch(longer = false) },
                     onLongerMatch = { viewModel.changeMatch(longer = true) },

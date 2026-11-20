@@ -218,6 +218,22 @@ class ReadAloudControllerTest {
     }
 
     @Test
+    fun readAloudFromHereJumpsToTheTapsSentenceAndClosingThePanelKeepsIt() {
+        startAndReceive()
+        controller.onStart(id(1))
+        controller.panelChanged(true)
+        controller.startAt(7)
+        assertEquals(ReadAloudPhase.STARTING, controller.state.value.phase)
+        assertTrue(sent.last().startsWith("""{"type":"readAloud.beginAt","""))
+        assertTrue(sent.last().endsWith(""""tap":7}"""))
+        val count = sent.size
+        controller.panelChanged(false)
+        assertEquals(count, sent.size)
+        controller.onSentences(gen, sentences(0, 1), null)
+        assertEquals(listOf("文0。", "文1。"), voice.spoken.map { it.second })
+    }
+
+    @Test
     fun aPanelOpenedWhilePausedStaysPausedWhenClosed() {
         startAndReceive()
         controller.onStart(id(1))

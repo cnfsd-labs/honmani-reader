@@ -108,6 +108,17 @@ class ReadAloudController(
         if (phase == ReadAloudPhase.PAUSED && current >= 0) restartAt(current) else begin()
     }
 
+    /**
+     * Starts (or jumps, if already reading) at the start of the sentence that holds lookup number
+     * [tap] of the tap bridge; from the page on screen if the page no longer knows that tap.
+     */
+    fun startAt(tap: Int) {
+        // Closing the panel must not go back to the sentence it paused.
+        resumeAfterPanel = false
+        resumeAfterFocus = false
+        begin(tap)
+    }
+
     fun pause() {
         resumeAfterFocus = false
         if (!state.value.running) return
@@ -397,14 +408,18 @@ class ReadAloudController(
         _state.value = _state.value.copy(phase = ReadAloudPhase.STARTING, problem = null)
     }
 
-    /** Starts from the page on screen. */
-    private fun begin() {
+    /** Starts from the page on screen, or from the sentence of lookup number [tap]. */
+    private fun begin(tap: Int? = null) {
         resetRun(0)
         _state.value = _state.value.copy(detached = false)
         awaiting = false
         whenConnected {
             resetRun(0)
-            toPage("""{"type":"readAloud.begin","gen":$gen,"count":$LOOKAHEAD}""")
+            if (tap == null) {
+                toPage("""{"type":"readAloud.begin","gen":$gen,"count":$LOOKAHEAD}""")
+            } else {
+                toPage("""{"type":"readAloud.beginAt","gen":$gen,"count":$LOOKAHEAD,"tap":$tap}""")
+            }
         }
     }
 
