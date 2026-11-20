@@ -19,11 +19,15 @@ object BackgroundPlayback {
     /** The app left the screen: whether the reader's voice pauses. */
     fun pauseWhenStopped(keepPlaying: Boolean): Boolean = !keepPlaying
 
-    /** What the notification shows, or null when there is none (nothing to play, or the setting is off). */
+    /**
+     * What the notification shows, or null when there is none (nothing to play, or the setting is off).
+     * An audiobook still loading counts as playing: it starts by itself once the subtitles are matched,
+     * and the service has to be started now, while the app is in front.
+     */
     fun nowPlaying(keepPlaying: Boolean, title: String, readAloud: ReadAloudPhase, audiobook: AudiobookPhase): NowPlaying? {
         if (!keepPlaying) return null
         val playing = readAloud == ReadAloudPhase.STARTING || readAloud == ReadAloudPhase.SPEAKING ||
-            audiobook == AudiobookPhase.PLAYING
+            audiobook == AudiobookPhase.LOADING || audiobook == AudiobookPhase.PLAYING
         val paused = readAloud == ReadAloudPhase.PAUSED || audiobook == AudiobookPhase.PAUSED
         return if (playing || paused) NowPlaying(title, playing) else null
     }

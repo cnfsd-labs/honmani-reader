@@ -24,12 +24,16 @@ class BackgroundPlaybackTest {
     }
 
     @Test
+    fun anAudiobookStillLoadingCountsAsPlaying_soTheServiceStartsWhileTheAppIsInFront() {
+        assertEquals(NowPlaying("本", true), BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.OFF, AudiobookPhase.LOADING))
+    }
+
+    @Test
     fun noNotificationWhenNothingPlays_itEnded_orKeepPlayingIsOff() {
         assertNull(BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.OFF, AudiobookPhase.OFF))
         assertNull(BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.ENDED, AudiobookPhase.OFF))
         assertNull(BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.PROBLEM, AudiobookPhase.OFF))
         assertNull(BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.OFF, AudiobookPhase.ENDED))
-        assertNull(BackgroundPlayback.nowPlaying(true, "本", ReadAloudPhase.OFF, AudiobookPhase.LOADING))
         assertNull(BackgroundPlayback.nowPlaying(false, "本", ReadAloudPhase.SPEAKING, AudiobookPhase.OFF))
         assertNull(BackgroundPlayback.nowPlaying(false, "本", ReadAloudPhase.OFF, AudiobookPhase.PLAYING))
     }
