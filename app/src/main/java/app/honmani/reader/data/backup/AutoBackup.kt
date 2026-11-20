@@ -64,25 +64,28 @@ class AutoBackup(
         Large,
     }
 
-    private val _offer = MutableStateFlow<Long?>(null)
+    /** A backup to offer: when it was made (epoch ms) and the phone model that made it, if it says. */
+    data class Offer(val madeAt: Long, val deviceName: String?)
 
-    /** When the backup to offer was made (epoch ms), or null when there is none to offer. */
-    val offer: StateFlow<Long?> = _offer.asStateFlow()
+    private val _offer = MutableStateFlow<Offer?>(null)
+
+    /** The backup to offer, or null when there is none to offer. */
+    val offer: StateFlow<Offer?> = _offer.asStateFlow()
 
     /** Called once when the app starts: offers a backup another phone left, if there is one. */
     suspend fun checkOffer() {
         if (device.getBoolean(KEY_ANSWERED, false)) return
-        val made = withContext(Dispatchers.IO) {
+        val found = withContext(Dispatchers.IO) {
             file.takeIf { it.isFile }?.let { stored ->
                 // Not the file's date: Android's restore has been seen to give it a wrong one (1970).
                 try {
-                    stored.inputStream().buffered().use(BackupCodec::read).exportedAt
+                    stored.inputStream().buffered().use(BackupCodec::read).let { Offer(it.exportedAt, it.deviceName) }
                 } catch (e: IOException) {
-                    stored.lastModified()
+                    Offer(stored.lastModified(), null)
                 }
             }
         }
-        if (made == null) answered() else _offer.value = made
+        if (found == null) answered() else _offer.value = found
     }
 
     /** The reader restored the offered backup or declined it; from now on it is kept up to date. */

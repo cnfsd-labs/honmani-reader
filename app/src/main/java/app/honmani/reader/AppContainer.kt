@@ -823,6 +823,7 @@ class AppContainer(context: Context) {
             restored = restoredBooks,
             grades = { difficultyStore.grades.value },
             installationId = ::installationId,
+            deviceName = { Build.MODEL },
             restoring = restoreLock,
         )
     }

@@ -283,15 +283,15 @@ class FolderBackupTest {
         assertEquals(FolderBackupState.Off, backup.state.value)
     }
 
-    private fun backupBytes(exportedAt: Long): ByteArray =
-        ByteArrayOutputStream().also { BackupCodec.write(BackupFile(exportedAt = exportedAt), it) }.toByteArray()
+    private fun backupBytes(exportedAt: Long, deviceName: String? = null): ByteArray =
+        ByteArrayOutputStream().also { BackupCodec.write(BackupFile(exportedAt = exportedAt, deviceName = deviceName), it) }.toByteArray()
 
     private fun stamp(at: Long) = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.ROOT).format(Date(at))
 
     @Test
     fun aBackupAnotherInstallLeftIsKeptUnderADatedNameAndOffered() = runBlocking {
         val made = 1_794_580_735_235L
-        val earlier = backupBytes(made)
+        val earlier = backupBytes(made, deviceName = "Pixel 7")
         folder.files[file] = earlier
         backup.choose("content://tree/a")
 
@@ -300,7 +300,8 @@ class FolderBackupTest {
         val kept = "content://tree/a/honmani-backup-${stamp(made)}.zip"
         assertTrue(earlier.contentEquals(folder.files[kept]))
         assertEquals("zip one", String(folder.files[file]!!))
-        assertEquals(FoundBackup(kept, "honmani-backup-${stamp(made)}.zip", made), backup.found.value)
+        assertEquals(FoundBackup(kept, "honmani-backup-${stamp(made)}.zip", made, "Pixel 7"), backup.found.value)
+        assertEquals("Pixel 7", FolderBackup(device, folder).found.value?.deviceName)
         assertEquals(made, backup.read(backup.found.value!!).exportedAt)
         // Later copies replace this install's own file.
         source.writeText("zip two")

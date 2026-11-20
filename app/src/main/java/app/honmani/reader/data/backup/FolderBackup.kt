@@ -111,9 +111,10 @@ sealed interface FolderBackupState {
 /**
  * A backup that was already in the chosen folder and not written by this install (another phone,
  * or Honmani before it was installed again): kept as [name] so this install's backup doesn't
- * replace it, and offered for restoring. [exportedAt] is when it was made.
+ * replace it, and offered for restoring. [exportedAt] is when it was made, [deviceName] the phone
+ * model that made it (null in files from older versions).
  */
-data class FoundBackup(val file: String, val name: String, val exportedAt: Long)
+data class FoundBackup(val file: String, val name: String, val exportedAt: Long, val deviceName: String? = null)
 
 /**
  * Also copies Honmani's own backup ([AutoBackup]) into a folder the reader chose (on the phone,
@@ -140,7 +141,7 @@ class FolderBackup(
     private fun readFound(): FoundBackup? {
         val file = device.getString(KEY_FOUND_FILE, null) ?: return null
         val name = device.getString(KEY_FOUND_NAME, null) ?: return null
-        return FoundBackup(file, name, device.getLong(KEY_FOUND_AT, 0L))
+        return FoundBackup(file, name, device.getLong(KEY_FOUND_AT, 0L), device.getString(KEY_FOUND_DEVICE, null))
     }
 
     /**
@@ -149,7 +150,7 @@ class FolderBackup(
      * every copy) until a folder is chosen again.
      */
     fun dismissFound() {
-        device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT)
+        device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT).remove(KEY_FOUND_DEVICE)
             .putString(KEY_ANSWERED, device.getString(KEY_FOLDER, null)).apply()
         _found.value = null
     }
@@ -242,12 +243,13 @@ class FolderBackup(
         val existing = target.find(folder, FILE_NAME) ?: return
         val hash = target.read(existing).use(::sha256)
         if (hash == device.getString(KEY_WRITTEN, null) || hash == device.getString(KEY_WRITING, null)) return
-        val made = try {
-            target.read(existing).buffered().use(BackupCodec::read).exportedAt
+        val read = try {
+            target.read(existing).buffered().use(BackupCodec::read)
         } catch (_: IOException) {
             // Not a backup (BackupFormatException is one), or one this version can't read.
             null
         }
+        val made = read?.exportedAt
         val stamp = SimpleDateFormat("yyyy-MM-dd-HHmm", Locale.ROOT).format(Date(made ?: now()))
         val base = FILE_NAME.removeSuffix(".zip")
         val name = generateSequence(1) { it + 1 }
@@ -269,9 +271,10 @@ class FolderBackup(
         device.edit().putString(KEY_KEPT_IN, folder).putString(KEY_KEPT_FILE, kept).putString(KEY_KEPT_NAME, name).apply()
         // Only a readable backup is offered, and only until the reader answered an offer for this
         // folder; anything else is just kept.
-        if (made != null && device.getString(KEY_ANSWERED, null) != folder) {
-            device.edit().putString(KEY_FOUND_FILE, kept).putString(KEY_FOUND_NAME, name).putLong(KEY_FOUND_AT, made).apply()
-            _found.value = FoundBackup(kept, name, made)
+        if (read != null && device.getString(KEY_ANSWERED, null) != folder) {
+            device.edit().putString(KEY_FOUND_FILE, kept).putString(KEY_FOUND_NAME, name).putLong(KEY_FOUND_AT, read.exportedAt)
+                .putString(KEY_FOUND_DEVICE, read.deviceName).apply()
+            _found.value = FoundBackup(kept, name, read.exportedAt, read.deviceName)
         }
     }
 
@@ -289,7 +292,7 @@ class FolderBackup(
             .onFailure { logWarning("Honmani.backup", "An older kept backup could not be deleted", it) }
             .getOrDefault(false)
         if (dropped && _found.value?.file == previous) {
-            device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT).apply()
+            device.edit().remove(KEY_FOUND_FILE).remove(KEY_FOUND_NAME).remove(KEY_FOUND_AT).remove(KEY_FOUND_DEVICE).apply()
             _found.value = null
         }
     }
@@ -324,6 +327,7 @@ class FolderBackup(
         private const val KEY_FOUND_FILE = "folder_backup_found_file"
         private const val KEY_FOUND_NAME = "folder_backup_found_name"
         private const val KEY_FOUND_AT = "folder_backup_found_at"
+        private const val KEY_FOUND_DEVICE = "folder_backup_found_device"
 
         /** The folder in which the reader last answered an offer: later backups found there aren't offered. */
         private const val KEY_ANSWERED = "folder_backup_answered"

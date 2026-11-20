@@ -114,6 +114,16 @@ class AutoBackupTest {
     }
 
     @Test
+    fun theOfferNamesThePhoneThatMadeTheBackup() = runBlocking {
+        dir.mkdirs()
+        auto.file.outputStream().use { BackupCodec.write(BackupFile(exportedAt = 42, deviceName = "Pixel 7"), it) }
+
+        auto.checkOffer()
+
+        assertEquals(AutoBackup.Offer(42, "Pixel 7"), auto.offer.first())
+    }
+
+    @Test
     fun theOfferNamesTheBackupsOwnDateNotTheRestoredFilesDate() = runBlocking {
         dir.mkdirs()
         auto.file.outputStream().use { BackupCodec.write(backup(at = 1_793_440_249_218), it) }
@@ -122,7 +132,7 @@ class AutoBackupTest {
 
         auto.checkOffer()
 
-        assertEquals(1_793_440_249_218, auto.offer.first())
+        assertEquals(1_793_440_249_218, auto.offer.first()?.madeAt)
     }
 
     @Test

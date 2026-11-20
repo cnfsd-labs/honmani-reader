@@ -329,12 +329,15 @@ fun AutoBackupOffer(viewModel: BackupViewModel = viewModel(factory = BackupViewM
     val state by viewModel.state.collectAsStateWithLifecycle()
     // Its own restore's progress and result only: Settings shows those of its own.
     var restoring by rememberSaveable { mutableStateOf(false) }
-    offer?.let { madeAt ->
-        val date = remember(madeAt) { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(madeAt)) }
+    offer?.let { found ->
+        val date = remember(found) { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(found.madeAt)) }
         AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.auto_backup_offer_title)) },
-            text = { Text(stringResource(R.string.auto_backup_offer, date)) },
+            text = {
+                val device = found.deviceName
+                Text(if (device.isNullOrBlank()) stringResource(R.string.auto_backup_offer, date) else stringResource(R.string.auto_backup_offer_device, date, device))
+            },
             confirmButton = {
                 TextButton(onClick = {
                     restoring = true
@@ -369,7 +372,11 @@ private fun RestoreConfirmDialog(state: BackupState.Confirm, onConfirm: (BackupS
             ) {
                 state.found?.let { found ->
                     val date = remember(found) { DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(found.exportedAt)) }
-                    Text(stringResource(R.string.backup_found_message, date, found.name))
+                    val device = found.deviceName
+                    Text(
+                        if (device.isNullOrBlank()) stringResource(R.string.backup_found_message, date, found.name)
+                        else stringResource(R.string.backup_found_message_device, date, found.name, device),
+                    )
                 }
                 Text(stringResource(R.string.backup_confirm_intro))
                 Text(pluralStringResource(R.plurals.backup_confirm_books, contents.books, contents.books))

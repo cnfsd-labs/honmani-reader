@@ -71,7 +71,7 @@ data class BackupFile(
     val installationId: String? = null,
     /** Sync files only: the installation id of the phone that wrote the file. */
     val deviceId: String? = null,
-    /** Sync files only: the phone's model, for the status line. */
+    /** The phone's model (null in files from older versions): the sync status line and restore offers name it. */
     val deviceName: String? = null,
     /** Sync files only: rows deleted on the writing phone, so other phones delete them too. */
     val tombstones: List<BackupTombstone> = emptyList(),

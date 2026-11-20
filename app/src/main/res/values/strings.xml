@@ -1665,6 +1665,7 @@
     <string name="backup_restored_not_included">Not in a backup: dictionaries and fonts (download them again), the reading progress sync login and the Google Cloud key.</string>
     <string name="auto_backup_offer_title">Restore from your previous phone?</string>
     <string name="auto_backup_offer">Android brought back Honmani\'s backup from %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
+    <string name="auto_backup_offer_device">Android brought back Honmani\'s backup from %1$s, made on %2$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
     <string name="auto_backup_restore">Restore</string>
     <string name="auto_backup_start_fresh">Start fresh</string>
     <string name="backup_folder_title">Back up to a folder</string>
@@ -1674,6 +1675,7 @@
     <string name="backup_folder_now_working">Backing up…</string>
     <string name="backup_found_title">Restore the backup in this folder?</string>
     <string name="backup_found_message">This folder already had a backup, from %1$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
+    <string name="backup_found_message_device">This folder already had a backup, from %1$s, made on %3$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
     <string name="backup_folder_waiting">Folder chosen. The next automatic backup is copied there.</string>
     <string name="backup_too_large">Your backup is bigger than the 10 MB Android\'s cloud backup allows, so Google\'s copy stays at the last smaller one.</string>
     <string name="backup_too_large_folder">The copy in your folder is up to date.</string>

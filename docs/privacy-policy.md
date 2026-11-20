@@ -25,14 +25,14 @@ If Android's backup to your Google account is on (or you move to a new phone wit
 Android's transfer), Android includes Honmani's settings (such as the accent colour and the Anki
 deck) and a copy Honmani keeps of its own backup file (see below: your saved words with their
 sentences, your flashcard reviews, reading progress, statistics, bookmarks and highlights, the titles of your books
-and the addresses and user names of your book servers). On a new phone Honmani
+the addresses and user names of your book servers, and your phone's model). On a new phone Honmani
 offers to restore it. Books, dictionaries, passwords and keys are never part of it.
 
 Settings → Backup writes your settings, reading progress, statistics, saved words
 and flashcard reviews to a file in a place you choose, such as your phone's storage or a cloud storage app you picked.
 Honmani sends it nowhere itself. The file holds no passwords or keys; it does hold your saved
-words with their sentences, your bookmarks and highlights, the titles of your books and the addresses and user names
-of your book servers, so keep it where only you can read it.
+words with their sentences, your bookmarks and highlights, the titles of your books, the addresses and user names
+of your book servers and your phone's model (so a restore can say which phone made it), so keep it where only you can read it.
 
 Settings → Backup → Sync folder: each phone writes one file with your progress, saved words (with their sentences),
 flashcard reviews, reading time, bookmarks and highlights (no passwords or keys) into a folder you choose, and reads the

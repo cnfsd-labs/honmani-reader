@@ -89,7 +89,7 @@ class BackupTest {
         } as android.content.SharedPreferences
 
     /** One installation of the app: its database, preferences and files. */
-    private inner class Phone(name: String, milestoneFails: Boolean = false, installationId: () -> String = { name }) {
+    private inner class Phone(name: String, milestoneFails: Boolean = false, installationId: () -> String = { name }, model: String? = null) {
         private val context = ApplicationProvider.getApplicationContext<Context>()
         val database: HonmaniDatabase = Room.inMemoryDatabaseBuilder(context, HonmaniDatabase::class.java)
             .allowMainThreadQueries()
@@ -113,6 +113,7 @@ class BackupTest {
             grades = { emptyMap() },
             installationId = installationId,
             now = { 1_800_000_000_000L },
+            deviceName = { model },
         )
 
         init {
@@ -228,6 +229,12 @@ class BackupTest {
         assertEquals(setOf("old", "other"), new.days().map { it.deviceId }.toSet())
         assertEquals(35 * 60L, new.days().perBookAndDay().single().seconds)
         assertEquals(2, new.days().size)
+    }
+
+    @Test
+    fun aBackupNamesThePhoneThatMadeIt() = runTest {
+        assertEquals("Pixel 7", throughFile(Phone("old", model = "Pixel 7").backup.export(readerSettings = null)).deviceName)
+        assertNull(throughFile(Phone("other").backup.export(readerSettings = null)).deviceName)
     }
 
     @Test

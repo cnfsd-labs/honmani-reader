@@ -110,6 +110,8 @@ class Backup(
     private val now: () -> Long = System::currentTimeMillis,
     /** Held while a restore runs; [SyncMerge] waits for it too. */
     private val restoring: Mutex = Mutex(),
+    /** This phone's model, named in backups so a restore offer can say which phone made one. */
+    private val deviceName: () -> String? = { null },
 ) {
     private val dao = database.backupDao()
     private val wordDao = database.wordDao()
@@ -249,7 +251,7 @@ class Backup(
             syncFormat = sync?.let { SyncFolder.FORMAT },
             installationId = installationId(),
             deviceId = sync?.deviceId,
-            deviceName = sync?.deviceName,
+            deviceName = sync?.deviceName ?: deviceName(),
             tombstones = tables.tombstones.map { BackupTombstone(it.kind, it.key, it.deletedAt) },
             folderTimes = tables.folderTimes,
         )
