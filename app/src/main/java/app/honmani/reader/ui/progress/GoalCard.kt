@@ -70,12 +70,13 @@ internal fun GoalCard(goal: GoalProgress?) {
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        val minutes = (goal.secondsToday / 60).toInt()
                         Text(
-                            if (goal.met) {
-                                stringResource(R.string.stats_goal_met)
-                            } else {
-                                stringResource(R.string.stats_goal_progress, (goal.secondsToday / 60).toInt(), goal.goalMinutes)
-                            },
+                            stringResource(
+                                if (goal.met) R.string.stats_goal_met else R.string.stats_goal_progress,
+                                minutes,
+                                goal.goalMinutes,
+                            ),
                             style = MaterialTheme.typography.titleLarge,
                         )
                     }

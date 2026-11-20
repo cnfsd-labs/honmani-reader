@@ -61,7 +61,7 @@
     <string name="settings_day_start_midnight">Midnight</string>
     <string name="stats_goal_title">Daily goal</string>
     <string name="stats_goal_progress">%1$d of %2$d min</string>
-    <string name="stats_goal_met">Goal reached</string>
+    <string name="stats_goal_met">Goal met · %1$d of %2$d min</string>
     <plurals name="stats_goal_streak">
         <item quantity="one">Goal streak: %1$d day</item>
         <item quantity="other">Goal streak: %1$d days</item>
