@@ -11,7 +11,8 @@
  *
  * While a passage is followed (read aloud, audiobook; sentence-follow.js) the passage decides where
  * the page is, not the place the reader was at before: a resize brings the passage back instead,
- * and these page turns count as our own scrolling, so they never look like the reader's.
+ * and these page turns count as our own scrolling, so they never look like the reader's. When the
+ * following ends, the start of the last passage becomes the place to keep.
  */
 (() => {
   'use strict';
@@ -175,6 +176,16 @@
     }, SETTLE_MS);
   }
 
+  // Read aloud or the audiobook stopped while the view went with it: the passage last followed is
+  // the reader's place. The first character of the page is not: Stop takes the bar away, the book
+  // gets taller, and the page holding that character can end before the passage.
+  document.addEventListener('honmani:follow.end', (event) => {
+    const range = event.detail;
+    const node = range && range.startContainer;
+    if (!node || node.nodeType !== 3 || !node.isConnected || range.startOffset >= node.data.length) return;
+    clearTimeout(rememberTimer);
+    anchor = { node, offset: range.startOffset };
+  });
   document.addEventListener(PAGE_CHANGE, rememberLater);
   for (const type of ['click', 'keyup', 'touchend', 'wheel', 'scroll']) {
     window.addEventListener(type, rememberLater, { capture: true, passive: true });

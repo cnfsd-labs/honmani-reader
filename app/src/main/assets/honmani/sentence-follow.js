@@ -35,7 +35,9 @@
  *   window.honmaniFollow.following()    whether a mark is shown and the view still goes with it
  *   window.honmaniFollow.keepMarkOnScreen()  brings the current mark back after a new layout
  *
- * clear() follows again too: closing or restarting starts attached.
+ * clear() follows again too: closing or restarting starts attached. If the view was still going
+ * with the mark, it dispatches 'honmani:follow.end' on document with the marked Range as detail
+ * (keep-position.js then keeps the start of that passage on screen through a resize).
  */
 (() => {
   'use strict';
@@ -43,6 +45,7 @@
   if (window.honmaniFollow) return;
 
   const HIGHLIGHT_NAME = 'honmani-read-aloud';
+  const FOLLOW_END = 'honmani:follow.end';
   const BOOK_ROOT_SELECTOR = '.book-content';
   const PRIORITY = -4;
   /** Pages turned at most for one passage: more means something is wrong, and the reader stays put. */
@@ -135,6 +138,11 @@
   }
 
   function clear() {
+    // The view went with the passage: that is where the reader is now, not the first character of
+    // the page (a resize right after, such as the read aloud bar going away, keeps it on screen).
+    if (marked && !detachedNow && markedRange) {
+      document.dispatchEvent(new CustomEvent(FOLLOW_END, { detail: markedRange }));
+    }
     marked = false;
     markedRange = null;
     detachedNow = false;

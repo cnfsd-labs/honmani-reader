@@ -429,3 +429,50 @@ test('a character with a box of no height still counts as on screen', async ({ p
   expect(await onScreen([box(306, 32 - 2000, 31, 0), box(306, 32, 31, 14)])).toBe(true);
   expect(await onScreen([box(306, 32, 0, 0)])).toBe(false);
 });
+
+const BIG_PARAGRAPHS = buildEpub({ title: '長い段落', chapters: [[0, 1, 2].map((p) => `<p>${Array.from({ length: 60 }, (_, k) => sentence(1, p * 60 + k)).join('')}</p>`)], raw: true });
+
+// Stop takes the read aloud bar away, and the book gets taller: the place the reader had before
+// read aloud began must not win over the page read aloud turned to (it took the page back there).
+for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
+  test(`stopping read aloud keeps the page it turned to when the bar goes away (${writingMode})`, async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 412, height: 800 });
+    await openBook(page, BIG_PARAGRAPHS, 'paginated', writingMode);
+    // The reader taps the first page (keep-position.js remembers it), then starts: the bar appears.
+    await page.mouse.click(200, 400);
+    await page.waitForTimeout(500);
+    await page.setViewportSize({ width: 412, height: 720 });
+    await page.waitForTimeout(1500);
+    const first = await ask(page, 'begin', { count: 10 });
+    const queue = [...first.items];
+    let item;
+    for (let n = 0; n < 25; n++) {
+      if (queue.length < 4) queue.push(...(await ask(page, 'more', { count: 10 })).items);
+      item = queue.shift();
+      await speak(page, item.i);
+    }
+    const before = await positions(page);
+    expect(Math.max(...before)).toBeGreaterThan(0);
+    await page.waitForTimeout(500);
+
+    await page.evaluate(() => window.__listener({ data: JSON.stringify({ type: 'readAloud.stop' }) }));
+    await page.setViewportSize({ width: 412, height: 800 });
+    await page.waitForTimeout(2500);
+    const lastSpoken = await page.evaluate((text) => {
+      const walker = document.createTreeWalker(document.querySelector('.book-content'), NodeFilter.SHOW_TEXT);
+      for (let node; (node = walker.nextNode()); ) {
+        const at = node.data.indexOf(text);
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 1);
+        return window.honmaniFollow.startOnScreen(range);
+      }
+      return null;
+    }, item.text.slice(0, 8));
+    expect(lastSpoken).toBe(true);
+    const after = await positions(page);
+    expect(after[after.length - 1]).toBeGreaterThan(0);
+  });
+}
