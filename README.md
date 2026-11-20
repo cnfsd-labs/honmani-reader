@@ -14,7 +14,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Search in the open book (reader menu): every match with its surroundings and place; a tap opens the
   book there and marks it
 - Read aloud (reader menu): the phone's Japanese voice (Android's text-to-speech settings) reads from the page on
-  screen, marks the sentence it says, turns the pages by itself and stops when you leave the app;
+  screen, marks the sentence it says and turns the pages by itself;
   play/pause, previous and next sentence and speed (0.5 to 1.5) are in a bar over the page.
   Pronunciations (reader menu): per book, "read this text as these kana" for names the voice gets wrong
 - Audiobook (reader menu, EPUB): pair a book with an audio file and a subtitle file (SRT or WebVTT);
@@ -23,6 +23,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   Subtitles not in the book are skipped; if fewer than half are found, the bar asks whether the files fit.
   Or make one with your own Google Cloud voice (costs money, shown before you start, with a spending cap).
   "Export audiobook" (the audiobook dialog or a book's sheet in the library) saves the audio and an SRT into a folder you pick
+- Read aloud and the audiobook keep playing with the screen off or another app in front (a notification
+  with play/pause and stop; a switch in Settings turns it off) and stop when you leave the book
 - Named bookmarks (reader menu): as many places per book as you like, jump from a list, rename or delete
   (Undo); a slider over the book shows the place as % and characters and jumps on release. After a jump,
   "Back to where you were" returns. Bookmarks are in the backup

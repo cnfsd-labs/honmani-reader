@@ -78,6 +78,47 @@
   /** Counts keepOnScreen calls: an earlier call still turning pages stops when a newer one starts. */
   let keeping = 0;
 
+  // With the screen off (read aloud or the audiobook playing on) the page is hidden and draws no
+  // frames, yet our page turns wait for frames, and so does ttu to show the next section. While
+  // our own turns run in a hidden page, frame callbacks run as message tasks instead (timers are
+  // throttled there), also those asked for just before the page hid. Elsewhere frames stay as
+  // they are, so nothing animates on and on with the screen off.
+  const nativeFrame = window.requestAnimationFrame.bind(window);
+  const frameCallbacks = new Map();
+  let lastFrameId = 0;
+  let frameTaskQueued = false;
+  const frameChannel = new MessageChannel();
+  const framesInTasks = () => autoDepth > 0 && document.hidden;
+  const runFrameCallbacks = (id, time) => {
+    const callback = frameCallbacks.get(id);
+    if (!callback) return;
+    frameCallbacks.delete(id);
+    callback(time);
+  };
+  frameChannel.port1.onmessage = () => {
+    frameTaskQueued = false;
+    const time = performance.now();
+    for (const id of [...frameCallbacks.keys()]) runFrameCallbacks(id, time);
+  };
+  const queueFrameTask = () => {
+    if (frameTaskQueued || frameCallbacks.size === 0) return;
+    frameTaskQueued = true;
+    frameChannel.port2.postMessage(null);
+  };
+  window.requestAnimationFrame = (callback) => {
+    const id = ++lastFrameId;
+    frameCallbacks.set(id, callback);
+    if (framesInTasks()) queueFrameTask();
+    else nativeFrame((time) => runFrameCallbacks(id, time));
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => {
+    frameCallbacks.delete(id);
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (framesInTasks()) queueFrameTask();
+  });
+
   function post(message) {
     const app = window.honmani;
     if (app && typeof app.postMessage === 'function') app.postMessage(JSON.stringify(message));
@@ -103,6 +144,7 @@
   /** Runs `fn` as our own scrolling: it does not detach the view. */
   async function auto(fn) {
     autoDepth++;
+    if (framesInTasks()) queueFrameTask();
     try {
       return await fn();
     } finally {

@@ -254,8 +254,10 @@ for (const writingMode of ['horizontal-tb', 'vertical-rl']) {
 }
 
 /** Reads the whole book aloud in paginated mode, advancing from chapter to chapter. */
-async function readThroughChapters(page, { lateKeys = false, markBehind = false } = {}) {
+async function readThroughChapters(page, { lateKeys = false, markBehind = false, screenOff = false } = {}) {
+  if (screenOff) await screenCanTurnOff(page);
   await openBook(page, BOOK, 'paginated', 'horizontal-tb');
+  if (screenOff) await page.evaluate(() => window.__turnScreenOff());
   let reply = await ask(page, 'begin', { count: 10 });
   const all = [...reply.items];
   const chapters = new Set();
@@ -292,6 +294,28 @@ async function readThroughChapters(page, { lateKeys = false, markBehind = false 
 test('paginated mode goes on into the next chapter and says when the book ends', async ({ page }) => {
   test.setTimeout(180_000);
   await readThroughChapters(page);
+});
+
+/** Lets the page's screen go off: then the page is hidden and the browser draws no frames (as a WebView). */
+async function screenCanTurnOff(page) {
+  await page.addInitScript(() => {
+    let off = false;
+    const frame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => frame((time) => off || callback(time));
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => off });
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (off ? 'hidden' : 'visible') });
+    window.__turnScreenOff = () => {
+      off = true;
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+  });
+}
+
+// With the screen off the WebView draws no frames: waiting for one stalled the advance at the
+// first chapter's end, and the marks that turn pages hung.
+test('with the screen off paginated mode still goes on into the next chapter', async ({ page }) => {
+  test.setTimeout(180_000);
+  await readThroughChapters(page, { screenOff: true });
 });
 
 // A slow phone (or CI runner) can take longer than a couple of frames to load the next section
