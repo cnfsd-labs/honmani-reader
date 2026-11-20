@@ -1563,6 +1563,7 @@
     <string name="reader_settings_custom_css_clear">Clear</string>
     <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
     <string name="reader_settings_edge_taps_details">Taps at the left or right edge turn the page (paginated only).</string>
+    <string name="reader_settings_edge_taps_hint">In a book, a tap near the left or right edge now turns the page; a tap anywhere else still looks the word up.</string>
     <string name="reader_settings_edge_zone">Width of the page edges</string>
     <string name="reader_settings_edge_zone_narrow">Narrow</string>
     <string name="reader_settings_edge_zone_medium">Medium</string>

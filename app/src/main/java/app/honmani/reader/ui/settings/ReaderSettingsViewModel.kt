@@ -35,9 +35,24 @@ sealed interface ReaderSettingsState {
  * reloads the reader once the screen closes, so ttu applies them (it reads its settings when
  * the page loads). Runs on the main thread, as the reader page needs.
  */
-class ReaderSettingsViewModel(private val ttu: TtuLibrary, private val fonts: FontStore) : ViewModel() {
+class ReaderSettingsViewModel(
+    private val ttu: TtuLibrary,
+    private val fonts: FontStore,
+    /** True only the first time ever that edge taps are turned on ([app.honmani.reader.data.settings.EdgeTapsHint]). */
+    private val takeEdgeTapsHint: () -> Boolean = { false },
+) : ViewModel() {
     private val _state = MutableStateFlow<ReaderSettingsState>(ReaderSettingsState.Loading)
     val state: StateFlow<ReaderSettingsState> = _state.asStateFlow()
+
+    private val _edgeTapsHint = MutableStateFlow(false)
+
+    /** Whether to show the one-time hint about the edge-tap zones, just turned on for the first time. */
+    val edgeTapsHint: StateFlow<Boolean> = _edgeTapsHint.asStateFlow()
+
+    /** The edge-taps hint was shown. */
+    fun edgeTapsHintShown() {
+        _edgeTapsHint.value = false
+    }
 
     /** What ttu has stored, as last read or written. */
     private var stored: Map<String, String> = emptyMap()
@@ -93,7 +108,8 @@ class ReaderSettingsViewModel(private val ttu: TtuLibrary, private val fonts: Fo
 
     /** Shows and stores [settings]; only the values that differ are written. */
     fun update(settings: ReaderSettings) {
-        if (_state.value !is ReaderSettingsState.Loaded) return
+        val previous = (_state.value as? ReaderSettingsState.Loaded)?.settings ?: return
+        if (settings.edgeTaps && !previous.edgeTaps && takeEdgeTapsHint()) _edgeTapsHint.value = true
         _state.value = ReaderSettingsState.Loaded(settings)
         val values = settings.toStorage()
         val differing = values.filter { (key, value) -> stored[key] != value }
@@ -119,7 +135,7 @@ class ReaderSettingsViewModel(private val ttu: TtuLibrary, private val fonts: Fo
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as HonmaniApplication).container
-                ReaderSettingsViewModel(container.ttuLibrary, container.fontStore)
+                ReaderSettingsViewModel(container.ttuLibrary, container.fontStore, container.edgeTapsHint::take)
             }
         }
     }

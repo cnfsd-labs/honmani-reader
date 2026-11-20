@@ -75,6 +75,7 @@ import app.honmani.reader.data.review.ReviewRepository
 import app.honmani.reader.data.settings.AppearanceSettings
 import app.honmani.reader.data.settings.OnboardingSettings
 import app.honmani.reader.data.settings.ReaderMenuHint
+import app.honmani.reader.data.settings.EdgeTapsHint
 import app.honmani.reader.data.settings.ReviewSwipeHint
 import app.honmani.reader.data.settings.HighlightSettings
 import app.honmani.reader.data.settings.ReadAloudSettings
@@ -241,6 +242,7 @@ class AppContainer(context: Context) {
 
     val onboardingSettings: OnboardingSettings by lazy { OnboardingSettings(devicePreferences) }
     val readerMenuHint: ReaderMenuHint by lazy { ReaderMenuHint(devicePreferences) }
+    val edgeTapsHint: EdgeTapsHint by lazy { EdgeTapsHint(devicePreferences) }
     val reviewSwipeHint: ReviewSwipeHint by lazy { ReviewSwipeHint(devicePreferences) }
     val searchHistory: SearchHistory by lazy { SearchHistory(devicePreferences) }
     val libraryFolderView: LibraryFolderView by lazy { LibraryFolderView(devicePreferences) }

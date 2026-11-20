@@ -32,12 +32,16 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,12 +92,23 @@ fun ReaderSettingsScreen(
     LaunchedEffect(viewModel) { viewModel.load() }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val fontStates by viewModel.fontStates.collectAsStateWithLifecycle()
+    val edgeTapsHint by viewModel.edgeTapsHint.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val edgeTapsHintText = stringResource(R.string.reader_settings_edge_taps_hint)
+    LaunchedEffect(edgeTapsHint) {
+        if (!edgeTapsHint) return@LaunchedEffect
+        viewModel.edgeTapsHintShown()
+        snackbar.showSnackbar(edgeTapsHintText, withDismissAction = true, duration = SnackbarDuration.Long)
+    }
     val close = {
         viewModel.close()
         onClose()
     }
     BackHandler(onBack = close)
-    Scaffold(topBar = { HonmaniTopAppBar(title = stringResource(R.string.reader_settings_title), onBack = close) }) { padding ->
+    Scaffold(
+        topBar = { HonmaniTopAppBar(title = stringResource(R.string.reader_settings_title), onBack = close) },
+        snackbarHost = { SnackbarHost(snackbar) },
+    ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when (val current = state) {
                 ReaderSettingsState.Loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))

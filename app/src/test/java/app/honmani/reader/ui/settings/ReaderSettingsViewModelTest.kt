@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -119,5 +120,25 @@ class ReaderSettingsViewModelTest {
         answerRead(emptyMap())
         viewModel.close()
         assertTrue(page.scripts.none { it.contains("reload()") })
+    }
+
+    @Test
+    fun edgeTapsHint_onlyWhenTurnedOn_andOnlyWhileTheStoreAllowsIt() = runTest {
+        var allowed = 1
+        val viewModel = ReaderSettingsViewModel(ttu, fonts, takeEdgeTapsHint = { allowed-- > 0 })
+        viewModel.load()
+        answerRead(emptyMap())
+        val loaded = (viewModel.state.value as ReaderSettingsState.Loaded).settings
+        viewModel.update(loaded.copy(fontSize = loaded.fontSize + 1))
+        assertFalse(viewModel.edgeTapsHint.value)
+
+        viewModel.update(loaded.copy(edgeTaps = true))
+        assertTrue(viewModel.edgeTapsHint.value)
+        viewModel.edgeTapsHintShown()
+        assertFalse(viewModel.edgeTapsHint.value)
+
+        viewModel.update(loaded.copy(edgeTaps = false))
+        viewModel.update(loaded.copy(edgeTaps = true))
+        assertFalse(viewModel.edgeTapsHint.value)
     }
 }
