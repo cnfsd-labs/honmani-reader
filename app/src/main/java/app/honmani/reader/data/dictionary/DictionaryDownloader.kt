@@ -45,7 +45,7 @@ class DictionaryDownloader(
      * With a [partial] file (see [partialFile]) the bytes go there first and an interrupted
      * download is kept: the next call asks only for the rest (`Range`, with `If-Range` so a
      * changed file comes whole) and appends it when the server answers 206; a 200 starts over.
-     * The finished file is moved to [destination].
+     * The finished file is moved to [destination], also when a 416 says the partial file is already whole.
      */
     suspend fun download(
         url: String,
@@ -62,6 +62,12 @@ class DictionaryDownloader(
         var connection = connect(url, purpose, validator?.let { Resume(offset, it) })
         try {
             val status = connection.responseCode
+            if (partial != null && validator != null && status == HTTP_RANGE_NOT_SATISFIABLE && contentRangeTotal(connection) == offset) {
+                // Every byte came last time, but the app stopped before the file was moved.
+                movePartial(partial, destination)
+                onProgress(offset, offset)
+                return@withContext
+            }
             var resumed = status == HTTP_PARTIAL && contentRangeStart(connection) == offset
             if (validator != null && status != HttpURLConnection.HTTP_OK && !resumed) {
                 // 416, or a range that does not continue the file: start over.
@@ -113,12 +119,7 @@ class DictionaryDownloader(
                 if (done > total && partial != null) discardPartial(partial)
                 throw DownloadException("The download was incomplete ($done of $total bytes)", reason = FailureReason.OFFLINE)
             }
-            if (partial != null) {
-                if (!partial.renameTo(destination)) {
-                    partial.copyTo(destination, overwrite = true)
-                }
-                discardPartial(partial)
-            }
+            if (partial != null) movePartial(partial, destination)
             onProgress(done, total)
         } finally {
             connection.disconnect()
@@ -251,6 +252,17 @@ class DictionaryDownloader(
         connection.getHeaderField("Content-Range")?.trim()
             ?.removePrefix("bytes")?.trim()?.substringBefore('-')?.toLongOrNull() ?: -1L
 
+    /** The whole length in a 416's `Content-Range: bytes *` + `/N`, or -1. */
+    private fun contentRangeTotal(connection: HttpURLConnection): Long =
+        connection.getHeaderField("Content-Range")?.substringAfter('/', "")?.trim()?.toLongOrNull() ?: -1L
+
+    private fun movePartial(partial: File, destination: File) {
+        if (!partial.renameTo(destination)) {
+            partial.copyTo(destination, overwrite = true)
+        }
+        discardPartial(partial)
+    }
+
     /** What tells a later request whether the file is still the same: a strong ETag, else Last-Modified. */
     private fun validatorOf(connection: HttpURLConnection): String? {
         val etag = connection.getHeaderField("ETag")?.trim()
@@ -263,7 +275,7 @@ class DictionaryDownloader(
         fun partialFile(directory: File, url: String): File {
             val hash = MessageDigest.getInstance("SHA-256").digest(url.toByteArray())
                 .take(12).joinToString("") { "%02x".format(it) }
-            return File(directory, "dictionary-download-$hash.part")
+            return File(directory, "$PARTIAL_PREFIX$hash.part")
         }
 
         /** Deletes an interrupted download and what it was resumed against. */
@@ -271,6 +283,27 @@ class DictionaryDownloader(
             partial.delete()
             validatorFileOf(partial).delete()
         }
+
+        /**
+         * Deletes interrupted downloads in [directory] untouched for [maxAgeMs]: one the user gave up
+         * on would otherwise stay in the cache (up to the size of the biggest dictionary), while a
+         * download retried within that time still resumes.
+         */
+        fun sweepStalePartials(directory: File, now: Long = System.currentTimeMillis(), maxAgeMs: Long = STALE_PARTIAL_MS) {
+            directory.listFiles()?.forEach { file ->
+                val name = file.name
+                if (name.startsWith(PARTIAL_PREFIX) && (name.endsWith(".part") || name.endsWith(".part.validator")) &&
+                    now - file.lastModified() > maxAgeMs
+                ) {
+                    file.delete()
+                }
+            }
+        }
+
+        private const val PARTIAL_PREFIX = "dictionary-download-"
+
+        /** A week: long enough for a retry, short enough that a given-up download does not linger. */
+        const val STALE_PARTIAL_MS = 7L * 24 * 60 * 60 * 1000
 
         private fun validatorFileOf(partial: File) = File(partial.path + ".validator")
 

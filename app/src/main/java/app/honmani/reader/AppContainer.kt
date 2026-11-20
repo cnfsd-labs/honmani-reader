@@ -1009,11 +1009,17 @@ class AppContainer(context: Context) {
         applicationScope.launch { autoBackup.checkOffer() }
     }
 
-    /** Once per app start: removes import copies and catalogue downloads a kill left behind. */
+    /**
+     * Once per app start: removes import copies and catalogue downloads a kill left behind, and
+     * dictionary downloads given up on a week ago.
+     */
     fun sweepLeftovers() {
         applicationScope.launch {
             bookImporter.sweepTemporaryFiles()
-            withContext(Dispatchers.IO) { OpdsAutoImport.sweepStaleDownloads(downloadsDir, createdAt) }
+            withContext(Dispatchers.IO) {
+                OpdsAutoImport.sweepStaleDownloads(downloadsDir, createdAt)
+                DictionaryDownloader.sweepStalePartials(appContext.cacheDir)
+            }
         }
     }
 

@@ -35,7 +35,9 @@ class DictionaryDownloadResumeTest {
         server = HeaderServer { _, out ->
             val headers = server.requests.last().headers
             val range = headers["range"]?.removePrefix("bytes=")?.substringBefore('-')?.toIntOrNull()
-            if (rangesSupported && range != null && headers["if-range"] == ETAG) {
+            if (rangesSupported && range != null && range >= payload.size && headers["if-range"] == ETAG) {
+                out.head("416 Range Not Satisfiable", "ETag: $ETAG", "Content-Range: bytes */${payload.size}", "Content-Length: 0")
+            } else if (rangesSupported && range != null && headers["if-range"] == ETAG) {
                 out.head(
                     "206 Partial Content",
                     "ETag: $ETAG",
@@ -84,6 +86,43 @@ class DictionaryDownloadResumeTest {
         assertEquals(payload.size.toLong() to payload.size.toLong(), progress.last())
         assertTrue(progress.first().first > 120_000)
         assertFalse(partial.exists())
+    }
+
+    @Test
+    fun aDownloadKilledBeforeItsFileWasMovedFinishesWithoutDownloadingAgain() = runTest {
+        val destination = File(temp.root, "dict.zip")
+        partial.writeBytes(payload)
+        File(partial.path + ".validator").writeText(ETAG)
+        val before = server.requests.size
+
+        downloader.download(url, destination, partial = partial)
+
+        assertEquals(before + 1, server.requests.size)
+        assertEquals("bytes=${payload.size}-", server.requests.last().headers["range"])
+        assertArrayEquals(payload, destination.readBytes())
+        assertFalse(partial.exists())
+        assertTrue(temp.root.listFiles()!!.none { it.name.startsWith("dictionary-download-") })
+    }
+
+    @Test
+    fun aDownloadGivenUpOnIsSweptAfterAWeek_aRecentOneStaysForTheRetry() = runTest {
+        interruptedDownload(File(temp.root, "dict.zip"))
+        val validator = File(partial.path + ".validator")
+        assertTrue(validator.exists())
+        val other = File(temp.root, "keep.zip").apply { writeText("x") }
+        val now = System.currentTimeMillis()
+
+        DictionaryDownloader.sweepStalePartials(temp.root, now)
+        assertTrue(partial.exists())
+
+        val old = now - DictionaryDownloader.STALE_PARTIAL_MS - 1_000
+        partial.setLastModified(old)
+        validator.setLastModified(old)
+        other.setLastModified(old)
+        DictionaryDownloader.sweepStalePartials(temp.root, now)
+        assertFalse(partial.exists())
+        assertFalse(validator.exists())
+        assertTrue(other.exists())
     }
 
     @Test
