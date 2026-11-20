@@ -316,6 +316,9 @@ async function screenCanTurnOff(page) {
 test('with the screen off paginated mode still goes on into the next chapter', async ({ page }) => {
   test.setTimeout(180_000);
   await readThroughChapters(page, { screenOff: true });
+  // ttu saved its bookmark on those turns too: the reader menu's place goes with read aloud.
+  const reported = await positions(page);
+  expect(Math.max(...reported)).toBeGreaterThan(sentence(1, 0).length * 200);
 });
 
 // A slow phone (or CI runner) can take longer than a couple of frames to load the next section

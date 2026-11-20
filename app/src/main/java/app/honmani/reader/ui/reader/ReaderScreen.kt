@@ -215,6 +215,9 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var addBookOnStart by addBookOnStartState
     val overlays = rememberReaderOverlays()
     val current = rememberCurrentBook(container)
+    // ttu's last saved position (book id to characters): the menu's place follows page turns made
+    // while it is open (read aloud, the audiobook), with the screen on or off.
+    var savedPosition by remember { mutableStateOf<Pair<Long, Long>?>(null) }
     KeepPlayingEffect(container, audio, current.book?.title.orEmpty())
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
     val jumpSnackbar = remember { SnackbarHostState() }
@@ -461,6 +464,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                 },
                 onActivity = tracker::onActivity,
                 onPage = { ttuId, characters, progress ->
+                    savedPosition = ttuId to characters
                     tracker.onPage(ttuId, characters, progress)
                     container.progressSync.onPosition(ttuId, characters)
                 },
@@ -661,7 +665,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
         if (menuOpen && !atLibrary) {
             val syncState by container.koSyncStatus.state.collectAsStateWithLifecycle()
             val syncFailure = syncState.failureFor(current.ttuId)
-            val place by produceState<MenuPlace?>(null, bookText) {
+            val opened by produceState<MenuPlace?>(null, bookText) {
                 val id = current.ttuId
                 val text = bookText
                 value = if (id == null || text == null) null else {
@@ -684,6 +688,12 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     }
                     MenuPlace(characters ?: 0L, text.total, speed)
                 }
+            }
+            // Only saves made while the menu is open: an older one may predate a position set otherwise (sync).
+            val savedAtOpen = remember { savedPosition }
+            val place = opened?.let { base ->
+                savedPosition?.takeIf { it !== savedAtOpen && it.first == current.ttuId }
+                    ?.let { base.copy(characters = it.second) } ?: base
             }
             ReaderMenuSheet(
                 showProgress = appSettings.showProgress,
