@@ -54,7 +54,8 @@ public: never copy those notes, personal details or discussions into it.
   `UiSounds`, never while read aloud or audio plays; the Appearance "Sounds" switch (off by default) gates them; they use the media stream (the
   sonification stream is muted by ringer silent/vibrate); haptics follow the system setting.
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
-  contradicts ranks below those it agrees with; own deinflection (`lookup/Deinflector`; an entry without word classes borrows those of the same
+  contradicts ranks below those it agrees with; a tap inside a ruby base scans from the base's start only
+  when the best entry there covers the whole base with its furigana; own deinflection (`lookup/Deinflector`; an entry without word classes borrows those of the same
   expression+reading in another dictionary, else matches uninflected text only); glossaries
   stored deflated (`GlossaryPacker`).
 - **Saved words:** recorded on every tap lookup (a long press records nothing until a panel action saves

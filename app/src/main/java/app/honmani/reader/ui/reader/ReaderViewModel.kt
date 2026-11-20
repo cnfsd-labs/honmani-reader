@@ -287,30 +287,34 @@ class ReaderViewModel(
         stopReading()
     }
 
-    fun onTap(tap: TapLookup) {
+    fun onTap(tapped: TapLookup) {
         lookupJob?.cancel()
         counted = null
         discarded = null
-        _countedTap.value = tap.takeIf { recordsOnOpen(it) }
+        _countedTap.value = tapped.takeIf { recordsOnOpen(it) }
         val lookupId = ++lookupCount
         lookupJob = viewModelScope.launch {
             val start = TimeSource.Monotonic.markNow()
-            tapStarted = tap to start
+            tapStarted = tapped to start
             // Deinflection and matching take up to ~20 ms on older phones: not on the main thread,
             // where the reader draws.
-            val result = try {
-                withContext(compute) { lookup(tap.text, tap.ruby) }
+            val (tap, result) = try {
+                withContext(compute) { lookUpTap(tapped) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // A damaged dictionary row must not take the app down on a tap.
                 log("Lookup failed: $e")
-                show(LookupPanelState.NothingFound(tap))
+                show(LookupPanelState.NothingFound(tapped))
                 return@launch
+            }
+            if (tap != tapped) {
+                _countedTap.value = tap.takeIf { recordsOnOpen(it) }
+                tapStarted = tap to start
             }
             log("Lookup of ${tap.text.length} chars: ${result.entries.size} entries in ${start.elapsedNow()}")
             if (result.entries.isNotEmpty()) {
-                _highlight.value = Highlight(lookupId, result.matchedLength, tap.tapNumber)
+                _highlight.value = Highlight(lookupId, result.matchedLength, tap.tapNumber, tap.fromRubyBase)
                 log("Mark sent ${start.elapsedNow()} after the tap's message")
             }
             // Keep the previous panel on screen until the new result is ready, to avoid flicker.
@@ -321,7 +325,7 @@ class ReaderViewModel(
                     val first = tap.text.takeIf { it.isNotEmpty() }
                         ?.let { String(Character.toChars(it.codePointAt(0))) }.orEmpty()
                     kanjiOf(first)[first]
-                        ?.let { LookupPanelState.Kanji(tap, it, highlight = Highlight(lookupId, first.length, tap.tapNumber)) }
+                        ?.let { LookupPanelState.Kanji(tap, it, highlight = Highlight(lookupId, first.length, tap.tapNumber, tap.fromRubyBase)) }
                         ?: LookupPanelState.NothingFound(tap)
                 }
                 else -> {
@@ -338,7 +342,7 @@ class ReaderViewModel(
                     LookupPanelState.Results(
                         tap = tap,
                         groups = groups,
-                        highlight = Highlight(lookupId, result.matchedLength, tap.tapNumber),
+                        highlight = Highlight(lookupId, result.matchedLength, tap.tapNumber, tap.fromRubyBase),
                         longestMatch = result.entries.maxOf { it.source.length },
                     )
                 }
@@ -355,6 +359,18 @@ class ReaderViewModel(
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, furigana = furigana, kanji = kanji) }
         }
+    }
+
+    /**
+     * The lookup of [tap]: from the start of its ruby base when a word there covers the whole base
+     * with the base's furigana (東京 for a tap on 京 under とうきょう), else from the tapped character.
+     */
+    private suspend fun lookUpTap(tap: TapLookup): Pair<TapLookup, LookupResult> {
+        tap.fromRubyBase()?.let { base ->
+            val result = lookup(base.text, base.ruby)
+            if (base.foundWholeRubyBase(result)) return base to result
+        }
+        return tap to lookup(tap.text, tap.ruby)
     }
 
     /**
@@ -404,7 +420,7 @@ class ReaderViewModel(
                 return@launch
             }
             if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
-            val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber)
+            val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber, tap.fromRubyBase)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
             updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), learned = emptySet(), furigana = emptyMap(), kanji = emptyMap()) }

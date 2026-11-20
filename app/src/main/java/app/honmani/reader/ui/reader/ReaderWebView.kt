@@ -292,7 +292,7 @@ fun ReaderWebView(
         highlight.collect { shown ->
             val message = if (shown != null) {
                 val color = highlightColor.toHex()
-                """{"type":"highlight","length":${shown.length},"color":"$color","tap":${shown.tapNumber}}"""
+                """{"type":"highlight","length":${shown.length},"color":"$color","tap":${shown.tapNumber},"fromRubyBase":${shown.fromRubyBase}}"""
             } else {
                 """{"type":"clear"}"""
             }
@@ -489,7 +489,8 @@ private fun marksReply(request: BridgeMessage.Marks, marks: List<List<WordMark>>
 private fun Color.toHex(): String = "#%06X".format(toArgb() and 0xFFFFFF)
 
 /** Marks [length] characters from the tap of lookup [lookupId], which makes each mark distinct. */
-data class Highlight(val lookupId: Long, val length: Int, val tapNumber: Int = 0)
+/** A mark of [length] characters from the tap ([fromRubyBase]: from the start of the tapped ruby base). */
+data class Highlight(val lookupId: Long, val length: Int, val tapNumber: Int = 0, val fromRubyBase: Boolean = false)
 
 /**
  * A WebView whose text selection toolbar (Translate, Copy, Select all) can be emptied, which

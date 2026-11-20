@@ -11,7 +11,11 @@
  *     "ruby": [{ "start": <n>, "end": <n>, "reading": "<furigana>" }] }
  *
  * "ruby" lists furigana for ruby bases that lie wholly inside "text" (indexes into "text"); it is
- * left out when there are none.
+ * left out when there are none. A tap inside a ruby base after its first character (京 of 東京
+ * read とうきょう) also sends "rubyBase": { "before": "<the base before the tapped character>",
+ * "end": <where the base ends in "text">, "reading": "<furigana>" }: the app looks the whole base
+ * up instead when a word matches it with that reading, and then answers highlights with
+ * "fromRubyBase": true, marking from the start of the base.
  *   { "type": "dismiss" }   (a tap on book content that is not on text)
  *   { "type": "turnPage", "next": <bool> }
  *                           (a tap in the left or right edge zone of a paginated page, instead
@@ -367,10 +371,19 @@
     const sentence = around.sentence.replaceAll(GAIJI, '\u3013');
     const { offset } = around;
     const previous = around.previous.replaceAll(GAIJI, '\u3013');
-    lastTap = { block, node, index, skip: start - position };
+    lastTap = { block, node, index, skip: start - position, base: null };
     const message = { type: 'lookup', text, sentence, sentenceOffset: offset, tap: ++tapNumber };
     const ruby = rubyWithin(paragraphRuby, start, text.length);
     if (ruby.length > 0) message.ruby = ruby;
+    // A tap on 京 of 東京 (one reading over both): the app may look the whole base up instead.
+    const base = limit === Infinity && paragraphRuby.find((span) => span.start < start && start < span.end);
+    if (base && base.end - start <= text.length && base.reading.length > 0 && base.reading.length <= MAX_READING_LENGTH) {
+      const baseStart = rangeFromText(block, base.start, base.start + 1);
+      if (baseStart && baseStart.startContainer.nodeType === Node.TEXT_NODE) {
+        lastTap.base = { node: baseStart.startContainer, index: baseStart.startOffset };
+        message.rubyBase = { before: paragraph.slice(base.start, start), end: base.end - start, reading: base.reading };
+      }
+    }
     if (previous) message.previousSentence = previous;
     const place = window.honmaniHighlights ? rangeFromText(block, start, start + 1) : null;
     const measured = place && window.honmaniHighlights.measure(place);
@@ -437,18 +450,23 @@
     style.textContent = `::highlight(${HIGHLIGHT_NAME}) { background-color: ${highlightBackground(color)}; }`;
   }
 
-  /** Marks `length` characters of book text from the last tap, skipping furigana. */
-  function highlight(length, color) {
+  /**
+   * Marks `length` characters of book text from the last tap, skipping furigana; from the start of
+   * the tapped ruby base when the app looked that up (`fromBase`).
+   */
+  function highlight(length, color, fromBase) {
     clearHighlight();
     if (!lastTap || !lastTap.node.isConnected) return;
+    const start = fromBase && lastTap.base ? { ...lastTap.base, skip: 0 } : lastTap;
+    if (!start.node.isConnected) return;
 
     const walker = textWalker(lastTap.block);
-    walker.currentNode = lastTap.node;
+    walker.currentNode = start.node;
     const ranges = [];
-    let node = lastTap.node;
-    let offset = lastTap.index;
+    let node = start.node;
+    let offset = start.index;
     // Past the opening brackets the scan skipped.
-    let skip = lastTap.skip;
+    let skip = start.skip;
     while (node && skip > 0) {
       const available = node.data.length - offset;
       if (skip < available) {
@@ -504,7 +522,7 @@
     if (message.type === 'highlight' && Number.isInteger(message.length)) {
       // A reply that comes after a newer tap would mark the wrong text.
       if (Number.isInteger(message.tap) && message.tap < tapNumber) return;
-      highlight(message.length, message.color);
+      highlight(message.length, message.color, message.fromRubyBase === true);
     } else if (message.type === 'clear') {
       clearHighlight();
     }

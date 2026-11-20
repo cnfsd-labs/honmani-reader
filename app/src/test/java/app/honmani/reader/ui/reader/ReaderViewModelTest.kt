@@ -16,6 +16,7 @@ import app.honmani.reader.lookup.Inflection
 import app.honmani.reader.lookup.KanjiInfo
 import app.honmani.reader.lookup.LookupEntry
 import app.honmani.reader.lookup.LookupResult
+import app.honmani.reader.lookup.RubySpan
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import androidx.lifecycle.ViewModelProvider
@@ -941,5 +942,82 @@ class ReaderViewModelTest {
         search.removeWord((search.panel.value as LookupPanelState.Results).groups.single())
 
         assertEquals(0, deletes)
+    }
+
+    // A tap on 京 of 東京 under one reading, とうきょう: the bridge sends the text from 京 and the base.
+    private val tapOnSecondKanji = TapLookup(
+        text = "京へ行く。",
+        sentence = "東京へ行く。",
+        sentenceOffset = 1,
+        tapNumber = 3,
+        position = 101,
+        rubyBase = TapLookup.RubyBase(before = "東", end = 1, reading = "とうきょう"),
+    )
+
+    private fun rubyModel(lookups: MutableList<Pair<String, List<RubySpan>>>, found: (String, List<RubySpan>) -> LookupResult) =
+        ReaderViewModel(
+            lookup = { text, ruby -> lookups += text to ruby; found(text, ruby) },
+            compute = Dispatchers.Unconfined,
+        )
+
+    @Test
+    fun aTapInsideARubyBaseLooksUpTheWholeBase_whenAWordMatchesItWithItsReading() {
+        val lookups = mutableListOf<Pair<String, List<RubySpan>>>()
+        val model = rubyModel(lookups) { text, _ ->
+            if (text.startsWith("東京")) LookupResult(listOf(entry("東京", "東京").copy(matchesFurigana = true)))
+            else LookupResult(listOf(entry("京", "京")))
+        }
+        model.onTap(tapOnSecondKanji)
+
+        assertEquals(listOf("東京へ行く。" to listOf(RubySpan(0, 2, "とうきょう"))), lookups)
+        val panel = model.panel.value as LookupPanelState.Results
+        assertEquals("東京", panel.groups.first().expression)
+        assertEquals(Highlight(panel.highlight.lookupId, 2, 3, fromRubyBase = true), panel.highlight)
+        assertEquals("東京へ行く。", panel.tap.text)
+        assertEquals(0, panel.tap.sentenceOffset)
+        assertEquals(100L, panel.tap.position)
+    }
+
+    @Test
+    fun aTapInsideARubyBaseKeepsTheTappedCharacter_whenNoWordMatchesTheWholeBase() {
+        val lookups = mutableListOf<Pair<String, List<RubySpan>>>()
+        val model = rubyModel(lookups) { text, _ ->
+            // Only 東 matches from the base start: shorter than the base.
+            if (text.startsWith("東")) LookupResult(listOf(entry("東", "東").copy(matchesFurigana = true)))
+            else LookupResult(listOf(entry("京", "京")))
+        }
+        model.onTap(tapOnSecondKanji)
+
+        assertEquals(listOf("東京へ行く。", "京へ行く。"), lookups.map { it.first })
+        val panel = model.panel.value as LookupPanelState.Results
+        assertEquals("京", panel.groups.first().expression)
+        assertFalse(panel.highlight.fromRubyBase)
+        assertEquals(tapOnSecondKanji, panel.tap)
+    }
+
+    @Test
+    fun aTapInsideARubyBaseKeepsTheTappedCharacter_whenTheReadingDisagrees() {
+        val lookups = mutableListOf<Pair<String, List<RubySpan>>>()
+        val model = rubyModel(lookups) { text, _ ->
+            if (text.startsWith("東京")) LookupResult(listOf(entry("東京", "東京")))
+            else LookupResult(listOf(entry("京", "京")))
+        }
+        model.onTap(tapOnSecondKanji)
+
+        val panel = model.panel.value as LookupPanelState.Results
+        assertEquals("京", panel.groups.first().expression)
+        assertEquals(1, panel.highlight.length)
+        assertFalse(panel.highlight.fromRubyBase)
+    }
+
+    @Test
+    fun aTapOnTheFirstCharacterOfARubyBaseIsLookedUpOnce() {
+        val lookups = mutableListOf<Pair<String, List<RubySpan>>>()
+        val model = rubyModel(lookups) { text, _ -> LookupResult(listOf(entry("東京", text.take(2)).copy(matchesFurigana = true))) }
+        val ruby = listOf(RubySpan(0, 2, "とうきょう"))
+        model.onTap(TapLookup(text = "東京へ", sentence = "東京へ", sentenceOffset = 0, ruby = ruby))
+
+        assertEquals(listOf("東京へ" to ruby), lookups)
+        assertFalse((model.panel.value as LookupPanelState.Results).highlight.fromRubyBase)
     }
 }

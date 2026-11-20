@@ -2,6 +2,7 @@ package app.honmani.reader.ui.reader
 
 import app.honmani.reader.data.library.HIGHLIGHT_TEXT_MAX
 import app.honmani.reader.data.words.WordMarksMode
+import app.honmani.reader.lookup.LookupResult
 import app.honmani.reader.lookup.RubySpan
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -361,7 +362,42 @@ data class TapLookup(
     val highlightId: Long? = null,
     /** ttu's character count before the looked-up text (as highlights count), where the page could measure it; else null. */
     val position: Long? = null,
+    /** A tap inside a ruby base after its first character: that base, which may be looked up instead ([fromRubyBase]). */
+    val rubyBase: RubyBase? = null,
+    /** This lookup starts at the start of the tapped ruby base, [RubyBase.before] ahead of the tapped character. */
+    val fromRubyBase: Boolean = false,
 ) {
+    /** The part of a ruby base before the tapped character, where the base ends in the tap's text, and its furigana. */
+    data class RubyBase(val before: String, val end: Int, val reading: String)
+
+    /**
+     * The same tap looked up from the start of its ruby base (東京 for a tap on 京 under one
+     * reading), with the base's furigana; null if the tap was not inside a base.
+     */
+    fun fromRubyBase(): TapLookup? {
+        val base = rubyBase ?: return null
+        val shift = base.before.length
+        if (sentenceOffset < shift || sentence.substring(sentenceOffset - shift, sentenceOffset) != base.before) return null
+        return copy(
+            text = base.before + text,
+            sentenceOffset = sentenceOffset - shift,
+            ruby = listOf(RubySpan(0, shift + base.end, base.reading)) + ruby.map { it.copy(start = it.start + shift, end = it.end + shift) },
+            position = position?.let { (it - shift).coerceAtLeast(0) },
+            rubyBase = null,
+            fromRubyBase = true,
+        )
+    }
+
+    /**
+     * Whether [result], the lookup of [fromRubyBase], is kept: its best entry covers the whole ruby
+     * base with the base's furigana as its reading. Else the tapped character is looked up.
+     */
+    fun foundWholeRubyBase(result: LookupResult): Boolean {
+        val base = ruby.firstOrNull()?.takeIf { fromRubyBase } ?: return false
+        val best = result.entries.firstOrNull() ?: return false
+        return best.matchesFurigana && best.source.length >= base.end
+    }
+
     companion object {
         // Generous bounds; the bridge sends at most 20 code points and 400 sentence chars.
         private const val MAX_TEXT_LENGTH = 64
@@ -397,7 +433,14 @@ data class TapLookup(
             if (!lookup.isValid()) return null
             // Furigana only helps ranking: drop it, not the lookup, if its indexes do not fit.
             val ruby = envelope.ruby.map { RubySpan(it.start, it.end, it.reading) }
-            return if (isValidRuby(ruby, lookup.text.length)) lookup.copy(ruby = ruby) else lookup
+            val withRuby = if (isValidRuby(ruby, lookup.text.length)) lookup.copy(ruby = ruby) else lookup
+            val base = envelope.rubyBase?.takeIf {
+                !envelope.selection && withRuby.ruby.size == ruby.size &&
+                    it.before.isNotEmpty() && it.before.length + lookup.text.length <= MAX_TEXT_LENGTH &&
+                    it.end in 1..lookup.text.length && withRuby.ruby.all { span -> span.start >= it.end } &&
+                    it.reading.isNotBlank() && it.reading.length <= MAX_READING_LENGTH
+            }
+            return if (base == null) withRuby else withRuby.copy(rubyBase = RubyBase(base.before, base.end, base.reading))
         }
 
         private fun passage(wire: PassageEnvelope?): SelectedPassage? =
@@ -439,7 +482,11 @@ data class TapLookup(
         val highlight: HighlightEnvelope? = null,
         val highlightId: Long? = null,
         val position: Long? = null,
+        val rubyBase: RubyBaseEnvelope? = null,
     )
+
+    @Serializable
+    private data class RubyBaseEnvelope(val before: String, val end: Int, val reading: String)
 
     @Serializable
     private data class HighlightEnvelope(

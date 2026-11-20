@@ -298,4 +298,20 @@ class TapLookupTest {
         assertNull(BridgeMessage.parse("""{"type":"library.unknown","requestId":1}"""))
         assertNull(BridgeMessage.parse("""{"type":5}"""))
     }
+
+    @Test
+    fun parsesTheTappedRubyBase_andDropsOneThatDoesNotFit() {
+        fun message(base: String) =
+            """{"type":"lookup","text":"京へ","sentence":"東京へ","sentenceOffset":1,"rubyBase":$base}"""
+        assertEquals(
+            TapLookup.RubyBase("東", 1, "とうきょう"),
+            TapLookup.parse(message("""{"before":"東","end":1,"reading":"とうきょう"}"""))?.rubyBase,
+        )
+        assertNull(TapLookup.parse(message("""{"before":"東","end":3,"reading":"とうきょう"}"""))?.rubyBase)
+        assertNull(TapLookup.parse(message("""{"before":"","end":1,"reading":"とうきょう"}"""))?.rubyBase)
+        assertNull(TapLookup.parse(message("""{"before":"東","end":1,"reading":""}"""))?.rubyBase)
+        // The base must sit in the sentence right before the tapped text.
+        val wrong = TapLookup.parse(message("""{"before":"西","end":1,"reading":"とうきょう"}"""))
+        assertNull(wrong?.fromRubyBase())
+    }
 }

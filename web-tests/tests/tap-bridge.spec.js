@@ -88,6 +88,29 @@ test('leaves out furigana of a ruby word tapped in the middle', async ({ page })
   expect(message.ruby.map((span) => span.reading)).toEqual(['とう', 'きょう', 'あした']);
 });
 
+test('a tap inside a ruby base offers the whole base with its reading', async ({ page }) => {
+  await tapChar(page, '#h3', '字');
+  const [message] = await messages(page);
+  expect(message.rubyBase).toEqual({ before: '漢', end: 1, reading: 'かんじ' });
+
+  // The app looked the whole base up: the mark starts at its first character.
+  await reply(page, { type: 'highlight', length: 2, fromRubyBase: true });
+  expect(await highlighted(page)).toEqual(['漢字']);
+  // It did not: the mark starts at the tapped character.
+  await reply(page, { type: 'highlight', length: 2 });
+  expect(await highlighted(page)).toEqual(['字', 'と']);
+});
+
+test('no ruby base is offered for a tap on its first character or on per-character furigana', async ({ page }) => {
+  await tapChar(page, '#h3', '漢');
+  await tapChar(page, '#h3', '京');
+  await tapChar(page, '#h3', '日');
+  const [first, perCharacter, withRb] = await messages(page);
+  expect(first).not.toHaveProperty('rubyBase');
+  expect(perCharacter).not.toHaveProperty('rubyBase');
+  expect(withRb.rubyBase).toEqual({ before: '明', end: 1, reading: 'あした' });
+});
+
 test('sends no ruby field without furigana in the scanned text', async ({ page }) => {
   await tapChar(page, '#v2', 'ど');
 
