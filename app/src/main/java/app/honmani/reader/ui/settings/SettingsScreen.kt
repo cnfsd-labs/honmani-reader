@@ -388,7 +388,7 @@ private fun SettingsContent(
                     item { review() }
                     item { anki() }
                     item { voice() }
-                    item { KnownWordsSettingsRow() }
+                    item { KnownWordsSettingsRow(onOpenDictionaries) }
                 }
                 SettingsPage.GOAL -> {
                     item { goal() }

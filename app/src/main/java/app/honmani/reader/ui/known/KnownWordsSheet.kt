@@ -116,7 +116,13 @@ internal class KnownWordsFlow(
          * [offer]: the problem is a missing dictionary, which one tap can download (never one already installed).
          * [retryWaniKani]: WaniKani could not be read; "Try again" returns to the token, still filled in.
          */
-        data class Problem(val message: String, val offer: CatalogDictionary? = null, val retryWaniKani: Boolean = false) : Step
+        /** [inDictionaries]: the fix is on the Dictionaries screen (a dictionary turned off or still downloading). */
+        data class Problem(
+            val message: String,
+            val offer: CatalogDictionary? = null,
+            val retryWaniKani: Boolean = false,
+            val inDictionaries: Boolean = false,
+        ) : Step
 
         /** The quiz is asking word number `answers.size + 1`; [answers] are the answers so far (true = known). */
         data class Quiz(val setup: QuizSetup, val answers: List<Boolean> = emptyList()) : Step
@@ -148,20 +154,20 @@ internal class KnownWordsFlow(
         return when (what) {
             MissingDictionary.FREQUENCY ->
                 if (DictionaryCatalog.isInstalled(DictionaryCatalog.frequency, installed.map { it.title })) {
-                    Step.Problem(context.getString(R.string.known_frequency_off))
+                    Step.Problem(context.getString(R.string.known_frequency_off), inDictionaries = true)
                 } else {
                     Step.Problem(context.getString(R.string.known_no_frequency), offer = DictionaryCatalog.frequency)
                 }
             MissingDictionary.WORDS ->
                 if (installed.any { it.termCount > 0 }) {
-                    Step.Problem(context.getString(R.string.known_words_off))
+                    Step.Problem(context.getString(R.string.known_words_off), inDictionaries = true)
                 } else {
                     Step.Problem(context.getString(R.string.known_no_words, DictionaryCatalog.words.name), offer = DictionaryCatalog.words)
                 }
         }
     }
 
-    private fun downloading() = Step.Problem(context.getString(R.string.known_dictionary_downloading))
+    private fun downloading() = Step.Problem(context.getString(R.string.known_dictionary_downloading), inDictionaries = true)
 
     /** Starts the same download as the Dictionaries screen's (once); the reader tries again once it is in. */
     fun download(dictionary: CatalogDictionary) {
@@ -350,7 +356,7 @@ internal fun fileProblem(e: Exception): Int? = when (e) {
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun KnownWordsSheet(onDismiss: () -> Unit) {
+fun KnownWordsSheet(onDismiss: () -> Unit, onOpenDictionaries: (() -> Unit)? = null) {
     val context = LocalContext.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
     val scope = rememberCoroutineScope()
@@ -431,7 +437,16 @@ fun KnownWordsSheet(onDismiss: () -> Unit) {
         }
     }
     KnownFromAnkiDialogs(knownFromAnki)
-    KnownWordsDialogs(flow)
+    KnownWordsDialogs(
+        flow,
+        onOpenDictionaries = onOpenDictionaries?.let { open ->
+            {
+                flow.cancel()
+                onDismiss()
+                open()
+            }
+        },
+    )
 }
 
 @Composable
@@ -446,7 +461,7 @@ private fun batchTitle(batch: KnownBatchEntity): String = when (batch.source) {
 }
 
 @Composable
-private fun KnownWordsDialogs(flow: KnownWordsFlow) {
+private fun KnownWordsDialogs(flow: KnownWordsFlow, onOpenDictionaries: (() -> Unit)?) {
     val withNotifications = rememberWithNotifications()
     when (val step = flow.step) {
         null -> Unit
@@ -569,11 +584,13 @@ private fun KnownWordsDialogs(flow: KnownWordsFlow) {
                     }
                 } else if (step.retryWaniKani) {
                     TextButton(onClick = flow::showWaniKani) { Text(stringResource(R.string.action_retry)) }
+                } else if (step.inDictionaries && onOpenDictionaries != null) {
+                    TextButton(onClick = onOpenDictionaries) { Text(stringResource(R.string.known_open_dictionaries)) }
                 } else {
                     TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) }
                 }
             },
-            dismissButton = if (step.offer != null || step.retryWaniKani) {
+            dismissButton = if (step.offer != null || step.retryWaniKani || (step.inDictionaries && onOpenDictionaries != null)) {
                 { TextButton(onClick = flow::cancel) { Text(stringResource(R.string.action_close)) } }
             } else {
                 null

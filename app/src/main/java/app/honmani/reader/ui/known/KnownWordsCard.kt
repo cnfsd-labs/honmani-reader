@@ -31,14 +31,14 @@ private const val KEY_CARD_DISMISSED = "card_dismissed"
 
 /** The offer in the Words list for readers who have told Honmani little: gone for good once dismissed. */
 @Composable
-fun KnownWordsCard() {
+fun KnownWordsCard(onOpenDictionaries: (() -> Unit)? = null) {
     val context = LocalContext.current
     val preferences = remember { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var dismissed by remember { mutableStateOf(preferences.getBoolean(KEY_CARD_DISMISSED, false)) }
     val known by (context.applicationContext as HonmaniApplication).container.knownWords.batches.knownCount
         .collectAsState(initial = Int.MAX_VALUE)
     var open by rememberSaveable { mutableStateOf(false) }
-    if (open) KnownWordsSheet(onDismiss = { open = false })
+    if (open) KnownWordsSheet(onDismiss = { open = false }, onOpenDictionaries = onOpenDictionaries)
     if (dismissed || known >= CARD_BELOW) return
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.known_card_text), style = MaterialTheme.typography.titleSmall)
@@ -57,9 +57,9 @@ fun KnownWordsCard() {
 
 /** The settings row that opens [KnownWordsSheet]. */
 @Composable
-fun KnownWordsSettingsRow() {
+fun KnownWordsSettingsRow(onOpenDictionaries: (() -> Unit)? = null) {
     var open by rememberSaveable { mutableStateOf(false) }
-    if (open) KnownWordsSheet(onDismiss = { open = false })
+    if (open) KnownWordsSheet(onDismiss = { open = false }, onOpenDictionaries = onOpenDictionaries)
     ListItem(
         headlineContent = { Text(stringResource(R.string.known_title)) },
         supportingContent = { Text(stringResource(R.string.known_card_details)) },

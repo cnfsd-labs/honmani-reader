@@ -440,6 +440,7 @@ fun WordsScreen(
                     dueIds = dueIds,
                     libraryBookIds = libraryBookIds,
                     onOpenBook = onOpenBook,
+                    onOpenDictionaries = onOpenDictionaries,
                 )
                 WordsPage.REVIEW -> ReviewPage(
                     due = reviewDue,
@@ -566,6 +567,7 @@ private fun WordsContent(
     dueIds: Set<Long> = emptySet(),
     libraryBookIds: Set<Long> = emptySet(),
     onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
+    onOpenDictionaries: (() -> Unit)? = null,
 ) {
     // Above the keyboard when the filter field is typed in.
     Column(modifier = Modifier.fillMaxSize().consumeWindowInsets(padding).imePadding()) {
@@ -636,6 +638,7 @@ private fun WordsContent(
                 onExportPackage = onExportPackage,
                 onExportCsv = onExportCsv,
                 ankiEnabled = ankiEnabled,
+                onOpenDictionaries = onOpenDictionaries,
                 exportEnabled = !shown.isNullOrEmpty() && uiState.ankiProgress == null,
             )
         }
@@ -720,6 +723,7 @@ private fun WordsContent(
             onDismissOffer = onDismissOffer,
             libraryBookIds = libraryBookIds,
             onOpenBook = onOpenBook,
+            onOpenDictionaries = onOpenDictionaries,
         )
     }
 }
@@ -762,6 +766,7 @@ private fun WordList(
     onDismissOffer: () -> Unit = {},
     libraryBookIds: Set<Long> = emptySet(),
     onOpenBook: (bookId: Long, position: Long?) -> Unit = { _, _ -> },
+    onOpenDictionaries: (() -> Unit)? = null,
 ) {
     when {
         words == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -812,7 +817,7 @@ private fun WordList(
                 }
             }
             if (filter == WordFilter.LEARNING) {
-                item(key = "knownCard") { KnownWordsCard() }
+                item(key = "knownCard") { KnownWordsCard(onOpenDictionaries) }
             }
             items(words, key = { it.id }) { word ->
                 val expanded = word.id == uiState.expanded
@@ -950,10 +955,11 @@ private fun WordsMenu(
     onExportCsv: () -> Unit,
     exportEnabled: Boolean,
     ankiEnabled: Boolean = true,
+    onOpenDictionaries: (() -> Unit)? = null,
 ) {
     var open by remember { mutableStateOf(false) }
     var showKnown by remember { mutableStateOf(false) }
-    if (showKnown) KnownWordsSheet(onDismiss = { showKnown = false })
+    if (showKnown) KnownWordsSheet(onDismiss = { showKnown = false }, onOpenDictionaries = onOpenDictionaries)
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more_options))
