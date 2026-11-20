@@ -211,6 +211,8 @@ fun ReaderWebView(
     onReadAloud: (BridgeMessage) -> Unit = {},
     /** A book was laid out on screen (also after the page was loaded again, such as for a font change). */
     onBookShown: () -> Unit = {},
+    /** The page's renderer died; a new WebView follows only once the screen composes again. */
+    onRendererGone: () -> Unit = {},
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)
     val currentOnDismiss by rememberUpdatedState(onDismiss)
@@ -229,6 +231,7 @@ fun ReaderWebView(
     val currentHighlights by rememberUpdatedState(highlightsMessage)
     val currentOnReadAloud by rememberUpdatedState(onReadAloud)
     val currentOnBookShown by rememberUpdatedState(onBookShown)
+    val currentOnRendererGone by rememberUpdatedState(onRendererGone)
     val currentHighlightColor by rememberUpdatedState(highlightColor)
     val webViewRef = remember { WebViewRef() }
     var atLibrary by remember { mutableStateOf(true) }
@@ -353,7 +356,10 @@ fun ReaderWebView(
                     context = context,
                     scope = scope,
                     startUrl = if (renderer == 0) START_URL else rendererRestart.startUrl(openBookId[0], SystemClock.elapsedRealtime(), START_URL),
-                    onRenderProcessGone = { renderer++ },
+                    onRenderProcessGone = {
+                        currentOnRendererGone()
+                        renderer++
+                    },
                     // Only over a book: ttu's own pages keep their text fields' Paste and Select all.
                     hideSelectionToolbar = { currentHideToolbar && inBook },
                     sentenceEnds = { currentSentenceEnds },
