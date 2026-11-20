@@ -1052,13 +1052,15 @@ private fun LookupGroupItem(
  * A word due for review offers its review here, in a quiet line: Forgot or Got it, graded as on
  * the review screen; ignoring it leaves the word due.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DueReview(group: LookupGroup, onReview: (Boolean) -> Unit) {
     val forgotLabel = stringResource(R.string.panel_review_forgot_description, group.expression)
     val gotItLabel = stringResource(R.string.panel_review_got_it_description, group.expression)
-    Row(
+    // A FlowRow so that at a large font scale the buttons wrap below the label instead of squeezing it.
+    FlowRow(
         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        itemVerticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(

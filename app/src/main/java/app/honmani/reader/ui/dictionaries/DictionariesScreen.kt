@@ -356,7 +356,7 @@ private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    CancelButton { onCancel(status.id) }
+                    CancelButton(download?.let { stringResource(R.string.download_cancel_description, it.name) }) { onCancel(status.id) }
                 }
                 is ImportStatus.Failed -> {
                     Text(importErrorMessage(status))
@@ -371,11 +371,17 @@ private fun ImportStatusCard(status: ImportStatus, onDismissFailures: () -> Unit
     }
 }
 
-/** Stops a queued or running import; a download stopped this way starts from zero next time. */
+/**
+ * Stops a queued or running import; a download stopped this way starts from zero next time (only an
+ * interrupted one resumes). [description] names what it stops for TalkBack.
+ */
 @Composable
-private fun CancelButton(onClick: () -> Unit) {
+private fun CancelButton(description: String? = null, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onClick) {
+        TextButton(
+            onClick = onClick,
+            modifier = if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
+        ) {
             Text(stringResource(R.string.action_cancel))
         }
     }

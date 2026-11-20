@@ -61,7 +61,7 @@
     <string name="settings_day_start_midnight">Midnight</string>
     <string name="stats_goal_title">Daily goal</string>
     <string name="stats_goal_progress">%1$d of %2$d min</string>
-    <string name="stats_goal_met">Goal met · %1$d of %2$d min</string>
+    <string name="stats_goal_met">Goal met · %1$d min today</string>
     <plurals name="stats_goal_streak">
         <item quantity="one">Goal streak: %1$d day</item>
         <item quantity="other">Goal streak: %1$d days</item>
@@ -424,6 +424,7 @@
     <string name="action_mark_learned">Mark as learned</string>
     <string name="action_mark_learning">Move back to “Looking up”</string>
     <string name="action_undo">Undo</string>
+    <string name="download_cancel_description">Cancel download of %1$s</string>
     <string name="word_moved_to_learned">%1$s moved to Known</string>
     <string name="panel_review_due">Due for review</string>
     <string name="panel_review_forgot">Forgot</string>
@@ -742,7 +743,7 @@
     <string name="known_anki_deck_details">Every word of one of your AnkiDroid decks.</string>
     <string name="known_wanikani">WaniKani</string>
     <string name="known_wanikani_details">Your vocabulary at Guru (stage 5) and above.</string>
-    <string name="known_wanikani_intro">Marks the WaniKani vocabulary you have at Guru (stage 5) and above as known. In WaniKani, open Settings, API Tokens, and create a token without any permissions; paste it here.</string>
+    <string name="known_wanikani_intro">Marks the WaniKani vocabulary you have at Guru (stage 5) and above as known. In WaniKani, open Settings → API Tokens and create a token without any permissions; paste it here.</string>
     <string name="known_wanikani_token">API token</string>
     <string name="known_wanikani_kanji">Also mark kanji at Guru (stage 5) and above</string>
     <string name="known_wanikani_privacy">The token is sent only to api.wanikani.com, only now, and Honmani does not keep it.</string>
@@ -773,10 +774,10 @@
     <string name="known_file_name">word list</string>
     <string name="known_no_frequency">The most common words need a frequency dictionary. Honmani can download Jiten\'s word frequency list now.</string>
     <string name="known_frequency_download">Download (%1$d MB)</string>
-    <string name="known_frequency_off">The most common words need a frequency dictionary. Jiten\'s list is installed but turned off: turn it on in Settings, Dictionaries.</string>
+    <string name="known_frequency_off">The most common words need a frequency dictionary. Jiten\'s list is installed but turned off: turn it on in Settings → Dictionaries.</string>
     <string name="known_no_words">The most common words need a word dictionary to tell what each ranked word is. Honmani can download %1$s (English definitions) now.</string>
-    <string name="known_words_off">The most common words need a word dictionary. Turn one on in Settings, Dictionaries.</string>
-    <string name="known_dictionary_downloading">Downloading the dictionary. Try again once it is installed; Settings, Dictionaries shows its progress.</string>
+    <string name="known_words_off">The most common words need a word dictionary. Turn one on in Settings → Dictionaries.</string>
+    <string name="known_dictionary_downloading">Downloading the dictionary. Try again once it is installed; Settings → Dictionaries shows its progress.</string>
     <string name="known_file_unreadable">That file could not be read.</string>
     <string name="known_file_too_large">That file is larger than 5 MB, which is too large for a word list.</string>
     <string name="known_list_empty">That list holds no words.</string>
@@ -1575,7 +1576,7 @@
     <string name="reader_settings_custom_css_clear">Clear</string>
     <string name="reader_settings_edge_taps">Tap the page edges to turn pages</string>
     <string name="reader_settings_edge_taps_details">Taps at the left or right edge turn the page (paginated only).</string>
-    <string name="reader_settings_edge_taps_hint">In a book, a tap near the left or right edge now turns the page; a tap anywhere else still looks the word up.</string>
+    <string name="reader_settings_edge_taps_hint">In a book, a tap near the left or right edge now turns the page in the paginated layout; a tap anywhere else still looks the word up.</string>
     <string name="reader_settings_edge_zone">Width of the page edges</string>
     <string name="reader_settings_edge_zone_narrow">Narrow</string>
     <string name="reader_settings_edge_zone_medium">Medium</string>
@@ -1677,7 +1678,7 @@
     <string name="backup_restored_not_included">Not in a backup: dictionaries and fonts (download them again), the reading progress sync login and the Google Cloud key.</string>
     <string name="auto_backup_offer_title">Restore from your previous phone?</string>
     <string name="auto_backup_offer">Android brought back Honmani\'s backup from %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
-    <string name="auto_backup_offer_device">Android brought back Honmani\'s backup from %1$s, made on %2$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
+    <string name="auto_backup_offer_device">Android brought back Honmani\'s backup from %2$s, %1$s: your saved words, reading progress, statistics and settings. Books and dictionaries are added again separately; a book\'s progress returns when you add it.</string>
     <string name="auto_backup_restore">Restore</string>
     <string name="auto_backup_start_fresh">Start fresh</string>
     <string name="backup_folder_title">Back up to a folder</string>
@@ -1687,7 +1688,7 @@
     <string name="backup_folder_now_working">Backing up…</string>
     <string name="backup_found_title">Restore the backup in this folder?</string>
     <string name="backup_found_message">This folder already had a backup, from %1$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
-    <string name="backup_found_message_device">This folder already had a backup, from %1$s, made on %3$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
+    <string name="backup_found_message_device">This folder already had a backup from %3$s, %1$s. It is kept as %2$s, so this phone\'s backup does not replace it. You can also restore it later from that file.</string>
     <string name="backup_folder_waiting">Folder chosen. The next automatic backup is copied there.</string>
     <string name="backup_too_large">Your backup is bigger than the 10 MB Android\'s cloud backup allows, so Google\'s copy stays at the last smaller one.</string>
     <string name="backup_too_large_folder">The copy in your folder is up to date.</string>
