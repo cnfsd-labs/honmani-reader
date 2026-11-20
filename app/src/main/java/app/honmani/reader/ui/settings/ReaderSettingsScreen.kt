@@ -97,8 +97,12 @@ fun ReaderSettingsScreen(
     val edgeTapsHintText = stringResource(R.string.reader_settings_edge_taps_hint)
     LaunchedEffect(edgeTapsHint) {
         if (!edgeTapsHint) return@LaunchedEffect
-        viewModel.edgeTapsHintShown()
-        snackbar.showSnackbar(edgeTapsHintText, withDismissAction = true, duration = SnackbarDuration.Long)
+        // Cleared only afterwards: clearing it first changes this effect's key and cancels the snackbar.
+        try {
+            snackbar.showSnackbar(edgeTapsHintText, withDismissAction = true, duration = SnackbarDuration.Long)
+        } finally {
+            viewModel.edgeTapsHintShown()
+        }
     }
     val close = {
         viewModel.close()
