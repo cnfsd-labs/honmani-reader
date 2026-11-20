@@ -69,6 +69,7 @@ import app.honmani.reader.R
 import app.honmani.reader.data.stats.DayTotal
 import app.honmani.reader.data.stats.PeriodSummary
 import app.honmani.reader.data.stats.StatsPeriod
+import app.honmani.reader.data.stats.TodayHint
 import app.honmani.reader.data.stats.WeekSpeed
 import app.honmani.reader.ui.InfoButton
 import app.honmani.reader.ui.InfoDialog
@@ -283,6 +284,13 @@ private fun Headline(summary: PeriodSummary, onInfo: () -> Unit) {
             }
             Text(duration(summary.seconds), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
             Text(characters(summary.characters), style = MaterialTheme.typography.titleMedium)
+            when (val hint = TodayHint.of(summary)) {
+                is TodayHint.KeepStreak -> stringResource(R.string.stats_keep_streak, hint.days)
+                is TodayHint.Yesterday -> stringResource(R.string.stats_yesterday, duration(hint.seconds))
+                null -> null
+            }?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (summary.listenSeconds > 0) {
                 Text(
                     stringResource(R.string.stats_with_audio, duration(summary.listenSeconds)),

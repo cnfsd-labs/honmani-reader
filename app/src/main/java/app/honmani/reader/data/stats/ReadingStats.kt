@@ -38,7 +38,27 @@ data class PeriodSummary(
     val books: List<Pair<Long, DayTotal>>,
     /** Whether anything at all has been counted, in any period. */
     val anyReading: Boolean,
+    /** Today only: yesterday's reading, for the hint while today has none yet. */
+    val yesterday: DayTotal? = null,
 )
+
+/** The one line under an empty Today: what keeps the day from looking like nothing. */
+sealed interface TodayHint {
+    /** A streak of [days] (2 or more) ends unless today has reading. */
+    data class KeepStreak(val days: Int) : TodayHint
+
+    /** Nothing read today yet; yesterday had [seconds] of reading. */
+    data class Yesterday(val seconds: Long, val characters: Long) : TodayHint
+
+    companion object {
+        /** Null unless the summary is today's, today has no reading yet and yesterday had some. */
+        fun of(summary: PeriodSummary): TodayHint? {
+            if (summary.period != StatsPeriod.TODAY || summary.daysRead > 0) return null
+            val yesterday = summary.yesterday?.takeIf(ReadingStats::isReadingDay) ?: return null
+            return if (summary.streak >= 2) KeepStreak(summary.streak) else Yesterday(yesterday.seconds, yesterday.characters)
+        }
+    }
+}
 
 /** One book's reading. */
 data class BookReading(
@@ -115,6 +135,7 @@ object ReadingStats {
                 emptyList()
             },
             anyReading = rows.any { it.seconds > 0 || it.characters > 0 },
+            yesterday = if (period == StatsPeriod.TODAY) total(today.minusDays(1)) else null,
         )
     }
 

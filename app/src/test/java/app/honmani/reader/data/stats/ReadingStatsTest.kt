@@ -135,4 +135,22 @@ class ReadingStatsTest {
         assertNull(ReadingStats.speed(seconds = 7_200, characters = 1))
         assertEquals(3_600L, ReadingStats.speed(seconds = 3_600, characters = 3_600))
     }
+
+    @Test
+    fun anEmptyTodayHintsAtTheStreakOrYesterday() {
+        fun hint(rows: List<ReadingDayEntity>) = TodayHint.of(ReadingStats.period(rows, today, StatsPeriod.TODAY))
+
+        // Read today: no hint.
+        assertNull(hint(rows))
+        // A streak of two or more days ending yesterday.
+        assertEquals(TodayHint.KeepStreak(2), hint(listOf(row(1, 1, 25, 3_000), row(1, 2, 10))))
+        // Only yesterday: its minutes and characters.
+        assertEquals(TodayHint.Yesterday(25 * 60L, 3_000), hint(listOf(row(1, 1, 25, 3_000), row(1, 3, 10))))
+        // Nothing yesterday (or under a minute without characters), or nothing ever: no hint.
+        assertNull(hint(listOf(row(1, 2, 25))))
+        assertNull(hint(listOf(ReadingDayEntity(1, today.minusDays(1).toString(), 30, 0))))
+        assertNull(hint(emptyList()))
+        // Other periods have no hint.
+        assertNull(TodayHint.of(ReadingStats.period(listOf(row(1, 1, 25)), today, StatsPeriod.WEEK)))
+    }
 }

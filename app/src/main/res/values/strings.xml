@@ -1377,6 +1377,8 @@
     <string name="stats_total">All time</string>
     <string name="stats_with_audio">%1$s of it with audio</string>
     <string name="stats_streak">Streak</string>
+    <string name="stats_keep_streak">Read today to keep your %1$d-day streak</string>
+    <string name="stats_yesterday">Nothing read yet today · yesterday %1$s</string>
     <plurals name="stats_days">
         <item quantity="one">%1$d day</item>
         <item quantity="other">%1$d days</item>
