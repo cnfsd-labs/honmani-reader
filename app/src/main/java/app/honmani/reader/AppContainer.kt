@@ -69,6 +69,7 @@ import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.difficulty.Segmenter
 import app.honmani.reader.data.review.BookSentences
 import app.honmani.reader.data.review.Relevance
+import app.honmani.reader.data.review.PanelReview
 import app.honmani.reader.data.review.ReviewFilter
 import app.honmani.reader.data.review.ReviewScope
 import app.honmani.reader.data.review.ReviewRepository
@@ -805,6 +806,18 @@ class AppContainer(context: Context) {
 
     /** Records the reader's lookups and takes them back ("Don't count"). */
     val lookupRecorder: LookupRecorder by lazy { LookupRecorder(wordRepository, reviewRepository, wordProgressStore) }
+
+    /** Forgot / Got it for a due word in the lookup panel, as the review screen would ask it (its scope included). */
+    val panelReview: PanelReview by lazy {
+        PanelReview(
+            reviews = reviewRepository,
+            words = wordRepository,
+            enabled = { reviewSettings.reviewInPanel.value },
+            perDay = { reviewSettings.reviewsPerDay.value },
+            knownAfterDays = { reviewSettings.knownAfterDays.value },
+            scope = { reviewFilter(reviewScope.value) },
+        )
+    }
 
     /** What a restored backup keeps for books not back in the library yet. */
     val restoredBooks: RestoredBooks by lazy { RestoredBooks(File(appContext.filesDir, "restored-books.json")) }

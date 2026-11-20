@@ -11,6 +11,7 @@ import app.honmani.reader.anki.AnkiResult
 import app.honmani.reader.anki.CardContent
 import app.honmani.reader.anki.VoiceProblem
 import app.honmani.reader.data.dictionary.FailureReason
+import app.honmani.reader.data.review.PanelReviewUndo
 import app.honmani.reader.data.words.DeletedWord
 import app.honmani.reader.data.words.LookedUpWord
 import app.honmani.reader.data.words.LookupOrigin
@@ -78,6 +79,8 @@ sealed interface LookupPanelState {
         val longestMatch: Int = highlight.length,
         /** No match is shorter than this many characters (1 until a shorter lookup found nothing). */
         val shortestMatch: Int = 1,
+        /** The tapped word ([WordRepository.key] of the first group) is due for review today: the panel offers Forgot / Got it. */
+        val due: String? = null,
     ) : LookupPanelState {
         /** The match can be made one character shorter (only for a tap in the book, not a referenced word). */
         val canShorten: Boolean
@@ -136,6 +139,16 @@ class ReaderViewModel(
     private val saveLearned: suspend (expression: String, reading: String) -> Unit = { _, _ -> },
     /** Moves the saved word (expression, reading) back to Learning: the undo of [saveLearned]. */
     private val saveLearning: suspend (expression: String, reading: String) -> Unit = { _, _ -> },
+    /**
+     * Whether the saved word (expression, reading) is due for review today, judged by the card as
+     * it was before the tap's own lookup (given) lapsed it; see [app.honmani.reader.data.review.PanelReview].
+     */
+    private val dueInReview: suspend (expression: String, reading: String, lookup: LookupUndo?) -> Boolean = { _, _, _ -> false },
+    /** Grades the word from the panel (Got it or Forgot); null if it couldn't be. */
+    private val gradeReview: suspend (expression: String, reading: String, gotIt: Boolean, lookup: LookupUndo?) -> PanelReviewUndo? =
+        { _, _, _, _ -> null },
+    /** Takes back a review [gradeReview] made. */
+    private val undoReview: suspend (PanelReviewUndo) -> Unit = {},
     /** Deletes the saved word (expression, reading) as the word list does; null if it isn't saved. */
     private val deleteWord: suspend (expression: String, reading: String) -> DeletedWord? = { _, _ -> null },
     /** Puts back a word [deleteWord] removed (undo). */
@@ -192,6 +205,9 @@ class ReaderViewModel(
     /** What the lookups of one tap in the book changed, by the saved word's key, until the tap is replaced. */
     private var counted: Pair<TapLookup, List<LookupUndo>>? = null
     private val _countedTap = MutableStateFlow<TapLookup?>(null)
+
+    /** The recording of the tap's best match (the tap, the word's key, what it changed), for the review offer. */
+    private var tapRecording: Triple<TapLookup, String, Deferred<LookupUndo?>>? = null
 
     /** A tap the reader chose not to count: a lookup of it still being saved is taken back when it is. */
     private var discarded: TapLookup? = null
@@ -338,7 +354,7 @@ class ReaderViewModel(
                         show(LookupPanelState.NothingFound(tap))
                         return@launch
                     }
-                    if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
+                    tapRecording = if (recordsOnOpen(tap)) recordTap(tap, groups.first()) else null
                     LookupPanelState.Results(
                         tap = tap,
                         groups = groups,
@@ -358,6 +374,7 @@ class ReaderViewModel(
             val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, furigana = furigana, kanji = kanji) }
+            offerReview(tap)
         }
     }
 
@@ -419,11 +436,11 @@ class ReaderViewModel(
                 updateResults(tap) { if (longer) it.copy(longestMatch = length) else it.copy(shortestMatch = length) }
                 return@launch
             }
-            if (recordsOnOpen(tap)) record(tap, groups.first(), taps = true)
+            tapRecording = if (recordsOnOpen(tap)) recordTap(tap, groups.first()) else null
             val highlight = Highlight(lookupId, found.matchedLength, tap.tapNumber, tap.fromRubyBase)
             // From the panel as it is now, not the copy taken before: an Anki add started meanwhile
             // keeps its spinner.
-            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), learned = emptySet(), furigana = emptyMap(), kanji = emptyMap()) }
+            updateResults(tap) { it.copy(groups = groups, highlight = highlight, inAnki = emptySet(), starred = emptySet(), ignored = emptySet(), learned = emptySet(), furigana = emptyMap(), kanji = emptyMap(), due = null) }
             _highlight.value = highlight
             val inAnki = wordsInAnki(groups)
             val starred = starredWords(groups)
@@ -432,6 +449,7 @@ class ReaderViewModel(
             val furigana = furiganaOf(groups)
             val kanji = kanjiOf(groups)
             updateResults(tap) { it.copy(inAnki = inAnki, starred = starred, ignored = ignored, learned = learned, furigana = furigana, kanji = kanji) }
+            offerReview(tap)
         }
     }
 
@@ -737,6 +755,63 @@ class ReaderViewModel(
      * The known words among [groups]. A tap's lookup of its best match ([recorded]) moves that word
      * back to Learning, so it never counts here, whether or not the recording has been written yet.
      */
+    private fun recordTap(tap: TapLookup, best: LookupGroup) =
+        Triple(tap, WordRepository.key(best.expression, best.reading), record(tap, best, taps = true))
+
+    /**
+     * Once the tap's own lookup is saved (it may lapse the card: the check needs what it changed),
+     * marks the tapped word due if the review screen would ask it today.
+     */
+    private suspend fun offerReview(tap: TapLookup) {
+        val (recordedTap, key, recording) = tapRecording?.takeIf { it.first == tap } ?: return
+        val group = (_panel.value as? LookupPanelState.Results)?.takeIf { it.tap == recordedTap }?.groups?.firstOrNull() ?: return
+        if (WordRepository.key(group.expression, group.reading) != key) return
+        val due = try {
+            dueInReview(group.expression, group.reading, recording.await())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log("Checking a due review failed: $e")
+            false
+        }
+        if (!due) return
+        updateResults(tap) { panel ->
+            val first = panel.groups.firstOrNull()
+            if (panel.previous == null && first != null && WordRepository.key(first.expression, first.reading) == key) panel.copy(due = key) else panel
+        }
+    }
+
+    /**
+     * Forgot or Got it ([gotIt]) for the tapped word due for review, graded as on the review screen
+     * from the card as it was before this tap. The snackbar tells when it comes next and can undo it.
+     */
+    fun reviewWord(group: LookupGroup, gotIt: Boolean) {
+        val state = _panel.value as? LookupPanelState.Results ?: return
+        val key = WordRepository.key(group.expression, group.reading)
+        if (state.previous != null || state.due != key) return
+        val tap = state.tap
+        val recording = tapRecording?.takeIf { it.first == tap && it.second == key }?.third ?: return
+        updateResults(tap) { it.copy(due = null) }
+        // A deliberate answer: "Don't count" leaves the word alone.
+        keep(key)
+        viewModelScope.launch {
+            try {
+                val undo = gradeReview(group.expression, group.reading, gotIt, recording.await())
+                if (undo == null) {
+                    log("A review from the panel was refused")
+                    return@launch
+                }
+                if (undo.markedLearned) updateResults(tap) { it.copy(learned = it.learned + key) }
+                _changes.send(PanelChange.Reviewed(group.expression, group.reading, gotIt, undo, tap))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("Reviewing a word failed: $e")
+                updateResults(tap) { it.copy(due = key) }
+            }
+        }
+    }
+
     private suspend fun learnedWords(groups: List<LookupGroup>, recorded: Boolean): Set<String> = try {
         val learned = learnedAmong(groups.map { it.expression to it.reading })
         if (recorded) learned - WordRepository.key(groups.first().expression, groups.first().reading) else learned
@@ -825,6 +900,7 @@ class ReaderViewModel(
                         if (change.lookup?.word == null) saveLearning(change.expression, change.reading)
                     }
                     is PanelChange.Removed -> restoreWord(change.deleted)
+                    is PanelChange.Reviewed -> undoReview(change.undo)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -849,6 +925,17 @@ class ReaderViewModel(
                             ignored = panel.ignored.with(word.ignored),
                             learned = panel.learned.with(word.status == WordStatus.LEARNED),
                         )
+                    }
+                    is PanelChange.Reviewed -> {
+                        // The same tap's panel offers the review again; it grades from the same card.
+                        val first = panel.groups.firstOrNull()
+                        if (panel.tap != change.tap || panel.previous != null || first == null ||
+                            WordRepository.key(first.expression, first.reading) != key
+                        ) {
+                            panel
+                        } else {
+                            panel.copy(due = key, learned = if (change.undo.markedLearned) panel.learned - key else panel.learned)
+                        }
                     }
                 }
             }
@@ -1064,6 +1151,9 @@ class ReaderViewModel(
                     learnedAmong = { container.wordRepository.learnedAmong(it) },
                     saveLearned = { expression, reading -> container.wordRepository.markLearned(expression, reading) },
                     saveLearning = { expression, reading -> container.wordRepository.markLearning(expression, reading) },
+                    dueInReview = { expression, reading, lookup -> container.panelReview.isDue(expression, reading, lookup) },
+                    gradeReview = { expression, reading, gotIt, lookup -> container.panelReview.grade(expression, reading, gotIt, lookup) },
+                    undoReview = { container.panelReview.undo(it) },
                     deleteWord = { expression, reading ->
                         container.wordRepository.find(expression, reading)?.let { container.wordRepository.delete(it.id) }
                     },
@@ -1098,6 +1188,18 @@ sealed interface PanelChange {
      * action); [lookup] is what the action's own recording changed, so an undo restores exactly that.
      */
     data class Learned(override val expression: String, override val reading: String, val lookup: LookupUndo? = null) : PanelChange
+
+    /**
+     * Forgot or Got it ([gotIt]) for a word due for review, from the panel of [tap]; [undo] takes
+     * the review back and tells when the word comes next.
+     */
+    class Reviewed(
+        override val expression: String,
+        override val reading: String,
+        val gotIt: Boolean,
+        val undo: PanelReviewUndo,
+        val tap: TapLookup,
+    ) : PanelChange
 
     /** "Remove from Words": the word as it was, with its lookups. */
     class Removed(val deleted: DeletedWord) : PanelChange {

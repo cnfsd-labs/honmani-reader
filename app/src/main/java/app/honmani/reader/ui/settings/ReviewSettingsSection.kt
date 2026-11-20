@@ -40,6 +40,7 @@ fun ReviewSettingsSection() {
     val autoPlay by settings.autoPlay.collectAsStateWithLifecycle()
     val autoPlayContent by settings.autoPlayContent.collectAsStateWithLifecycle()
     val knownAfter by settings.knownAfterDays.collectAsStateWithLifecycle()
+    val reviewInPanel by settings.reviewInPanel.collectAsStateWithLifecycle()
     ListItem(
         headlineContent = { Text(stringResource(R.string.review_settings_new_per_day)) },
         supportingContent = { Text(stringResource(R.string.review_settings_new_per_day_details)) },
@@ -142,6 +143,12 @@ fun ReviewSettingsSection() {
             )
         }
     }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.review_settings_in_panel)) },
+        supportingContent = { Text(stringResource(R.string.review_settings_in_panel_details)) },
+        trailingContent = { Switch(checked = reviewInPanel, onCheckedChange = null) },
+        modifier = Modifier.toggleable(reviewInPanel, role = Role.Switch, onValueChange = settings::setReviewInPanel),
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

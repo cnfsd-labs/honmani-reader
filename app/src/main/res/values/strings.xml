@@ -425,6 +425,13 @@
     <string name="action_mark_learning">Move back to “Looking up”</string>
     <string name="action_undo">Undo</string>
     <string name="word_moved_to_learned">%1$s moved to Known</string>
+    <string name="panel_review_due">Due for review</string>
+    <string name="panel_review_forgot">Forgot</string>
+    <string name="panel_review_got_it">Got it</string>
+    <string name="panel_review_forgot_description">Forgot %1$s, review</string>
+    <string name="panel_review_got_it_description">Got it, %1$s, review</string>
+    <string name="panel_review_next_tomorrow">%1$s: next review tomorrow</string>
+    <string name="panel_review_next_in_days">%1$s: next review in %2$d days</string>
     <string name="word_deleted">%1$s deleted</string>
     <string name="word_removed_from_words">%1$s removed from Words</string>
     <string name="action_remove_from_words">Remove from Words</string>
@@ -1219,6 +1226,8 @@
     <string name="review_settings_auto_play_sentence">Sentence</string>
     <string name="review_settings_known_after">Known after</string>
     <string name="review_settings_known_after_details">A word is Known once its reviews are this far apart.</string>
+    <string name="review_settings_in_panel">Review due words while reading</string>
+    <string name="review_settings_in_panel_details">A word due today offers Forgot and Got it when you look it up in a book.</string>
     <string name="review_settings_days">%1$d days</string>
     <string name="words_search_clear">Clear search</string>
     <string name="words_search_empty">No saved words match \"%1$s\".</string>

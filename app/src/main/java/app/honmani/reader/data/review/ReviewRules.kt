@@ -2,6 +2,7 @@ package app.honmani.reader.data.review
 
 import app.honmani.reader.data.time.DayClock
 import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordScheduler
 import java.time.ZoneId
 
@@ -119,6 +120,24 @@ object ReviewRules {
         if (isKnownByMemory(card, knownAfterDays)) 1f else (card.stability / knownAfterDays).toFloat().coerceIn(0f, 0.99f)
 
     fun isBuried(card: ReviewCardEntity, now: Long) = (card.buriedUntil ?: 0L) > now
+
+    /**
+     * [card] of [word] is due before [cutoff] ([dueCutoff]): in review, Honmani's own, the word not
+     * ignored, not buried at [now] and not retired. The same test as the review queue's SQL (`DUE`
+     * in ReviewDao), for one card in memory.
+     */
+    fun isDue(card: ReviewCardEntity, word: WordEntity, cutoff: Long, now: Long): Boolean =
+        card.wordId == word.id &&
+            card.state == ReviewState.REVIEW &&
+            word.scheduler == WordScheduler.HONMANI &&
+            !word.ignored &&
+            card.due < cutoff &&
+            !isBuried(card, now) &&
+            card.stability < RETIRE_AFTER_DAYS
+
+    /** A grading took the card from [before] to [after] and so across the line to known by memory. */
+    fun becameKnown(before: ReviewCardEntity, after: ReviewCardEntity, knownAfterDays: Int = DEFAULT_KNOWN_AFTER_DAYS): Boolean =
+        !isKnownByMemory(before, knownAfterDays) && isKnownByMemory(after, knownAfterDays)
 
     /**
      * Counts as known by memory: in review, stable for [knownAfterDays] or more, the latest real

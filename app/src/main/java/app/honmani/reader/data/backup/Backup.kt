@@ -636,6 +636,7 @@ class Backup(
             ReviewSettings.KEY_AUTO_PLAY to BackupValue.STRING,
             ReviewSettings.KEY_AUTO_PLAY_CONTENT to BackupValue.STRING,
             ReviewSettings.KEY_KNOWN_AFTER to BackupValue.INT,
+            ReviewSettings.KEY_REVIEW_IN_PANEL to BackupValue.BOOLEAN,
             DaySettings.KEY_START_HOUR to BackupValue.INT,
             DownloadSettings.KEY_OVER_MOBILE_DATA to BackupValue.BOOLEAN,
             ReadingGoalSettings.KEY_ENABLED to BackupValue.BOOLEAN,

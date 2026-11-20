@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.LocalResources
 import app.honmani.reader.R
 
 /**
- * Shows each change made from [viewModel]'s lookup panel ("Mark as learned", "Remove from Words")
+ * Shows each change made from [viewModel]'s lookup panel ("Mark as learned", "Remove from Words", a review)
  * in [hostState] with an undo, as the word list does; the next waits until it is gone.
  */
 @Composable
@@ -17,13 +17,15 @@ fun PanelUndo(viewModel: ReaderViewModel, hostState: SnackbarHostState) {
     val resources = LocalResources.current
     LaunchedEffect(viewModel, hostState) {
         viewModel.changes.collect { change ->
-            val message = resources.getString(
-                when (change) {
-                    is PanelChange.Learned -> R.string.word_moved_to_learned
-                    is PanelChange.Removed -> R.string.word_removed_from_words
-                },
-                change.expression,
-            )
+            val message = when (change) {
+                is PanelChange.Learned -> resources.getString(R.string.word_moved_to_learned, change.expression)
+                is PanelChange.Removed -> resources.getString(R.string.word_removed_from_words, change.expression)
+                is PanelChange.Reviewed -> if (change.undo.nextInDays <= 1) {
+                    resources.getString(R.string.panel_review_next_tomorrow, change.expression)
+                } else {
+                    resources.getString(R.string.panel_review_next_in_days, change.expression, change.undo.nextInDays)
+                }
+            }
             val result = hostState.showSnackbar(message, resources.getString(R.string.action_undo), duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) viewModel.undo(change)
         }

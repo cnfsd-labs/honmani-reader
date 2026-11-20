@@ -3,6 +3,7 @@ package app.honmani.reader.data.review
 import androidx.room.withTransaction
 import app.honmani.reader.data.HonmaniDatabase
 import app.honmani.reader.data.words.LookupOrigin
+import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.WordScheduler
 import java.time.ZoneId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -182,19 +183,44 @@ class ReviewRepository(
     /**
      * A real review on the review screen: grades the card (a new one is introduced first), logs it
      * and returns what [undo] needs; null for an unknown or Anki word, or a suspended card.
+     * [from]: grade this card instead of the stored one (the card as it was before the lookup that
+     * opened the panel lapsed it); [undo] still returns to the stored card.
      */
-    suspend fun record(wordId: Long, grade: Grade, inSession: Boolean = true): ReviewUndo? = database.withTransaction {
+    suspend fun record(wordId: Long, grade: Grade, inSession: Boolean = true, from: ReviewCardEntity? = null): ReviewUndo? = database.withTransaction {
         val word = words.find(wordId) ?: return@withTransaction null
         if (word.scheduler != WordScheduler.HONMANI) return@withTransaction null
         val time = now()
         val before = dao.find(wordId) ?: ReviewCardEntity(wordId = wordId, due = time, addedAt = time)
         if (before.state == ReviewState.SUSPENDED) return@withTransaction null
-        val after = ReviewRules.grade(before, grade, time, zone(), real = true, inSession = inSession, startHour = startHour())
+        val graded = from?.takeIf { it.wordId == wordId } ?: before
+        val after = ReviewRules.grade(graded, grade, time, zone(), real = true, inSession = inSession, startHour = startHour())
         dao.upsert(after)
-        val elapsed = before.lastReviewAt?.let { (time - it) / ReviewRules.DAY_MS.toDouble() } ?: 0.0
+        val elapsed = graded.lastReviewAt?.let { (time - it) / ReviewRules.DAY_MS.toDouble() } ?: 0.0
         val logId = dao.insertLog(ReviewLogEntity(wordId = wordId, at = time, grade = grade.value, elapsedDays = elapsed))
         ReviewUndo(before, logId)
     }
+
+    /**
+     * Whether [word] with [card] (which may differ from the stored card: as it was before a lookup
+     * lapsed it) is among the reviews due today, as the review screen would take them: due
+     * ([ReviewRules.isDue]), and with a [filter] (a scope other than Due) one of its words, else
+     * within [perDay] ([ReviewLimit]), the same cut as the book's tint of due words.
+     */
+    suspend fun isDueToday(word: WordEntity, card: ReviewCardEntity, perDay: Int, filter: suspend () -> ReviewFilter? = { null }): Boolean {
+        val time = now()
+        val cutoff = ReviewRules.dueCutoff(time, zone(), startHour())
+        if (!ReviewRules.isDue(card, word, cutoff, time)) return false
+        filter()?.let { return it.accepts(word) }
+        if (perDay == ReviewLimit.NO_LIMIT) return true
+        val due = (dao.dueCards(cutoff, time, Int.MAX_VALUE).filter { it.word.id != word.id } + CardWithWord(card, word))
+            .sortedWith(compareBy({ it.card.due }, { it.word.id }))
+        val today = ReviewLimit.apply(due, { it.word.id }, perDay, dao.reviewedSince(ReviewRules.startOfDay(time, zone(), startHour = startHour())))
+        return today.any { it.word.id == word.id }
+    }
+
+    /** Local days from today to the day of [time]: 1 for tomorrow. */
+    fun daysUntil(time: Long): Int =
+        (ReviewRules.localDay(time, zone(), startHour()) - ReviewRules.localDay(now(), zone(), startHour())).toInt()
 
     /** Takes back a review made by [record]: the card as it was, without the log row. */
     suspend fun undo(undo: ReviewUndo) = database.withTransaction {

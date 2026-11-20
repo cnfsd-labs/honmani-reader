@@ -12,6 +12,9 @@ import app.honmani.reader.data.words.WordEntity
 import app.honmani.reader.data.words.LookupUndo
 import app.honmani.reader.data.words.WordUndo
 import app.honmani.reader.data.words.WordRepository
+import app.honmani.reader.data.review.ReviewUndo
+import app.honmani.reader.data.review.ReviewCardEntity
+import app.honmani.reader.data.review.PanelReviewUndo
 import app.honmani.reader.lookup.Inflection
 import app.honmani.reader.lookup.KanjiInfo
 import app.honmani.reader.lookup.LookupEntry
@@ -786,6 +789,43 @@ class ReaderViewModelTest {
         model.setIgnored(group, false)
 
         assertTrue(key in (model.panel.value as LookupPanelState.Results).ignored)
+    }
+
+    @Test
+    fun aDueWord_offersItsReview_gradesWithTheTapsLookup_andUndoOffersItAgain() = runTest {
+        val card = ReviewCardEntity(wordId = 1, due = 0, addedAt = 0)
+        val tapLookup = LookupUndo(null, null, card)
+        val asked = mutableListOf<LookupUndo?>()
+        val graded = mutableListOf<Pair<Boolean, LookupUndo?>>()
+        val undone = mutableListOf<PanelReviewUndo>()
+        val review = PanelReviewUndo(1, ReviewUndo(card, 7), markedLearned = false, nextInDays = 3)
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べる"))) },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { tapLookup },
+            dueInReview = { _, _, lookup -> asked += lookup; true },
+            gradeReview = { _, _, gotIt, lookup -> graded += gotIt to lookup; review },
+            undoReview = { undone += it },
+        )
+        model.onTap(tap("食べる"))
+        val state = model.panel.value as LookupPanelState.Results
+        val key = state.groups.single().let { WordRepository.key(it.expression, it.reading) }
+        assertEquals("the check waits for the tap's own recording", listOf<LookupUndo?>(tapLookup), asked)
+        assertEquals(key, state.due)
+
+        model.reviewWord(state.groups.single(), gotIt = true)
+
+        assertEquals(listOf<Pair<Boolean, LookupUndo?>>(true to tapLookup), graded)
+        assertNull((model.panel.value as LookupPanelState.Results).due)
+        val change = model.changes.first() as PanelChange.Reviewed
+        assertEquals(3, change.undo.nextInDays)
+        // Answered once: a second press does nothing.
+        model.reviewWord(state.groups.single(), gotIt = false)
+        assertEquals(1, graded.size)
+
+        model.undo(change)
+        assertEquals(listOf(review), undone)
+        assertEquals(key, (model.panel.value as LookupPanelState.Results).due)
     }
 
     @Test

@@ -3,6 +3,11 @@ package app.honmani.reader.ui.reader
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -198,6 +203,8 @@ fun LookupPanel(
     onLearn: ((LookupGroup) -> Unit)? = null,
     /** "Remove from Words" of a saved word found by a search, from its "In Words" label; null offers none. */
     onRemove: ((LookupGroup) -> Unit)? = null,
+    /** Forgot (false) or Got it (true) for the tapped word due for review ([LookupPanelState.Results.due]); null offers none. */
+    onReview: ((LookupGroup, Boolean) -> Unit)? = null,
     /** "Don't count": takes back what this tap changed (see [ReaderViewModel.dontCount]); null when it changed nothing. */
     onDontCount: (() -> Unit)? = null,
     /** The highlight swatches (a selection's lookup, or a tap on a highlighted word); null shows none. */
@@ -504,6 +511,9 @@ fun LookupPanel(
                                         null
                                     },
                                     saved = WordRepository.key(group.expression, group.reading) in state.saved,
+                                    due = onReview != null && i == 0 && state.previous == null &&
+                                        state.due == WordRepository.key(group.expression, group.reading),
+                                    onReview = { gotIt -> onReview?.invoke(group, gotIt) },
                                     kanji = state.kanji,
                                     onShowKanji = onShowKanji,
                                     furigana = state.furigana[WordRepository.key(group.expression, group.reading)].orEmpty(),
@@ -872,6 +882,9 @@ private fun LookupGroupItem(
     /** Removes the saved word from Words; offered from the "In Words" label. */
     onRemove: (() -> Unit)? = null,
     saved: Boolean = false,
+    /** The word is due for review: Forgot / Got it under its header ([onReview] with true for Got it). */
+    due: Boolean = false,
+    onReview: (Boolean) -> Unit = {},
     kanji: Map<String, KanjiInfo> = emptyMap(),
     onShowKanji: (String) -> Unit = {},
     /** The reader's furigana correction of this word (see [FuriganaOverride]); empty if none. */
@@ -997,6 +1010,15 @@ private fun LookupGroupItem(
             FoldedMeaning(group)
             return@Column
         }
+        if (LocalMotionEnabled.current) {
+            AnimatedVisibility(
+                visible = due,
+                enter = expandVertically(motionSpring()) + fadeIn(motionSpring()),
+                exit = shrinkVertically(motionSpring()) + fadeOut(motionSpring()),
+            ) { DueReview(group, onReview) }
+        } else if (due) {
+            DueReview(group, onReview)
+        }
         if (onLearn != null) LearnButton(saved, onLearn, onRemove)
         val brief = detail == Detail.BRIEF
         // Grammar ("te-form · teiru") and dictionary names only in the full view.
@@ -1023,6 +1045,34 @@ private fun LookupGroupItem(
             detail == Detail.FULL -> DetailLink(stringResource(R.string.lookup_show_less)) { onDetail(Detail.BRIEF) }
         }
         ExamplesRow(group.expression, group.reading, onLookupWord)
+    }
+}
+
+/**
+ * A word due for review offers its review here, in a quiet line: Forgot or Got it, graded as on
+ * the review screen; ignoring it leaves the word due.
+ */
+@Composable
+private fun DueReview(group: LookupGroup, onReview: (Boolean) -> Unit) {
+    val forgotLabel = stringResource(R.string.panel_review_forgot_description, group.expression)
+    val gotItLabel = stringResource(R.string.panel_review_got_it_description, group.expression)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            stringResource(R.string.panel_review_due),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = { onReview(false) }, modifier = Modifier.semantics { contentDescription = forgotLabel }) {
+            Text(stringResource(R.string.panel_review_forgot))
+        }
+        FilledTonalButton(onClick = { onReview(true) }, modifier = Modifier.semantics { contentDescription = gotItLabel }) {
+            Text(stringResource(R.string.panel_review_got_it))
+        }
     }
 }
 

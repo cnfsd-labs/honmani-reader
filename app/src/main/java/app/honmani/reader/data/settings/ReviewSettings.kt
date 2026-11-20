@@ -48,6 +48,11 @@ class ReviewSettings(private val preferences: SharedPreferences) {
     /** Memory stability in days from which a word counts as known: one of [KNOWN_AFTER_CHOICES]. */
     val knownAfterDays: StateFlow<Int> = _knownAfterDays.asStateFlow()
 
+    private val _reviewInPanel = MutableStateFlow(preferences.getBoolean(KEY_REVIEW_IN_PANEL, true))
+
+    /** A tap on a word due for review offers Forgot / Got it in the lookup panel. */
+    val reviewInPanel: StateFlow<Boolean> = _reviewInPanel.asStateFlow()
+
     fun setNewPerDay(value: Int) {
         _newPerDay.value = value.coerceIn(0, MAX_NEW_PER_DAY)
         preferences.edit().putInt(KEY_NEW_PER_DAY, _newPerDay.value).apply()
@@ -83,6 +88,11 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         preferences.edit().putInt(KEY_KNOWN_AFTER, _knownAfterDays.value).apply()
     }
 
+    fun setReviewInPanel(value: Boolean) {
+        _reviewInPanel.value = value
+        preferences.edit().putBoolean(KEY_REVIEW_IN_PANEL, value).apply()
+    }
+
     /** Reads the stored values again (a backup was restored). */
     fun reload() {
         _newPerDay.value = storedNewPerDay()
@@ -92,6 +102,7 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         _autoPlay.value = storedAutoPlay()
         _autoPlayContent.value = storedAutoPlayContent()
         _knownAfterDays.value = storedKnownAfter()
+        _reviewInPanel.value = preferences.getBoolean(KEY_REVIEW_IN_PANEL, true)
     }
 
     private fun storedAutoPlay() = ReviewAutoPlay.entries.firstOrNull { it.name == preferences.getString(KEY_AUTO_PLAY, null) }
@@ -116,6 +127,7 @@ class ReviewSettings(private val preferences: SharedPreferences) {
         const val KEY_AUTO_PLAY = "review_auto_play"
         const val KEY_AUTO_PLAY_CONTENT = "review_auto_play_content"
         const val KEY_KNOWN_AFTER = "review_known_after_days"
+        const val KEY_REVIEW_IN_PANEL = "review_in_panel"
         const val DEFAULT_NEW_PER_DAY = 10
         const val MAX_NEW_PER_DAY = 200
         val NEW_PER_DAY_CHOICES = listOf(0, 5, 10, 20, 30, 50)

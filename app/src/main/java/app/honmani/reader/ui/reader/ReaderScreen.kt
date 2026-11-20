@@ -561,6 +561,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     onSetStarred = viewModel::setStarred,
                     onSetIgnored = viewModel::setIgnored,
                     onMarkLearned = viewModel::markLearned,
+                    onReview = viewModel::reviewWord,
                     onSetFurigana = viewModel::setFurigana,
                     onEditLookup = { openInDictionary(context, it) },
                     onListen = { group ->
