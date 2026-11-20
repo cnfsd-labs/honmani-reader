@@ -51,6 +51,7 @@ fun ProgressSyncSection() {
     val status by container.koSyncStatus.state.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var editing by rememberSaveable { mutableStateOf(false) }
+    var syncing by remember { mutableStateOf(false) }
 
     ListItem(
         headlineContent = { Text(stringResource(R.string.sync_title)) },
@@ -72,9 +73,16 @@ fun ProgressSyncSection() {
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.weight(1f),
                             )
-                            TextButton(onClick = {
-                                scope.launch { if (!container.progressSync.syncNow()) container.progressSync.checkServer() }
-                            }) { Text(stringResource(R.string.sync_now)) }
+                            TextButton(enabled = !syncing, onClick = {
+                                syncing = true
+                                scope.launch {
+                                    try {
+                                        if (!container.progressSync.syncNow()) container.progressSync.checkServer()
+                                    } finally {
+                                        syncing = false
+                                    }
+                                }
+                            }) { Text(stringResource(if (syncing) R.string.sync_running else R.string.sync_now)) }
                         }
                     }
                     if (ok != null) {

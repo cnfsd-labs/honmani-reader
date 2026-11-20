@@ -712,7 +712,12 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                     val ttuId = current.ttuId
                     scope.launch {
                         val sync = container.progressSync
-                        if (sync.syncNow() || ttuId == null) return@launch
+                        if (sync.syncNow()) {
+                            val failed = container.koSyncStatus.state.value.failure != null
+                            jumpSnackbar.showSnackbar(resources.getString(if (failed) R.string.sync_still_failed else R.string.sync_done))
+                            return@launch
+                        }
+                        if (ttuId == null) return@launch
                         // Nothing waited to be sent: the failure came from opening the book, so that pull runs again.
                         val book = container.bookDao.findByTtuId(ttuId) ?: return@launch
                         val ttu = viewModel.ttuLibrary

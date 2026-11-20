@@ -371,21 +371,22 @@ class ProgressSync(
     }
 
     /** Sends the positions that couldn't be sent before: a network is back, or the app started. */
-    fun resend() {
-        if (settings.account.value == null) return
-        scope.launch { pushLock.withLock { settings.account.value?.let { settle(it) } } }
+    fun resend(): Job? {
+        if (settings.account.value == null) return null
+        return scope.launch { pushLock.withLock { settings.account.value?.let { settle(it) } } }
     }
 
     /**
      * "Sync now" after a failure: the current position at once, then what couldn't be sent before.
      * Returns false if nothing was waiting to be sent (the failure came from a [pull]): the caller
-     * then pulls again (the reader) or [checkServer]s (Settings).
+     * then pulls again (the reader) or [checkServer]s (Settings). Returns once the send is done
+     * (sent or failed), so the caller can show it running; the send itself is not cancelled with the caller.
      */
     suspend fun syncNow(): Boolean {
         flush()
         val waiting = synchronized(this) { pushJob != null } ||
             withContext(Dispatchers.IO) { unsent.raw() != null || unsent.all().any { !it.held } }
-        if (waiting) resend()
+        if (waiting) resend()?.join()
         return waiting
     }
 
