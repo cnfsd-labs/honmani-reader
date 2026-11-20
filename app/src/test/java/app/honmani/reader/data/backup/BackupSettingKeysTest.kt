@@ -31,6 +31,7 @@ class BackupSettingKeysTest {
                 "ui_animations" to "boolean",
                 "highlight_extent" to "string",
                 "read_aloud_rate" to "float",
+                "keep_playing_screen_off" to "boolean",
                 "review_new_per_day" to "int",
                 "review_reviews_per_day" to "int",
                 "review_show_sentence" to "boolean",

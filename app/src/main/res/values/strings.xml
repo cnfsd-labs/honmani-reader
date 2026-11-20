@@ -899,6 +899,12 @@
     <string name="delete_dictionary_message">Its entries are removed from lookups. You can import it again later.</string>
 
     <string name="notification_channel_audiobook">Making audiobooks</string>
+    <string name="notification_channel_playback">Read aloud and audiobooks</string>
+    <string name="playback_playing">Playing</string>
+    <string name="playback_paused">Paused</string>
+    <string name="playback_stop">Stop</string>
+    <string name="settings_keep_playing">Keep playing with the screen off</string>
+    <string name="settings_keep_playing_details">Read aloud and audiobooks go on when the screen turns off or you switch apps, with controls in a notification and on the lock screen. Off, they pause.</string>
     <string name="audiobook_notification_title">Audiobook</string>
     <string name="audiobook_making">Making audiobook: %1$s</string>
     <string name="audiobook_preparing">Preparing…</string>

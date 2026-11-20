@@ -353,6 +353,7 @@ private fun SettingsContent(
                             ),
                         )
                     }
+                    item { KeepPlayingSection() }
                     item { LookupTextSizeSection() }
                     item { LookupPitchSection() }
                     item { examples() }

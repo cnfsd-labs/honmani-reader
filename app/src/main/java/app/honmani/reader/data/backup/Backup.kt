@@ -626,6 +626,7 @@ class Backup(
             AppearanceSettings.KEY_ANIMATIONS to BackupValue.BOOLEAN,
             HighlightSettings.KEY_EXTENT to BackupValue.STRING,
             ReadAloudSettings.KEY_RATE to BackupValue.FLOAT,
+            ReadAloudSettings.KEY_KEEP_PLAYING to BackupValue.BOOLEAN,
             ReviewSettings.KEY_NEW_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_REVIEWS_PER_DAY to BackupValue.INT,
             ReviewSettings.KEY_SENTENCE to BackupValue.BOOLEAN,

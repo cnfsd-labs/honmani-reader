@@ -75,6 +75,11 @@ internal class ReaderAudio(
     val playing: Boolean
         get() = readAloudState.phase == ReadAloudPhase.SPEAKING || audiobookState.phase == AudiobookPhase.PLAYING
 
+    /** Sound is playing now, from the voices themselves (the screen's state stands still in the background). */
+    val playingNow: Boolean
+        get() = readAloud.state.value.phase == ReadAloudPhase.SPEAKING ||
+            audiobook.controller.state.value.phase == AudiobookPhase.PLAYING
+
     /** Plays the open book's audiobook from where it was left (the dialog's Play, the snackbar's, "Continue listening"). */
     fun play(id: Long) {
         readAloud.close()

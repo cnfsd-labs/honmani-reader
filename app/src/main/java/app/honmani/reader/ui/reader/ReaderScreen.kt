@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.honmani.reader.HonmaniApplication
 import app.honmani.reader.R
+import app.honmani.reader.readaloud.BackgroundPlayback
 import app.honmani.reader.data.settings.ReaderSettings
 import app.honmani.reader.ui.review.ReadNext
 import app.honmani.reader.ui.review.ReviewScreen
@@ -148,11 +149,19 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                audio.readAloud.appStopped()
-                audio.audiobook.controller.appStopped()
+                // With "Keep playing with the screen off" the voice goes on (PlaybackService).
+                if (BackgroundPlayback.pauseWhenStopped(container.readAloudSettings.keepPlaying.value)) {
+                    audio.readAloud.appStopped()
+                    audio.audiobook.controller.appStopped()
+                }
                 tracker.setAudioPlaying(false)
                 // The state collection is stopped too, so the flag is cleared here, not by the effect.
                 context.findActivity()?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            // Back with the voice still playing: the screen state did not follow it in the background.
+            if (event == Lifecycle.Event.ON_START && audio.playingNow) {
+                tracker.setAudioPlaying(true)
+                context.findActivity()?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
             tracker.setForeground(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
             // Characters read count from ttu's positions; ask before the app may be closed.
@@ -206,6 +215,7 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
     var addBookOnStart by addBookOnStartState
     val overlays = rememberReaderOverlays()
     val current = rememberCurrentBook(container)
+    KeepPlayingEffect(container, audio, current.book?.title.orEmpty())
     // Bookmarks and jumps in the open book (reader menu): the list, a bookmark being named, "Back to where you were".
     val jumpSnackbar = remember { SnackbarHostState() }
     val jumper = remember(viewModel) { PlaceJumper(viewModel.ttuLibrary, container.progressSync, scope, jumpSnackbar) }

@@ -106,6 +106,7 @@ import app.honmani.reader.readaloud.AudioInfo
 import app.honmani.reader.readaloud.AudiobookExporter
 import app.honmani.reader.readaloud.AudiobookLoader
 import app.honmani.reader.readaloud.AudiobookStore
+import app.honmani.reader.readaloud.PlaybackHub
 import app.honmani.reader.readaloud.SessionModes
 import app.honmani.reader.readaloud.generate.AudiobookEnvironment
 import app.honmani.reader.readaloud.generate.AudiobookMaker
@@ -216,6 +217,9 @@ class AppContainer(context: Context) {
 
     /** The read aloud speed (reader menu → Read aloud). */
     val readAloudSettings: ReadAloudSettings by lazy { ReadAloudSettings(settingsPreferences) }
+
+    /** The reader's voice as the media notification shows it (PlaybackService). */
+    val playback = PlaybackHub()
 
     /** The highlight extent chosen last (the lookup panel's Selection / Sentence / Paragraph chips). */
     val highlightSettings: HighlightSettings by lazy { HighlightSettings(settingsPreferences) }
