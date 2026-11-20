@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -1057,23 +1058,27 @@ private fun LookupGroupItem(
 private fun DueReview(group: LookupGroup, onReview: (Boolean) -> Unit) {
     val forgotLabel = stringResource(R.string.panel_review_forgot_description, group.expression)
     val gotItLabel = stringResource(R.string.panel_review_got_it_description, group.expression)
-    // A FlowRow so that at a large font scale the buttons wrap below the label instead of squeezing it.
+    // A FlowRow so that at a large font scale the buttons wrap below the label instead of squeezing
+    // it. The label keeps its own width (a weighted item would be broken at its longest word) and a
+    // weighted spacer pushes the buttons, kept together in one Row, to the end of the line.
     FlowRow(
         modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
         itemVerticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             stringResource(R.string.panel_review_due),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.padding(end = 8.dp),
         )
-        TextButton(onClick = { onReview(false) }, modifier = Modifier.semantics { contentDescription = forgotLabel }) {
-            Text(stringResource(R.string.panel_review_forgot))
-        }
-        FilledTonalButton(onClick = { onReview(true) }, modifier = Modifier.semantics { contentDescription = gotItLabel }) {
-            Text(stringResource(R.string.panel_review_got_it))
+        Spacer(Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { onReview(false) }, modifier = Modifier.semantics { contentDescription = forgotLabel }) {
+                Text(stringResource(R.string.panel_review_forgot))
+            }
+            FilledTonalButton(onClick = { onReview(true) }, modifier = Modifier.semantics { contentDescription = gotItLabel }) {
+                Text(stringResource(R.string.panel_review_got_it))
+            }
         }
     }
 }
