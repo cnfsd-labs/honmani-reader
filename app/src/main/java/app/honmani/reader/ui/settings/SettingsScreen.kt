@@ -329,6 +329,7 @@ private fun SettingsContent(
                             modifier = Modifier.clickable(onClick = onOpenReaderSettings),
                         )
                     }
+                    item { KeepPlayingSection() }
                     item {
                         ListItem(
                             headlineContent = { Text(stringResource(R.string.settings_previous_sentence)) },
@@ -353,7 +354,6 @@ private fun SettingsContent(
                             ),
                         )
                     }
-                    item { KeepPlayingSection() }
                     item { LookupTextSizeSection() }
                     item { LookupPitchSection() }
                     item { examples() }

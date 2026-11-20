@@ -322,7 +322,7 @@
     <string name="settings_section_data">Backup</string>
     <string name="settings_section_help">Help and about</string>
     <string name="settings_section_goal">Goal and time</string>
-    <string name="settings_reading_summary">Reader, lookup panel, sample books</string>
+    <string name="settings_reading_summary">Reader, keep playing, lookup panel, sample books</string>
     <string name="settings_appearance_summary">Accent colour, difficulty on covers</string>
     <string name="settings_flashcards_summary">Anki cards, review, known words</string>
     <string name="settings_goal_summary">Daily goal, day starts at, reading time</string>
