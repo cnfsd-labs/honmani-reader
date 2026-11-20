@@ -167,7 +167,10 @@ private class PlainHttpServer(
 ) {
     private val socket = java.net.ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
     val port = socket.localPort
-    val requests: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+    private val received: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
+    /** A copy: the server thread may still add the request it is reading while a test looks. */
+    val requests: List<String> get() = synchronized(received) { received.toList() }
 
     init {
         Thread {
@@ -181,12 +184,12 @@ private class PlainHttpServer(
                     it.soTimeout = 500
                     it.getOutputStream().write(response.toByteArray())
                     it.shutdownOutput()
-                    val received = java.io.ByteArrayOutputStream()
+                    val bytes = java.io.ByteArrayOutputStream()
                     try {
-                        it.getInputStream().copyTo(received)
+                        it.getInputStream().copyTo(bytes)
                     } catch (_: Exception) {
                     }
-                    requests += received.toString(Charsets.ISO_8859_1.name())
+                    received += bytes.toString(Charsets.ISO_8859_1.name())
                 }
             }
         }.apply { isDaemon = true }.start()
