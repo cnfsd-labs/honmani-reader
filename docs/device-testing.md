@@ -28,6 +28,9 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   Dragging after the mark extends it either way, across ruby and columns (page stays still); the panel's
   bubble shows the whole selection with Copy, no arrows. A quick flick still turns the page.
 - AnkiDroid card; Words -> export -> "Anki package", import in desktop Anki (audio in the chosen deck).
+- Settings -> Dictionaries: start a download, turn Wi-Fi off at about half and on again -> it goes on
+  from there, not from 0. Cancel on the row or in the notification: it stops, the dictionary is
+  offered again, a second tap on Download queues it once.
 - Force-stop, reopen -> books, dictionaries, position kept.
 
 ## Reader settings
@@ -188,6 +191,11 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
   lapses it, back next day.
 - Reading counts: a due word read moves later (once a day), a lookup makes it due; closing the book shows
   how many due words you passed.
+- Review in the panel (Settings -> Flashcards -> "Review due words while reading", on): tap a word tinted
+  due -> "Due for review" with Forgot / Got it under its header. Got it -> "<word>: next review in n days"
+  with Undo (Undo brings the line back), counted in reviews today, word no longer tinted; Forgot -> next
+  review tomorrow. Not offered on a long press, for a word over the daily limit or outside the review
+  scope, or with the switch off. TalkBack reads "Got it, <word>, review".
 - Book sheet -> "Words to learn before reading" -> "Learn n words": with the book's sentences, most used
   first; words in Learning not listed; "Top 20" ticks the 20 most used.
 - Largest font: chips wrap uncut, buttons and menu usable.
@@ -221,7 +229,13 @@ aloud, on a page with furigana.
 - Back ends read aloud, the book stays open; a second Back leaves the book.
 - Tap a word: pauses while the panel is open, resumes from the sentence start on close; the panel's word
   audio never plays over the voice.
-- Another player, Home or unplugging headphones pauses it for good; the screen stays on only while reading.
+- Another player or unplugging headphones pauses it for good; the screen stays on only while reading.
+- Screen off or Home (Settings -> Reading -> "Keep playing with the screen off", on by default): speech goes
+  on, pages turn (also across a chapter), a notification and the lock screen show play/pause and stop; on
+  Android 13+ the notification permission is asked when read aloud starts. Back to the library or closing
+  the app ends it and the notification. Switch off: screen off or Home pauses.
+- Lookup panel -> "Read aloud from here": starts at the looked-up sentence (also inside a ruby word), the
+  panel closes; Stop leaves that passage on screen.
 - A notification sound while reading (phone muted): speech pauses and then goes on from the sentence
   start by itself (logcat ReadAloud "audio focus lost for a moment", "audio focus back"); same after a
   call. Pause by hand during the sound: it stays paused.
@@ -243,8 +257,8 @@ Needs an EPUB, an audio file and an SRT/WebVTT matching the text; use a silent r
 - Same bar order, volume buttons, swipe-away/Follow and Back as read aloud.
 - Next/previous move one subtitle (previous first restarts the current), also paused. Speed
   0.5/0.75/1/1.25/1.5, kept.
-- Pause, close the app: audio paused, screen no longer kept on, Play continues. Another player or
-  unplugging headphones pauses;
+- Screen off or Home: keeps playing with the notification, as read aloud (switch off: paused, screen no
+  longer kept on, Play continues). Another player or unplugging headphones pauses;
   a notification sound or call pauses until it is over, then the audio goes on; a word tap pauses while
   the panel is open.
 - Read aloud and the audiobook stop each other.
@@ -326,7 +340,9 @@ Books and sync -> Reading progress sync, sign in, read a few pages, back to the 
   is part of the address, `<address>/api/koreader/<API key>`, with any user name and password.
 - Status: Settings -> Books and sync shows "Last synced ... ago" / "Not synced yet". Server off, turn a page -> "Last
   attempt failed ...: server unreachable" (or wrong login, HTTP status); that book's reader menu starts
-  with "Progress sync failed: ..."; other books no hint. Server back -> next sync clears both.
+  with "Progress sync failed: ..." and "Sync now"; other books no hint. Server back -> "Sync now" (or the
+  next sync) clears both.
+- A forward jump from the server ("Continued at ...% from ...") offers "Back to n%" in the reader.
 
 ## Back up and restore
 

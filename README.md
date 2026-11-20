@@ -5,7 +5,7 @@ with a pop-up dictionary. Open a book, tap any word and see what it means, even 
 conjugated: 食べさせられなかった leads straight to 食べる.
 
 - Dictionaries with one tap on the first start (English or Japanese definitions), or any
-  Yomitan dictionary
+  Yomitan dictionary; a download can be cancelled and picks up where it stopped
 - EPUB and text files (Aozora Bunko too); text shared from another app or pasted becomes a book; an
   optional catalogue of about 17,000 public-domain Aozora works to search and add (online only after a tap)
 - Vertical or horizontal text, furigana, reader fonts; pages turn with a tap, a swipe or the volume
@@ -13,8 +13,8 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   CSS. A tap on a picture opens it full screen with zoom
 - Search in the open book (reader menu): every match with its surroundings and place; a tap opens the
   book there and marks it
-- Read aloud (reader menu): the phone's Japanese voice (Android's text-to-speech settings) reads from the page on
-  screen, marks the sentence it says and turns the pages by itself;
+- Read aloud (reader menu, or "Read aloud from here" in the lookup panel): the phone's Japanese voice
+  (Android's text-to-speech settings) reads from the page on screen or the looked-up sentence, marks the sentence it says and turns the pages by itself;
   play/pause, previous and next sentence and speed (0.5 to 1.5) are in a bar over the page.
   Pronunciations (reader menu): per book, "read this text as these kana" for names the voice gets wrong
 - Audiobook (reader menu, EPUB): pair a book with an audio file and a subtitle file (SRT or WebVTT);
@@ -24,7 +24,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   Or make one with your own Google Cloud voice (costs money, shown before you start, with a spending cap).
   "Export audiobook" (the audiobook dialog or a book's sheet in the library) saves the audio and an SRT into a folder you pick
 - Read aloud and the audiobook keep playing with the screen off or another app in front (a notification
-  with play/pause and stop; a switch in Settings turns it off) and stop when you leave the book
+  with play/pause and stop; Settings → Reading turns it off) and stop when you leave the book
 - Named bookmarks (reader menu): as many places per book as you like, jump from a list, rename or delete
   (Undo); a slider over the book shows the place as % and characters and jumps on release. After a jump,
   "Back to where you were" returns. Bookmarks are in the backup
@@ -45,21 +45,20 @@ conjugated: 食べさせられなかった leads straight to 食べる.
   variant, or your own note type (Lapis, Marvin's Mining Note or any other): you choose which field gets
   what, and Honmani never adds fields to it or changes its template
 - Search the dictionaries in Japanese, romaji or English (Words, or the launcher shortcut "Search"); the
-  button 部 finds a kanji by its parts (radical search). Handwriting is left to the keyboard (Gboard's
-  Japanese handwriting layout works in the field)
+  button 部 finds a kanji by its parts (radical search)
 - Flashcard review of the words you are learning, with the sentence you met them in: two buttons
   (Forgot / Got it), a memory model (FSRS) that also counts words you read in books, new words ordered
   by the book you are reading, a daily review limit (50, 100, 200 or none), words due today tinted in the
-  book, cards known for a year retired, speaker buttons for the word and the sentence (optionally played by
+  book and answered right in the lookup panel when you tap one (Settings → Flashcards), cards known for a year retired, speaker buttons for the word and the sentence (optionally played by
   themselves, with the phone's voice), and a book's words learned before you read it (book sheet)
 - Reading statistics (time, characters, speed), a reading level with titles, milestones (a banner celebrates them) and optional soft sounds, a day that can start
-  later than midnight (Settings, Goal and time); reading time per day and book (time with an audiobook or Read aloud playing is counted
+  later than midnight (Settings → Goal and time); reading time per day and book (time with an audiobook or Read aloud playing is counted
   separately) can be exported as a CSV for the Refold app (Progress, Statistics)
 - Book difficulty from 1 to 100, worked out on the phone from the text
 - Your own book server (OPDS, such as Calibre-Web): browse, search, download; "Japanese books" at the top
   of its start page lists only those. A folder on the phone: add
-  it once, or watch it (Settings, Books and sync) and its new books join when the library opens
-- Accent colours, or a random one every day or every launch (Settings, Appearance)
+  it once, or watch it (Settings → Books and sync) and its new books join when the library opens
+- Accent colours, or a random one every day or every launch (Settings → Appearance)
 - Reading progress sync with KOReader (e-readers, Calibre-Web Automated, Komga), to the character
   (Komga keeps the chapter), with the last sync and error shown in Settings
 - Back up settings, progress, statistics, saved words and flashcard reviews to one file, for a new
@@ -128,7 +127,7 @@ complete bundled reader, and no Play-restricted permissions.
   books, which are named by content hash (review cards, logs and read days ride on their word, matched
   by spelling and reading); a restore merges and keeps what books not in the library had until the same
   file is added again.
-- **Sync folder.** Settings -> Backup -> Sync folder: each phone writes its own
+- **Sync folder.** Settings → Backup → Sync folder: each phone writes its own
   `honmani-sync-<id>.zip` (backup format plus edit times and deletion markers, no passwords) to a folder
   you pick when the app goes to the background, and merges the other phones' files on its next start
   (`SyncFolder`, `SyncMerge`).

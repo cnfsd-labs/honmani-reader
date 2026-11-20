@@ -66,6 +66,8 @@ public: never copy those notes, personal details or discussions into it.
 - **Saved words:** recorded on every tap lookup (a long press records nothing until a panel action saves
   the word), ranked by a decayed score (half-life 14 days), never
   deleted for age. Finished words are "Known" (they include words marked from lists or Anki, never looked up); the tick action is "Mark as learned". Anki cards are suggested, never pushed.
+  A due word tapped in a book offers Forgot / Got it in the panel (`PanelReview`): graded from the card as
+  it was before the tap's lapse, outside a session (no 10-minute return).
 - **Spelling variants** (`SpellingVariants`): kanji forms of 2+ characters listed together by one
   dictionary entry count as one word for marks, coverage and progress; single kanji excluded; the
   vocabulary estimate and grading keep exact forms.
@@ -94,7 +96,8 @@ public: never copy those notes, personal details or discussions into it.
   (needs `:app:buildTtu` output or `TTU_DIR=...`). No Chromium build for Ubuntu 26.04 yet: set
   `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64` for install and run.
 - `testDebugUnitTest` also runs `:app:buildTtu` (Node and pnpm needed; `-x :app:buildTtu` fails).
-- This PC has 2 cores: run one Gradle build at a time. Before your own run, stop leftover runs (`./gradlew --stop`); a worker's lint (>1 h locally) slowed the coordinator's tests on 11-13. Leave full lint to CI when a targeted test is enough.
+- This PC has 2 cores: run one Gradle build at a time; stop leftover runs first (`./gradlew --stop`). Full
+  lint takes over an hour locally: leave it to CI when a targeted test is enough.
 - CI (`.github/workflows/android.yml`) runs all of this on every push (the browser tests as a parallel `browser`
   job, one retry, flaky tests named as warnings; `lintDebug` is the lint gate, release lint-vital is off) and cancels the running build:
   don't push while someone waits for an APK.
