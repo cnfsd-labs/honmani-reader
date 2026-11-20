@@ -1493,7 +1493,7 @@
     <string name="onboarding_pack_english">English definitions from Jitendex, with kanji, word frequency and pitch accent. About %1$d MB; Wi-Fi recommended.</string>
     <string name="onboarding_pack_japanese">Japanese definitions from Japanese Wiktionary, then Jitendex in English for words it lacks, with kanji, word frequency and pitch accent. About %1$d MB; Wi-Fi recommended.</string>
     <string name="onboarding_download">Download</string>
-    <string name="onboarding_downloading">Getting dictionary %1$d of %2$d. You can start reading meanwhile; keep Honmani open until this is done, as some phones pause apps in the background.</string>
+    <string name="onboarding_downloading">Getting dictionary %1$d of %2$d. You can start reading meanwhile: tapping a word looks it up once this is done. Keep Honmani open until then, as some phones pause apps in the background.</string>
     <string name="onboarding_ready">Dictionaries ready</string>
     <string name="download_failed_offline">There is no internet connection. Connect to Wi-Fi or mobile data and try again.</string>
     <string name="download_failed_server">The download server did not answer properly. Try again in a while.</string>
