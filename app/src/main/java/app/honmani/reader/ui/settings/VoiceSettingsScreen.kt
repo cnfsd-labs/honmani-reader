@@ -5,6 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -94,6 +97,7 @@ fun VoiceSettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun VoiceSettingsContent() {
     val context = LocalContext.current
     val container = remember { (context.applicationContext as HonmaniApplication).container }
@@ -185,17 +189,36 @@ private fun VoiceSettingsContent() {
                     )
                 }
                 if ((check as? KeyCheck.Failed)?.canRetry == true || hasKey) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    var confirmRemove by remember { mutableStateOf(false) }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if ((check as? KeyCheck.Failed)?.canRetry == true) {
                             OutlinedButton(onClick = keyCheck::check) {
                                 Text(stringResource(R.string.google_key_check_again))
                             }
                         }
                         if (hasKey) {
-                            TextButton(onClick = keyCheck::remove) {
+                            TextButton(onClick = { confirmRemove = true }) {
                                 Text(stringResource(R.string.google_key_remove))
                             }
                         }
+                    }
+                    if (confirmRemove) {
+                        AlertDialog(
+                            onDismissRequest = { confirmRemove = false },
+                            title = { Text(stringResource(R.string.google_key_remove_title)) },
+                            text = { Text(stringResource(R.string.google_key_remove_text)) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    confirmRemove = false
+                                    keyCheck.remove()
+                                }) { Text(stringResource(R.string.google_key_remove)) }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { confirmRemove = false }) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            },
+                        )
                     }
                 }
                 (check as? KeyCheck.Works)?.voices?.takeIf { it.isNotEmpty() }?.let { voices ->

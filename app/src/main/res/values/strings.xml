@@ -858,6 +858,8 @@
     <string name="google_key_check_again">Check again</string>
     <string name="google_key_remove">Remove key</string>
     <string name="google_key_checking">Checking the key…</string>
+    <string name="google_key_remove_title">Remove the Google Cloud key?</string>
+    <string name="google_key_remove_text">Google voices stop working until you enter the key again.</string>
     <plurals name="google_key_ok">
         <item quantity="one">Key works: %1$d Japanese voice</item>
         <item quantity="other">Key works: %1$d Japanese voices</item>
