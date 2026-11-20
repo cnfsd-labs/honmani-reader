@@ -751,10 +751,17 @@ class ReaderViewModel(
         keep(key)
         viewModelScope.launch {
             try {
-                record(tap, group).join()
+                val recorded = record(tap, group)
+                val lookup = try {
+                    recorded.await()
+                } catch (e: CancellationException) {
+                    // The recording was cancelled (the reader closed), not this action.
+                    ensureActive()
+                    null
+                }
                 saveLearned(group.expression, group.reading)
                 if (!recordsTaps) updateResults(tap) { it.copy(saved = it.saved + key) }
-                _changes.send(PanelChange.Learned(group.expression, group.reading))
+                _changes.send(PanelChange.Learned(group.expression, group.reading, lookup))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -795,7 +802,12 @@ class ReaderViewModel(
         viewModelScope.launch {
             try {
                 when (change) {
-                    is PanelChange.Learned -> saveLearning(change.expression, change.reading)
+                    is PanelChange.Learned -> {
+                        // Taking back the lookup this action recorded restores the word as it was
+                        // (removes it if the action saved it); otherwise it goes back to Learning.
+                        change.lookup?.let { undoLookup(it) }
+                        if (change.lookup?.word == null) saveLearning(change.expression, change.reading)
+                    }
                     is PanelChange.Removed -> restoreWord(change.deleted)
                 }
             } catch (e: CancellationException) {
@@ -808,7 +820,10 @@ class ReaderViewModel(
             _panel.update { panel ->
                 if (panel !is LookupPanelState.Results) return@update panel
                 when (change) {
-                    is PanelChange.Learned -> panel.copy(learned = panel.learned - key)
+                    is PanelChange.Learned -> {
+                        val created = change.lookup?.word?.let { it.before == null } == true
+                        panel.copy(learned = panel.learned - key, saved = if (created) panel.saved - key else panel.saved)
+                    }
                     is PanelChange.Removed -> {
                         val word = change.deleted.word
                         fun Set<String>.with(on: Boolean) = if (on) this + key else this
@@ -906,7 +921,7 @@ class ReaderViewModel(
         }
 
     /** Saves a match (the best one on a tap) to the word list, independently of later taps. */
-    private fun record(tap: TapLookup, best: LookupGroup, taps: Boolean = false): Job {
+    private fun record(tap: TapLookup, best: LookupGroup, taps: Boolean = false): Deferred<LookupUndo?> {
         val word = LookedUpWord(
             expression = best.expression,
             reading = best.reading,
@@ -919,7 +934,7 @@ class ReaderViewModel(
             position = tap.position,
         )
         val openBook = book
-        return (recordScope ?: viewModelScope).launch(Dispatchers.Main.immediate) {
+        return (recordScope ?: viewModelScope).async(Dispatchers.Main.immediate) {
             try {
                 // A tap right after the book opened comes before findBook has answered.
                 val found = try {
@@ -932,11 +947,13 @@ class ReaderViewModel(
                 val undo = recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
                 // Only the lookups a tap made by itself can be taken back, not a word the reader chose to save.
                 if (taps && undo != null) addCounted(tap, undo)
+                undo
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // The word list is a convenience; a failed write must not disturb reading.
                 log("Recording a lookup failed: $e")
+                null
             }
         }
     }
@@ -1060,8 +1077,11 @@ sealed interface PanelChange {
     val expression: String
     val reading: String
 
-    /** "Mark as learned": the word was in Learning before (a known word offers no such action). */
-    data class Learned(override val expression: String, override val reading: String) : PanelChange
+    /**
+     * "Mark as learned": the word was in Learning or not saved before (a known word offers no such
+     * action); [lookup] is what the action's own recording changed, so an undo restores exactly that.
+     */
+    data class Learned(override val expression: String, override val reading: String, val lookup: LookupUndo? = null) : PanelChange
 
     /** "Remove from Words": the word as it was, with its lookups. */
     class Removed(val deleted: DeletedWord) : PanelChange {

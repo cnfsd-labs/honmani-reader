@@ -863,6 +863,32 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun undoingMarkLearned_ofAWordTheActionSaved_takesBackItsRecording_soTheWordIsGoneAgain() = runTest {
+        val steps = mutableListOf<String>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べる"), entry("食べ物", "食べ"))) },
+            compute = Dispatchers.Unconfined,
+            recordLookup = { LookupUndo(WordUndo(9, WordRepository.key(it.expression, it.reading), null, 1, 1, emptyList()), null, null) },
+            undoLookup = { steps += "undo lookup ${it.key}" },
+            saveLearned = { expression, _ -> steps += "learned $expression" },
+            saveLearning = { expression, _ -> steps += "learning $expression" },
+        )
+        model.onTap(tap("食べる"))
+        steps.clear()
+        val other = (model.panel.value as LookupPanelState.Results).groups[1]
+        val key = WordRepository.key("食べ物", "食べ物")
+        model.markLearned(other)
+
+        model.undo(model.changes.first())
+
+        // The word had no row: undoing the action's own recording deletes it, nothing moves it to Learning.
+        assertEquals(listOf("learned 食べ物", "undo lookup $key"), steps)
+        val panel = model.panel.value as LookupPanelState.Results
+        assertFalse(key in panel.learned)
+        assertFalse(key in panel.saved)
+    }
+
+    @Test
     fun removeFromWords_deletesTheWord_andUndoPutsItBackAsItWas() = runTest {
         val key = WordRepository.key("食べる", "食べる")
         val saved = mutableSetOf(key)
