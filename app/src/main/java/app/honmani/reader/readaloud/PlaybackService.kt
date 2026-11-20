@@ -44,6 +44,9 @@ class PlaybackService : Service() {
     /** [onStartCommand] ran: before that the service may not stop (it must reach the front first). */
     private var started = false
 
+    /** [finish] ran and no new start came since: nothing may post the notification again (it would stay behind). */
+    private var stopping = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -86,6 +89,7 @@ class PlaybackService : Service() {
         // A started foreground service has to be in front within a few seconds, even when the
         // voice already ended again: then it goes at once.
         val now = hub.now.value
+        stopping = false
         startInFront(now ?: shown ?: NowPlaying("", false))
         started = true
         when (intent?.action) {
@@ -124,7 +128,7 @@ class PlaybackService : Service() {
     }
 
     private fun show(now: NowPlaying) {
-        if (now == shown) return
+        if (stopping || now == shown) return
         shown = now
         session.isActive = true
         session.setMetadata(
@@ -150,6 +154,7 @@ class PlaybackService : Service() {
     }
 
     private fun finish() {
+        stopping = true
         shown = null
         session.isActive = false
         stopForeground(STOP_FOREGROUND_REMOVE)
