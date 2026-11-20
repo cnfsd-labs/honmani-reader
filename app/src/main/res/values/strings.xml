@@ -1691,7 +1691,7 @@
     <string name="sync_folder_folder">Folder: %1$s</string>
     <string name="sync_folder_waiting">Waiting for the first write.</string>
     <string name="sync_folder_last">Last written %1$s</string>
-    <string name="sync_folder_synced">Synced with %1$s, %2$s</string>
+    <string name="sync_folder_synced">Synced with %1$s · %2$s</string>
     <string name="sync_folder_newer">%1$s has a newer Honmani: update it here</string>
     <string name="sync_folder_unreadable">Couldn\'t read %1$s\'s sync file. It is tried again next time.</string>
     <string name="sync_folder_unreadable_unknown">Couldn\'t read another phone\'s sync file. It is tried again next time.</string>

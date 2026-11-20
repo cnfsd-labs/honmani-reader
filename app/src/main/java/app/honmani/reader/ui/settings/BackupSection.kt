@@ -210,8 +210,8 @@ private fun SyncFolderRow() {
                         current.name?.let { Text(stringResource(R.string.sync_folder_folder, it)) }
                         val format = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                         Text(
-                            if (current.syncedWith != null && current.syncedAt != null) {
-                                stringResource(R.string.sync_folder_synced, current.syncedWith, format.format(Date(current.syncedAt)))
+                            if (current.syncedWith.isNotEmpty() && current.syncedAt != null) {
+                                stringResource(R.string.sync_folder_synced, current.syncedWith.joinToString(", "), format.format(Date(current.syncedAt)))
                             } else {
                                 current.lastAt?.let { stringResource(R.string.sync_folder_last, format.format(Date(it))) }
                                     ?: stringResource(R.string.sync_folder_waiting)

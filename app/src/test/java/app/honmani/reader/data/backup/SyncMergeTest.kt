@@ -929,8 +929,28 @@ class SyncMergeTest {
         folder.files[b.address] = whole.copyOf(whole.size - 1)
         a.sync()
         assertNotNull(a.findWord())
-        assertEquals("Phone b", (a.sync.state.value as SyncFolderState.On).syncedWith)
+        assertEquals(listOf("Phone b"), (a.sync.state.value as SyncFolderState.On).syncedWith)
         assertNull((a.sync.state.value as SyncFolderState.On).unreadable)
+    }
+
+    @Test
+    fun theSyncNamesEveryPhoneWhoseFileItMerged() = runBlocking<Unit> {
+        val a = phone("a")
+        val b = phone("b")
+        val c = phone("c")
+        b.addWord()
+        b.sync()
+        c.sync()
+        a.sync()
+        assertEquals(listOf("Phone b", "Phone c"), (a.sync.state.value as SyncFolderState.On).syncedWith.sorted())
+
+        // A sync with nothing new keeps naming the last ones; a later one names only the phone it read.
+        a.sync()
+        assertEquals(2, (a.sync.state.value as SyncFolderState.On).syncedWith.size)
+        c.addWord(word("犬"))
+        c.sync()
+        a.sync()
+        assertEquals(listOf("Phone c"), (a.sync.state.value as SyncFolderState.On).syncedWith)
     }
 
     @Test

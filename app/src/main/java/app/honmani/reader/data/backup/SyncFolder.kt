@@ -21,8 +21,8 @@ sealed interface SyncFolderState {
     data class On(
         val name: String?,
         val lastAt: Long?,
-        /** The phone whose file was merged last, and when (epoch ms). */
-        val syncedWith: String? = null,
+        /** The phones whose files the last sync that took any in merged, and when (epoch ms). */
+        val syncedWith: List<String> = emptyList(),
         val syncedAt: Long? = null,
         /** A phone whose file this Honmani is too old to read. */
         val newerDevice: String? = null,
@@ -88,7 +88,7 @@ class SyncFolder(
             SyncFolderState.On(
                 name,
                 device.getLong(KEY_LAST, 0L).takeIf { it > 0 },
-                device.getString(KEY_SYNCED_WITH, null),
+                device.getString(KEY_SYNCED_WITH, null)?.split(NAME_SEPARATOR).orEmpty(),
                 device.getLong(KEY_SYNCED_AT, 0L).takeIf { it > 0 },
                 device.getString(KEY_NEWER, null),
                 device.getString(KEY_HELD_STAMP, null)?.let {
@@ -158,11 +158,17 @@ class SyncFolder(
         }
     }
 
-    /** Merges [backup] (times beyond the ceiling set back) and notes who it was with. */
-    private suspend fun mergeFile(backup: BackupFile) {
+    /** Merges [backup] (times beyond the ceiling set back) and returns its phone's name. */
+    private suspend fun mergeFile(backup: BackupFile): String {
         merge(SyncStamps.clamp(backup, SyncStamps.ceiling(now())))
+        return backup.deviceName ?: ANOTHER_PHONE
+    }
+
+    /** Notes the phones whose files were just merged, if any. */
+    private fun noteSynced(names: Collection<String>) {
+        if (names.isEmpty()) return
         device.edit()
-            .putString(KEY_SYNCED_WITH, backup.deviceName ?: ANOTHER_PHONE)
+            .putString(KEY_SYNCED_WITH, names.joinToString(NAME_SEPARATOR))
             .putLong(KEY_SYNCED_AT, now())
             .apply()
     }
@@ -176,6 +182,7 @@ class SyncFolder(
         val heldStamp = device.getString(KEY_HELD_STAMP, null)
         var held: Held? = heldStamp?.let { Held(it, device.getString(KEY_HELD_ADDRESS, null).orEmpty(), device.getString(KEY_HELD_NAME, null) ?: ANOTHER_PHONE, device.getLong(KEY_HELD_LATEST, 0L)) }
         var heldPresent = false
+        val merged = LinkedHashSet<String>()
         for (file in target.list(folder)) {
             if (!OTHER_FILE.matches(file.name) || file.name == fileName(id)) continue
             val stamp = "${file.address}|${file.size}|${file.modified}"
@@ -203,7 +210,7 @@ class SyncFolder(
                                 heldPresent = true
                             }
                         } else {
-                            mergeFile(backup)
+                            merged += mergeFile(backup)
                             nowSeen += stamp
                         }
                     }
@@ -218,6 +225,7 @@ class SyncFolder(
                 if (unreadable == null) unreadable = from.orEmpty()
             }
         }
+        noteSynced(merged)
         // A held file that changed or went away is no longer the one the reader was asked about.
         if (!heldPresent) held = null
         val edit = device.edit().putStringSet(KEY_SEEN, nowSeen).putString(KEY_NEWER, newer)
@@ -246,7 +254,7 @@ class SyncFolder(
             val address = device.getString(KEY_HELD_ADDRESS, null).orEmpty()
             withContext(Dispatchers.IO) {
                 try {
-                    if (take) mergeFile(target.read(address).use { BackupCodec.read(it) })
+                    if (take) noteSynced(listOf(mergeFile(target.read(address).use { BackupCodec.read(it) })))
                     val seen = device.getStringSet(KEY_SEEN, null).orEmpty() + stamp
                     device.edit().putStringSet(KEY_SEEN, seen)
                         .remove(KEY_HELD_STAMP).remove(KEY_HELD_ADDRESS).remove(KEY_HELD_NAME).remove(KEY_HELD_LATEST).apply()
@@ -318,6 +326,9 @@ class SyncFolder(
         private val OTHER_FILE = Regex("^honmani-sync-[^. ]+\\.zip$")
 
         private const val ANOTHER_PHONE = "Another phone"
+
+        /** Between the names in [KEY_SYNCED_WITH] (a phone's name has no line break). */
+        private const val NAME_SEPARATOR = "\n"
         private const val KEY_SEEN = "sync_folder_seen"
         private const val KEY_SYNCED_WITH = "sync_folder_synced_with"
         private const val KEY_SYNCED_AT = "sync_folder_synced_at"
