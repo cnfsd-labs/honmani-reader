@@ -132,4 +132,9 @@ test('a paragraph whose text nodes are replaced is asked about again, so its mar
     p.replaceChildren(document.createTextNode(p.textContent));
   });
   await expect.poll(requests).toBe(2);
+  await page.evaluate(() => {
+    const request = window.__messages.filter((m) => m.type === 'marks.request')[1];
+    window.__listener({ data: JSON.stringify({ type: 'marks', requestId: request.requestId, color: '#ffc400', blocks: [{ id: request.blocks[0].id, marks: [[2, 2, 0]] }] }) });
+  });
+  await expect.poll(async () => (await learningMarked(page)).filter(Boolean)).toEqual(['東京']);
 });

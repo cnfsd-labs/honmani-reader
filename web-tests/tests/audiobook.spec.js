@@ -153,6 +153,37 @@ test('a section turned to with the screen off is followed', async ({ page }) => 
   expect(await page.evaluate(() => window.__messages.some((m) => m.type === 'audiobook.lost'))).toBe(false);
 });
 
+// A frame asked for by someone else that throws must not take the others down with it: the next
+// section would never be shown.
+test('a throwing frame callback with the screen off does not strand the page turn', async ({ page }) => {
+  await page.addInitScript(() => {
+    let off = false;
+    const frame = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (callback) => frame((time) => off || callback(time));
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => off });
+    window.__turnScreenOff = () => {
+      off = true;
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+  });
+  await openBook(page, '<div id="ttu-a"><p>吾輩は猫である。</p><p>名前はまだ無い。</p></div>');
+  await page.evaluate(() => {
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'ArrowDown') return;
+      requestAnimationFrame(() => {
+        throw new Error('a callback of the page');
+      });
+      requestAnimationFrame(() => {
+        document.querySelector('.book-content').innerHTML = '<div id="ttu-b"><p>どこで生れたか。</p></div>';
+      });
+    });
+    window.__turnScreenOff();
+  });
+  await sections(page, A_B);
+  await send(page, { type: 'audiobook.mark', gen: 3, start: 14, end: 18 });
+  await expect.poll(() => marked(page)).toEqual(['どこで生']);
+});
+
 test('a scroll by hand detaches: the mark moves on, and follow.attach or clear follows again', async ({ page }) => {
   await openBook(page, TWO_SECTIONS, { storage: { viewMode: 'continuous' }, css: 'height: 5000px;' });
   await sections(page, A_B);

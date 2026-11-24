@@ -563,7 +563,8 @@
         const start = piece.start + at;
         const key = `${start}:${length}:${kind}`;
         const kept = before.get(key);
-        if (kept && kept.ranges.every((range) => range.startContainer.isConnected)) {
+        // A range whose text node was replaced has collapsed into the paragraph, which is still there.
+        if (kept && kept.ranges.every((range) => range.startContainer.isConnected && !range.collapsed)) {
           now.set(key, kept);
           continue;
         }

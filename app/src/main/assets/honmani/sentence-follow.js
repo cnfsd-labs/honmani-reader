@@ -96,7 +96,12 @@
     const callback = frameCallbacks.get(id);
     if (!callback) return;
     frameCallbacks.delete(id);
-    callback(time);
+    // As with native frames: one callback that throws does not stop the others of the batch.
+    try {
+      callback(time);
+    } catch (error) {
+      reportError(error);
+    }
   };
   frameChannel.port1.onmessage = () => {
     frameTaskQueued = false;
