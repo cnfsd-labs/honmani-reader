@@ -289,6 +289,21 @@ class KnownWordsTest {
     }
 
     @Test
+    fun readingsOfOneRank_areAskedWithTheDictionarysFirst() = runTest {
+        install(
+            "JMdict",
+            listOf("今日", "きょう", "", 10, "today"),
+            listOf("今日", "こんち", "", 2, "today"),
+        )
+        // Jiten ranks both alike, the rare reading first.
+        jiten(*(1..600).flatMap { listOf(Triple("今日", "こんち", it), Triple("今日", "きょう", it)) }.toTypedArray())
+
+        val setup = known.prepareQuiz(kotlin.random.Random(1))!!
+
+        assertEquals(listOf("今日" to "きょう"), setup.questions.map { it.word.expression to it.word.reading })
+    }
+
+    @Test
     fun theQuizAsksContentWordsOnly_eachWithItsOwnRank() = runTest {
         // JMdict-style: the word classes are the definition tags.
         val rows = listOf(

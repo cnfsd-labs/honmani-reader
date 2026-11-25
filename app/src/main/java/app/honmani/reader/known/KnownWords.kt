@@ -139,6 +139,10 @@ class KnownWords(
         // asked (女性 as じょせい, not にょしょう). The ranks stay those of the list, which planQuiz cuts.
         val firstReading = HashMap<String, String?>()
         for (row in ranked) if (row.written !in firstReading) firstReading[row.written] = row.reading
+        // Jiten gives every reading of a written form the same rank, in no order (今日: こんち, きょう):
+        // with several, the resolver picks the best-ranked one, then the dictionary's first.
+        val severalReadings = ranked.filterNot { it.usuallyKana }.groupBy({ it.written }, { it.reading })
+            .filterValues { it.distinct().size > 1 }.keys
         // The drawn ranks are spread over the whole list, function words included, so that the
         // estimate stays in ranks of the full list; each moves forward to the nearest word that
         // says something about vocabulary and is asked with its own rank. The word classes are
@@ -155,7 +159,8 @@ class KnownWords(
         }
         val questions = askable.mapNotNull { rank ->
             val row = ranked[rank - 1]
-            val word = resolver.resolve(listOf(WantedWord(row.written, row.reading)), deinflect = false).words.firstOrNull()
+            val reading = row.reading.takeIf { row.usuallyKana || row.written !in severalReadings }
+            val word = resolver.resolve(listOf(WantedWord(row.written, reading)), deinflect = false).words.firstOrNull()
             if (word != null && seen.add(word.expression)) QuizQuestion(rank, word, usuallyKana = row.usuallyKana) else null
         }
         return QuizSetup(title, ranked.size, questions)
