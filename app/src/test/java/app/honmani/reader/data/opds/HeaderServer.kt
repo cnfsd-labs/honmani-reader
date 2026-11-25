@@ -35,17 +35,18 @@ internal class HeaderServer(private val respond: (path: String, out: OutputStrea
     val authorizations: MutableList<String?> = Collections.synchronizedList(mutableListOf())
     val requests: MutableList<ReceivedRequest> = Collections.synchronizedList(mutableListOf())
 
-    init {
-        Thread {
-            while (!socket.isClosed) {
-                val client = try {
-                    socket.accept()
-                } catch (_: Exception) {
-                    break
-                }
-                handle(client)
+    private val acceptor = Thread {
+        while (!socket.isClosed) {
+            val client = try {
+                socket.accept()
+            } catch (_: Exception) {
+                break
             }
-        }.apply { isDaemon = true }.start()
+            handle(client)
+        }
+    }.apply {
+        isDaemon = true
+        start()
     }
 
     private fun handle(client: Socket) = client.use {
@@ -76,5 +77,9 @@ internal class HeaderServer(private val respond: (path: String, out: OutputStrea
         out.flush()
     }
 
-    fun stop() = socket.close()
+    /** Waits for the accepting thread: until it has left accept(), the port still takes a connection. */
+    fun stop() {
+        socket.close()
+        acceptor.join(1_000)
+    }
 }
