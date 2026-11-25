@@ -483,4 +483,27 @@ class ReadAloudControllerTest {
         controller.start()
         assertTrue(controller.state.value.detached)
     }
+
+    @Test
+    fun withTheRendererLostNothingStartsUntilTheBookIsOnScreenAgain() {
+        startAndReceive()
+        controller.onStart(id(0))
+        controller.onFocusPaused()
+        controller.pageGone()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+        sent.clear()
+
+        controller.resume()
+        controller.togglePlay()
+        controller.next()
+        controller.startAt(3)
+        controller.onFocusResumed()
+        assertEquals(emptyList<String>(), sent)
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+
+        controller.pageReloaded()
+        assertEquals(ReadAloudPhase.PAUSED, controller.state.value.phase)
+        controller.resume()
+        assertEquals(listOf("readAloud.seek"), types())
+    }
 }

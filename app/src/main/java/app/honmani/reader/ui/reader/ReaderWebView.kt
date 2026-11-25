@@ -211,7 +211,7 @@ fun ReaderWebView(
     onReadAloud: (BridgeMessage) -> Unit = {},
     /** A book was laid out on screen (also after the page was loaded again, such as for a font change). */
     onBookShown: () -> Unit = {},
-    /** The page's renderer died; a new WebView follows only once the screen composes again. */
+    /** The page's renderer died; with the screen off the new WebView has no size (shows no text) until the app is back. */
     onRendererGone: () -> Unit = {},
 ) {
     val currentOnLookup by rememberUpdatedState(onLookup)

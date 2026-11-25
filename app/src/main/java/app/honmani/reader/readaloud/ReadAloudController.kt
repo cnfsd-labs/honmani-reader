@@ -83,6 +83,9 @@ class ReadAloudController(
     /** Paused because another app needs the audio for a moment: the focus coming back continues. */
     private var resumeAfterFocus = false
 
+    /** The page's renderer died and the book is not on screen again: nothing can be started. */
+    private var pageGone = false
+
     /** Where in the sentence (as the book has it) the page was last told the voice is. */
     private var markOffset = 0
 
@@ -102,6 +105,7 @@ class ReadAloudController(
 
     /** Starts at the first sentence that begins on the page on screen. */
     fun start() {
+        if (pageGone) return
         if (phase == ReadAloudPhase.STARTING || phase == ReadAloudPhase.SPEAKING) return
         resumeAfterPanel = false
         resumeAfterFocus = false
@@ -113,6 +117,7 @@ class ReadAloudController(
      * [tap] of the tap bridge; from the page on screen if the page no longer knows that tap.
      */
     fun startAt(tap: Int) {
+        if (pageGone) return
         // Closing the panel must not go back to the sentence it paused.
         resumeAfterPanel = false
         resumeAfterFocus = false
@@ -148,6 +153,7 @@ class ReadAloudController(
     fun previous() = jump(maxOf(current - 1, 0))
 
     private fun jump(target: Int) {
+        if (pageGone) return
         if (phase != ReadAloudPhase.SPEAKING && phase != ReadAloudPhase.PAUSED) return
         resumeAfterPanel = false
         when {
@@ -226,8 +232,20 @@ class ReadAloudController(
         pause()
     }
 
-    /** The page was loaded again (a font change): its cursor is gone, so wait for Play. */
+    /**
+     * The page's renderer died. Until the book is on screen again ([pageReloaded]) Play does nothing:
+     * with the screen off the new page has no size, so the reading would start at the book's
+     * beginning and its page turns would overwrite the reader's place.
+     */
+    fun pageGone() {
+        pause()
+        pageGone = true
+        log("page gone")
+    }
+
+    /** The page was loaded again (a font change, a lost renderer): its cursor is gone, so wait for Play. */
     fun pageReloaded() {
+        pageGone = false
         if (phase != ReadAloudPhase.OFF) {
             resumeAfterPanel = false
             _state.value = _state.value.copy(detached = false)

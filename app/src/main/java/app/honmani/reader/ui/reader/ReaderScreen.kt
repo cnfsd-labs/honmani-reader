@@ -525,10 +525,10 @@ private fun ReaderWithTabs(viewModel: ReaderViewModel) {
                         else -> Unit
                     }
                 },
-                // With the screen off no new WebView comes until the app is back: read aloud, which
-                // asks the page for its next sentences, would wait in silence while the notification
-                // says Playing. The audiobook plays from its own file and goes on.
-                onRendererGone = { audio.readAloud.pause() },
+                // With the screen off the new WebView has no size until the app is back: read aloud, which
+                // asks the page for its sentences, pauses until then. The audiobook plays from its own
+                // file and goes on.
+                onRendererGone = { audio.readAloud.pageGone() },
                 onBookShown = {
                     audio.readAloud.pageReloaded()
                     audio.audiobook.controller.pageReloaded()
