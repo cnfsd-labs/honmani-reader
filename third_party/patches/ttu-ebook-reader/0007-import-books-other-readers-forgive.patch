@@ -1,0 +1,747 @@
+From: Honmani <noreply@honmani.invalid>
+Subject: [PATCH] Import books other readers forgive
+
+One missing font, an encoded or wrongly cased reference or a blank page
+refused the whole book; contents entries and pictures were matched by
+parts of their names. References are resolved to the files in the zip,
+what is missing is skipped, and broken CSS no longer keeps a book shut.
+
+diff -ru a/apps/web/src/lib/functions/book-data-loader/format-style-sheet.ts b/apps/web/src/lib/functions/book-data-loader/format-style-sheet.ts
+--- a/apps/web/src/lib/functions/book-data-loader/format-style-sheet.ts	2026-11-25 17:51:54.256774355 +0100
++++ b/apps/web/src/lib/functions/book-data-loader/format-style-sheet.ts	2026-11-25 17:51:54.340539020 +0100
+@@ -13,7 +13,7 @@
+ const bodyRegex = /\s?body\s?/gi;
+ 
+ export default function formatStyleSheet(bookData: BooksDbBookData, parentSelector: string) {
+-  const cssTree = parseCss(bookData.styleSheet);
++  const cssTree = parseStyleSheet(bookData.styleSheet);
+ 
+   const newRules = cssTree.stylesheet.rules
+     .filter((r) => r.type === 'rule')
+@@ -60,6 +60,17 @@
+   });
+ }
+ 
++/** The browser's own parser forgives what the CSS parser throws on (an extra bracket). */
++function parseStyleSheet(css: string) {
++  try {
++    return parseCss(css);
++  } catch (_) {
++    const sheet = new CSSStyleSheet();
++    sheet.replaceSync(css);
++    return parseCss([...sheet.cssRules].map((rule) => rule.cssText).join('\n'));
++  }
++}
++
+ function encapsulatedSelectors(selectors: string[], parentSelector: string) {
+   return selectors.map((selector) => `${parentSelector} ${selector}`);
+ }
+diff -ru a/apps/web/src/lib/functions/file-loaders/epub/extract-epub.ts b/apps/web/src/lib/functions/file-loaders/epub/extract-epub.ts
+--- a/apps/web/src/lib/functions/file-loaders/epub/extract-epub.ts	2026-11-25 17:51:54.253538763 +0100
++++ b/apps/web/src/lib/functions/file-loaders/epub/extract-epub.ts	2026-11-25 17:51:54.339535018 +0100
+@@ -4,8 +4,8 @@
+  * All rights reserved.
+  */
+ 
+-import { BlobReader, BlobWriter, TextWriter, ZipReader } from '@zip.js/zip.js';
+-import { isOPFType, type EpubContent, type EpubOPFContent } from './types';
++import { BlobReader, BlobWriter, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
++import type { EpubContent, EpubManifestItem } from './types';
+ 
+ import type { Entry } from '@zip.js/zip.js';
+ import { XMLParser } from 'fast-xml-parser';
+@@ -14,67 +14,234 @@
+ 
+ initZipSettings();
+ 
++const PAGE = 'application/xhtml+xml';
++const CSS = 'text/css';
++const NCX = 'application/x-dtbncx+xml';
++const SVG = 'image/svg+xml';
++
++const typeByExtension: Record<string, string> = {
++  '.xhtml': PAGE,
++  '.html': PAGE,
++  '.htm': PAGE,
++  '.xht': PAGE,
++  '.css': CSS,
++  '.ncx': NCX,
++  '.jpg': 'image/jpeg',
++  '.jpeg': 'image/jpeg',
++  '.png': 'image/png',
++  '.gif': 'image/gif',
++  '.webp': 'image/webp',
++  '.svg': SVG
++};
++
++/** Finds the key in the book's data of a reference made in the file with the key `from`. */
++export type ResolveHref = (from: string, href: string) => string | undefined;
++
++/**
++ * Reads a book's files, forgiving what other readers forgive: references that are encoded, in the
++ * wrong case or to missing files, wrong media types, any namespace prefix. `contents` comes back
++ * cleaned up: the manifest lists only files that exist (`@_href` is their key in `result`), the
++ * spine only pages and pictures of it.
++ */
+ export default async function extractEpub(blob: Blob) {
+   const reader = new ZipReader(new BlobReader(blob));
+   // get all entries from the zip
+-  const entries = await reader.getEntries();
++  const entries = (await reader.getEntries({ filenameEncoding: 'utf-8' })).filter((entry) => !entry.directory);
++  const findEntry = entryFinder(entries);
+ 
+-  const result: Record<string, string | Blob> = {};
+-  let contentsDirectory = '';
+-  let contents!: EpubContent | EpubOPFContent;
+-  if (entries.length) {
+-    const fileMap = entries.reduce<Record<string, Entry>>((acc, cur) => {
+-      acc[cur.filename] = cur;
+-      return acc;
+-    }, {});
+-
+-    const containerXml = await fileMap['META-INF/container.xml'].getData!(new TextWriter());
+-    const parser = new XMLParser({
+-      ignoreAttributes: false
+-    });
+-    const container = parser.parse(containerXml);
+-    const rootFiles = container.container.rootfiles.rootfile;
+-    const rootFile = Array.isArray(rootFiles) ? rootFiles[0] : rootFiles;
+-
+-    const contentOpfFilename = rootFile['@_full-path'];
+-
+-    const contentsXml = await fileMap[contentOpfFilename].getData!(new TextWriter());
+-    result[contentOpfFilename] = contentsXml;
+-
+-    contentsDirectory = path.dirname(contentOpfFilename);
+-
+-    contents = parser.parse(contentsXml);
+-
+-    await Promise.all(
+-      (isOPFType(contents)
+-        ? contents['opf:package']['opf:manifest']['opf:item']
+-        : contents.package.manifest.item
+-      ).map(async (item) => {
+-        const fileRelativePath = item['@_href'];
+-        const entry = fileMap[path.join(contentsDirectory, fileRelativePath)];
+-
+-        if (!entry) {
+-          throw new Error(`item ${fileRelativePath} not found`);
+-        }
+-
+-        if (entry.getData && !entry.directory) {
+-          let value: string | Blob;
+-          const mediaType: string = item['@_media-type'];
+-          if (mediaType.startsWith('image/')) {
+-            value = await entry.getData(new BlobWriter(mediaType));
+-          } else {
+-            value = await entry.getData(new TextWriter());
+-          }
+-          result[fileRelativePath] = value;
+-        }
+-      })
++  const parser = new XMLParser({
++    ignoreAttributes: false,
++    parseTagValue: false,
++    transformTagName: (name) => name.replace(/^(?!dc:)[^:]+:/, ''),
++    isArray: (name) => ['item', 'itemref', 'rootfile'].includes(name)
++  });
++
++  const container = parser.parse(await readText(findEntry('', 'META-INF/container.xml')));
++  const opfEntry = findEntry('', container.container.rootfiles.rootfile[0]['@_full-path']);
++  const contentsDirectory = path.dirname(opfEntry!.filename);
++  const contents: EpubContent = parser.parse(await readText(opfEntry));
++
++  const keyOf = (entry: Entry) =>
++    path
++      .relative(`/${contentsDirectory}`, `/${entry.filename}`)
++      // The key ends up in attributes of the stored HTML, where these would be escaped
++      .replace(/[&"<>; ]/g, encodeURIComponent);
++
++  const listedItems = contents.package.manifest.item;
++  const items: EpubManifestItem[] = [];
++  const entryByKey = new Map<string, Entry>();
++
++  listedItems.forEach((item) => {
++    const entry = findEntry(contentsDirectory, item['@_href']);
++
++    if (entry) {
++      const key = keyOf(entry);
++      entryByKey.set(key, entry);
++      items.push({
++        ...item,
++        '@_href': key,
++        '@_media-type': mediaTypeOf(item['@_media-type'] || '', entry)
++      });
++    }
++  });
++
++  const spineItems = contents.package.spine.itemref.flatMap((itemref) => {
++    const id = itemref['@_idref'];
++    const pageId = withFallbacks(id, listedItems).find((candidate) =>
++      items.some((item) => item['@_id'] === candidate && item['@_media-type'] === PAGE)
+     );
++    const item = items.find((candidate) => candidate['@_id'] === (pageId || id));
++
++    return item && (pageId || item['@_media-type'].startsWith('image/')) ? [item] : [];
++  });
++
++  if (!spineItems.length) {
++    throw new Error('no chapters found');
+   }
+ 
++  const result: Record<string, string | Blob> = {};
++  const read = async (item: EpubManifestItem) => {
++    const key = item['@_href'];
++    const mediaType = item['@_media-type'];
++    const entry = entryByKey.get(key)!;
++
++    if ([PAGE, CSS, NCX].includes(mediaType) || (mediaType === SVG && spineItems.includes(item))) {
++      result[key] = await readText(entry);
++    } else if (mediaType.startsWith('image/')) {
++      result[key] = await entry.getData!(new BlobWriter(mediaType));
++    }
++  };
++
++  await Promise.all(items.map(read));
++
++  // Pictures the pages show without the manifest listing them
++  const pages = Object.values(result).filter((value): value is string => typeof value === 'string');
++  const unlistedPictures = entries.filter((entry) => {
++    const name = path.basename(entry.filename);
++
++    return (
++      !entryByKey.has(keyOf(entry)) &&
++      mediaTypeOf('', entry).startsWith('image/') &&
++      pages.some((page) => page.includes(name) || page.includes(encodeURIComponent(name)))
++    );
++  });
++
++  await Promise.all(
++    unlistedPictures.map((entry) => {
++      const key = keyOf(entry);
++      const item = { '@_id': '', '@_href': key, '@_media-type': mediaTypeOf('', entry) };
++      entryByKey.set(key, entry);
++      items.push(item);
++      return read(item);
++    })
++  );
++
+   await reader.close();
++
++  contents.package.manifest.item = items;
++  contents.package.spine.itemref = spineItems.map((item) => ({ '@_idref': item['@_id'] }));
++
++  const resolveHref: ResolveHref = (from, href) => {
++    const fromEntry = entryByKey.get(from);
++    const entry = fromEntry && findEntry(path.dirname(fromEntry.filename), href);
++    const key = entry && keyOf(entry);
++
++    return key && entryByKey.has(key) ? key : undefined;
++  };
++
+   return {
+-    contentsDirectory,
+     contents,
+-    result
++    result,
++    resolveHref
++  };
++}
++
++function entryFinder(entries: Entry[]) {
++  const byName = new Map<string, Entry>();
++  const byLooseName = new Map<string, Entry>();
++  const loose = (name: string) => name.normalize('NFC').toLowerCase();
++
++  entries.forEach((entry) => {
++    byName.set(entry.filename, entry);
++    byLooseName.set(loose(entry.filename), entry);
++  });
++
++  return (directory: string, href: string) => {
++    if (!href) return undefined;
++
++    const raw = href.replace(/#.*$/s, '').replace(/\\/g, '/').trim();
++    const names = [raw, decodeHref(raw)].map((name) =>
++      // Above the root: the root, as browsers do
++      path.join('/', directory, name).slice(1)
++    );
++
++    return (
++      byName.get(names[0]) ||
++      byName.get(names[1]) ||
++      byLooseName.get(loose(names[0])) ||
++      byLooseName.get(loose(names[1]))
++    );
+   };
+ }
++
++function decodeHref(href: string) {
++  try {
++    return decodeURIComponent(href);
++  } catch (_) {
++    return href;
++  }
++}
++
++/** The declared media type, or the file extension's where that isn't one the reader knows. */
++function mediaTypeOf(declared: string, entry: Entry) {
++  if (declared === 'text/html' || declared === 'text/x-oeb1-document') return PAGE;
++  if ([PAGE, CSS, NCX].includes(declared) || declared.startsWith('image/')) return declared;
++
++  return typeByExtension[path.extname(entry.filename).toLowerCase()] || declared;
++}
++
++/** The id of a manifest item and, in order, those it falls back to. */
++function withFallbacks(id: string, items: EpubManifestItem[]) {
++  const ids: string[] = [];
++  let next: string | undefined = id;
++
++  while (next && !ids.includes(next)) {
++    const current: string = next;
++    ids.push(current);
++    next = items.find((item) => item['@_id'] === current)?.['@_fallback'];
++  }
++  return ids;
++}
++
++async function readText(entry: Entry | undefined) {
++  if (!entry?.getData) {
++    throw new Error('required file not found');
++  }
++  const bytes = await entry.getData(new Uint8ArrayWriter());
++
++  try {
++    return new TextDecoder(encodingOf(bytes)).decode(bytes);
++  } catch (_) {
++    return new TextDecoder().decode(bytes);
++  }
++}
++
++/** UTF-8 unless a byte order mark, UTF-16's zero bytes or the XML declaration say otherwise. */
++function encodingOf(bytes: Uint8Array) {
++  const [a, b] = bytes;
++
++  if (a === 0xfe && b === 0xff) return 'utf-16be';
++  if (a === 0xff && b === 0xfe) return 'utf-16le';
++
++  if (bytes.length >= 8) {
++    const zeros = (start: number) => [0, 2, 4, 6].filter((i) => bytes[start + i] === 0).length;
++
++    if (zeros(0) === 4 && zeros(1) === 0) return 'utf-16be';
++    if (zeros(1) === 4 && zeros(0) === 0) return 'utf-16le';
++  }
++
++  const head = String.fromCharCode(...bytes.slice(0, 200));
++  const declared = /^<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']/.exec(head)?.[1] || 'utf-8';
++
++  return /^utf-16/i.test(declared) ? 'utf-8' : declared;
++}
+diff -ru a/apps/web/src/lib/functions/file-loaders/epub/generate-epub-html.ts b/apps/web/src/lib/functions/file-loaders/epub/generate-epub-html.ts
+--- a/apps/web/src/lib/functions/file-loaders/epub/generate-epub-html.ts	2026-11-25 17:51:54.253759170 +0100
++++ b/apps/web/src/lib/functions/file-loaders/epub/generate-epub-html.ts	2026-11-25 17:51:54.339604627 +0100
+@@ -4,7 +4,8 @@
+  * All rights reserved.
+  */
+ 
+-import { isOPFType, type EpubContent, type EpubOPFContent } from './types';
++import type { EpubContent, EpubManifestItem } from './types';
++import type { ResolveHref } from './extract-epub';
+ import type { Section } from '../../../data/database/books-db/versions/v3/books-db-v3';
+ import buildDummyBookImage from '../utils/build-dummy-book-image';
+ import clearAllBadImageRef from '../utils/clear-all-bad-image-ref';
+@@ -49,121 +50,62 @@
+ 
+ export default function generateEpubHtml(
+   data: Record<string, string | Blob>,
+-  contents: EpubContent | EpubOPFContent,
++  contents: EpubContent,
+   document: Document,
+-  contentsDirectory: string
++  resolveHref: ResolveHref
+ ) {
+-  const fallbackData = new Map<string, string>();
+   const importHTMLFixMode = importHTMLFixMode$.getValue();
+   const restrictImportFixToAnchor = restrictImportFixToAnchor$.getValue();
+   const applyImportFixes = importHTMLFixMode !== ImportHTMLFixMode.OFF;
+   const selfClosingContentTagsToFix =
+     applyImportFixes && !restrictImportFixToAnchor ? selfClosingContentTags : [];
+ 
+-  let tocData = { type: 3, content: '' };
+-  let navKey = '';
+-
+-  const itemIdToHtmlRef = (
+-    isOPFType(contents)
+-      ? contents['opf:package']['opf:manifest']['opf:item']
+-      : contents.package.manifest.item
+-  ).reduce<Record<string, string>>((acc, item) => {
+-    if (item['@_fallback']) {
+-      fallbackData.set(item['@_id'], item['@_fallback']);
+-    }
+-
+-    if (item['@_media-type'] === 'application/xhtml+xml' || item['@_media-type'] === 'text/html') {
+-      acc[item['@_id']] = item['@_href'];
+-
+-      if (item['@_properties'] === 'nav') {
+-        navKey = item['@_href'];
+-      }
+-    }
++  const items = contents.package.manifest.item;
++  const itemIdToHtmlRef = items.reduce<Record<string, string>>((acc, item) => {
++    acc[item['@_id']] = item['@_href'];
+     return acc;
+   }, {});
+ 
+-  const blobLocations = Object.entries(data).reduce<string[]>((acc, [key, value]) => {
+-    const isV2Toc = key.endsWith('.ncx') && !tocData.content;
+-
+-    if (isV2Toc || navKey === key) {
+-      tocData = {
+-        type: isV2Toc ? 2 : 3,
+-        content: value as string
+-      };
+-    }
+-
+-    if (value instanceof Blob) {
+-      acc.push(key);
+-    }
+-    return acc;
+-  }, []);
+-
+   const parser = new DOMParser();
+-  const spineItemRef = isOPFType(contents)
+-    ? contents['opf:package']['opf:spine']['opf:itemref']
+-    : contents.package.spine.itemref;
+-  const itemRefs = Array.isArray(spineItemRef) ? spineItemRef : [spineItemRef];
++  const itemRefs = contents.package.spine.itemref;
+   const sectionData: Section[] = [];
+   const result = document.createElement('div');
+ 
+-  let mainChapters: Section[] = [];
+-  let firstChapterMatchIndex = -1;
+-
+   if (applyImportFixes && restrictImportFixToAnchor) {
+     selfClosingContentTagsToFix.push('a');
+   }
+ 
+-  if (tocData.type && tocData.content) {
+-    let parsedToc = parser.parseFromString(tocData.content, 'text/html');
+-
+-    if (tocData.type === 3) {
+-      let navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
++  const spineHrefs = itemRefs.map((ref) => itemIdToHtmlRef[ref['@_idref']]);
++  const isNav = (item: EpubManifestItem) =>
++    (item['@_properties'] || '').split(/\s+/).includes('nav');
++  const isNcx = (item: EpubManifestItem) => item['@_media-type'] === 'application/x-dtbncx+xml';
++  const readToc = (item: EpubManifestItem | undefined, read: (content: string) => TocEntry[]) => {
++    if (!item) return [];
++
++    // The first entry of each file in the spine
++    return read(data[item['@_href']] as string).flatMap(({ href, label }) => {
++      const resolved = resolveHref(item['@_href'], href);
++      const reference =
++        spineHrefs.find((spineHref) => spineHref === resolved) ||
++        spineHrefs.find((spineHref) => baseName(spineHref) === baseName(href));
+ 
+-      if (!navTocElement) {
+-        parsedToc = parser.parseFromString(tocData.content, 'text/xml');
+-      }
+-
+-      navTocElement = parsedToc.querySelector('nav[epub\\:type="toc"],nav#toc');
++      return reference ? [{ reference, charactersWeight: 1, label }] : [];
++    });
++  };
+ 
+-      if (navTocElement) {
+-        mainChapters = [...navTocElement.querySelectorAll('a')].map((elm) => {
+-          const anchor = elm as HTMLAnchorElement;
++  let mainChapters: Section[] = readToc(items.find(isNav), (content) => readNav(content, parser));
+ 
+-          return { reference: anchor.href, charactersWeight: 1, label: anchor.innerText };
+-        });
+-      }
+-    } else {
+-      mainChapters = [...parsedToc.querySelectorAll('navPoint')].map((elm) => {
+-        const navLabel = elm.querySelector('navLabel text') as HTMLElement;
+-        const contentElm = elm.querySelector('content') as HTMLElement;
+-
+-        return {
+-          reference: contentElm.getAttribute('src') as string,
+-          charactersWeight: 1,
+-          label: navLabel.innerText
+-        };
+-      });
+-    }
++  if (!mainChapters.length) {
++    mainChapters = readToc(items.find(isNcx), (content) => readNcx(content, parser));
+   }
+ 
+-  if (mainChapters.length) {
+-    firstChapterMatchIndex = itemRefs.findIndex((ref) =>
+-      mainChapters[0].reference.includes(itemIdToHtmlRef[ref['@_idref'].split('/').pop() || ''])
+-    );
+-
+-    if (firstChapterMatchIndex !== 0) {
+-      const firstRef = itemRefs[0]['@_idref'];
+-      const firstHTMLRef = itemIdToHtmlRef[firstRef];
+-      const fallbackRef = fallbackData.get(firstRef);
+-      const reference = firstHTMLRef || (fallbackRef ? itemIdToHtmlRef[fallbackRef] : firstHTMLRef);
+-
+-      mainChapters.unshift({
+-        reference,
+-        charactersWeight: 1,
+-        label: 'Preface',
+-        startCharacter: 0
+-      });
+-    }
++  if (mainChapters.length && !mainChapters.some((c) => c.reference === spineHrefs[0])) {
++    mainChapters.unshift({
++      reference: spineHrefs[0],
++      charactersWeight: 1,
++      label: 'Preface',
++      startCharacter: 0
++    });
+   }
+ 
+   let currentMainChapter = mainChapters[0];
+@@ -173,15 +115,11 @@
+   let currentCharCount = 0;
+ 
+   itemRefs.forEach((item) => {
+-    let itemIdRef = item['@_idref'];
+-    let htmlHref = itemIdToHtmlRef[itemIdRef];
+-
+-    if (!htmlHref && fallbackData.has(itemIdRef)) {
+-      itemIdRef = fallbackData.get(itemIdRef) as string;
+-      htmlHref = itemIdToHtmlRef[itemIdRef];
+-    }
+-
+-    let contentToParse = (data[htmlHref] as string) || '';
++    const itemIdRef = item['@_idref'];
++    const htmlHref = itemIdToHtmlRef[itemIdRef];
++    const content = data[htmlHref];
++    let contentToParse =
++      typeof content === 'string' ? content : `<img src="${buildDummyBookImage(htmlHref)}" />`;
+ 
+     for (const tagMatch of selfClosingContentTagsToFix) {
+       const matches = contentToParse.match(new RegExp(`<${tagMatch}[^>]+?>`, 'gim')) || [];
+@@ -203,15 +141,25 @@
+         .trim();
+     }
+ 
++    // In HTML these would swallow the rest of the page
++    contentToParse = contentToParse.replace(
++      /<(script|style|title|textarea|iframe|noscript)((?:\s[^<>]*)?)\/>/gi,
++      '<$1$2></$1>'
++    );
++
+     let parsedContent = parser.parseFromString(contentToParse, 'text/html');
+     let body = parsedContent.body;
+ 
+     if (!body?.childNodes?.length) {
+-      parsedContent = parser.parseFromString(contentToParse, 'text/xml');
+-      body = parsedContent.querySelector('body')!;
++      const parsedXml = parser.parseFromString(contentToParse, 'text/xml');
++      const xmlBody = parsedXml.querySelector('body');
+ 
+-      if (!body?.childNodes?.length) {
+-        throw new Error('Unable to find valid body content while parsing EPUB');
++      parsedXml.querySelectorAll('parsererror').forEach((elm) => elm.remove());
++
++      // Otherwise a blank page
++      if (xmlBody?.childNodes.length) {
++        parsedContent = parsedXml;
++        body = xmlBody;
+       }
+     }
+ 
+@@ -228,27 +176,36 @@
+       for (const attr of attributes) {
+         const value = elm.getAttribute(attr);
+ 
+-        if (value) {
+-          elm.setAttribute(attr, path.join(path.dirname(htmlHref), value));
++        if (value && !value.startsWith('data:')) {
++          const image = resolveHref(htmlHref, value);
++
++          if (image && data[image] instanceof Blob) {
++            elm.setAttribute(attr, buildDummyBookImage(image));
++          }
+         }
+       }
+     }
+ 
+-    let innerHtml = body.innerHTML || '';
+-
+-    blobLocations.forEach((blobLocation) => {
+-      innerHtml = innerHtml.replaceAll(
+-        relative(contentsDirectory, blobLocation),
+-        buildDummyBookImage(blobLocation)
++    for (const elm of body.querySelectorAll('[style*="url("]')) {
++      const style = (elm.getAttribute('style') || '').replace(
++        /url\(\s*["']?([^"')]+)["']?\s*\)/g,
++        (match, value) => {
++          const image = value.startsWith('data:') ? undefined : resolveHref(htmlHref, value);
++          return image && data[image] instanceof Blob
++            ? `url('${buildDummyBookImage(image)}')`
++            : match;
++        }
+       );
+-    });
++      elm.setAttribute('style', style);
++    }
+ 
+     const childBodyDiv = document.createElement('div');
+     childBodyDiv.className = `ttu-book-body-wrapper ${bodyClass}`;
+     if (bodyId) {
+       childBodyDiv.id = bodyId;
+     }
+-    childBodyDiv.innerHTML = innerHtml;
++    childBodyDiv.innerHTML = body.innerHTML || '';
++    splitLongBlocks(childBodyDiv);
+ 
+     const childHtmlDiv = document.createElement('div');
+     childHtmlDiv.className = `ttu-book-html-wrapper ${htmlClass}`;
+@@ -269,10 +226,7 @@
+       childBodyDiv.classList.add('ttu-no-text');
+     }
+ 
+-    const mainChapterIndex = mainChapters.findIndex((chapter) =>
+-      chapter.reference.includes(htmlHref.split('/').pop() || '')
+-    );
+-    const mainChapter = mainChapterIndex > -1 ? mainChapters[mainChapterIndex] : undefined;
++    const mainChapter = mainChapters.find((chapter) => chapter.reference === htmlHref);
+     const characters = currentCharCount - previousCharacterCount;
+ 
+     if (mainChapter) {
+@@ -336,36 +290,78 @@
+   });
+ }
+ 
++const LONG_BLOCK_LENGTH = 10000;
++const BLOCK_PART_LENGTH = 1000;
++
+ /**
+- * Replicates https://nodejs.org/api/path.html#path_path_relative_from_to
++ * A novel in one block with line breaks: the time the browser needs for it grows with the square
++ * of its length (120,000 characters took half a minute). Parts of it become blocks of their own,
++ * which looks the same when they end at line breaks.
+  */
+-function relative(fromPath: string, toPath: string): string {
+-  const fromDirName = path.dirname(fromPath);
+-  const toDirName = path.dirname(toPath);
+-  const toFilename = path.basename(toPath);
+-
+-  if (fromDirName === toDirName) {
+-    return toFilename;
+-  }
++function splitLongBlocks(root: HTMLElement) {
++  const blocks = new Set([...root.querySelectorAll('br')].map((br) => br.parentElement!));
+ 
+-  const fromParts = fromDirName === '.' ? [] : fromDirName.split('/');
+-  const toParts = toDirName === '.' ? [] : toDirName.split('/');
+-
+-  if (fromParts.length >= toParts.length) {
+-    for (let i = 0; i < fromParts.length; i += 1) {
+-      if (fromParts[i] !== toParts[i]) {
+-        return path.join(
+-          '../'.repeat(fromParts.length - i) + toParts.slice(i).join('/'),
+-          toFilename
++  blocks.forEach((block) => {
++    if (!block.matches('div,p,section,article,main,blockquote')) return;
++    if ((block.textContent || '').length < LONG_BLOCK_LENGTH) return;
++
++    let part: Node[] = [];
++    let length = 0;
++
++    [...block.childNodes].forEach((node) => {
++      part.push(node);
++      length += (node.textContent || '').length;
++
++      if (node.nodeName === 'BR' && length >= BLOCK_PART_LENGTH) {
++        const wrapper = root.ownerDocument.createElement('span');
++        wrapper.setAttribute(
++          'style',
++          part[0].previousSibling ? 'display:block;text-indent:0' : 'display:block'
+         );
++        block.insertBefore(wrapper, part[0]);
++        wrapper.append(...part);
++        part = [];
++        length = 0;
+       }
+-    }
+-  }
+-  for (let i = 0; i < fromParts.length; i += 1) {
+-    if (fromParts[i] !== toParts[i]) {
+-      return path.join('../'.repeat(fromParts.length - i) + toParts.slice(i).join('/'), toFilename);
+-    }
+-  }
++    });
++  });
++}
++
++interface TocEntry {
++  href: string;
++  label: string;
++}
+ 
+-  return path.join(toParts.slice(fromParts.length - toParts.length).join('/'), toFilename);
++const labelOf = (elm: Element | null) => (elm?.textContent || '').replace(/\s+/g, ' ').trim();
++
++function readNav(content: string, parser: DOMParser): TocEntry[] {
++  const selector = 'nav[epub\\:type~="toc"],nav#toc,nav[role="doc-toc"]';
++  const nav =
++    parser.parseFromString(content, 'text/html').querySelector(selector) ||
++    parser.parseFromString(content, 'text/xml').querySelector(selector);
++
++  return [...(nav?.querySelectorAll('a') || [])].map((elm) => ({
++    href: elm.getAttribute('href') || '',
++    label: labelOf(elm)
++  }));
++}
++
++function readNcx(content: string, parser: DOMParser): TocEntry[] {
++  // Without namespace prefixes
++  const ncx = parser.parseFromString(content.replace(/<(\/?)[\w-]+:/g, '<$1'), 'text/html');
++
++  return [...ncx.querySelectorAll('navPoint')].map((elm) => ({
++    href: elm.querySelector('content')?.getAttribute('src') || '',
++    label: labelOf(elm.querySelector('navLabel text'))
++  }));
++}
++
++function baseName(href: string) {
++  const name = path.basename(href.replace(/#.*$/s, '').replace(/\\/g, '/'));
++
++  try {
++    return decodeURIComponent(name).toLowerCase();
++  } catch (_) {
++    return name.toLowerCase();
++  }
+ }
+diff -ru a/apps/web/src/lib/functions/file-loaders/epub/load-epub.ts b/apps/web/src/lib/functions/file-loaders/epub/load-epub.ts
+--- a/apps/web/src/lib/functions/file-loaders/epub/load-epub.ts	2026-11-25 17:51:54.253878476 +0100
++++ b/apps/web/src/lib/functions/file-loaders/epub/load-epub.ts	2026-11-25 17:51:54.339644108 +0100
+@@ -17,8 +17,8 @@
+   document: Document,
+   lastBookModified: number
+ ): Promise<LoadData> {
+-  const { contents, result: data, contentsDirectory } = await extractEpub(file);
+-  const result = generateEpubHtml(data, contents, document, contentsDirectory);
++  const { contents, result: data, resolveHref } = await extractEpub(file);
++  const result = generateEpubHtml(data, contents, document, resolveHref);
+ 
+   const displayData = {
+     title: file.name,
+diff -ru a/apps/web/src/lib/functions/file-loaders/utils/clear-all-bad-image-ref.ts b/apps/web/src/lib/functions/file-loaders/utils/clear-all-bad-image-ref.ts
+--- a/apps/web/src/lib/functions/file-loaders/utils/clear-all-bad-image-ref.ts	2026-11-25 17:51:54.255342436 +0100
++++ b/apps/web/src/lib/functions/file-loaders/utils/clear-all-bad-image-ref.ts	2026-11-25 17:51:54.340098474 +0100
+@@ -12,7 +12,7 @@
+ export default function clearAllBadImageRef(el: HTMLElement) {
+   const clearTagBadImageAttribute = (tag: Element, attributeName: string) => {
+     const attr = tag.getAttribute(attributeName);
+-    if (attr && !(attr.startsWith('ttu:') || attr.startsWith('data:image/gif;ttu:'))) {
++    if (attr && !(attr.startsWith('ttu:') || attr.startsWith('data:image/'))) {
+       tag.setAttribute(`data-ttu-${attributeName}`, attr);
+       tag.removeAttribute(attributeName);
+     }

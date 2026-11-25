@@ -160,6 +160,7 @@
     <string name="library_unsupported">%1$s is not a book Honmani can open. Add an EPUB or a TXT file.</string>
     <string name="library_unreadable">%1$s could not be read as a book.</string>
     <string name="library_no_space">%1$s could not be added: there is not enough free space on this phone. Free some space and try again.</string>
+    <string name="library_copy_protected">%1$s is copy protected (DRM), so only the app of the shop it came from can open it.</string>
     <string name="library_too_large">%1$s is too large for a book (the limit is %2$d MB).</string>
     <string name="library_reader_failed">The reader could not open “%1$s”.</string>
     <string name="action_reset_progress">Reset progress</string>
@@ -263,6 +264,7 @@
     <string name="catalog_download_failed_server">The server could not send the book. Tap to try again.</string>
     <string name="catalog_download_failed_unreadable">The file could not be read as a book.</string>
     <string name="catalog_download_failed_no_space">There is not enough free space on this phone. Free some space and tap to try again.</string>
+    <string name="catalog_download_failed_copy_protected">The book is copy protected (DRM).</string>
     <string name="catalog_download_failed_too_large">The file is too large for a book.</string>
     <string name="catalog_download_failed_reader">The reader could not open this book.</string>
     <string name="action_download_book">Download %1$s</string>

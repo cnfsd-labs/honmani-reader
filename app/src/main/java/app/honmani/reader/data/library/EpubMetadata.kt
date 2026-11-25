@@ -1,15 +1,16 @@
 package app.honmani.reader.data.library
 
-import app.honmani.reader.data.SafeXml
+import app.honmani.reader.data.sync.EpubFiles
+import app.honmani.reader.data.sync.EpubPositions
+import app.honmani.reader.data.sync.XNode
+import app.honmani.reader.data.sync.Xhtml
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import java.net.URLDecoder
+import java.util.zip.ZipEntry
 import java.util.zip.ZipException
 import java.util.zip.ZipFile
-import org.w3c.dom.Element
-import org.xml.sax.SAXException
 
 /** Title, author and cover of an EPUB, read from its package document (OPF). */
 data class EpubMetadata(
@@ -33,60 +34,40 @@ data class EpubMetadata(
             ZipFile(file).use { zip -> read(zip) }
         } catch (e: ZipException) {
             throw InvalidEpubException("Not a zip file", e)
-        } catch (e: SAXException) {
-            throw InvalidEpubException("Malformed XML", e)
         } catch (e: IOException) {
             throw InvalidEpubException("Unreadable file", e)
         }
 
         private fun read(zip: ZipFile): EpubMetadata {
-            val container = zip.xml(CONTAINER_PATH)
+            val files = EpubFiles(zip)
+            val container = files.find("", CONTAINER_PATH)?.let { zip.xml(it) }
                 ?: throw InvalidEpubException("No $CONTAINER_PATH")
-            val opfPath = container.elements("rootfile").firstNotNullOfOrNull {
-                it.getAttribute("full-path").ifBlank { null }
+            val opfEntry = container.findAll("rootfile").firstNotNullOfOrNull { root ->
+                root.attributes["full-path"]?.let { files.find("", it) }
             } ?: throw InvalidEpubException("No package document")
-            val opf = zip.xml(opfPath) ?: throw InvalidEpubException("Missing $opfPath")
+            val opf = zip.xml(opfEntry) ?: throw InvalidEpubException("Unreadable ${opfEntry.name}")
 
-            val title = opf.elements("title").firstNotNullOfOrNull { it.text() }
-            val author = opf.elements("creator").firstNotNullOfOrNull { it.text() }
+            val title = opf.findAll("title").firstNotNullOfOrNull { it.trimmedText() }
+            val author = opf.findAll("creator").firstNotNullOfOrNull { it.trimmedText() }
             val cover = coverHref(opf)
-                ?.let { resolve(opfPath, it) }
+                ?.let { files.find(opfEntry.name.substringBeforeLast('/', ""), it) }
                 ?.let { zip.bytes(it, MAX_COVER_BYTES) }
                 ?.let { bytes -> imageExtension(bytes)?.let { Cover(bytes, it) } }
             return EpubMetadata(title, author, cover)
         }
 
         /** EPUB 3 `properties="cover-image"`, else the EPUB 2 `<meta name="cover">` item. */
-        private fun coverHref(opf: Element): String? {
-            val items = opf.elements("item")
-            items.firstOrNull { "cover-image" in it.getAttribute("properties").split(' ') }
-                ?.let { return it.getAttribute("href") }
-            val coverId = opf.elements("meta")
-                .firstOrNull { it.getAttribute("name") == "cover" }
-                ?.getAttribute("content")
+        private fun coverHref(opf: XNode): String? {
+            val items = opf.findAll("item")
+            items.firstOrNull { "cover-image" in it.attributes["properties"].orEmpty().split(' ') }
+                ?.let { return it.attributes["href"] }
+            val coverId = opf.findAll("meta")
+                .firstOrNull { it.attributes["name"] == "cover" }
+                ?.attributes?.get("content")
                 ?: return null
-            return items.firstOrNull { it.getAttribute("id") == coverId }
-                ?.takeIf { it.getAttribute("media-type").startsWith("image/") }
-                ?.getAttribute("href")
-        }
-
-        /** Resolves [href] (URL-encoded, relative to the OPF) to a zip entry path. */
-        internal fun resolve(opfPath: String, href: String): String? {
-            val decoded = try {
-                URLDecoder.decode(href.substringBefore('#').replace("+", "%2B"), "UTF-8")
-            } catch (_: IllegalArgumentException) {
-                return null
-            }
-            val parts = opfPath.substringBeforeLast('/', "").split('/').filter { it.isNotEmpty() }
-                .toMutableList()
-            for (part in decoded.split('/')) {
-                when (part) {
-                    "", "." -> Unit
-                    ".." -> parts.removeLastOrNull() ?: return null
-                    else -> parts += part
-                }
-            }
-            return parts.joinToString("/").ifEmpty { null }
+            return items.firstOrNull { it.attributes["id"] == coverId }
+                ?.takeIf { it.attributes["media-type"].orEmpty().startsWith("image/") }
+                ?.attributes?.get("href")
         }
 
         private fun imageExtension(bytes: ByteArray): String? = when {
@@ -101,8 +82,7 @@ data class EpubMetadata(
         private fun ByteArray.startsWith(vararg prefix: Int): Boolean =
             size >= prefix.size && prefix.indices.all { this[it].toInt() and 0xFF == prefix[it] }
 
-        private fun ZipFile.bytes(path: String, limit: Int): ByteArray? {
-            val entry = getEntry(path) ?: return null
+        private fun ZipFile.bytes(entry: ZipEntry, limit: Int): ByteArray? {
             if (entry.size > limit) return null
             return getInputStream(entry).use { input ->
                 val bytes = input.readUpTo(limit + 1)
@@ -121,19 +101,12 @@ data class EpubMetadata(
             return out.toByteArray()
         }
 
-        private fun ZipFile.xml(path: String): Element? {
-            val bytes = bytes(path, MAX_XML_BYTES) ?: return null
-            return SafeXml.parse(bytes)
-        }
+        /** Leniently, as ttu reads it: a stray & in a title must not refuse the book. */
+        private fun ZipFile.xml(entry: ZipEntry): XNode? =
+            bytes(entry, MAX_XML_BYTES)?.let { Xhtml.parse(EpubPositions.decodeText(it)) }
 
-        /** Descendant elements with this local name, in any namespace. */
-        private fun Element.elements(localName: String): List<Element> {
-            val nodes = getElementsByTagNameNS("*", localName)
-            return (0 until nodes.length).mapNotNull { nodes.item(it) as? Element }
-        }
-
-        private fun Element.text(): String? =
-            textContent?.replace(Regex("\\s+"), " ")?.trim()?.ifEmpty { null }
+        private fun XNode.trimmedText(): String? =
+            textContent().replace(Regex("\\s+"), " ").trim().ifEmpty { null }
     }
 }
 

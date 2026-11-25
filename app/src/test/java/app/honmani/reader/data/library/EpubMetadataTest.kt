@@ -106,12 +106,10 @@ class EpubMetadataTest {
     }
 
     @Test
-    fun resolve_handlesRelativePaths() {
-        assertEquals("OEBPS/images/a.png", EpubMetadata.resolve("OEBPS/content.opf", "images/a.png"))
-        assertEquals("images/a.png", EpubMetadata.resolve("OEBPS/content.opf", "../images/a.png"))
-        assertEquals("a.png", EpubMetadata.resolve("content.opf", "./a.png"))
-        assertEquals("OEBPS/a b.png", EpubMetadata.resolve("OEBPS/content.opf", "a%20b.png"))
-        assertEquals("OEBPS/a+b.png", EpubMetadata.resolve("OEBPS/content.opf", "a+b.png"))
-        assertNull(EpubMetadata.resolve("content.opf", "../../escape.png"))
+    fun anOpfOtherReadersForgiveIsReadable() {
+        val metadata = read(TestBooks.epub(title = "猫 & 犬", author = "A&hellip;B"))
+
+        assertEquals("猫 & 犬", metadata.title)
+        assertEquals("A…B", metadata.author)
     }
 }

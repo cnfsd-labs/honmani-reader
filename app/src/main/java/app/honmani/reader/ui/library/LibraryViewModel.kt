@@ -142,6 +142,8 @@ sealed interface LibraryNotice {
 
     data class Unreadable(val fileName: String) : LibraryNotice
 
+    data class CopyProtected(val fileName: String) : LibraryNotice
+
     data class TooLarge(val fileName: String) : LibraryNotice
     data class NoSpace(val fileName: String) : LibraryNotice
 
@@ -566,6 +568,7 @@ class LibraryViewModel(
                 is BookAdder.Result.AlreadyInLibrary -> LibraryNotice.AlreadyInLibrary(result.book.title)
                 BookAdder.Result.Unsupported -> LibraryNotice.Unsupported(picked.name)
                 BookAdder.Result.Unreadable -> LibraryNotice.Unreadable(picked.name)
+                BookAdder.Result.CopyProtected -> LibraryNotice.CopyProtected(picked.name)
                 BookAdder.Result.TooLarge -> LibraryNotice.TooLarge(picked.name)
                 BookAdder.Result.NoSpace -> LibraryNotice.NoSpace(picked.name)
                 is BookAdder.Result.ReaderFailed -> LibraryNotice.ReaderFailed(result.title)

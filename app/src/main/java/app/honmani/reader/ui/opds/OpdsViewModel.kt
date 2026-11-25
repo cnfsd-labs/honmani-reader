@@ -83,7 +83,7 @@ sealed interface DownloadState {
     data class Failed(val reason: DownloadFailure) : DownloadState
 }
 
-enum class DownloadFailure { NETWORK, UNAUTHORIZED, SERVER, UNREADABLE, TOO_LARGE, READER, HOTSPOT, NO_SPACE }
+enum class DownloadFailure { NETWORK, UNAUTHORIZED, SERVER, UNREADABLE, COPY_PROTECTED, TOO_LARGE, READER, HOTSPOT, NO_SPACE }
 
 /** The catalogue dialog: adding a catalogue ([id] null) or changing one. */
 data class CatalogEditor(
@@ -403,6 +403,8 @@ class OpdsViewModel(
                     }
                     BookAdder.Result.Unsupported, BookAdder.Result.Unreadable ->
                         setDownload(entry.id, DownloadState.Failed(DownloadFailure.UNREADABLE))
+                    BookAdder.Result.CopyProtected ->
+                        setDownload(entry.id, DownloadState.Failed(DownloadFailure.COPY_PROTECTED))
                     BookAdder.Result.TooLarge ->
                         setDownload(entry.id, DownloadState.Failed(DownloadFailure.TOO_LARGE))
                     BookAdder.Result.NoSpace ->

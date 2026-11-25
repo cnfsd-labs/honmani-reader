@@ -28,6 +28,9 @@ class BookAdder(
 
         data object Unreadable : Result
 
+        /** Copy protected (DRM). */
+        data object CopyProtected : Result
+
         /** Larger than [BookImporter.MAX_BOOK_BYTES]. */
         data object TooLarge : Result
 
@@ -48,6 +51,7 @@ class BookAdder(
         is BookImporter.Result.AlreadyInLibrary -> Result.AlreadyInLibrary(result.book)
         BookImporter.Result.Unsupported -> Result.Unsupported
         BookImporter.Result.Unreadable -> Result.Unreadable
+        BookImporter.Result.CopyProtected -> Result.CopyProtected
         BookImporter.Result.TooLarge -> Result.TooLarge
         BookImporter.Result.NoSpace -> Result.NoSpace
     }

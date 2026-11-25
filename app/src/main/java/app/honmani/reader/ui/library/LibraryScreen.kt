@@ -542,6 +542,7 @@ private fun noticeText(notice: LibraryNotice): String = when (notice) {
     is LibraryNotice.AlreadyInLibrary -> stringResource(R.string.library_already_added, notice.title)
     is LibraryNotice.Unsupported -> stringResource(R.string.library_unsupported, notice.fileName)
     is LibraryNotice.Unreadable -> stringResource(R.string.library_unreadable, notice.fileName)
+    is LibraryNotice.CopyProtected -> stringResource(R.string.library_copy_protected, notice.fileName)
     is LibraryNotice.TooLarge -> stringResource(R.string.library_too_large, notice.fileName, BookImporter.MAX_BOOK_BYTES / (1024 * 1024))
     is LibraryNotice.NoSpace -> stringResource(R.string.library_no_space, notice.fileName)
     is LibraryNotice.ReaderFailed -> stringResource(R.string.library_reader_failed, notice.title)

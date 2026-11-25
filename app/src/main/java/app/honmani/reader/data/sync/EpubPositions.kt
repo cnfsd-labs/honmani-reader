@@ -5,7 +5,6 @@ import app.honmani.reader.data.readBytesAtMost
 import app.honmani.reader.diagnostics.logWarning
 import java.io.File
 import java.io.IOException
-import java.net.URLDecoder
 import java.nio.charset.Charset
 import java.util.BitSet
 import java.util.zip.ZipFile
@@ -42,8 +41,8 @@ class SectionStarts(val starts: Map<String, Int>, val total: Int)
  */
 class EpubPositions private constructor(
     private val file: File,
-    /** Zip entry names of the spine documents, in reading order. */
-    private val spine: List<String>,
+    /** The spine documents, in reading order. */
+    private val spine: List<SpineDocument>,
     /** Characters before each spine document. */
     private val starts: IntArray,
     /** Characters in the whole book. */
@@ -114,8 +113,7 @@ class EpubPositions private constructor(
     private fun sizeOf(index: Int): Int = (if (index + 1 < starts.size) starts[index + 1] else total) - starts[index]
 
     private fun document(index: Int): XNode? = try {
-        ZipFile(file).use { zip -> zip.getEntry(spine[index])?.let { zip.getInputStream(it).use { input -> input.readBytesAtMost(MAX_DOCUMENT_BYTES) } } }
-            ?.let { bodyOf(Xhtml.parse(decodeText(it))) }
+        ZipFile(file).use { zip -> zip.text(spine[index]) }?.let { bodyOf(Xhtml.parse(it)) }
     } catch (_: IOException) {
         null
     }
@@ -143,6 +141,7 @@ class EpubPositions private constructor(
         private val STEP = Regex("""^([^\[\].]+)(?:\[(\d+)])?(?:\.(\d+))?$""")
         private const val TAG = "Honmani.sync"
         private const val BYTE_ORDER_MARK = '\uFEFF'
+        private val SHIFT_JIS = setOf("shift_jis", "shift-jis", "sjis", "x-sjis", "ms_kanji", "ms932", "windows-31j")
         private val ENCODING = Regex("""^<\?xml[^>]*encoding\s*=\s*["']([^"']+)["']""")
 
         /** Reads the book's spine and counts its characters; null if it is not a readable EPUB. */
@@ -152,13 +151,13 @@ class EpubPositions private constructor(
                 if (spine.isEmpty()) return null
                 var total = 0
                 val starts = IntArray(spine.size)
-                for ((i, name) in spine.withIndex()) {
+                for ((i, document) in spine.withIndex()) {
                     starts[i] = total
                     val text = try {
-                        zip.text(name)
+                        zip.text(document)
                     } catch (e: TooLargeException) {
                         // Counting needs the whole document; skipping it would shift every later position.
-                        logWarning(TAG, "No progress sync for this book: $name is larger than ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB")
+                        logWarning(TAG, "No progress sync for this book: ${document.name} is larger than ${MAX_DOCUMENT_BYTES / (1024 * 1024)} MB")
                         return null
                     }
                     val body = text?.let { bodyOf(Xhtml.parse(it)) } ?: continue
@@ -182,8 +181,8 @@ class EpubPositions private constructor(
             ZipFile(file).use { zip ->
                 val spine = spineOf(zip)
                 if (spine.isEmpty()) return null
-                spine.mapNotNull { name ->
-                    val body = zip.text(name)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
+                spine.mapNotNull { document ->
+                    val body = zip.text(document)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
                     val text = StringBuilder()
                     val ruby = BitSet()
                     fun visit(node: XNode, inRuby: Boolean) {
@@ -217,8 +216,8 @@ class EpubPositions private constructor(
             ZipFile(file).use { zip ->
                 val spine = spineOf(zip)
                 if (spine.isEmpty()) return null
-                spine.mapNotNull { name ->
-                    val body = zip.text(name)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
+                spine.mapNotNull { document ->
+                    val body = zip.text(document)?.let { bodyOf(Xhtml.parse(it)) } ?: return@mapNotNull null
                     val pieces = ArrayList<SpeechPiece>()
 
                     /** The text under [node] as the page shows it, without readings. */
@@ -285,14 +284,14 @@ class EpubPositions private constructor(
          */
         fun sectionStarts(file: File): SectionStarts? = try {
             ZipFile(file).use { zip ->
-                val entries = spineEntries(zip)
+                val entries = spineOf(zip)
                 if (entries.isEmpty()) return null
                 var total = 0
                 val starts = LinkedHashMap<String, Int>()
-                for ((id, name) in entries) {
-                    starts.putIfAbsent("ttu-$id", total)
+                for (document in entries) {
+                    starts.putIfAbsent("ttu-${document.id}", total)
                     val text = try {
-                        zip.text(name)
+                        zip.text(document)
                     } catch (e: TooLargeException) {
                         return null
                     }
@@ -315,12 +314,12 @@ class EpubPositions private constructor(
          */
         fun countedText(file: File): IntArray? = try {
             ZipFile(file).use { zip ->
-                val entries = spineEntries(zip)
+                val entries = spineOf(zip)
                 if (entries.isEmpty()) return null
                 val out = IntList()
-                for ((_, name) in entries) {
+                for (document in entries) {
                     val text = try {
-                        zip.text(name)
+                        zip.text(document)
                     } catch (e: TooLargeException) {
                         return null
                     }
@@ -383,25 +382,11 @@ class EpubPositions private constructor(
             return n
         }
 
-        /** The spine's documents in reading order, as paths in the zip; empty if there is none. */
-        private fun spineOf(zip: ZipFile): List<String> = spineEntries(zip).map { it.second }
+        /** The spine's documents in reading order; empty if there is none. */
+        internal fun spineOf(zip: ZipFile): List<SpineDocument> = spineDocuments(zip) { zip.text(it) }
 
-        /** The spine's documents in reading order: the itemref's idref and the path in the zip. */
-        private fun spineEntries(zip: ZipFile): List<Pair<String, String>> {
-            val container = zip.text("META-INF/container.xml")?.let(Xhtml::parse) ?: return emptyList()
-            val opfPath = container.find("rootfile")?.attributes?.get("full-path") ?: return emptyList()
-            val opf = zip.text(opfPath)?.let(Xhtml::parse) ?: return emptyList()
-            val base = opfPath.substringBeforeLast('/', "")
-            val manifest = opf.findAll("item").mapNotNull { item ->
-                val id = item.attributes["id"] ?: return@mapNotNull null
-                val href = item.attributes["href"] ?: return@mapNotNull null
-                id to resolve(base, href)
-            }.toMap()
-            return opf.findAll("itemref").mapNotNull { ref ->
-                val id = ref.attributes["idref"] ?: return@mapNotNull null
-                manifest[id]?.let { id to it }
-            }.filter { zip.getEntry(it.second) != null }
-        }
+        /** A document's text, as ttu shows it; null for a picture. */
+        private fun ZipFile.text(document: SpineDocument): String? = if (document.hasText) text(document.name) else null
 
         private fun bodyOf(document: XNode): XNode = document.find("body") ?: document
 
@@ -523,19 +508,6 @@ class EpubPositions private constructor(
             }
         }
 
-        private fun resolve(base: String, href: String): String {
-            val path = URLDecoder.decode(href.substringBefore('#').replace("+", "%2B"), "UTF-8")
-            val parts = (if (base.isEmpty()) emptyList() else base.split('/')).toMutableList()
-            for (part in path.split('/')) {
-                when (part) {
-                    "", "." -> Unit
-                    ".." -> if (parts.isNotEmpty()) parts.removeAt(parts.lastIndex)
-                    else -> parts += part
-                }
-            }
-            return parts.joinToString("/")
-        }
-
         /**
          * UTF-8 unless a byte order mark, UTF-16's zero bytes or the XML declaration say otherwise
          * (Shift_JIS in older Japanese books, UTF-16 in some tool-made ones).
@@ -574,7 +546,9 @@ class EpubPositions private constructor(
             val head = String(bytes, 0, minOf(bytes.size, 200), Charsets.ISO_8859_1)
             val name = ENCODING.find(head)?.groupValues?.get(1) ?: return null
             if (name.startsWith("UTF-16", ignoreCase = true)) return null
-            return runCatching { Charset.forName(name) }.getOrNull()
+            // Browsers read Shift_JIS as Windows does (①, ～), and so does ttu.
+            val known = if (name.lowercase() in SHIFT_JIS) "windows-31j" else name
+            return runCatching { Charset.forName(known) }.getOrNull()
         }
     }
 }

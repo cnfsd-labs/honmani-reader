@@ -43,6 +43,9 @@ class BookImporter(
         /** An EPUB that cannot be read, or a file that could not be copied. */
         data object Unreadable : Result
 
+        /** Copy protected (DRM): the pages are encrypted, only the shop's own app can open it. */
+        data object CopyProtected : Result
+
         /** Larger than [MAX_BOOK_BYTES]: a video or archive by mistake, or a book too big to keep. */
         data object TooLarge : Result
 
@@ -91,7 +94,7 @@ class BookImporter(
 
             val metadata = when (format) {
                 BookFormat.EPUB -> try {
-                    EpubMetadata.read(temp)
+                    EpubMetadata.read(temp).also { if (isCopyProtected(temp)) return Result.CopyProtected }
                 } catch (_: InvalidEpubException) {
                     return Result.Unreadable
                 }

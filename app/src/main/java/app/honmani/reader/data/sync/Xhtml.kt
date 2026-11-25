@@ -28,6 +28,9 @@ internal class XNode(val name: String?, val text: String?, val attributes: Map<S
         return null
     }
 
+    /** All text in here, as the DOM's `textContent`. */
+    fun textContent(): String = text ?: children.joinToString("") { it.textContent() }
+
     fun findAll(name: String): List<XNode> = buildList {
         fun visit(node: XNode) {
             if (node.name == name) add(node)
