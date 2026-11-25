@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
@@ -37,6 +38,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -118,6 +120,18 @@ private fun DictionariesContent(
     val scope = rememberCoroutineScope()
     val deletedMessage = pendingDelete?.let { stringResource(R.string.dictionary_deleted, it.title) }
 
+    // The cards come above the rows in view, which a keyed list keeps in place even at its very top:
+    // without this a failed download showed nothing.
+    val listState = rememberLazyListState()
+    val imports = (uiState as? DictionariesUiState.Loaded)?.imports
+    var seenCards by remember { mutableStateOf<Set<ImportCard>?>(null) }
+    LaunchedEffect(imports) {
+        if (imports == null) return@LaunchedEffect
+        val new = seenCards?.let { firstNewCard(it, imports) }
+        seenCards = importCards(imports)
+        if (new != null) listState.scrollToItem(new)
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -142,6 +156,7 @@ private fun DictionariesContent(
                 CircularProgressIndicator()
             }
             is DictionariesUiState.Loaded -> LazyColumn(
+                state = listState,
                 modifier = modifier,
                 // Room for the floating button below the last row.
                 contentPadding = PaddingValues(bottom = 88.dp),
@@ -237,6 +252,21 @@ private fun DictionariesContent(
         )
     }
 }
+
+/** A card of the import list as the reader saw it: an import's [id], and whether it said "failed". */
+internal data class ImportCard(val id: String, val failed: Boolean)
+
+internal fun importCards(imports: List<ImportStatus>): Set<ImportCard> = imports.mapTo(HashSet()) { ImportCard(it.id, it is ImportStatus.Failed) }
+
+/**
+ * Where in [imports] the first card is that the list must bring into view: a failure or a new import
+ * not among [seen]. An update's card waits its turn, as the dictionary's own row says it is updating.
+ */
+internal fun firstNewCard(seen: Set<ImportCard>, imports: List<ImportStatus>): Int? =
+    imports.indexOfFirst {
+        val failed = it is ImportStatus.Failed
+        (failed || it.replaces == null) && ImportCard(it.id, failed) !in seen
+    }.takeIf { it >= 0 }
 
 @Composable
 private fun SectionTitle(text: String) {
