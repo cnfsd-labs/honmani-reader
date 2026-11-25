@@ -61,7 +61,7 @@ public: never copy those notes, personal details or discussions into it.
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
   contradicts ranks below those it agrees with; a match that ends inside the next word (もので in ものです, `cutsNextWord`) ranks below the shorter ones; text in kana ranks by how common a word is in kana (Jiten's ㋕) plus the Segmenter's inflection cost, then by dictionary order; a tap inside a ruby base scans from the base's start only
   when the best entry there covers the whole base with its furigana; own deinflection (`lookup/Deinflector`; an entry without word classes borrows those of the same
-  expression+reading in another dictionary (not a kana entry of a dictionary that has word classes), else matches uninflected text only; ます and です inflect); glossaries
+  expression+reading in another dictionary (not a kana entry of a dictionary that has word classes), else matches uninflected text only; ます and です inflect; a lemma a dictionary's form-of entry names without it conjugating to that form ranks below shorter matches; a kana rank counts only for the verb class the first dictionary gives that kana word); glossaries
   stored deflated (`GlossaryPacker`).
 - **Saved words:** recorded on every tap lookup (a long press records nothing until a panel action saves
   the word), ranked by a decayed score (half-life 14 days), never

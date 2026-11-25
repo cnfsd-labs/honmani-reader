@@ -551,6 +551,64 @@ class DictionaryLookupTest {
         assertFalse(hmph.headwords().contains("ふふん"))
     }
 
+    /** Rows as in wty: conjugated forms point to every lemma spelled that way, whatever it is. */
+    private suspend fun wty() {
+        val bank = """[
+            ["ある","ある","","v5",0,["存在する。"],0,""],
+            ["ある","ある","","",0,["或る。"],0,""],
+            ["あれ","あれ","non-lemma","",0,[["ある",["godan hypothetical"]],["ある",["imperative godan"]]],0,""],
+            ["歩く","あるく","","v5",0,["足で進む。"],0,""],
+            ["あるか","あるか","non-lemma","",0,[["歩く",["imperfective godan"]]],0,""],
+            ["保護","ほご","","vs",0,["守ること。"],0,""],
+            ["ほご","ほご","non-lemma","",0,[["保護",["transliteration"]]],0,""],
+            ["いる","いる","","v5",0,["必要である。"],0,""]
+        ]"""
+        val files = mapOf("index.json" to index("wty-ja-ja"), "term_bank_1.json" to bank)
+        DictionaryImporter(database).import(writeZip(temp.root, files, "wty.zip"))
+    }
+
+    @Test
+    fun aConjugatedFormPointsOnlyToLemmasThatConjugateToIt() = runTest {
+        wty()
+
+        // あれ is the imperative of the verb, not a form of 或る.
+        val are = lookup.lookup("あれ").entries
+        assertEquals(listOf("存在する。", "或る。"), are.map { it.term.glossary.json.removeSurrounding("[\"", "\"]") })
+        assertEquals(listOf(Inflection.IMPERATIVE), are.first().inflections)
+        // The stem before another ending (あるかない) does not outrank ある before か, but stays listed.
+        val aruka = lookup.lookup("あるか、").entries
+        assertEquals("ある", aruka.first().source)
+        assertEquals("歩く", aruka.last().term.expression)
+        // Where the form really conjugates it is found as before.
+        val arukanai = lookup.lookup("あるかない").entries.first()
+        assertEquals("歩く", arukanai.term.expression)
+        assertEquals(listOf(Inflection.NEGATIVE), arukanai.inflections)
+        // Another spelling is no conjugated form.
+        assertEquals("保護", lookup.lookup("ほごと").entries.first().term.expression)
+    }
+
+    @Test
+    fun aKanaRankCountsForTheWordTheFirstDictionaryMeans() = runTest {
+        install(
+            "Jitendex",
+            listOf("いる", "いる", "v1", 10, "to be"),
+            listOf("言う", "いう", "v5", 10, "to say"),
+        )
+        wty()
+        val files = mapOf(
+            "index.json" to index("Jiten", extra = ",\"frequencyMode\":\"rank-based\""),
+            "term_meta_bank_1.json" to """[
+                ["いる","freq",{"reading":"いる","frequency":{"value":10,"displayValue":"10㋕"}}],
+                ["言う","freq",{"reading":"いう","frequency":{"value":200,"displayValue":"200㋕"}}]
+            ]""",
+        )
+        DictionaryImporter(database).import(writeZip(temp.root, files, "jiten.zip"))
+
+        // いった is 言う: the rank of いる says nothing about 要る.
+        assertEquals("言う", lookup.lookup("いった").entries.first().term.expression)
+        assertEquals("to be", lookup.lookup("いた").entries.first().term.glossary.json.removeSurrounding("[\"", "\"]"))
+    }
+
     @Test
     fun repeatMarksVariationSelectorsAndWidthsAreNormalized() = runTest {
         install(

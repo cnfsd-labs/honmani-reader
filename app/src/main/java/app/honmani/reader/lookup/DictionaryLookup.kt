@@ -167,6 +167,9 @@ class DictionaryLookup(
         fun readingPrefix(source: String) =
             readingPrefixes.getOrPut(source) { Furigana.readingPrefix(source, ruby) }
 
+        // The word classes the first dictionary that names any gives a word (expression and reading).
+        val firstClasses = HashMap<Pair<String, String>, Pair<DictionaryEntity, Int>>()
+
         suspend fun match(candidates: List<Candidate>): List<LookupEntry> {
             val candidatesByText = candidates.groupBy { it.deinflection.text }
             val terms = candidatesByText.keys.chunked(MAX_LOOKUP_TEXTS)
@@ -179,7 +182,14 @@ class DictionaryLookup(
             val classesByWord = HashMap<Pair<String, String>, Int>()
             for (term in terms) {
                 val classes = WordClass.fromRules(term.rules)
-                if (classes != 0) classesByWord.merge(term.expression to term.reading, classes, Int::or)
+                if (classes == 0) continue
+                val word = term.expression to term.reading
+                classesByWord.merge(word, classes, Int::or)
+                val dictionary = dictionaries[term.dictionaryId] ?: continue
+                val (first, firstGiven) = firstClasses[word] ?: (dictionary to 0)
+                val byOrder = dictionaryOrder.compare(dictionary, first)
+                if (byOrder < 0) firstClasses[word] = dictionary to classes
+                if (byOrder == 0) firstClasses[word] = first to (firstGiven or classes)
             }
             return terms.mapNotNull { term ->
                 val dictionary = dictionaries[term.dictionaryId] ?: return@mapNotNull null
@@ -225,7 +235,7 @@ class DictionaryLookup(
         if (kanjiEnd > 0 && (matched.maxOfOrNull { it.source.length } ?: 0) <= kanjiEnd) {
             matched = (matched + match(candidates(text, maxLength, dropKanaAt = kanjiEnd))).distinctBy { it.term.id }
         }
-        var (entries, pointers) = resolved(matched)
+        var (entries, pointers, notDerived) = resolved(matched)
         // Furigana that is no reading of the word as written names the word meant: 宅 read うち
         // is 家, 本気 read マジ is マジ. Then the furigana's word is looked up too, its longest
         // match only (not every word read like the first kana).
@@ -236,7 +246,7 @@ class DictionaryLookup(
         var kanaOnlyNamed = emptySet<Long>()
         if (byFurigana.isNotEmpty()) {
             val longest = byFurigana.maxOf { it.source.length }
-            val (moreEntries, morePointers) = resolved(byFurigana.filter { it.source.length == longest })
+            val (moreEntries, morePointers, moreNotDerived) = resolved(byFurigana.filter { it.source.length == longest })
             val first = ruby.first()
             val hiraganaOverKanji = first.reading.all(JapaneseText::isHiragana) &&
                 text.substring(first.start, first.end).codePoints().anyMatch(JapaneseText::isKanji)
@@ -247,6 +257,7 @@ class DictionaryLookup(
             }
             entries = (entries + moreEntries.map { it.copy(matchesFurigana = true) }).distinctBy { it.term.id }
             pointers = pointers + morePointers
+            notDerived = notDerived + moreNotDerived
         }
         val meta = meta(entries, dictionaries)
         // An entry the book's furigana contradicts ranks below every entry it agrees with, even a
@@ -260,10 +271,16 @@ class DictionaryLookup(
         // has to be undone: いた is the past of いる, not 板 or 痛. Only with a list that says how
         // common words are in kana.
         val kanaRanks = meta.values.any { it.kanaRank != null }
+        // The rank of いる in kana is that of the ichidan verb, not of another dictionary's いる (要る).
+        fun ranksThisWord(entry: LookupEntry): Boolean {
+            val classes = WordClass.fromRules(entry.term.rules)
+            val first = firstClasses[entry.term.expression to entry.term.reading]?.second ?: return true
+            return classes == 0 || classes and first != 0
+        }
         fun kanaCost(entry: LookupEntry): Double = when {
             !kanaRanks || !entry.source.all(JapaneseText::isKana) -> 0.0
             DictionaryCatalog.isNames(entry.dictionary.title) -> Double.MAX_VALUE
-            else -> ln(metaOf(entry)?.kanaRank ?: Segmenter.RARE_RANK.toDouble()) +
+            else -> ln(metaOf(entry)?.kanaRank?.takeIf { ranksThisWord(entry) } ?: Segmenter.RARE_RANK.toDouble()) +
                 (if (entry.matchedExpression && entry.inflections.isEmpty()) -KANA_ENTRY_BONUS else 0.0) +
                 Segmenter.inflectionCost(entry.inflections, entry.source.all(Segmenter::isKatakana))
         }
@@ -271,7 +288,7 @@ class DictionaryLookup(
         fun rankAsWritten(entry: LookupEntry): Double = metaOf(entry)
             ?.let { if (entry.source.all(JapaneseText::isKana)) it.rank else it.writtenRank ?: it.rank } ?: Double.MAX_VALUE
         val order = compareBy<LookupEntry> { contradicted(it) }
-            .thenBy { cutsNextWord(it.source, text) }
+            .thenBy { cutsNextWord(it.source, text) || it.term.id in notDerived }
             .thenByDescending { it.source.length }
             // A pointer whose target is missing says nothing itself.
             .thenBy { it.term.id in pointers }
@@ -375,7 +392,7 @@ class DictionaryLookup(
                     matchedExpression = parsed.patterns.isNotEmpty() || parsed.prefixes.any { term.expression.startsWith(it) },
                 )
             }
-        val (startedEntries, pointers) = followPointers(longVowelEntries + started) { _, _ -> false }
+        val (startedEntries, pointers, _) = followPointers(longVowelEntries + started) { _, _ -> false }
 
         val englishEntries = if (english != null) englishSearch(english, dictionaries, source, tiers, maxWords) else emptyList()
         val entries = found + startedEntries + englishEntries
@@ -450,25 +467,27 @@ class DictionaryLookup(
     /**
      * [entries] with each pointer entry ([Redirect]) replaced by the entries it points to in the
      * same dictionary, matched as the pointer was: 生れた shows 生まれる's definitions, not
-     * "⟶ 生れる". Also returns the ids of pointers whose target is missing.
+     * "⟶ 生れる". Also returns the ids of pointers whose target is missing, and of entries only
+     * named as the lemma of a conjugated form they do not conjugate to here: あるか as a form of
+     * 歩く (before another ending), あれ as one of 或る.
      */
     private suspend fun followPointers(
         entries: List<LookupEntry>,
         matchesFurigana: (source: String, reading: String) -> Boolean,
-    ): Pair<List<LookupEntry>, Set<Long>> {
+    ): Triple<List<LookupEntry>, Set<Long>, Set<Long>> {
         val targets = entries
             .mapNotNull { entry -> Redirect.target(entry.term.sequence, entry.term.glossary.json)?.let { entry.term.id to it } }
             .toMap()
-        if (targets.isEmpty()) return entries to emptySet()
-        val found = targets.values.distinct().chunked(MAX_LOOKUP_TEXTS)
+        if (targets.isEmpty()) return Triple(entries, emptySet(), emptySet())
+        val found = targets.values.map { it.word }.distinct().chunked(MAX_LOOKUP_TEXTS)
             .flatMap { termDao.findByExpressionOrReading(it) }
         val unresolved = HashSet<Long>()
         val resolved = entries.flatMap { entry ->
-            val target = targets[entry.term.id] ?: return@flatMap listOf(entry to false)
+            val target = targets[entry.term.id] ?: return@flatMap listOf(Resolved(entry, viaPointer = false, conjugated = false))
             val sequence = entry.term.sequence
             val terms = found
                 .filter {
-                    it.dictionaryId == entry.term.dictionaryId && it.expression == target &&
+                    it.dictionaryId == entry.term.dictionaryId && it.expression == target.word &&
                         (sequence == null || sequence >= 0 || it.sequence == -sequence)
                 }
                 .map { unpacked(it, entry.dictionary) }
@@ -476,23 +495,33 @@ class DictionaryLookup(
                 .filter { Redirect.target(it.sequence, it.glossary.json) == null }
             if (terms.isEmpty()) {
                 unresolved += entry.term.id
-                listOf(entry to false)
+                listOf(Resolved(entry, viaPointer = false, conjugated = false))
             } else {
                 terms.map { term ->
-                    entry.copy(
+                    val found = entry.copy(
                         term = term,
                         matchesFurigana = matchesFurigana(entry.source, term.reading.ifEmpty { term.expression }),
-                    ) to true
+                    )
+                    Resolved(found, viaPointer = true, conjugated = target.conjugated)
                 }
             }
         }
         // A target the text also matched directly shows once, preferably as matched directly
         // (食べた as 食べる's past form rather than as the form-of entry's lemma).
-        val order = compareByDescending<Pair<LookupEntry, Boolean>> { it.first.source.length }
-            .thenBy { it.second }
-            .thenBy(entryOrder) { it.first }
-        return resolved.sortedWith(order).distinctBy { it.first.term.id }.map { it.first } to unresolved
+        val order = compareBy<Resolved> { it.conjugated }
+            .thenByDescending { it.entry.source.length }
+            .thenBy { it.viaPointer }
+            .thenBy(entryOrder) { it.entry }
+        val distinct = resolved.sortedWith(order).distinctBy { it.entry.term.id }
+        return Triple(
+            distinct.map { it.entry },
+            unresolved,
+            distinct.filter { it.conjugated }.mapTo(HashSet()) { it.entry.term.id },
+        )
     }
+
+    /** An entry after [followPointers]; [conjugated]: named by the entry of a conjugated form. */
+    private class Resolved(val entry: LookupEntry, val viaPointer: Boolean, val conjugated: Boolean)
 
     /**
      * What the enabled kanji dictionaries say about the kanji in [text], by character; the

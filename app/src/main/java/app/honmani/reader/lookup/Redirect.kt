@@ -19,18 +19,29 @@ import java.net.URLDecoder
 object Redirect {
     private const val QUERY = "?query="
 
-    /** The written form an entry with [sequence] and [glossary] (JSON) points to; null if it is a real entry. */
-    fun target(sequence: Long?, glossary: String): String? {
+    /** Words in wty's notes on conjugated forms ("past completive continuative"), not on other spellings ("transliteration"). */
+    private val CONJUGATIONS = setOf("imperfective", "continuative", "hypothetical", "imperative", "conclusive", "attributive", "evidential")
+
+    /** The written form [word] an entry points to; [conjugated] if as the lemma of a conjugated form. */
+    data class Target(val word: String, val conjugated: Boolean)
+
+    /** What an entry with [sequence] and [glossary] (JSON) points to; null if it is a real entry. */
+    fun target(sequence: Long?, glossary: String): Target? {
         val items = try {
             Json.parseToJsonElement(glossary) as? JsonArray
         } catch (_: SerializationException) {
             null
         } ?: return null
         val formOf = items.map(::formOfTarget)
-        if (items.isNotEmpty() && formOf.all { it != null }) return formOf.first()
+        if (items.isNotEmpty() && formOf.all { it != null }) return Target(formOf.first()!!, items.all(::isConjugation))
         if (sequence == null || sequence >= 0) return null
-        return formOf.firstNotNullOfOrNull { it } ?: items.firstNotNullOfOrNull(::linkTarget)
+        val word = formOf.firstNotNullOfOrNull { it } ?: items.firstNotNullOfOrNull(::linkTarget)
+        return word?.let { Target(it, conjugated = false) }
     }
+
+    /** Whether a form-of item's notes say the form is a conjugated one. */
+    private fun isConjugation(item: JsonElement): Boolean = ((item as JsonArray)[1] as JsonArray)
+        .any { note -> (note as? JsonPrimitive)?.content.orEmpty().split(' ').any(CONJUGATIONS::contains) }
 
     /** The term of a form-of item: [term, [rules or notes]]. */
     private fun formOfTarget(item: JsonElement): String? =
