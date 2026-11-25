@@ -68,6 +68,12 @@ class WordKnowledge(
         return spellings.any { it in known || (read[it]?.reads ?: 0) >= WordProgress.KNOWN }
     }
 
+    /**
+     * Whether the word [key] is new to the reader, in any spelling: never met in reading and not
+     * known otherwise either (marked as learned from a lookup or a list, or imported as known).
+     */
+    fun isNew(key: String): Boolean = !hasRead(key) && !isKnown(key)
+
     /** [learningForms] by first character, longest first. */
     private val formsByFirst: Map<Char, List<String>> by lazy {
         learningForms.filter { it.isNotEmpty() }.groupBy { it[0] }.mapValues { (_, forms) -> forms.sortedByDescending { it.length } }

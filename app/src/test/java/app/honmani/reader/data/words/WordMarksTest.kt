@@ -153,12 +153,19 @@ class WordMarksTest {
     }
 
     @Test
-    fun aWordLearnedInWordsButNeverReadIsNewAndKnownAtOnce() {
-        // 猫 was marked learned in Words and is not in any book read yet: the "+ New" grey and the hidden furigana both apply.
+    fun aWordMarkedLearnedButNeverReadIsKnownAndNotNew() {
+        // 猫 was marked learned and is not in any book read yet: no "+ New" grey, and its furigana can hide.
         val knowledge = WordKnowledge(read = emptyMap(), progress = emptyMap(), learning = emptySet(), known = setOf("猫"))
         val text = "猫"
         val marks = WordMarks.of(text, segmenter, knowledge, WordMarksMode.NEW, knownWords = true).map { it.kind }
-        assertEquals(listOf(WordMark.Kind.NEW, WordMark.Kind.KNOWN), marks)
+        assertEquals(listOf(WordMark.Kind.KNOWN), marks)
+        // Nor does it count as a sentence's unknown word: 鼬 is the only one here.
+        val sentence = "猫は鼬を"
+        val found = WordMarks.of(sentence, segmenter, knowledge, WordMarksMode.NEW, sentences = true)
+        assertEquals(
+            listOf("は" to WordMark.Kind.NEW, "鼬" to WordMark.Kind.NEW, "を" to WordMark.Kind.NEW, sentence to WordMark.Kind.SENTENCE),
+            found.map { sentence.substring(it.start, it.start + it.length) to it.kind },
+        )
     }
 
     @Test

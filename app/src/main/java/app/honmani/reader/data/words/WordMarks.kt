@@ -10,7 +10,7 @@ enum class WordMarksMode(val storage: String) {
     /** Words looked up and not known yet. */
     LEARNING("learning"),
 
-    /** Those, and words the reader has never met ([WordMark.Kind.NEW]). */
+    /** Those, and words new to the reader ([WordMark.Kind.NEW]). */
     NEW("new"),
     ;
 
@@ -27,7 +27,7 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
         /** Looked up and not known yet (`WordProgress`). */
         LEARNING,
 
-        /** Never met in reading. */
+        /** Never met in reading and not known otherwise ([WordKnowledge.isNew]). */
         NEW,
 
         /** A word the reader knows ([WordKnowledge.isKnown]): the reader hides its furigana. */
@@ -43,9 +43,9 @@ data class WordMark(val start: Int, val length: Int, val kind: Kind) {
 
 /**
  * The words to mark in the reader, split as books are graded ([Segmenter]). A new word is one the
- * reader has never met, not one the vocabulary estimate guesses they don't know: a mark is a claim
- * about one word, which a guess about frequency bands can't make. A new reader's first pages are
- * mostly marked; the particles and other common words lose their marks within a few pages.
+ * reader has never met and has not marked as known, not one the vocabulary estimate guesses they
+ * don't know: a mark is a claim about one word, which a guess about frequency bands can't make. A
+ * new reader's first pages are mostly marked; the particles and other common words lose their marks within a few pages.
  */
 object WordMarks {
     fun of(
@@ -96,11 +96,10 @@ object WordMarks {
             val kind = when {
                 isDue(token.key, due, knowledge) -> WordMark.Kind.DUE
                 tint && knowledge.isLearning(token.key) -> WordMark.Kind.LEARNING
-                tint && mode == WordMarksMode.NEW && !knowledge.hasRead(token.key) -> WordMark.Kind.NEW
+                tint && mode == WordMarksMode.NEW && knowledge.isNew(token.key) -> WordMark.Kind.NEW
                 else -> null
             }
             if (kind != null) marks += WordMark(token.start, token.length, kind)
-            // Also for a word marked learned in Words and never read: it is new and known at once.
             if (knownWords && knowledge.isKnown(token.key)) marks += WordMark(token.start, token.length, WordMark.Kind.KNOWN)
         }
         if (sentences) marks += oneUnknownSentences(text, tokens, knowledge, sentenceEnds)
@@ -117,9 +116,9 @@ object WordMarks {
     private const val MAX_SENTENCE = 400
 
     /**
-     * The sentences of [text] that hold exactly one word the reader does not know: one never met in
-     * reading or being learned (a form looked up counts as written). Grammar words and text no
-     * dictionary knows (names) are not counted.
+     * The sentences of [text] that hold exactly one word the reader does not know: a new one
+     * ([WordKnowledge.isNew]) or one being learned (a form looked up counts as
+     * written). Grammar words and text no dictionary knows (names) are not counted.
      */
     private fun oneUnknownSentences(text: String, tokens: List<Token>, knowledge: WordKnowledge, sentenceEnds: String): List<WordMark> {
         val ends = tokens.mapTo(HashSet()) { it.start + it.length }
@@ -132,7 +131,7 @@ object WordMarks {
                 unknown += token.start
                 formEnd = token.start + form.length
             } else if (token.rank != Token.UNKNOWN && token.rank > GRAMMAR_RANK_LIMIT && !knowledge.isIgnored(token.key) &&
-                (knowledge.isLearning(token.key) || !knowledge.hasRead(token.key))
+                (knowledge.isLearning(token.key) || knowledge.isNew(token.key))
             ) {
                 unknown += token.start
             }
