@@ -182,7 +182,7 @@ class Segmenter(private val lexicon: Lexicon, private val maxCached: Int = MAX_C
         private val UNKNOWN_COST = costOf(RARE_RANK) + 4
 
         /** How much less likely than a plain word undoing [inflections] makes a reading. */
-        private fun inflectionCost(inflections: List<Inflection>, katakana: Boolean): Double {
+        internal fun inflectionCost(inflections: List<Inflection>, katakana: Boolean): Double {
             var cost = if (katakana && inflections.isNotEmpty()) KATAKANA_INFLECTION_COST else 0.0
             for ((index, inflection) in inflections.withIndex()) {
                 cost += when (inflection) {

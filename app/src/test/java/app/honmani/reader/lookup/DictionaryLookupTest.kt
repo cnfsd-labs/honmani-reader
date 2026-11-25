@@ -218,6 +218,82 @@ class DictionaryLookupTest {
         assertEquals("いる", lookup.lookup("いました").entries.first().term.expression)
     }
 
+    /** Jiten's ranks: ㋕ marks the rank of the word written in kana. */
+    private suspend fun jiten(vararg rows: Triple<String, String, String>) {
+        val bank = rows.joinToString(",", "[", "]") { (expression, reading, display) ->
+            """["$expression","freq",{"reading":"$reading","frequency":{"value":${display.trimEnd('㋕')},"displayValue":"$display"}}]"""
+        }
+        val files = mapOf("index.json" to index("Jiten", extra = ",\"frequencyMode\":\"rank-based\""), "term_meta_bank_1.json" to bank)
+        DictionaryImporter(database).import(writeZip(temp.root, files, "jiten.zip"))
+    }
+
+    private suspend fun first(text: String) = lookup.lookup(text).entries.first().let { it.term.expression to it.source }
+
+    @Test
+    fun textInKanaShowsTheWordMostCommonInKana() = runTest {
+        install(
+            "JMdict",
+            listOf("板", "いた", "n", 10, "board"),
+            listOf("居る", "いる", "v1", 10, "to be"),
+            listOf("なう", "なう", "v5", 10, "to twist"),
+            listOf("成る", "なる", "v5", 10, "to become"),
+            listOf("軟化", "なんか", "n", 10, "softening"),
+            listOf("なんか", "なんか", "", 10, "things like"),
+            listOf("此", "これ", "", 10, "this (rare)"),
+            listOf("或る", "ある", "", 10, "a certain"),
+            listOf("或る", "わくる", "", 10, "invented reading"),
+        )
+        assertEquals("板" to "いた", first("いた"))
+        jiten(
+            Triple("板", "いた", "5594"), Triple("板", "いた", "10729㋕"),
+            Triple("居る", "いる", "37㋕"), Triple("居る", "いる", "3276"),
+            Triple("なう", "なう", "36734㋕"),
+            Triple("成る", "なる", "19㋕"), Triple("成る", "なる", "9472"),
+            Triple("軟化", "なんか", "31834"), Triple("軟化", "なんか", "36224㋕"),
+            Triple("なんか", "なんか", "118814㋕"),
+            Triple("或る", "ある", "609㋕"), Triple("或る", "ある", "53389"), Triple("或る", "わくる", "20000"),
+        )
+
+        assertEquals("居る" to "いた", first("いた"))
+        assertEquals("成る" to "なって", first("なって"))
+        // Automatic counts miss words like なんか: the entry written so comes first.
+        assertEquals("なんか" to "なんか", first("なんか"))
+        // In kanji, the rank in kana does not count.
+        assertEquals("板" to "板", first("板"))
+        assertEquals("わくる", lookup.lookup("或る").entries.first().term.reading)
+    }
+
+    @Test
+    fun aMatchThatEndsInsideTheNextWordRanksBelowTheShorterOnes() = runTest {
+        install(
+            "JMdict",
+            listOf("事", "こと", "n", 10, "thing"),
+            listOf("琴柱", "ことじ", "n", 10, "bridge of a koto"),
+            listOf("もの", "もの", "n", 10, "thing"),
+            listOf("もので", "もので", "", 10, "because"),
+            listOf("無い", "ない", "adj-i", 10, "not"),
+            listOf("飲む", "のむ", "v5", 10, "to drink"),
+            listOf("何処", "どこ", "n", 10, "where"),
+            listOf("どこか", "どこか", "n", 10, "somewhere"),
+            listOf("居る", "いる", "v1", 10, "to be"),
+            listOf("いたこ", "いたこ", "n", 10, "medium"),
+            listOf("先生", "せんせい", "n", 10, "teacher"),
+            listOf("先", "さき", "n", 10, "tip"),
+        )
+
+        assertEquals("事" to "こと", first("ことじゃない"))
+        assertEquals("琴柱" to "ことじ", first("ことじが"))
+        assertEquals("もの" to "もの", first("ものですが"))
+        assertEquals("もので" to "もので", first("もので、"))
+        // The same entry over the part that is its own.
+        assertEquals("無い" to "ない", first("ないでしょう"))
+        assertEquals("飲む" to "飲んで", first("飲んですぐ"))
+        assertEquals("何処" to "どこ", first("どこから"))
+        assertEquals("どこか" to "どこか", first("どこからしい"))
+        assertEquals("居る" to "いた", first("いたこと"))
+        assertEquals("先生" to "先生", first("先生ー"))
+    }
+
     @Test
     fun anEntryWithoutWordClassesBorrowsThoseOfTheSameWordInAnotherDictionary() = runTest {
         jmdict()

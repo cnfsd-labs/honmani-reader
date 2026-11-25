@@ -14,6 +14,9 @@ import app.honmani.reader.data.dictionary.TermEntity
 import app.honmani.reader.data.dictionary.TermKey
 import app.honmani.reader.data.dictionary.TermMetaDao
 import app.honmani.reader.data.dictionary.TermMetaEntity
+import app.honmani.reader.data.difficulty.LexiconLoader
+import app.honmani.reader.data.difficulty.Segmenter
+import kotlin.math.ln
 
 /** A dictionary entry that matches the start of the looked-up text. */
 data class LookupEntry(
@@ -50,6 +53,12 @@ data class WordMeta(
     val frequencies: List<Frequency> = emptyList(),
     /** Downstep positions in morae (0: no downstep), from the first pitch dictionary that has them. */
     val pitches: List<Int> = emptyList(),
+    /**
+     * The best rank of the word written in kana, from lists that mark those (Jiten's "37㋕"), and
+     * of the word as the dictionary writes it; null if no list says.
+     */
+    val kanaRank: Double? = null,
+    val writtenRank: Double? = null,
 ) {
     /** The best rank among the frequency dictionaries, for ordering; null if none ranks the word. */
     val rank: Double? get() = frequencies.mapNotNull { it.rank }.minOrNull()
@@ -169,7 +178,9 @@ class DictionaryLookup(
                     (candidatesByText[term.reading].orEmpty().map { it to false })
                 matches
                     .filter { (candidate, _) -> candidate.deinflection.fits(termClasses) }
-                    .maxWithOrNull(matchOrder)
+                    .maxWithOrNull(
+                        compareBy<Pair<Candidate, Boolean>> { !cutsNextWord(it.first.source, text) }.then(matchOrder),
+                    )
                     ?.let { (candidate, matchedExpression) ->
                         LookupEntry(
                             term = term,
@@ -228,7 +239,23 @@ class DictionaryLookup(
         val furiganaDecides = entries.any { it.matchesFurigana }
         fun contradicted(entry: LookupEntry) =
             furiganaDecides && !entry.matchesFurigana && readingPrefix(entry.source) != null
+        fun metaOf(entry: LookupEntry) = meta[metaKey(entry.term.expression, entry.term.reading)]
+        // In kana a word is as likely as it is common in kana, and somewhat less the more grammar
+        // has to be undone: いた is the past of いる, not 板 or 痛. Only with a list that says how
+        // common words are in kana.
+        val kanaRanks = meta.values.any { it.kanaRank != null }
+        fun kanaCost(entry: LookupEntry): Double = when {
+            !kanaRanks || !entry.source.all(JapaneseText::isKana) -> 0.0
+            DictionaryCatalog.isNames(entry.dictionary.title) -> Double.MAX_VALUE
+            else -> ln(metaOf(entry)?.kanaRank ?: Segmenter.RARE_RANK.toDouble()) +
+                (if (entry.matchedExpression && entry.inflections.isEmpty()) -KANA_ENTRY_BONUS else 0.0) +
+                Segmenter.inflectionCost(entry.inflections, entry.source.all(Segmenter::isKatakana))
+        }
+        // The rank of 或る in kana says nothing about 或る.
+        fun rankAsWritten(entry: LookupEntry): Double = metaOf(entry)
+            ?.let { if (entry.source.all(JapaneseText::isKana)) it.rank else it.writtenRank ?: it.rank } ?: Double.MAX_VALUE
         val order = compareBy<LookupEntry> { contradicted(it) }
+            .thenBy { cutsNextWord(it.source, text) }
             .thenByDescending { it.source.length }
             // A pointer whose target is missing says nothing itself.
             .thenBy { it.term.id in pointers }
@@ -237,13 +264,14 @@ class DictionaryLookup(
             // The short causative (読ます) after other readings of the same text: its ます forms
             // are also polite forms, and in fewer steps, so しました would be 占む, いました 忌む.
             .thenBy { Inflection.CAUSATIVE_SHORT in it.inflections }
+            .thenBy { kanaCost(it) }
             .thenBy { it.inflections.size }
             .thenByDescending { it.matchedExpression }
             // A name (JMnedict) after the ordinary words of the same match, however the dictionaries
             // are ordered: a surname is rarely what the reader wants from a common word.
             .thenBy { DictionaryCatalog.isNames(it.dictionary.title) }
             // The more common word first (by the frequency dictionaries, if any are installed).
-            .thenBy { meta[metaKey(it.term.expression, it.term.reading)]?.rank ?: Double.MAX_VALUE }
+            .thenBy { rankAsWritten(it) }
             .then(entryOrder)
         return LookupResult(entries.sortedWith(order), meta = meta)
     }
@@ -527,7 +555,10 @@ class DictionaryLookup(
                 .distinct()
                 .ifEmpty { null }
         }.orEmpty()
-        return WordMeta(frequencies, pitches)
+        val (kana, written) = rows
+            .filter { it.kind == TermMetaEntity.Kind.FREQUENCY && it.value != null && dictionaries.getValue(it.dictionaryId).ranksFrequency }
+            .partition { LexiconLoader.isKanaRank(it.display) }
+        return WordMeta(frequencies, pitches, kana.minOfOrNull { it.value!! }, written.minOfOrNull { it.value!! })
     }
 
     /** Whether lower frequency values of this dictionary mean more common words. */
@@ -614,6 +645,22 @@ class DictionaryLookup(
         }
     }
 
+    /**
+     * Whether [source] at the start of [text] surely ends inside another word: before a small kana
+     * (琴柱 in ことじゃ), or with the first half of です, から or こと (もので in ものです, いすか in
+     * いすから, いたこ in いたこと). Such a match ranks below the shorter ones.
+     */
+    private fun cutsNextWord(source: String, text: String): Boolean {
+        val rest = text.substring(source.length)
+        if (rest.isEmpty()) return false
+        return rest[0] in SMALL_KANA || when (source.last()) {
+            'で' -> DESU.matchesAt(rest, 0)
+            'か' -> source.length > 1 && rest[0] == 'ら' && !rest.startsWith("らし")
+            'こ' -> source.length > 2 && rest[0] == 'と' && source[source.length - 2] in "たる"
+            else -> false
+        }
+    }
+
     private fun isWordCharacter(codePoint: Int): Boolean =
         JapaneseText.isKanji(codePoint) || codePoint == '々'.code ||
             (Character.isBmpCodePoint(codePoint) && JapaneseText.isKana(codePoint.toChar()))
@@ -646,8 +693,20 @@ class DictionaryLookup(
         /** Light rows a search reads per prefix or pattern and column, to rank by frequency. */
         const val SEARCH_KEY_LIMIT = 200
 
+        /**
+         * For an entry written as the kana text, uninflected: lists that split text automatically
+         * count such words (なんか, いと) too rarely. Tuned on 12 Aozora Bunko works.
+         */
+        const val KANA_ENTRY_BONUS = 2.0
+
         /** Matches the tap bridge's scan length. */
         const val MAX_SOURCE_LENGTH = 20
+
+        /** Kana that never start a word, nor stretch the one before (先生ー, だめぇ). */
+        const val SMALL_KANA = "ゃゅょャュョ"
+
+        /** What follows で in です and its forms, but not a word after で (飲んですぐ). */
+        val DESU = Regex("しょ|した|す(?:$|[^ぁ-ん]|[かがけさしぜぞとなねのよわ])")
 
         /** Hiragana after a kanji that are particles rather than okurigana. */
         const val PARTICLES = "はがをにへとでものや"

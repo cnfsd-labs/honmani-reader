@@ -59,7 +59,7 @@ public: never copy those notes, personal details or discussions into it.
   framework `MediaSession`, no media3) only shows and controls what the reader screen plays
   (`PlaybackHub`); leaving the book for the library or closing the app ends it. Off = pause on ON_STOP.
 - **Lookup:** tap-based, scan length 20, longest match first, except an entry the book's furigana
-  contradicts ranks below those it agrees with; a tap inside a ruby base scans from the base's start only
+  contradicts ranks below those it agrees with; a match that ends inside the next word (もので in ものです, `cutsNextWord`) ranks below the shorter ones; text in kana ranks by how common a word is in kana (Jiten's ㋕) plus the Segmenter's inflection cost; a tap inside a ruby base scans from the base's start only
   when the best entry there covers the whole base with its furigana; own deinflection (`lookup/Deinflector`; an entry without word classes borrows those of the same
   expression+reading in another dictionary, else matches uninflected text only); glossaries
   stored deflated (`GlossaryPacker`).
