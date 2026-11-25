@@ -13,6 +13,7 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -39,6 +40,15 @@ class WorkManagerDictionaryImportSchedulerTest {
             context,
             Configuration.Builder().setExecutor(SynchronousExecutor()).setWorkerFactory(factory).build(),
         )
+    }
+
+    /**
+     * A worker left running is ended by the garbage collector, which then uses WorkManager's closed
+     * database and fails whichever test runs next (UncaughtExceptionsBeforeTest).
+     */
+    @After
+    fun stopWorkers() {
+        WorkManager.getInstance(context).cancelAllWork().result.get()
     }
 
     private val dictionary = DictionaryCatalog.dictionaries.first()
