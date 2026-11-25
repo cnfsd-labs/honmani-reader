@@ -10,12 +10,13 @@ import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 
 /**
- * Japanese text files come in UTF-8, Shift_JIS (most Aozora Bunko originals), EUC-JP and UTF-16,
- * often without a byte order mark. ッツ Ebook Reader reads them as UTF-8 only, so the library
+ * Japanese text files come in UTF-8, Shift_JIS (most Aozora Bunko originals), EUC-JP, UTF-16 and
+ * (old ones) JIS, often without a byte order mark. ッツ Ebook Reader reads them as UTF-8 only, so the library
  * stores every text file as UTF-8.
  */
 object TextEncoding {
     private const val SAMPLE_BYTES = 64 * 1024
+    private val JIS_ESCAPES = listOf("\u001B\u0024B", "\u001B\u0024@")
 
     /**
      * The longest Japanese novels are about 10 MB of text (3 bytes per character). The file is
@@ -67,6 +68,10 @@ object TextEncoding {
             bytes.startsWith(0xFF, 0xFE) -> return Charsets.UTF_16LE
         }
         val sample = bytes.copyOf(minOf(bytes.size, SAMPLE_BYTES))
+        // JIS is ASCII bytes only, so it would pass as UTF-8; its escapes are in no other text.
+        if (sample.all { it >= 0 } && JIS_ESCAPES.any { it in String(sample, Charsets.US_ASCII) }) {
+            charset("ISO-2022-JP")?.let { return it }
+        }
         // Valid UTF-8 of any length is almost never another encoding by accident. A file cut
         // inside its last character (an interrupted download) still counts.
         if (decodes(sample, Charsets.UTF_8, complete = false)) return Charsets.UTF_8

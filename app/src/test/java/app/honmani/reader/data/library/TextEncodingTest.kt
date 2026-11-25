@@ -62,6 +62,12 @@ class TextEncodingTest {
     }
 
     @Test
+    fun jisIsNotTakenForAscii() {
+        val text = "吾輩は猫である。\r\n名前はまだ無い。"
+        assertEquals(text, roundTrip(text.toByteArray(Charset.forName("ISO-2022-JP"))).second)
+    }
+
+    @Test
     fun aLongShiftJisFileCutInsideACharacterIsStillShiftJis() {
         val long = text.repeat(40) // well over the 64 KB sample
         assertEquals(long, roundTrip(long.toByteArray(Charset.forName("windows-31j"))).second)
