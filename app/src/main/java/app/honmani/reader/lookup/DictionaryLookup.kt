@@ -3,7 +3,6 @@ package app.honmani.reader.lookup
 import app.honmani.reader.data.dictionary.DictionaryCatalog
 import app.honmani.reader.data.dictionary.DictionaryDao
 import app.honmani.reader.data.dictionary.DictionaryEntity
-import app.honmani.reader.data.dictionary.Glossary
 import app.honmani.reader.data.dictionary.GlossIndex
 import app.honmani.reader.data.dictionary.GlossaryPacker
 import app.honmani.reader.data.dictionary.KanjiDao
@@ -128,7 +127,7 @@ class DictionaryLookup(
     /** [term] with its glossary unpacked, so [Glossary.json] reads it. */
     private suspend fun unpacked(term: TermEntity, dictionary: DictionaryEntity): TermEntity =
         if (term.glossary.isPacked) {
-            term.copy(glossary = Glossary.plain(GlossaryPacker.unpack(term.glossary, presetOf(dictionary))))
+            term.copy(glossary = GlossaryPacker.unpacked(term.glossary, presetOf(dictionary)))
         } else {
             term
         }

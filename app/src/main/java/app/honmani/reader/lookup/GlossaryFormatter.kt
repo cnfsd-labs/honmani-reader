@@ -30,16 +30,20 @@ object GlossaryFormatter {
     /** Parts of a wty sense item that are not its meaning: labels, examples, links. */
     private val skippedInSense = setOf("tags", "tag", "backlink", "related-words", "synonyms", "antonyms")
 
-    fun format(glossary: String): List<Sense> {
-        val definitions = try {
+    /** The definitions in [glossary]; none if it is no JSON array. */
+    fun definitions(glossary: String): JsonArray =
+        try {
             json.parseToJsonElement(glossary) as? JsonArray
         } catch (_: SerializationException) {
             null
         } catch (_: IllegalArgumentException) {
             null
-        } ?: return emptyList()
-        return definitions.flatMap { senses(it) }.filter { it.glosses.isNotEmpty() }
-    }
+        } ?: JsonArray(emptyList())
+
+    fun format(glossary: String): List<Sense> = format(definitions(glossary))
+
+    fun format(definitions: JsonArray): List<Sense> =
+        definitions.flatMap { senses(it) }.filter { it.glosses.isNotEmpty() }
 
     private fun senses(definition: JsonElement): List<Sense> = when (definition) {
         is JsonPrimitive -> listOf(Sense(listOfNotNull(definition.contentOrNullIfBlank())))

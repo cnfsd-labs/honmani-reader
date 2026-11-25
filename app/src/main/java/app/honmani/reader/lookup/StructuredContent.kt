@@ -1,8 +1,6 @@
 package app.honmani.reader.lookup
 
 import java.net.URLDecoder
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -42,24 +40,15 @@ sealed interface GlossNode {
  * (the examples themselves stay).
  */
 object StructuredContent {
-    private val json = Json { ignoreUnknownKeys = true }
-
     /** Roles of parts that are not shown. */
     private val skippedRoles = setOf(
         "attribution", "attribution-footnote", "forms", "graphic", "backlink", "preamble", "summary-entry",
     )
     private val skippedTags = setOf("img", "rp", "script", "style")
 
-    fun parse(glossary: String): List<GlossNode> {
-        val definitions = try {
-            json.parseToJsonElement(glossary) as? JsonArray
-        } catch (_: SerializationException) {
-            null
-        } catch (_: IllegalArgumentException) {
-            null
-        } ?: return emptyList()
-        return definitions.mapNotNull(::definition)
-    }
+    fun parse(glossary: String): List<GlossNode> = parse(GlossaryFormatter.definitions(glossary))
+
+    fun parse(definitions: JsonArray): List<GlossNode> = definitions.mapNotNull(::definition)
 
     private fun definition(element: JsonElement): GlossNode? = when (element) {
         is JsonPrimitive -> element.text()?.let { block(GlossNode.Text(it)) }

@@ -107,6 +107,19 @@ class GlossLayoutTest {
     }
 
     @Test
+    fun onlyFormOfEntriesWithoutANegativeSequencePointElsewhere() {
+        val formOf = """["食べる",["past"]]"""
+        assertEquals("食べる", Redirect.target(1, "[$formOf]")?.word)
+        assertEquals("食べる", Redirect.target(null, " [\n  $formOf, $formOf ]")?.word)
+        assertNull(Redirect.target(1, """[$formOf,"to eat"]"""))
+        assertNull(Redirect.target(1, """["to eat",$formOf]"""))
+        assertNull(Redirect.target(1, "[]"))
+        assertNull(Redirect.target(null, ""))
+        assertNull(Redirect.target(1, "[[broken"))
+        assertEquals("食べる", Redirect.target(-1, """["to eat",$formOf]""")?.word)
+    }
+
+    @Test
     fun brokenGlossariesGiveNothing() {
         assertEquals(emptyList<String>(), render("not json"))
         assertEquals(emptyList<String>(), render("""[{"type":"image","path":"a.png"}]"""))

@@ -118,8 +118,12 @@ class GlossaryPacker(val preset: ByteArray) : AutoCloseable {
          * packed glossary that inflates to more than [maxBytes] throws [DataFormatException], so a
          * corrupt or hostile database row cannot fill the memory.
          */
-        fun unpack(glossary: Glossary, preset: ByteArray?, maxBytes: Int = MAX_UNPACKED_BYTES): String {
-            if (!glossary.isPacked) return glossary.json
+        fun unpack(glossary: Glossary, preset: ByteArray?, maxBytes: Int = MAX_UNPACKED_BYTES): String =
+            unpacked(glossary, preset, maxBytes).json
+
+        /** [glossary] as a plain one, as [unpack] reads it. */
+        fun unpacked(glossary: Glossary, preset: ByteArray?, maxBytes: Int = MAX_UNPACKED_BYTES): Glossary {
+            if (!glossary.isPacked) return glossary
             requireNotNull(preset) { "Packed glossary without a preset" }
             val inflater = Inflater(true)
             try {
@@ -127,16 +131,17 @@ class GlossaryPacker(val preset: ByteArray) : AutoCloseable {
                 inflater.setInput(bytes, 1, bytes.size - 1)
                 inflater.setDictionary(preset)
                 val output = ByteArrayOutputStream(minOf(bytes.size * 4, maxBytes))
+                output.write(Glossary.PLAIN.toInt())
                 val buffer = ByteArray(BUFFER_SIZE)
                 while (!inflater.finished()) {
                     val count = inflater.inflate(buffer)
                     if (count == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
                         throw DataFormatException("Truncated glossary")
                     }
-                    if (output.size() + count > maxBytes) throw DataFormatException("Glossary larger than $maxBytes bytes")
+                    if (output.size() - 1 + count > maxBytes) throw DataFormatException("Glossary larger than $maxBytes bytes")
                     output.write(buffer, 0, count)
                 }
-                return output.toString(Charsets.UTF_8.name())
+                return Glossary(output.toByteArray())
             } finally {
                 inflater.end()
             }

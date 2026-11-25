@@ -27,6 +27,8 @@ object Redirect {
 
     /** What an entry with [sequence] and [glossary] (JSON) points to; null if it is a real entry. */
     fun target(sequence: Long?, glossary: String): Target? {
+        // Most entries are neither, and reading all their definitions is most of a lookup's work.
+        if ((sequence == null || sequence >= 0) && !opensWithFormOf(glossary)) return null
         val items = try {
             Json.parseToJsonElement(glossary) as? JsonArray
         } catch (_: SerializationException) {
@@ -37,6 +39,16 @@ object Redirect {
         if (sequence == null || sequence >= 0) return null
         val word = formOf.firstNotNullOfOrNull { it } ?: items.firstNotNullOfOrNull(::linkTarget)
         return word?.let { Target(it, conjugated = false) }
+    }
+
+    /** Whether the first definition in [glossary] is an array, as a form-of item is. */
+    private fun opensWithFormOf(glossary: String): Boolean {
+        var i = 0
+        repeat(2) {
+            while (i < glossary.length && glossary[i].isWhitespace()) i++
+            if (i >= glossary.length || glossary[i++] != '[') return false
+        }
+        return true
     }
 
     /** Whether a form-of item's notes say the form is a conjugated one. */

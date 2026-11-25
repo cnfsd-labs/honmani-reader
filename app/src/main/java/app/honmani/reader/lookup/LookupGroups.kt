@@ -1,6 +1,7 @@
 package app.honmani.reader.lookup
 
 import app.honmani.reader.data.dictionary.TermEntity
+import kotlinx.serialization.json.JsonArray
 
 /** Senses of one entry from one dictionary. */
 data class DictionarySection(
@@ -63,11 +64,11 @@ object LookupGroups {
                         .values
                         .sortedWith(compareBy({ it.first().dictionary.priority }, { it.first().dictionary.title }))
                         .map { fromDictionary ->
+                            val shown = shown(fromDictionary.map { it.term })
                             DictionarySection(
                                 dictionaryTitle = fromDictionary.first().dictionary.title,
-                                senses = fromDictionary.filterNot { it.term.isFormsList() }
-                                    .flatMap { GlossaryFormatter.format(it.term.glossary.json) },
-                                lines = lines(fromDictionary.map { it.term }),
+                                senses = shown.flatMap { GlossaryFormatter.format(it.second) },
+                                lines = linesOf(shown),
                             )
                         },
                     frequencies = meta.frequencies,
@@ -104,15 +105,20 @@ object LookupGroups {
             match != null && match.senses.isNotEmpty() && match.senses == section.senses
         }
 
+    /** The [terms] that are shown, with their definitions. */
+    private fun shown(terms: List<TermEntity>): List<Pair<TermEntity, JsonArray>> =
+        terms.filterNot { it.isFormsList() }.map { it to GlossaryFormatter.definitions(it.glossary.json) }
+
+    internal fun lines(terms: List<TermEntity>): List<GlossLine> = linesOf(shown(terms))
+
     /**
-     * The definitions of [terms] (one dictionary's entries for a word) as lines. Entries split
+     * The definitions of [shown] (one dictionary's entries for a word) as lines. Entries split
      * into one sense each (as JMdict does) are numbered; a dictionary that keeps word classes
      * in its definition tags (JMdict) shows them as tags.
      */
-    internal fun lines(terms: List<TermEntity>): List<GlossLine> {
-        val shown = terms.filterNot { it.isFormsList() }
-        val perTerm = shown.map { term ->
-            val lines = GlossLayout.lines(StructuredContent.parse(term.glossary.json))
+    private fun linesOf(shown: List<Pair<TermEntity, JsonArray>>): List<GlossLine> {
+        val perTerm = shown.map { (term, definitions) ->
+            val lines = GlossLayout.lines(StructuredContent.parse(definitions))
             val tags = term.definitionTags.orEmpty().split(' ')
                 .filter { it.isNotBlank() && it.toIntOrNull() == null }
             if (tags.isEmpty() || lines.any { line -> line.items.any { it is GlossItem.Tag } } || lines.isEmpty()) {
