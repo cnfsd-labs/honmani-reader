@@ -204,6 +204,7 @@ class ProgressSyncTest {
 
             assertNull(pulled)
             assertTrue("Waited $tookMs ms", tookMs < 3_000)
+            assertEquals(SyncFailure.Kind.NETWORK, status.state.value.failure?.reason)
             held.forEach { it.close() }
         }
     }
@@ -227,6 +228,7 @@ class ProgressSyncTest {
 
         assertNull(pulled)
         assertTrue("Waited $tookMs ms", tookMs < 1_500)
+        assertNull(status.state.value.failure)
     }
 
     @Test

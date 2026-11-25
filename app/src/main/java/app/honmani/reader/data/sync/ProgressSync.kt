@@ -6,6 +6,7 @@ import app.honmani.reader.data.library.BookEntity
 import app.honmani.reader.data.library.BookFormat
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -218,9 +219,18 @@ class ProgressSync(
         if (book.format != BookFormat.EPUB) return null
         // The request blocks in HttpURLConnection, which a timeout cannot interrupt: it runs on
         // its own and is left behind when the deadline passes (its answer is dropped).
-        val lookup = CoroutineScope(currentCoroutineContext().minusKey(Job)).async { find(account, book, ttuId, bookmark) }
+        val waiting = AtomicBoolean()
+        val lookup = CoroutineScope(currentCoroutineContext().minusKey(Job)).async {
+            find(account, book, ttuId, bookmark, waiting)
+        }
         return try {
-            withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
+            val found = withTimeoutOrNull(pullTimeoutMs) { lookup.await() }
+            // Reading the book slowly, before or after the request, is no server problem.
+            if (found == null && waiting.get()) {
+                Log.i(TAG, "No progress sync for this book: no answer in $pullTimeoutMs ms")
+                status?.failed(KoSyncException(KoSyncException.Reason.NETWORK, "No answer in time"), ttuId)
+            }
+            found
         } catch (e: IOException) {
             Log.i(TAG, "No progress sync for this book: ${e.message}")
             status?.failed(e, ttuId)
@@ -235,9 +245,12 @@ class ProgressSync(
         book: BookEntity,
         ttuId: Long?,
         bookmark: suspend () -> Pair<Long?, Long>,
+        waiting: AtomicBoolean,
     ): Found {
         val document = document(book) ?: return Found.None
+        waiting.set(true)
         val remote = client.progress(account, document.id)
+        waiting.set(false)
         status?.succeeded()
         val (local, savedAt) = bookmark()
         if (ttuId != null) local?.let { synchronized(synced) { synced[ttuId] = it } }
