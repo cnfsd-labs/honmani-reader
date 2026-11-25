@@ -13,9 +13,7 @@ plugins {
 
 android {
     namespace = "app.honmani.reader"
-    compileSdk {
-        version = release(37) { minorApiLevel = 2 }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "app.honmani.reader"

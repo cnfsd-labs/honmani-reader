@@ -9,8 +9,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.SliderState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import java.text.NumberFormat
@@ -200,8 +202,7 @@ private fun timeLeft(place: MenuPlace, left: Long): String {
 @OptIn(ExperimentalMaterial3Api::class)
 private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
     val total = place?.total ?: 0
-    val slider = remember(place) { SliderState(value = place?.let { BookPlace.fraction(it.characters, it.total) } ?: 0f) }
-    val fraction = slider.value
+    var fraction by remember(place) { mutableFloatStateOf(place?.let { BookPlace.fraction(it.characters, it.total) } ?: 0f) }
     val characters = BookPlace.charactersAt(fraction, total)
     val numbers = NumberFormat.getIntegerInstance()
     val label = stringResource(R.string.reader_menu_slider)
@@ -216,9 +217,9 @@ private fun PlaceSlider(place: MenuPlace?, onJump: (Long) -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
         )
         Slider(
-            state = slider,
-            onValueChange = { slider.value = it },
-            onValueChangeFinished = { onJump(BookPlace.charactersAt(slider.value, total)) },
+            value = fraction,
+            onValueChange = { fraction = it },
+            onValueChangeFinished = { onJump(BookPlace.charactersAt(fraction, total)) },
             enabled = place != null && total > 0,
             // No dot at the end of the track.
             track = { state -> SliderDefaults.Track(sliderState = state, enabled = place != null && total > 0, drawStopIndicator = null) },

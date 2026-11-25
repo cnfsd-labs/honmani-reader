@@ -13,6 +13,10 @@ updates:
       androidx:
         patterns:
           - "androidx.*"
+    ignore:
+      # material3 1.5.0: the reader menu swiped up to full height ignores taps. Try the next version again.
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: ["2026.11.01"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
