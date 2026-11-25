@@ -1,7 +1,9 @@
 package app.honmani.reader.data.backup
 
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -33,7 +35,7 @@ class RestoredBooksTest {
         file.resolve("inner").writeText("x")
         val restored = RestoredBooks(file)
 
-        restored.addWaiting(listOf(WaitingBook(key = "waiting", id = -1)))
+        assertThrows(IOException::class.java) { restored.addWaiting(listOf(WaitingBook(key = "waiting", id = -1))) }
         restored.setPosition("a", RestoredPosition(100, 0.1f))
 
         assertEquals(emptyList<WaitingBook>(), restored.waiting())

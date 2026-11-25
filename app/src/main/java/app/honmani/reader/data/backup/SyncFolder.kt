@@ -3,7 +3,6 @@ package app.honmani.reader.data.backup
 import android.content.SharedPreferences
 import app.honmani.reader.diagnostics.logWarning
 import java.io.ByteArrayOutputStream
-import java.security.MessageDigest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -291,7 +290,7 @@ class SyncFolder(
         pruneTombstones(now() - TOMBSTONE_KEEP_MS)
         val id = installationId()
         val file = export(SyncIdentity(id, deviceName))
-        val fingerprint = fingerprint(file)
+        val fingerprint = BackupCodec.fingerprint(file)
         val name = fileName(id)
         // The file may have been deleted from the folder since: then it is written again.
         if (device.getString(KEY_FINGERPRINT, null) == fingerprint && target.find(folder, name) != null) return
@@ -314,13 +313,6 @@ class SyncFolder(
          * A reader of the folder ignores names that start with a dot.
          */
         fun tempName(installationId: String) = ".honmani-sync-$installationId.part.zip"
-
-        /** What the content is, without when it was written: the same data gives the same value. */
-        private fun fingerprint(file: BackupFile): String {
-            val json = BackupCodec.toJson(file.copy(exportedAt = 0))
-            return MessageDigest.getInstance("SHA-256").digest(json.toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
-        }
 
         /** Another phone's file: no temporary file or a folder app's conflict copy ("name (1).zip", "name.sync-conflict-….zip"). */
         private val OTHER_FILE = Regex("^honmani-sync-[^. ]+\\.zip$")

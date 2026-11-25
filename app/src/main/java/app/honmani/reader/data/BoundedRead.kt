@@ -1,6 +1,7 @@
 package app.honmani.reader.data
 
 import java.io.ByteArrayOutputStream
+import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 
@@ -26,4 +27,19 @@ fun InputStream.readBytesAtMost(limit: Int): ByteArray {
         remaining -= read
     }
     return out.toByteArray()
+}
+
+/** Reads [input] as it comes, for data too large to hold twice; throws [TooLargeException] after [limit] bytes. */
+class BoundedInputStream(input: InputStream, private val limit: Long) : FilterInputStream(input) {
+    private var count = 0L
+
+    override fun read(): Int = super.read().also { if (it >= 0) counted(1) }
+
+    override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
+        super.read(buffer, offset, length).also { if (it > 0) counted(it) }
+
+    private fun counted(bytes: Int) {
+        count += bytes
+        if (count > limit) throw TooLargeException(limit)
+    }
 }

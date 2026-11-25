@@ -49,6 +49,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -101,7 +102,8 @@ class BackupTest {
         private val files = folder.newFolder(name)
         val stretches = ReadStretchStore(files.resolve("read-stretches.txt"))
         val progress = WordProgressStore(files.resolve("word-progress.json"))
-        val restored = RestoredBooks(files.resolve("restored-books.json"))
+        val restoredFile = files.resolve("restored-books.json")
+        val restored = RestoredBooks(restoredFile)
         val words = WordRepository(database, now = { 1_800_000_000_000L })
         val backup = Backup(
             database = database,
@@ -930,6 +932,52 @@ class BackupTest {
 
         assertNull(new.words.find("猫", "よみ")!!.ankiNoteId)
         assertNull(old.backup.export(readerSettings = null).words.first { it.expression == "猫" }.ankiNoteId)
+    }
+
+    @Test
+    fun statisticsDoNotStayUnderIdsOfBooksThatCouldNotBeNoted() = runTest {
+        val backup = throughFile(oldPhone().backup.export(readerSettings = null))
+        val new = Phone("new")
+        // A non-empty directory cannot be replaced by the file, so the write fails.
+        new.restoredFile.resolve("inner").mkdirs()
+
+        assertTrue(runCatching { new.backup.restore(backup) }.isFailure)
+        assertTrue(new.days().isEmpty())
+        assertTrue(new.database.backupDao().words().isEmpty())
+
+        new.restoredFile.deleteRecursively()
+        new.backup.restore(backup)
+        assertTrue(new.days().isNotEmpty())
+        val known = new.restored.waiting().map { it.id }.toSet()
+        assertTrue(new.days().all { it.bookId in known })
+    }
+
+    @Test
+    fun aLongTimeReadersBackupIsWrittenAndReadAgain() {
+        // 15,000 looked-up words with 4 sentences each, 10,000 known words, 100,000 counted lookups.
+        val sentence = "吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。"
+        val words = List(25_000) { i ->
+            BackupWord(
+                expression = "語$i", reading = "ご$i", gloss = "a word, number $i", status = "LEARNING", lookupCount = 4, firstLookedUpAt = i.toLong(),
+                lastLookedUpAt = i + 1L, rankKey = i / 3.0, lastSentence = sentence, lastSurfaceStart = 0, lastSurfaceEnd = 2,
+                progress = BackupWordStep(3, 4, 5, learned = false),
+                lookups = List(if (i < 15_000) 4 else 0) { BackupWordLookup("語$i", "$i.$it $sentence", 0, 2, "hash-a", "吾輩は猫である", 5L * i + it, position = i.toLong()) },
+            )
+        }
+        val backup = BackupFile(exportedAt = 1, words = words, lookupEvents = List(100_000) { BackupLookupEvent(1_700_000_000_000L + it, "hash-a") })
+        val bytes = ByteArrayOutputStream().also { BackupCodec.write(backup, it) }.toByteArray()
+
+        // Above the old limit of 32 MB that such a file could be written but not read with.
+        assertTrue(BackupCodec.toJson(backup).toByteArray().size > 32 * 1024 * 1024)
+        assertTrue(bytes.size < AutoBackup.MAX_BYTES)
+        assertEquals(backup, BackupCodec.read(ByteArrayInputStream(bytes)))
+    }
+
+    @Test
+    fun theFingerprintIgnoresWhenTheBackupWasMade() {
+        val backup = BackupFile(exportedAt = 1, folders = listOf("棚"))
+        assertEquals(BackupCodec.fingerprint(backup), BackupCodec.fingerprint(backup.copy(exportedAt = 2)))
+        assertNotEquals(BackupCodec.fingerprint(backup), BackupCodec.fingerprint(backup.copy(folders = listOf("本"))))
     }
 
     @Test

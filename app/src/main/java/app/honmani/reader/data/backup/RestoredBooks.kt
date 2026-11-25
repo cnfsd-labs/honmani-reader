@@ -55,13 +55,18 @@ class RestoredBooks(private val file: File) {
 
     fun waiting(): List<WaitingBook> = synchronized(lock) { current().waiting }
 
-    /** Adds [books] to the waiting ones (replacing any with the same key). */
+    /**
+     * Adds [books] to the waiting ones (replacing any with the same key). Throws if that can't be saved:
+     * the transaction around it is then undone, so no statistics stay under ids no book is known by
+     * (the next restore would give those ids to other books).
+     */
     fun addWaiting(books: Collection<WaitingBook>) {
         if (books.isEmpty()) return
-        update { state ->
+        val saved = update { state ->
             val keys = books.mapTo(HashSet()) { it.key }
             state.copy(waiting = state.waiting.filter { it.key !in keys } + books)
         }
+        if (!saved) throw IOException("Could not write ${file.name}")
     }
 
     /** The waiting book with content hash [hash], still waiting; null if there is none. */
@@ -69,13 +74,17 @@ class RestoredBooks(private val file: File) {
         synchronized(lock) { current().waiting.firstOrNull { it.key == hash && it.details != null } }
 
     /** [book] is back in the library: it no longer waits. */
-    fun remove(book: WaitingBook) = update { state -> state.copy(waiting = state.waiting - book) }
+    fun remove(book: WaitingBook) {
+        update { state -> state.copy(waiting = state.waiting - book) }
+    }
 
-    fun setPosition(hash: String, position: RestoredPosition) = update { it.copy(positions = it.positions + (hash to position)) }
+    fun setPosition(hash: String, position: RestoredPosition) {
+        update { it.copy(positions = it.positions + (hash to position)) }
+    }
 
     /** Drops the position waiting for the book with content hash [hash] (the book was removed). */
-    fun forgetPosition(hash: String) = update { state ->
-        if (hash in state.positions) state.copy(positions = state.positions - hash) else state
+    fun forgetPosition(hash: String) {
+        update { state -> if (hash in state.positions) state.copy(positions = state.positions - hash) else state }
     }
 
     /** The position to give ttu for the book with content hash [hash], once. */
@@ -89,17 +98,21 @@ class RestoredBooks(private val file: File) {
         return taken
     }
 
-    private fun update(evenIfUnsaved: Boolean = false, change: (State) -> State) {
+    /** False if the change could not be written. */
+    private fun update(evenIfUnsaved: Boolean = false, change: (State) -> State): Boolean {
+        var saved = true
         val changed = synchronized(lock) {
             val before = current()
             val after = change(before)
             if (after == before) return@synchronized false
             // Memory follows the file: a change that could not be written (full storage) is dropped.
-            if (!save(after) && !evenIfUnsaved) return@synchronized false
+            saved = save(after)
+            if (!saved && !evenIfUnsaved) return@synchronized false
             loaded = after
             true
         }
         if (changed) changes.update { it + 1 }
+        return saved
     }
 
     /** Under [lock]. */

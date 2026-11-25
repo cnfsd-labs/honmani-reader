@@ -4,7 +4,6 @@ import app.honmani.reader.diagnostics.logWarning
 import android.content.SharedPreferences
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +24,7 @@ import kotlinx.coroutines.withContext
  * replace the old phone's backup with an empty one.
  *
  * It is written whenever the app asks ([save]: on leaving a book, on going to the background) and
- * its content changed since the last one ([fingerprint], kept in [device]): nothing is rewritten
+ * its content changed since the last one ([BackupCodec.fingerprint], kept in [device]): nothing is rewritten
  * while nothing changed, whatever the time.
  *
  * A backup over [MAX_BYTES] would make Android skip all of the app's backup, so it never goes into
@@ -138,7 +137,7 @@ class AutoBackup(
             }
             if (earlier != null) made.copy(readerSettings = earlier) else made
         }
-        val content = fingerprint(backup)
+        val content = BackupCodec.fingerprint(backup)
         val stored = withContext(Dispatchers.IO) { (if (tooLarge.value) largeFile else file).isFile }
         if (!force && stored && device.getString(KEY_FINGERPRINT, null) == content) return Outcome.Skipped
         val outcome = withContext(Dispatchers.IO) {
@@ -195,14 +194,7 @@ class AutoBackup(
 
         private const val KEY_ANSWERED = "auto_backup_offer_answered"
 
-        /** [fingerprint] of the last backup written; on this phone only, like [KEY_ANSWERED]. */
+        /** [BackupCodec.fingerprint] of the last backup written; on this phone only, like [KEY_ANSWERED]. */
         private const val KEY_FINGERPRINT = "auto_backup_fingerprint"
-
-        /** What the backup holds, without when it was made: the same data gives the same value. */
-        private fun fingerprint(backup: BackupFile): String {
-            val json = BackupCodec.toJson(backup.copy(exportedAt = 0))
-            return MessageDigest.getInstance("SHA-256").digest(json.toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
-        }
     }
 }

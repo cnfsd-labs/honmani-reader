@@ -1,10 +1,15 @@
 package app.honmani.reader.data.backup
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.StructureKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test
 
 /** The times in a sync file: the latest one, and setting the ones past a ceiling back. */
+@OptIn(ExperimentalSerializationApi::class)
 class SyncStampsTest {
     private val ceiling = 10_000L
 
@@ -54,5 +59,39 @@ class SyncStampsTest {
     fun aFileWithinTheCeilingIsReturnedAsItIs() {
         val file = file()
         assertSame(file, SyncStamps.clamp(file, ceiling))
+    }
+
+    /** Every number in the file that could be a time, with whether it is an edit time [SyncStamps] knows. */
+    @Test
+    fun everyTimeFieldOfTheFileIsEitherHandledOrHistory() {
+        val edits = setOf(
+            "exportedAt",
+            "books.book.addedAt", "books.book.lastOpenedAt", "books.book.finishedAt", "books.book.updatedAt",
+            "finishedBooks.finishedAt", "bookmarks.updatedAt", "highlights.updatedAt", "pronunciations.updatedAt",
+            "words.lastLookedUpAt", "words.updatedAt", "words.card.addedAt", "words.card.updatedAt",
+            "tombstones.deletedAt", "folderTimes", "syncSettings.at",
+        )
+        val history = setOf(
+            "removedBooks.removedAt", "bookmarks.createdAt", "highlights.createdAt", "pronunciations.createdAt",
+            "lookupEvents.at", "words.firstLookedUpAt", "words.card.lastReviewAt", "words.lookups.at",
+            "words.reviews.at", "knownBatches.createdAt",
+        )
+        val found = HashSet<String>()
+        longs(BackupFile.serializer().descriptor, "", found)
+        val times = found.filter { it.endsWith("At") || it.endsWith(".at") || it == "folderTimes" }.toSet()
+
+        assertEquals(edits + history, times)
+    }
+
+    private fun longs(descriptor: SerialDescriptor, path: String, found: MutableSet<String>) {
+        when (descriptor.kind) {
+            PrimitiveKind.LONG -> found += path
+            StructureKind.LIST, StructureKind.MAP -> longs(descriptor.getElementDescriptor(if (descriptor.kind == StructureKind.MAP) 1 else 0), path, found)
+            StructureKind.CLASS -> for (i in 0 until descriptor.elementsCount) {
+                val name = descriptor.getElementName(i)
+                longs(descriptor.getElementDescriptor(i), if (path.isEmpty()) name else "$path.$name", found)
+            }
+            else -> Unit
+        }
     }
 }

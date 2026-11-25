@@ -1,18 +1,22 @@
 package app.honmani.reader.data.backup
 
+import app.honmani.reader.data.BoundedInputStream
 import app.honmani.reader.data.TooLargeException
-import app.honmani.reader.data.readBytesAtMost
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.decodeFromStream
+import kotlinx.serialization.json.encodeToStream
 
 /**
  * Everything a reader wants back after installing Honmani again, except the books themselves:
@@ -294,7 +298,11 @@ open class BackupFormatException(message: String, cause: Throwable? = null) : IO
 /** The file is from a newer Honmani; [deviceName] says which phone, if it is a sync file. */
 class NewerBackupException(message: String, val deviceName: String? = null) : BackupFormatException(message)
 
-/** Reads and writes [BackupFile]s: one JSON entry in a zip. */
+/**
+ * Reads and writes [BackupFile]s: one JSON entry in a zip. A long-time reader's JSON is tens of MB, so it
+ * is streamed and never held as one text.
+ */
+@OptIn(ExperimentalSerializationApi::class)
 object BackupCodec {
     const val ENTRY = "honmani-backup.json"
     const val MIME_TYPE = "application/zip"
@@ -304,39 +312,46 @@ object BackupCodec {
         encodeDefaults = true
     }
 
-    /** The JSON a zip holds; also what [SyncFolder] fingerprints to tell whether anything changed. */
-    fun toJson(backup: BackupFile): String = json.encodeToString(BackupFile.serializer(), backup)
+    /** The JSON a zip holds. */
+    internal fun toJson(backup: BackupFile): String = json.encodeToString(BackupFile.serializer(), backup)
 
-    /** The file as a JSON tree and back, for code that edits values across the whole file ([SyncStamps]). */
-    fun toTree(backup: BackupFile): JsonElement = json.encodeToJsonElement(BackupFile.serializer(), backup)
+    /** What [backup] holds, without when it was made: the same data gives the same value. */
+    fun fingerprint(backup: BackupFile): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val sink = object : OutputStream() {
+            override fun write(byte: Int) = digest.update(byte.toByte())
 
-    fun fromTree(tree: JsonElement): BackupFile = json.decodeFromJsonElement(BackupFile.serializer(), tree)
+            override fun write(bytes: ByteArray, offset: Int, length: Int) = digest.update(bytes, offset, length)
+        }
+        json.encodeToStream(BackupFile.serializer(), backup.copy(exportedAt = 0), sink)
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
 
     fun write(backup: BackupFile, output: OutputStream) {
         val zip = ZipOutputStream(output)
         zip.putNextEntry(ZipEntry(ENTRY))
-        zip.write(toJson(backup).toByteArray(Charsets.UTF_8))
+        json.encodeToStream(BackupFile.serializer(), backup, zip)
         zip.closeEntry()
         zip.finish()
         zip.flush()
     }
 
-    /** A backup's JSON is a few MB at most; a zip entry can claim to inflate to far more. */
-    internal const val MAX_JSON_BYTES = 32 * 1024 * 1024
+    /**
+     * A zip entry can claim to inflate to any size. Nothing limits what [write] writes, so this must
+     * stay far above what years of reading make (about 50 MB for 25,000 words and 100,000 lookups).
+     */
+    internal const val MAX_JSON_BYTES = 128L * 1024 * 1024
 
-    fun read(input: InputStream, maxJsonBytes: Int = MAX_JSON_BYTES): BackupFile {
+    fun read(input: InputStream, maxJsonBytes: Long = MAX_JSON_BYTES): BackupFile {
         val zip = ZipInputStream(input)
         while (true) {
             val entry = zip.nextEntry ?: throw BackupFormatException("No $ENTRY in the file")
             if (entry.name == ENTRY) break
         }
-        val text = try {
-            zip.readBytesAtMost(maxJsonBytes).toString(Charsets.UTF_8)
+        val backup = try {
+            json.decodeFromStream(BackupFile.serializer(), BoundedInputStream(zip, maxJsonBytes))
         } catch (e: TooLargeException) {
             throw BackupFormatException("Not a Honmani backup: the data is too large", e)
-        }
-        val backup = try {
-            json.decodeFromString(BackupFile.serializer(), text)
         } catch (e: SerializationException) {
             throw BackupFormatException("Not a Honmani backup", e)
         } catch (e: IllegalArgumentException) {
