@@ -16,6 +16,10 @@ data class LexiconSources(val terms: List<DictionaryEntity>, val frequency: Dict
             for (dictionary in terms.sortedBy { it.title }) append("|").append(dictionary.title).append("@").append(dictionary.revision)
         }
 
+    /** The saved lexicon's: also changes when a dictionary is imported again or [LexiconLoader] adds other words. */
+    val lexiconKey: String
+        get() = "$signature|lexicon${LexiconLoader.VERSION}|" + (terms.map { it.id }.sorted() + frequency.id).joinToString(",")
+
     companion object {
         /**
          * Null when there is nothing to grade with: no word dictionary or no frequency list.
@@ -73,6 +77,12 @@ class LexiconLoader(private val dao: DifficultyDao) {
     }
 
     companion object {
+        /**
+         * Raised when the same dictionaries give another [Lexicon] than before (grammar words, word
+         * classes, ranks; `LexiconLoaderTest` notices), so that app updates build the saved one again.
+         */
+        const val VERSION = 1
+
         private const val PAGE = 20_000
 
         /** Jiten's mark for a rank of the word written in kana ("615㋕"). */

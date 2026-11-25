@@ -734,12 +734,10 @@ class AppContainer(context: Context) {
 
     /**
      * The words of [sources] for splitting books, one for grading and word marks. Saved in app
-     * storage, so only a new dictionary set or an app update builds it again (several seconds).
+     * storage, so only a new dictionary set or [LexiconLoader.VERSION] builds it again (several seconds).
      */
     private suspend fun lexicon(sources: LexiconSources): Lexicon = lexiconLock.withLock {
-        // An update may change what LexiconLoader adds (grammar words): its time is part of the key.
-        val installed = appContext.packageManager.getPackageInfo(appContext.packageName, 0).lastUpdateTime
-        val signature = "${sources.signature}|$installed"
+        val signature = sources.lexiconKey
         sharedLexicon?.takeIf { it.first == signature }?.second ?: withContext(Dispatchers.IO) {
             // Let the outdated lexicon go before the new one is read or built (tens of MB each).
             sharedLexicon = null
