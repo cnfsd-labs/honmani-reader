@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
@@ -56,7 +57,15 @@ private fun HomeTab.TabIcon() {
         // Icon-sized whatever the font size, like the drawn icons beside it.
         val size = with(LocalDensity.current) { GLYPH_SIZE.toSp() }
         Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            Text(glyph, fontSize = size, lineHeight = size, fontWeight = FontWeight.Medium)
+            // Noto Sans CJK (Pixels) is 1.45 times as high as its glyphs whatever the line height:
+            // unbounded, or the box cuts the kanji off at the bottom.
+            Text(
+                glyph,
+                fontSize = size,
+                lineHeight = size,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.wrapContentSize(unbounded = true),
+            )
         }
     } else {
         Icon(rememberVectorPainter(vector!!), contentDescription = null)
