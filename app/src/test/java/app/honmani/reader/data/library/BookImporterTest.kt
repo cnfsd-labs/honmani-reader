@@ -176,6 +176,18 @@ class BookImporterTest {
     }
 
     @Test
+    fun aCopyProtectedBookIsRefusedAndNotKept() = runTest {
+        val list = """<encryption><EncryptedData><CipherData><CipherReference URI="OEBPS/ch1.xhtml"/></CipherData></EncryptedData></encryption>"""
+        val epub = TestBooks.epub(
+            files = mapOf("META-INF/encryption.xml" to list.toByteArray(), "OEBPS/ch1.xhtml" to ByteArray(500) { (it * 37 + 11).toByte() }),
+        )
+
+        assertEquals(BookImporter.Result.CopyProtected, import(epub, "neko.epub"))
+        assertTrue(booksDir.listFiles().orEmpty().isEmpty())
+        assertTrue(dao.observeAll().first().isEmpty())
+    }
+
+    @Test
     fun anEpubWithoutTitleTakesTheFileName() = runTest {
         val book = (import(TestBooks.epub(title = null), "kokoro.epub") as BookImporter.Result.Added).book
 

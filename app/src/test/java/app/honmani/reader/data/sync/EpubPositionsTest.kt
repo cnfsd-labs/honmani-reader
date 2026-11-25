@@ -209,6 +209,12 @@ class EpubPositionsTest {
     }
 
     @Test
+    fun shiftJisIsReadAsWindowsWritesIt() {
+        val page = """<?xml version="1.0" encoding="Shift_JIS"?><html><body><p>①吾輩～</p></body></html>"""
+        assertEquals(page, EpubPositions.decodeText(page.toByteArray(charset("windows-31j"))))
+    }
+
+    @Test
     fun aChapterThatInflatesBeyondTheLimitIsNotRead() {
         // Compresses to a few KB, inflates past the cap: must not be held in memory.
         val size = EpubPositions.MAX_DOCUMENT_BYTES + 1

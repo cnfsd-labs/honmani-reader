@@ -50,4 +50,40 @@ ${chapter.map((p) => (raw ? p : `<p>${p}</p>`)).join('\n')}
   return Buffer.from(zipSync(files));
 }
 
-module.exports = { buildEpub };
+const HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n';
+
+/** A page with `body` as its markup. */
+const page = (body, head = '<title>章</title>') =>
+  `${HEAD}<html xmlns="http://www.w3.org/1999/xhtml"><head>${head}</head><body>\n${body}\n</body></html>`;
+
+/**
+ * An EPUB for import tests, its parts as they are, so they can be wrong. `items` are manifest items
+ * ({ id, href, type, attrs }), `spine` their ids, `toc` the contents ([href, label]) and `files` the
+ * book's files by their name next to the package document (strings or bytes).
+ */
+function rawEpub({ title, items, spine = items.map((item) => item.id), toc = [], files, opf = (xml) => xml }) {
+  const xhtml = 'application/xhtml+xml';
+  const manifest = [{ id: 'nav', href: 'nav.xhtml', type: xhtml, attrs: 'properties="nav"' }, ...items]
+    .map(({ id, href, type = xhtml, attrs = '' }) => `<item id="${id}" href="${href}" media-type="${type}" ${attrs}/>`)
+    .join('');
+  const entries = {
+    mimetype: [strToU8('application/epub+zip'), { level: 0 }],
+    'META-INF/container.xml': strToU8(
+      `${HEAD}<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`,
+    ),
+    'OEBPS/content.opf': strToU8(
+      opf(
+        `${HEAD}<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">urn:uuid:1</dc:identifier><dc:title>${title}</dc:title><dc:language>ja</dc:language></metadata><manifest>${manifest}</manifest><spine>${spine.map((id) => `<itemref idref="${id}"/>`).join('')}</spine></package>`,
+      ),
+    ),
+    'OEBPS/nav.xhtml': strToU8(
+      `${HEAD}<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol>${toc.map(([href, label]) => `<li><a href="${href}">${label}</a></li>`).join('')}</ol></nav></body></html>`,
+    ),
+  };
+  for (const [name, data] of Object.entries(files)) {
+    entries[`OEBPS/${name}`] = typeof data === 'string' ? strToU8(data) : new Uint8Array(data);
+  }
+  return Buffer.from(zipSync(entries));
+}
+
+module.exports = { buildEpub, rawEpub, page };
