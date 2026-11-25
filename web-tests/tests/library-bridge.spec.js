@@ -44,11 +44,11 @@ const BOOKS = {
     title: '一段落の本',
     paragraphs: [Array.from({ length: 400 }, (_, i) => `これは${i + 1}番目の文です。`).join('')],
   }),
-  // A converted Aozora text: the whole chapter (~33,000 characters) in one block of <br> lines.
+  // The whole chapter (~33,000 characters) in one block of many text nodes (one of <br> lines is split on import).
   'one-block.epub': buildEpub({
     title: '一塊の本',
     raw: true,
-    paragraphs: [`<div>${Array.from({ length: 1000 }, (_, i) => `これは第${i + 1}行目の文章で、吾輩は猫である。名前はまだ無い。`).join('<br/>')}</div>`],
+    paragraphs: [`<div>${Array.from({ length: 1000 }, (_, i) => `<span>これは第${i + 1}行目の文章で、吾輩は猫である。名前はまだ無い。</span>`).join('')}</div>`],
   }),
   // Lines split by <br> in one block, and words in their own elements with a space between.
   'lines.epub': buildEpub({
