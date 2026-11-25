@@ -39,7 +39,7 @@ conjugated: 食べさせられなかった leads straight to 食べる.
 - Marks in the book on words you are learning or have not met yet, and a list of the words a book holds
   that you don't know; "Ignore word" sets aside names and wrongly split words (no mark, no card, not
   counted), with a list in Words to undo it
-- Every tapped word is saved with its sentence ("Don't count" in the panel takes it back; a long press
+- Every tapped word is saved with its sentence ("Don't count" in the panel takes it back, with Undo; a long press
   to select text saves nothing); send words to Anki
   (AnkiDroid or an `.apkg` for Anki on a computer). Cards use Honmani's own note type, a sentence-first
   variant, or your own note type (Lapis, Marvin's Mining Note or any other): you choose which field gets

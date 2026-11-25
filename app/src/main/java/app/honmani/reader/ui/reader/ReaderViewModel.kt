@@ -203,7 +203,7 @@ class ReaderViewModel(
     private var lookupCount = 0L
 
     /** What the lookups of one tap in the book changed, by the saved word's key, until the tap is replaced. */
-    private var counted: Pair<TapLookup, List<LookupUndo>>? = null
+    private var counted: Pair<TapLookup, List<CountedLookup>>? = null
     private val _countedTap = MutableStateFlow<TapLookup?>(null)
 
     /** The recording of the tap's best match (the tap, the word's key, what it changed), for the review offer. */
@@ -218,27 +218,28 @@ class ReaderViewModel(
      */
     val countedTap: StateFlow<TapLookup?> = _countedTap.asStateFlow()
 
-    private fun addCounted(tap: TapLookup, undo: LookupUndo) {
+    private fun addCounted(tap: TapLookup, lookup: CountedLookup) {
         if (tap == discarded) {
             // "Don't count" came before the lookup was saved.
-            viewModelScope.launch { takeBack(listOf(undo)) }
+            viewModelScope.launch { takeBack(listOf(lookup)) }
             return
         }
         // A late lookup of an earlier tap stays counted; only the current tap can be taken back.
         if (tap != _countedTap.value) return
         val earlier = counted?.takeIf { it.first == tap }?.second.orEmpty()
-        counted = tap to earlier + undo
+        counted = tap to earlier + lookup
     }
 
     /** The reader meant to save the word [key] (star, Anki card, "+ Learn"): "Don't count" leaves it alone. */
     private fun keep(key: String) {
         val (tap, items) = counted ?: return
-        counted = tap to items.filter { it.key != key }
+        counted = tap to items.filter { it.undo.key != key }
     }
 
     /**
      * "Don't count": takes back what the tap in the panel changed (a new word, a lost learned mark,
      * word progress, a lapsed card) and closes the panel. Earlier lookups of the word stay counted.
+     * What was taken back goes to [changes], to be counted again by an undo.
      */
     fun dontCount() {
         val tap = _countedTap.value ?: return
@@ -250,16 +251,19 @@ class ReaderViewModel(
         if (items.isNotEmpty()) viewModelScope.launch { takeBack(items) }
     }
 
-    private suspend fun takeBack(items: List<LookupUndo>) {
-        for (undo in items.asReversed()) {
+    private suspend fun takeBack(items: List<CountedLookup>) {
+        val takenBack = mutableListOf<LookedUpWord>()
+        for (item in items.asReversed()) {
             try {
-                undoLookup(undo)
+                undoLookup(item.undo)
+                takenBack += item.word
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 log("Taking back a lookup failed: $e")
             }
         }
+        if (takenBack.isNotEmpty()) _changes.send(PanelChange.NotCounted(takenBack.asReversed()))
     }
 
     /** The last tap and when its message came, until its panel is drawn ([onPanelDrawn]). */
@@ -888,7 +892,7 @@ class ReaderViewModel(
         }
     }
 
-    /** Takes back [change]: the word goes back to Learning, or a removed word comes back as it was. */
+    /** Takes back [change]: the word goes back to Learning, a removed word comes back, a lookup counts again. */
     fun undo(change: PanelChange) {
         viewModelScope.launch {
             try {
@@ -901,6 +905,7 @@ class ReaderViewModel(
                     }
                     is PanelChange.Removed -> restoreWord(change.deleted)
                     is PanelChange.Reviewed -> undoReview(change.undo)
+                    is PanelChange.NotCounted -> change.words.forEach { recordLookup(it) }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -937,6 +942,8 @@ class ReaderViewModel(
                             panel.copy(due = key, learned = if (change.undo.markedLearned) panel.learned - key else panel.learned)
                         }
                     }
+                    // Its panel was closed, and one opened since shows its own lookup.
+                    is PanelChange.NotCounted -> panel
                 }
             }
         }
@@ -1047,9 +1054,10 @@ class ReaderViewModel(
                     ensureActive()
                     null
                 }
-                val undo = recordLookup(word.copy(bookId = found?.id, bookTitle = found?.title))
+                val inBook = word.copy(bookId = found?.id, bookTitle = found?.title)
+                val undo = recordLookup(inBook)
                 // Only the lookups a tap made by itself can be taken back, not a word the reader chose to save.
-                if (taps && undo != null) addCounted(tap, undo)
+                if (taps && undo != null) addCounted(tap, CountedLookup(undo, inBook))
                 undo
             } catch (e: CancellationException) {
                 throw e
@@ -1178,6 +1186,9 @@ class ReaderViewModel(
     }
 }
 
+/** A tap's lookup: what it changed, and the [word] it recorded, to record it again. */
+private class CountedLookup(val undo: LookupUndo, val word: LookedUpWord)
+
 /** A change made from the lookup panel that the reader can undo from a snackbar. */
 sealed interface PanelChange {
     val expression: String
@@ -1205,5 +1216,11 @@ sealed interface PanelChange {
     class Removed(val deleted: DeletedWord) : PanelChange {
         override val expression get() = deleted.word.expression
         override val reading get() = deleted.word.reading
+    }
+
+    /** "Don't count": the lookups taken back, in the order they were made; never empty. */
+    class NotCounted(val words: List<LookedUpWord>) : PanelChange {
+        override val expression get() = words.last().expression
+        override val reading get() = words.last().reading
     }
 }

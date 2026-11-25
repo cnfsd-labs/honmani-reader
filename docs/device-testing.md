@@ -73,7 +73,8 @@ Format: do -> expect. Run what a change touches; the Release pass for every rele
 ## Lookup panel
 
 - **Don't count**: tap a new word -> undo arrow beside the speaker (largest font: a 5-character match
-  not cut). Press -> panel closes, word not in Words. On a saved word: lookup count, Learned mark, due
+  not cut). Press -> panel closes, word not in Words, "Lookup of … not counted" with Undo: the lookup counts
+  again. On a saved word: lookup count, Learned mark, due
   card, progress go back. Same sentence within the hour: no button. Starred/Anki-added kept. Taps inside
   a definition and "Edit and look up" change nothing. A long press counts nothing and has no button: word
   not in Words, no lookup row, no lapse; Star or Add to Anki in that panel saves the word.

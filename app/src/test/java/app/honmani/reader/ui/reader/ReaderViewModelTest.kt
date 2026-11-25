@@ -361,6 +361,31 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun undoingDontCountRecordsTheLookupAgain() = runTest {
+        val recorded = mutableListOf<LookedUpWord>()
+        val model = ReaderViewModel(
+            lookup = { _, _ -> LookupResult(listOf(entry("食べる", "食べました"))) },
+            compute = Dispatchers.Unconfined,
+            recordLookup = {
+                recorded += it
+                LookupUndo(WordUndo(1, WordRepository.key(it.expression, it.reading), null, 1, 1, emptyList()), null, null)
+            },
+            findBook = { ReadingBook(7, "本") },
+        )
+        model.onBookChanged(3)
+        model.onTap(tap("食べました。"))
+        model.dontCount()
+        val change = model.changes.first()
+        assertEquals("食べる", change.expression)
+        assertEquals(1, recorded.size)
+
+        model.undo(change)
+        assertEquals(2, recorded.size)
+        assertEquals("the same word, sentence and book", recorded[0], recorded[1])
+        assertEquals(7L, recorded[1].bookId)
+    }
+
+    @Test
     fun dontCountIsOfferedForATapThatChangedNothing_andTakesBackALookupSavedAfterIt() {
         val undone = mutableListOf<LookupUndo>()
         val saving = CompletableDeferred<LookupUndo?>()
