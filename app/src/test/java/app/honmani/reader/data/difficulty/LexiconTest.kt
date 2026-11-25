@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LexiconTest {
@@ -31,5 +32,26 @@ class LexiconTest {
         assertNull(Lexicon.read(file, "v9|Jiten@1|Jitendex@2"))
         file.writeText("damaged")
         assertNull(Lexicon.read(file, "v8|Jiten@1|Jitendex@2"))
+    }
+
+    /** Several dictionaries of the same words must not need room for all their entries at once. */
+    @Test
+    fun wordsOfSeveralDictionaries_areMergedWhileTheyAreAdded() {
+        val builder = Lexicon.Builder()
+        val words = (0 until 20_000).map { "語${it * 7919 % 20_000}" }
+        for (dictionary in 0 until 8) {
+            for ((i, word) in words.withIndex()) builder.add(word, 1 shl dictionary, if (dictionary == i % 8) i + 1 else 0)
+        }
+        assertTrue("room for ${builder.capacity}", builder.capacity <= 2 * words.size)
+
+        val lexicon = builder.build()
+        assertEquals(words.size, lexicon.size)
+        for ((i, word) in words.withIndex()) {
+            val index = lexicon.find(word)
+            assertEquals(word, 0xFF, lexicon.classes(index))
+            assertEquals(word, i + 1, lexicon.rank(index))
+        }
+        assertEquals(-1, lexicon.find("語"))
+        assertEquals(-1, lexicon.find("語20000"))
     }
 }

@@ -53,63 +53,86 @@ class Lexicon private constructor(
         return length - key.length
     }
 
-    /** Collects keys in any order; a key added again takes the union of classes and the best rank. */
+    /**
+     * Collects keys in any order; a key added again takes the union of classes and the best rank.
+     * Keys added again are merged whenever the arrays are full, not only at the end: dictionaries
+     * share most of their words, and all of several at once did not fit a 192 MB heap.
+     */
     class Builder {
-        private val text = StringBuilder()
-        private var starts = IntArray(1024)
+        private var chars = CharArray(4096)
+        private var starts = IntArray(1025)
         private var classes = IntArray(1024)
         private var ranks = IntArray(1024)
         private var count = 0
 
+        /** How many keys the arrays have room for. */
+        internal val capacity: Int get() = classes.size
+
         fun add(key: String, classes: Int, rank: Int): Builder {
             if (key.isEmpty()) return this
-            if (count == this.classes.size) {
-                starts = starts.copyOf(count * 2)
-                this.classes = this.classes.copyOf(count * 2)
-                ranks = ranks.copyOf(count * 2)
-            }
-            starts[count] = text.length
+            if (count == capacity) makeRoom()
+            val start = starts[count]
+            val end = start + key.length
+            if (end > chars.size) chars = chars.copyOf(maxOf(end, chars.size + chars.size / 2))
+            key.toCharArray(chars, start)
             this.classes[count] = classes
             ranks[count] = if (rank > 0) rank else UNRANKED
-            text.append(key)
             count++
+            starts[count] = end
             return this
         }
 
         fun build(): Lexicon {
-            val all = text.toString().toCharArray()
-            fun end(i: Int) = if (i + 1 < count) starts[i + 1] else all.size
-            fun compare(a: Int, b: Int): Int {
-                val lengthA = end(a) - starts[a]
-                val lengthB = end(b) - starts[b]
-                for (i in 0 until minOf(lengthA, lengthB)) {
-                    val difference = all[starts[a] + i] - all[starts[b] + i]
-                    if (difference != 0) return difference
-                }
-                return lengthA - lengthB
-            }
-            val order = sortIndices(count, ::compare)
+            merge()
+            return Lexicon(chars.copyOf(starts[count]), starts.copyOf(count + 1), classes.copyOf(count), ranks.copyOf(count))
+        }
 
-            val packed = StringBuilder(all.size)
-            val outStarts = IntArray(count + 1)
-            val outClasses = IntArray(count)
-            val outRanks = IntArray(count)
+        /** Merges the keys; the arrays grow only if that frees less than a third of them. */
+        private fun makeRoom() {
+            merge()
+            val room = capacity
+            if (count <= room - room / 3) return
+            starts = starts.copyOf(room + room / 2 + 1)
+            classes = classes.copyOf(room + room / 2)
+            ranks = ranks.copyOf(room + room / 2)
+        }
+
+        /** Sorts the keys and makes one of those that are equal. */
+        private fun merge() {
+            val order = sortIndices(count, ::compare)
             var size = 0
+            // Classes and ranks go into the first of equal keys; only that one stays in [order].
             for (i in order) {
-                if (size > 0 && sameAsLast(packed, outStarts, size, all, starts[i], end(i))) {
-                    outClasses[size - 1] = outClasses[size - 1] or classes[i]
-                    outRanks[size - 1] = minOf(outRanks[size - 1], ranks[i])
-                    continue
+                val last = if (size > 0) order[size - 1] else -1
+                if (last >= 0 && compare(last, i) == 0) {
+                    classes[last] = classes[last] or classes[i]
+                    ranks[last] = minOf(ranks[last], ranks[i])
+                } else {
+                    order[size++] = i
                 }
-                outStarts[size] = packed.length
-                packed.appendRange(all, starts[i], end(i))
-                outClasses[size] = classes[i]
-                outRanks[size] = ranks[i]
-                size++
             }
-            outStarts[size] = packed.length
-            val chars = packed.toString().toCharArray()
-            return Lexicon(chars, outStarts.copyOf(size + 1), outClasses.copyOf(size), outRanks.copyOf(size))
+            classes = IntArray(capacity).also { for (i in 0 until size) it[i] = classes[order[i]] }
+            ranks = IntArray(ranks.size).also { for (i in 0 until size) it[i] = ranks[order[i]] }
+            val sortedChars = CharArray(chars.size)
+            val sortedStarts = IntArray(starts.size)
+            for (i in 0 until size) {
+                val from = order[i]
+                chars.copyInto(sortedChars, sortedStarts[i], starts[from], starts[from + 1])
+                sortedStarts[i + 1] = sortedStarts[i] + starts[from + 1] - starts[from]
+            }
+            chars = sortedChars
+            starts = sortedStarts
+            count = size
+        }
+
+        private fun compare(a: Int, b: Int): Int {
+            val lengthA = starts[a + 1] - starts[a]
+            val lengthB = starts[b + 1] - starts[b]
+            for (i in 0 until minOf(lengthA, lengthB)) {
+                val difference = chars[starts[a] + i] - chars[starts[b] + i]
+                if (difference != 0) return difference
+            }
+            return lengthA - lengthB
         }
 
         /** 0 until [count] ordered by [compare], stable; a merge sort on ints, no boxing. */
@@ -136,15 +159,6 @@ class Lexicon private constructor(
                 width *= 2
             }
             return from
-        }
-
-        private fun sameAsLast(packed: StringBuilder, starts: IntArray, size: Int, all: CharArray, from: Int, to: Int): Boolean {
-            val lastStart = starts[size - 1]
-            if (packed.length - lastStart != to - from) return false
-            for (i in 0 until to - from) {
-                if (packed[lastStart + i] != all[from + i]) return false
-            }
-            return true
         }
     }
 
