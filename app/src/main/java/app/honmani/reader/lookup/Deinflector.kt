@@ -47,6 +47,7 @@ enum class Inflection {
     PREPARATION, RESULTING_STATE, ATTEMPT, GIVING, RECEIVING, REQUEST, DESIRE_OF_OTHERS,
     DIRECTION, WHILE, COMMAND_POLITE, TOO_MUCH, SEEMINGLY, EASY, HARD, WITHOUT, ADVERB, NOUN,
     SURU_VERB, NEGATIVE_VOLITIONAL, TE_WA, CLASSICAL,
+    ROUGH, CONTEMPT,
 }
 
 /**
@@ -87,7 +88,7 @@ object Deinflector {
         while (i < results.size) {
             val current = results[i++]
             if (current.inflections.size >= MAX_STEPS) continue
-            for (rule in rules) {
+            for (rule in current.text.lastOrNull()?.let(rulesByEnd::get) ?: rulesForAnyEnd) {
                 if (current.conditions and rule.conditionsIn == 0) continue
                 if (!current.text.endsWith(rule.inflected)) continue
                 val base = current.text.dropLast(rule.inflected.length) + rule.base
@@ -120,12 +121,13 @@ object Deinflector {
         ) = add(Rule(inflected, base, conditionsIn, conditionsOut, inflections.toList()))
 
         // The negatives of older and spoken Japanese on the negative stem: 知らぬ, 知らん,
-        // 知らねば (must), 知らざる.
+        // 知らねば (must), 知らざる, 知らねえ (rough).
         fun literaryNegatives(stem: String, base: String, out: Int) {
             rule(stem + "ぬ", base, FINAL, out, Inflection.NEGATIVE)
             rule(stem + "ん", base, FINAL, out, Inflection.NEGATIVE)
             rule(stem + "ねば", base, FINAL, out, Inflection.NEGATIVE, Inflection.CONDITIONAL_BA)
             rule(stem + "ざる", base, FINAL, out, Inflection.NEGATIVE)
+            for (nee in listOf("ねえ", "ねぇ", "ねー")) rule(stem + nee, base, FINAL, out, Inflection.NEGATIVE, Inflection.ROUGH)
         }
 
         // Ichidan: drop る and add the ending.
@@ -190,12 +192,19 @@ object Deinflector {
             rule(row.o + "う", row.u, FINAL, V5, Inflection.VOLITIONAL)
             rule(row.te, row.u, TE, V5, Inflection.TE)
             rule(row.ta, row.u, PAST, V5, Inflection.PAST)
+            // Old spelling with a full-size つ: 言つて, 思つた.
+            if (row.te == "って") {
+                rule("つて", row.u, TE, V5, Inflection.TE)
+                rule("つた", row.u, PAST, V5, Inflection.PAST)
+            }
         }
         // 行く is the one く verb with って/った.
         for (iku in listOf("行く", "いく", "逝く", "往く")) {
             val stem = iku.dropLast(1)
-            rule(stem + "って", iku, TE, V5, Inflection.TE)
-            rule(stem + "った", iku, PAST, V5, Inflection.PAST)
+            for (tsu in listOf("っ", "つ")) {
+                rule(stem + tsu + "て", iku, TE, V5, Inflection.TE)
+                rule(stem + tsu + "た", iku, PAST, V5, Inflection.PAST)
+            }
         }
         // Honorific verbs (なさる, くださる, いらっしゃる, おっしゃる, ござる) have い-stems. Only
         // theirs: any る verb would make しい the stem of 知る (発見されたら|しい).
@@ -260,6 +269,7 @@ object Deinflector {
         // 忘れないで (do not forget): ない with で, so 忘れない continues to 忘れる.
         rule("ないで", "ない", TE, ADJ, Inflection.TE)
         rule("かった", "い", PAST, ADJ, Inflection.PAST)
+        rule("かつた", "い", PAST, ADJ, Inflection.PAST)
         rule("くて", "い", TE, ADJ, Inflection.TE)
         rule("ければ", "い", FINAL, ADJ, Inflection.CONDITIONAL_BA)
         rule("かろう", "い", FINAL, ADJ, Inflection.VOLITIONAL)
@@ -276,6 +286,18 @@ object Deinflector {
         // out: after a kanji it also reads katakana シ, as in 赤シャツ.)
         rule("き", "い", FINAL, ADJ, Inflection.CLASSICAL)
 
+        // Rough speech: すげえ (すごい), うめえ (うまい), 危ねえ, 行きてえ.
+        for ((plain, rough) in listOf(
+            "かい" to "け", "こい" to "け", "がい" to "げ", "ごい" to "げ", "さい" to "せ", "たい" to "て", "どい" to "で",
+            "ない" to "ね", "まい" to "め", "らい" to "れ", "ろい" to "れ", "わい" to "え",
+        )) {
+            for (vowel in listOf("え", "ぇ", "ー")) rule(rough + vowel, plain, FINAL, ADJ, Inflection.ROUGH)
+        }
+        // Those with the changed sound in the kanji, by name: 甘え is no 甘い.
+        for (kanji in "痛高早速強弱怖恐旨臭遅酷軽黒暗深") {
+            for (vowel in listOf("え", "ぇ", "ー")) rule("$kanji$vowel", "${kanji}い", FINAL, ADJ, Inflection.ROUGH)
+        }
+
         // Polite ます, which conjugates on its own.
         rule("ます", "", MASU, STEM, Inflection.POLITE)
         rule("ません", "ます", FINAL, MASU, Inflection.NEGATIVE)
@@ -288,6 +310,7 @@ object Deinflector {
         rule("たい", "", ADJ, STEM, Inflection.WANT)
         rule("たがる", "", V5, STEM, Inflection.DESIRE_OF_OTHERS)
         rule("ながら", "", FINAL, STEM, Inflection.WHILE)
+        rule("やがる", "", V5, STEM, Inflection.CONTEMPT)
         rule("なさい", "", FINAL, STEM, Inflection.COMMAND_POLITE)
         rule("すぎる", "", V1, STEM, Inflection.TOO_MUCH)
         rule("そう", "", FINAL, STEM, Inflection.SEEMINGLY)
@@ -306,6 +329,8 @@ object Deinflector {
             rule(te + "る", te, V1, TE, Inflection.PROGRESSIVE)
             rule(te + "しまう", te, V5, TE, Inflection.COMPLETION)
             rule(if (voiced) "じゃう" else "ちゃう", te, V5, TE, Inflection.COMPLETION)
+            rule(if (voiced) "じまう" else "ちまう", te, V5, TE, Inflection.COMPLETION)
+            rule(te + "やがる", te, V5, TE, Inflection.PROGRESSIVE, Inflection.CONTEMPT)
             rule(te + "おく", te, V5, TE, Inflection.PREPARATION)
             rule(if (voiced) "どく" else "とく", te, V5, TE, Inflection.PREPARATION)
             rule(te + "ある", te, V5, TE, Inflection.RESULTING_STATE)
@@ -321,4 +346,11 @@ object Deinflector {
             rule(if (voiced) "じゃ" else "ちゃ", te, FINAL, TE, Inflection.TE_WA)
         }
     }
+
+    /** The rules that only add an ending: an ichidan stem may end in anything. */
+    private val rulesForAnyEnd = rules.filter { it.inflected.isEmpty() }
+
+    /** The [rules] that can undo something in a text ending in a letter, in their order. */
+    private val rulesByEnd: Map<Char, List<Rule>> = rules.mapNotNull { it.inflected.lastOrNull() }.distinct()
+        .associateWith { end -> rules.filter { it.inflected.isEmpty() || it.inflected.last() == end } }
 }

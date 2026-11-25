@@ -46,4 +46,6 @@ fun Inflection.labelRes(): Int = when (this) {
     Inflection.NEGATIVE_VOLITIONAL -> R.string.inflection_negative_volitional
     Inflection.TE_WA -> R.string.inflection_te_wa
     Inflection.CLASSICAL -> R.string.inflection_classical
+    Inflection.ROUGH -> R.string.inflection_rough
+    Inflection.CONTEMPT -> R.string.inflection_contempt
 }

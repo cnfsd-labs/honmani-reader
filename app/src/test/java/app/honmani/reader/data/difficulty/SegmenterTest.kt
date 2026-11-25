@@ -122,4 +122,74 @@ class SegmenterTest {
         val split = buildList { Segmenter(words).segment(text) { add(text.substring(it.start, it.start + it.length)) } }
         assertEquals(listOf("発見", "された", "らしい"), split)
     }
+
+    /** Words of real sentences the splitter used to get wrong, ranked and classed as in Jitendex and Jiten. */
+    private val real = Difficulty.addGrammar(
+        Lexicon.Builder().apply {
+            val v5 = WordClass.V5
+            val adjective = WordClass.ADJ_I
+            listOf("の" to 1, "は" to 2, "を" to 4, "が" to 5, "か" to 11, "だ" to 9, "な" to 14, "ね" to 17, "さ" to 104, "に" to 3)
+                .forEach { (word, rank) -> add(word, 0, rank) }
+            listOf(
+                "ある" to 18, "いう" to 25, "言う" to 25, "かう" to 290, "あたる" to 660, "払う" to 953, "知る" to 66, "行く" to 30,
+                "酔う" to 2_451,
+            ).forEach { (word, rank) -> add(word, v5, rank) }
+            add("する", v5 or WordClass.VS, 10)
+            listOf("できる" to 60, "いる" to 37).forEach { (word, rank) -> add(word, WordClass.V1, rank) }
+            listOf("いい" to 33, "長い" to 377, "すごい" to 500).forEach { (word, rank) -> add(word, adjective, rank) }
+            listOf(
+                "アラスカ" to 50_367, "ツノ" to 27_491, "長" to 2_975, "いつ" to 260, "アラ" to 20_000,
+                "二" to 1_269, "十" to 900, "二十" to 5_222, "十分" to 614, "分" to 503, "後" to 545,
+                "あれ" to 105, "かい" to 431, "あたり" to 1_814, "まんなか" to 2_505, "酔い" to 8_878,
+                "言" to 5_551, "つ" to 4_421, "て" to 20, "すげ" to 40_000, "え" to 300, "ねえ" to 500, "やつ" to 400,
+            ).forEach { (word, rank) -> add(word, 0, rank) }
+        },
+    ).build()
+
+    private fun splitReal(text: String): List<String> = buildList {
+        Segmenter(real).segment(text) {
+            val written = text.substring(it.start, it.start + it.length)
+            add(if (written == it.key) written else "$written=${it.key}")
+        }
+    }
+
+    @Test
+    fun aShortWordIsNoUncommonInflectionOfACommonVerb() {
+        // Not the imperative of ある, the stems of あたる, 酔う and いう, the potential of する, the stem of かう.
+        assertEquals(listOf("あれ", "だ"), splitReal("あれだ"))
+        assertEquals(listOf("まんなか", "あたり", "に"), splitReal("まんなかあたりに"))
+        assertEquals(listOf("酔い", "が"), splitReal("酔いが"))
+        assertEquals(listOf("いい", "だろう", "ね"), splitReal("いいだろうね"))
+        assertEquals(listOf("できる", "かい"), splitReal("できるかい"))
+    }
+
+    @Test
+    fun aRunOfKatakanaKeepsItsFirstAndLastLetter() {
+        // Not アラス (ある) + か, not 長 + いツ (いつ) + の.
+        assertEquals(listOf("アラスカ", "の"), splitReal("アラスカの"))
+        assertEquals(listOf("長い", "ツノ", "を"), splitReal("長いツノを"))
+    }
+
+    @Test
+    fun aNumberInKanjiStaysWhole() {
+        // Not 二 + 十分 (enough).
+        assertEquals(listOf("二十", "分", "後"), splitReal("二十分後"))
+        // A number no dictionary lists becomes one unknown word, however it ends.
+        assertEquals(listOf("十十二", "分"), splitReal("十十二分"))
+        assertEquals(listOf("二二"), splitReal("二二"))
+    }
+
+    @Test
+    fun oldSpellingsAreTheWordsOfToday() {
+        assertEquals(listOf("払わせたら=払う", "いゝ=いい", "な"), splitReal("払わせたらいゝな"))
+        assertEquals(listOf("言つてる=言う", "の", "だつた"), splitReal("言つてるのだつた"))
+        assertEquals(listOf("あれ", "だらう"), splitReal("あれだらう"))
+    }
+
+    @Test
+    fun roughSpeechComesBackInItsDictionaryForm() {
+        assertEquals(listOf("すげえ=すごい", "やつ", "だ"), splitReal("すげえやつだ"))
+        assertEquals(listOf("知らねえ=知る", "な"), splitReal("知らねえな"))
+        assertEquals(listOf("行きやがる=行く"), splitReal("行きやがる"))
+    }
 }

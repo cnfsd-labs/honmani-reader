@@ -1067,6 +1067,8 @@
     <string name="inflection_negative_volitional">まい (won\'t … / probably not …)</string>
     <string name="inflection_te_wa">ては / ちゃ (if … / …-ing)</string>
     <string name="inflection_classical">classical form</string>
+    <string name="inflection_rough">rough speech</string>
+    <string name="inflection_contempt">やがる (with contempt)</string>
 
     <string name="lookup_close">Close</string>
     <string name="picture_viewer_picture">Picture from the book. Pinch or double tap to zoom.</string>

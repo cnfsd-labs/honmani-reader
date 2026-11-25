@@ -119,9 +119,10 @@ object Difficulty {
      * the share of rare words and the vocabulary's variety instead of R95, refitted with light
      * novels. 8: Jiten's ranks of words in kana no longer rank their kanji spellings
      * (`LexiconLoader.addRank`), kanji with furigana count whole, the ratios to jiten.moe's
-     * measures measured again.
+     * measures measured again. 9: endings short words look like count as less likely
+     * ([Segmenter]), katakana words and numbers stay whole, rough speech and old spellings.
      */
-    const val VERSION = 8
+    const val VERSION = 9
 
     const val COVERAGE = 0.95
 
@@ -132,6 +133,8 @@ object Difficulty {
     val GRAMMAR = listOf(
         "でした", "でしょう", "でしょ", "でして", "だった", "だろう", "だろ", "だって", "であった", "であろう",
         "ました", "ません", "ませんでした", "ましょう", "まして", "なかった", "なくて",
+        // In the old spelling of older books.
+        "でせう", "だつた", "だらう", "だつて", "であつた", "であらう", "ませう", "なかつた",
     )
 
     /** Adds [GRAMMAR] to a lexicon being built from the dictionaries. */
