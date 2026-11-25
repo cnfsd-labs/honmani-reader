@@ -117,6 +117,12 @@ interface TermDao {
     )
     suspend fun keysByReadingRange(from: String, to: String, limit: Int): List<TermKey>
 
+    /** Whether any of the dictionary's first terms has word classes (a full scan of a names dictionary takes seconds). */
+    @Query(
+        "SELECT EXISTS(SELECT 1 FROM (SELECT rules FROM term WHERE dictionary_id = :dictionaryId LIMIT 5000) WHERE rules <> '')",
+    )
+    suspend fun namesWordClasses(dictionaryId: Long): Boolean
+
     /** Light rows of terms whose written form matches the GLOB [pattern]. */
     @Query("SELECT id, dictionary_id, expression, reading, score FROM term WHERE expression GLOB :pattern AND $ENABLED LIMIT :limit")
     suspend fun keysByExpressionPattern(pattern: String, limit: Int): List<TermKey>

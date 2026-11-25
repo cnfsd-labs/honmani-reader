@@ -16,6 +16,7 @@ import app.honmani.reader.data.dictionary.TermMetaDao
 import app.honmani.reader.data.dictionary.TermMetaEntity
 import app.honmani.reader.data.difficulty.LexiconLoader
 import app.honmani.reader.data.difficulty.Segmenter
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.ln
 
 /** A dictionary entry that matches the start of the looked-up text. */
@@ -109,6 +110,14 @@ class DictionaryLookup(
      */
     private val presets = HashMap<Pair<Long, Long>, ByteArray>()
 
+    private val wordClassesNamed = ConcurrentHashMap<Pair<Long, Long>, Boolean>()
+
+    /** Whether the dictionary gives its verbs and adjectives word classes (not names, not plain glossaries). */
+    private suspend fun namesWordClasses(dictionary: DictionaryEntity): Boolean {
+        val key = dictionary.id to dictionary.importedAt
+        return wordClassesNamed[key] ?: termDao.namesWordClasses(dictionary.id).also { wordClassesNamed[key] = it }
+    }
+
     private suspend fun presetOf(dictionary: DictionaryEntity): ByteArray? {
         val key = dictionary.id to dictionary.importedAt
         val preset = synchronized(presets) { presets[key] }
@@ -165,6 +174,8 @@ class DictionaryLookup(
                 .distinctBy { it.id }
             // An entry without word classes borrows those another installed dictionary gives
             // the same word (expression and reading); with none it matches uninflected text only.
+            // Not one in kana from a dictionary that names word classes: JMdict's なる without any
+            // is the old copula, not the verb another dictionary lists as なる.
             val classesByWord = HashMap<Pair<String, String>, Int>()
             for (term in terms) {
                 val classes = WordClass.fromRules(term.rules)
@@ -173,7 +184,12 @@ class DictionaryLookup(
             return terms.mapNotNull { term ->
                 val dictionary = dictionaries[term.dictionaryId] ?: return@mapNotNull null
                 val termClasses = WordClass.fromRules(term.rules)
-                    .takeIf { it != 0 } ?: classesByWord[term.expression to term.reading] ?: 0
+                    .takeIf { it != 0 }
+                    ?: classesByWord[term.expression to term.reading]?.takeUnless {
+                        term.expression.all(JapaneseText::isKana) && namesWordClasses(dictionary)
+                    }
+                    // ました and でした when tapped themselves, not 増した or 弟子.
+                    ?: if (term.expression in POLITE_AUXILIARIES) WordClass.V5 else 0
                 val matches = (candidatesByText[term.expression].orEmpty().map { it to true }) +
                     (candidatesByText[term.reading].orEmpty().map { it to false })
                 matches
@@ -266,6 +282,9 @@ class DictionaryLookup(
             .thenBy { Inflection.CAUSATIVE_SHORT in it.inflections }
             .thenBy { kanaCost(it) }
             .thenBy { it.inflections.size }
+            // As common in kana is mostly the same word, written なる in one dictionary and 成る in
+            // another: the reader's first dictionary.
+            .thenBy { if (kanaRanks && it.source.all(JapaneseText::isKana)) it.dictionary.priority else 0 }
             .thenByDescending { it.matchedExpression }
             // A name (JMnedict) after the ordinary words of the same match, however the dictionaries
             // are ordered: a surname is rarely what the reader wants from a common word.
@@ -669,6 +688,9 @@ class DictionaryLookup(
         conditions == WordClass.ANY || conditions and termClasses != 0
 
     private companion object {
+        /** Inflect as verbs in -す; dictionaries give them no verb class. */
+        val POLITE_AUXILIARIES = setOf("ます", "です")
+
         /**
          * Search tiers: the query as typed, its other forms, with unwritten long vowels; words
          * with the query as the gloss of their first meaning, of another meaning; words starting

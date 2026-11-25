@@ -173,6 +173,8 @@ class LookupCoverageCheck {
             }
         }
 
+        override suspend fun namesWordClasses(dictionaryId: Long) = all.any { it.dictionaryId == dictionaryId && it.rules.isNotEmpty() }
+
         override suspend fun findByExpressionOrReading(texts: List<String>): List<TermEntity> =
             texts.flatMap { byText[it].orEmpty() }
 

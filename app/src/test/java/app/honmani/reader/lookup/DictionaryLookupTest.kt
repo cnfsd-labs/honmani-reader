@@ -313,6 +313,33 @@ class DictionaryLookupTest {
     }
 
     @Test
+    fun aKanaWordOfADictionaryWithWordClassesBorrowsNone_andTheFirstDictionaryDecidesATie() = runTest {
+        jiten(Triple("成る", "なる", "19㋕"), Triple("なる", "なる", "19㋕"))
+        install("JMdict", listOf("成る", "なる", "v5", 10, "to become"), listOf("なる", "なる", "", 10, "that is in"))
+        install("Monolingual", listOf("なる", "なる", "v5", 10, "to become (second dictionary)"))
+
+        val full = lookup.lookup("なって").entries.filter { it.source == "なって" }
+
+        assertEquals(
+            listOf("JMdict" to "成る", "Monolingual" to "なる"),
+            full.map { it.dictionary.title to it.term.expression },
+        )
+    }
+
+    @Test
+    fun politePastsTappedThemselvesAreMasuAndDesu() = runTest {
+        jiten(Triple("増す", "ます", "2833㋕"), Triple("ます", "ます", "2833㋕"), Triple("です", "です", "16㋕"), Triple("弟子", "でし", "9000㋕"))
+        install(
+            "JMdict",
+            listOf("増す", "ます", "v5", 10, "to increase"), listOf("ます", "ます", "", 10, "polite"),
+            listOf("です", "です", "", 10, "to be (polite)"), listOf("弟子", "でし", "n", 10, "disciple"),
+        )
+
+        assertEquals("ます" to "ました", first("ました。"))
+        assertEquals("です" to "でした", first("でした。"))
+    }
+
+    @Test
     fun suruNounsAndKuru() = runTest {
         jmdict()
 
