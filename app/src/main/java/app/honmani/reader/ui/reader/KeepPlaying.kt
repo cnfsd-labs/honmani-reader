@@ -23,8 +23,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
  * "Keep playing with the screen off": tells [PlaybackService] what the reader's voice does and
  * takes its buttons. The controllers' own flows are followed, not the screen's state, which stops
  * updating while the app is in the background. The first playback asks for the notification
- * permission (Android 13+), once per book and only with the reader in front (a playback starting in
- * the background asks nothing); the voice plays whatever the answer.
+ * permission (Android 13+), once while the activity lives (the reader screen stays composed from
+ * book to book) and only with the reader in front (a playback starting in the background asks
+ * nothing); the voice plays whatever the answer.
  */
 @Composable
 internal fun KeepPlayingEffect(container: AppContainer, audio: ReaderAudio, title: String) {
