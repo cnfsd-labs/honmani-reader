@@ -340,6 +340,46 @@ test('a page turn saves the reading position right away, without a bookmark butt
   expect(await page.locator('div.fixed.h-3.w-3.opacity-25').count()).toBe(0);
 });
 
+for (const writingMode of ['vertical-rl', 'horizontal-tb']) {
+  test(`turning back over a chapter boundary saves that page, not the chapter's start (${writingMode})`, async ({ page }) => {
+    await setUp(page, { ...userFont, writingMode, viewMode: 'paginated' });
+    const chapter = (n) => Array.from({ length: 40 }, (_, i) => `第${n}章の${i + 1}段落。吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。`);
+    await importAndOpen(page, { ...nekoEpub, name: 'two.epub', buffer: buildEpub({ title: '二章の本', chapters: [chapter(1), chapter(2)] }) }, '二章の本');
+    const [next, previous] = writingMode === 'vertical-rl' ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft'];
+    const shown = async () => {
+      const text = await page.getByText(/^\s*\d+ \/ \d+/).first().textContent();
+      return Number(text.match(/\d+/)[0]);
+    };
+    const saved = () =>
+      page.evaluate(
+        () =>
+          new Promise((resolve, reject) => {
+            const request = indexedDB.open('books');
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+              const all = request.result.transaction('bookmark').objectStore('bookmark').getAll();
+              all.onsuccess = () => resolve(all.result[0]?.exploredCharCount ?? 0);
+            };
+          }),
+      );
+    const inChapter = (n) => page.locator('.book-content').getByText(`第${n}章の1段落`).count();
+    await page.waitForTimeout(500);
+    let lastOfFirst = 0;
+    for (let turns = 0; turns < 60 && !(await inChapter(2)); turns++) {
+      lastOfFirst = await shown();
+      await page.keyboard.press(next);
+      await page.waitForTimeout(200);
+    }
+    expect(await inChapter(2)).toBeGreaterThan(0);
+    expect(lastOfFirst).toBeGreaterThan(0);
+
+    await page.keyboard.press(previous);
+    await expect.poll(() => inChapter(1)).toBeGreaterThan(0);
+    await expect.poll(shown).toBe(lastOfFirst);
+    await expect.poll(saved).toBe(lastOfFirst);
+  });
+}
+
 test('long text nodes are never split between the halves of a surrogate pair', async ({ page }) => {
   await setUp(page, { ...userFont, writingMode: 'horizontal-tb', viewMode: 'paginated' });
   // No sentence end: patch 0005 cuts after 120 UTF-16 units, where 𠮟 (two units) starts at 119.

@@ -1,0 +1,34 @@
+From: Honmani <noreply@honmani.invalid>
+Subject: [PATCH] Measure a chapter before saving the position in it
+
+Turning back over a chapter boundary in the paginated reader lands on the
+previous chapter's last page, but the paragraphs' positions were measured
+only after the next frame: the automatic bookmark saved the chapter's
+start, and a resize before the next page turn jumped there.
+
+diff -ru a/apps/web/src/lib/components/book-reader/book-reader-paginated/book-reader-paginated.svelte b/apps/web/src/lib/components/book-reader/book-reader-paginated/book-reader-paginated.svelte
+--- a/apps/web/src/lib/components/book-reader/book-reader-paginated/book-reader-paginated.svelte	2026-11-25 07:00:25.504935343 +0100
++++ b/apps/web/src/lib/components/book-reader/book-reader-paginated/book-reader-paginated.svelte	2026-11-25 07:00:25.557046572 +0100
+@@ -410,6 +410,7 @@
+       customReadingPointRange = undefined;
+     }
+ 
++    calculator.updateParagraphPosIfMissing();
+     exploredCharCount = calculator.calcExploredCharCount(customReadingPointRange);
+ 
+     if (isUser) {
+diff -ru a/apps/web/src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts b/apps/web/src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts
+--- a/apps/web/src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts	2026-11-25 07:00:25.505177429 +0100
++++ b/apps/web/src/lib/components/book-reader/book-reader-paginated/section-character-stats-calculator.ts	2026-11-25 07:00:25.555473729 +0100
+@@ -64,6 +64,11 @@
+     this.calculator.updateParagraphPos(this.virtualScrollPos$.getValue());
+   }
+ 
++  /** The positions of a section just shown are otherwise measured only after the frame, too late for its bookmark. */
++  updateParagraphPosIfMissing() {
++    if (typeof this.calculator?.paragraphPos[0] !== 'number') this.updateParagraphPos();
++  }
++
+   calcExploredCharCount(customReadingPointRange: Range | undefined) {
+     if (dev && this.getPageGap() === 0) {
+       // Scroll position must be beyond text size for character count increment
